@@ -25647,7 +25647,7 @@ function shStreamQuiet(){
 // =============================================================================
 
 // ─── The front door ─────────────────────────────────────────────────────────
-const SH_VERSION = '0.25.1';
+const SH_VERSION = '0.26.1';
 
 (function(){
   if (typeof shFrontHome !== 'function') return;
@@ -26676,6 +26676,508 @@ function shFourthDue(){
       ENEMY_TYPES.zombie.speed = 3.1;
     }
   }
+})();
+
+
+// =============================================================================
+//  61 · TELEMETRY — because every bug in this game has been found by hand
+// -----------------------------------------------------------------------------
+//  The way faults have reached me so far: the player plays, something is wrong,
+//  he types a sentence about it, and I build a headless probe to reproduce it.
+//  That has worked — the intro fork bomb was found that way — but the loop is
+//  hours long and it only ever runs on one machine.
+//
+//  What this section adds is the thing that was actually missing: a report from
+//  the machines the game is running on. Specifically the four signals that
+//  correspond to the four times a beta tester has said "it broke":
+//
+//    "the intro froze"            → intro:  seconds spent, line reached, did it
+//                                   finish or was it skipped
+//    "mobile freezes on any popup"→ tap_target: what element was actually under
+//                                   the finger, which is the whole z-index bug
+//                                   in one field, plus rage_tap
+//    "the intro is laggy"         → frame_health: median, worst, long frames,
+//                                   and updateChunks' own peak
+//    a silent exception           → error tracking + session replay
+//
+//  It is INERT unless a key is configured. The desktop shell and the canonical
+//  app ship with no key, load no script, and touch no network; only the hosted
+//  beta build has one injected. And it is off entirely for anyone whose browser
+//  asks not to be tracked.
+// =============================================================================
+
+const Tel = {
+  on: false,
+  ready: false,
+  cfg: null,
+  t0: performance.now(),
+  taps: 0,            // sampled; a session does not need a thousand of these
+  minFrames: 30,      // do not report a window nobody played
+  tapCap: 40,
+  recent: [],         // for rage detection
+  frames: [],         // ms per frame in the current window
+  longFrames: 0,
+  stalls: 0,
+  lastFrame: performance.now(),
+  windowStart: performance.now(),
+};
+
+//  ─── Consent ────────────────────────────────────────────────────────────────
+//  Three ways to be off, and one of them is the browser's own setting. A beta
+//  tester doing me a favour should not have to read a privacy policy to find
+//  the switch.
+function shTelAllowed(){
+  try {
+    if (navigator.doNotTrack === '1' || window.doNotTrack === '1' ||
+        navigator.msDoNotTrack === '1') return false;
+    if (localStorage.getItem('fc-telemetry') === 'off') return false;
+  } catch (e){}
+  return true;
+}
+
+window.fcTelemetry = function(state){
+  try {
+    if (state === false){ localStorage.setItem('fc-telemetry','off'); Tel.on = false;
+      try { posthog.opt_out_capturing(); } catch (e){}
+      console.log('[fracture] telemetry off. Nothing further is sent.');
+    } else {
+      localStorage.removeItem('fc-telemetry');
+      console.log('[fracture] telemetry on. Reload to start reporting.');
+    }
+  } catch (e){}
+  return !!Tel.on;
+};
+
+//  ─── The loader ─────────────────────────────────────────────────────────────
+//  The standard PostHog stub, trimmed. If no key is configured this never runs,
+//  no script tag is created and the build stays offline — which is what the
+//  build test checks.
+function shTelInit(){
+  const cfg = (typeof window !== 'undefined') && window.FC_ANALYTICS;
+  if (!cfg || !cfg.key) return false;          // no key, no telemetry, no network
+  if (!shTelAllowed()) return false;
+  Tel.cfg = cfg;
+
+  const host   = cfg.host   || 'https://us.i.posthog.com';
+  const assets = cfg.assets || host.replace('//us.i.', '//us-assets.i.')
+                                   .replace('//eu.i.', '//eu-assets.i.');
+  try {
+    !function(t,e){
+      var o,n,p,r; e.__SV||(window.posthog=e,e._i=[],e.init=function(i,s,a){
+        function g(t,e){var o=e.split(".");2==o.length&&(t=t[o[0]],e=o[1]);
+          t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}}
+        (p=t.createElement("script")).type="text/javascript";p.crossOrigin="anonymous";
+        p.async=!0;p.src=assets+"/static/array.js";
+        (r=t.getElementsByTagName("script")[0]).parentNode.insertBefore(p,r);
+        var u=e;for(void 0!==a?u=e[a]=[]:a="posthog",u.people=u.people||[],
+        u.toString=function(t){var e="posthog";return"posthog"!==a&&(e+="."+a),
+        t||(e+=" (stub)"),e},u.people.toString=function(){return u.toString(1)+".people (stub)"},
+        o="init capture register register_once register_for_session unregister opt_out_capturing has_opted_out_capturing opt_in_capturing reset identify people.set get_distinct_id startSessionRecording stopSessionRecording captureException".split(" "),
+        n=0;n<o.length;n++)g(u,o[n]);e._i.push([i,s,a])},e.__SV=1)
+    }(document, window.posthog||[]);
+
+    posthog.init(cfg.key, {
+      api_host: host,
+      person_profiles: 'identified_only',   // beta players are anonymous
+      capture_pageview: false,              // one page; a pageview says nothing
+      capture_exceptions: true,             // uncaught errors, with stacks
+      disable_session_recording: false,     // the reason this is here at all
+      session_recording: {
+        maskAllInputs: true,                // the only text a player types is a name
+        maskTextSelector: '.tel-mask',
+      },
+      autocapture: false,                   // a canvas game has nothing to autocapture
+      loaded: () => { Tel.ready = true; },
+    });
+    Tel.on = true;
+    return true;
+  } catch (e){ return false; }
+}
+
+function shTel(name, props){
+  if (!Tel.on) return;
+  try { posthog.capture(name, props || {}); } catch (e){}
+}
+window.shTel = shTel;
+
+//  ─── What the machine is ────────────────────────────────────────────────────
+//  Sent once. The renderer string is the field that separates "the game is slow"
+//  from "the game is slow on software rendering", which is a different bug.
+function shTelBoot(){
+  let gpu = 'unknown';
+  try {
+    const c = document.createElement('canvas');
+    const gl = c.getContext('webgl') || c.getContext('experimental-webgl');
+    const dbg = gl && gl.getExtension('WEBGL_debug_renderer_info');
+    if (dbg) gpu = gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL);
+    else if (gl) gpu = gl.getParameter(gl.RENDERER);
+  } catch (e){}
+  shTel('boot', {
+    version: (typeof SH_VERSION !== 'undefined') ? SH_VERSION : '?',
+    touch: (typeof Touch !== 'undefined') ? !!Touch.on : false,
+    screen: `${window.innerWidth}x${window.innerHeight}`,
+    dpr: window.devicePixelRatio || 1,
+    cores: navigator.hardwareConcurrency || 0,
+    memory: navigator.deviceMemory || 0,
+    gpu: String(gpu).slice(0, 120),
+    lang: navigator.language,
+  });
+}
+
+// ─── 1. The intro, which has been reported broken four times ────────────────
+(function(){
+  if (typeof shPlayIntro !== 'function') return;
+  const origPlay = window.shPlayIntro;
+  window.shPlayIntro = function(){
+    Tel._introAt = performance.now();
+    return origPlay.apply(this, arguments);
+  };
+  const origEnd = shTransEnd;
+  window.shTransEnd = function(){
+    const running = Trans.active;
+    const r = origEnd.apply(this, arguments);
+    if (running && Tel._introAt){
+      const secs = (performance.now() - Tel._introAt) / 1000;
+      const lines = (Trans.script || []).length || 25;
+      shTel('intro', {
+        seconds: +secs.toFixed(1),
+        line: Trans.i,
+        lines,
+        //  The distinction that matters. Reaching the last line means he heard
+        //  the whole broadcast; stopping at line 2 after forty seconds is the
+        //  bug I have now fixed twice and would rather see than be told about.
+        finished: Trans.i >= lines - 1,
+        skipped: Trans.i < lines - 1,
+        per_line: +(secs / Math.max(1, Trans.i + 1)).toFixed(2),
+      });
+      Tel._introAt = 0;
+    }
+    return r;
+  };
+})();
+
+// ─── 2. What was actually under the finger ──────────────────────────────────
+//  The mobile freeze was an invisible full-screen sheet at a tying z-index
+//  eating every tap. Nothing about it was visible from the outside, and the
+//  hand-maintained "is a panel up" list could not see it either. But ONE field
+//  would have given it away instantly: the id of the topmost element at the
+//  point of contact. If a run of taps all report #touch-layer, the answer is
+//  on the screen without anybody having to describe a symptom.
+(function(){
+  const label = (el) => {
+    if (!el) return 'none';
+    if (el.id) return '#' + el.id;
+    const c = (el.className && el.className.baseVal !== undefined)
+      ? el.className.baseVal : (el.className || '');
+    const first = String(c).trim().split(/\s+/)[0];
+    return el.tagName.toLowerCase() + (first ? '.' + first : '');
+  };
+
+  window.addEventListener('pointerdown', (e) => {
+    if (!Tel.on) return;
+    try {
+      const now = performance.now();
+      const top = document.elementFromPoint(e.clientX, e.clientY);
+      const id  = label(top);
+
+      //  Rage: three contacts inside 600ms within forty pixels. This is what
+      //  "it froze" looks like from the inside, and it arrives with the name
+      //  of the element that was swallowing them.
+      Tel.recent.push({ t: now, x: e.clientX, y: e.clientY, id });
+      while (Tel.recent.length && now - Tel.recent[0].t > 600) Tel.recent.shift();
+      if (Tel.recent.length >= 3){
+        const a = Tel.recent[0], b = Tel.recent[Tel.recent.length - 1];
+        if (Math.hypot(b.x - a.x, b.y - a.y) < 40){
+          Tel.recent.length = 0;
+          shTel('rage_tap', { on: id, taps: 3, touch: (typeof Touch !== 'undefined') && Touch.on });
+        }
+      }
+
+      if (Tel.taps++ < Tel.tapCap)
+        shTel('tap_target', { on: id, touch: (typeof Touch !== 'undefined') && Touch.on });
+    } catch (err){}
+  }, true);
+})();
+
+// ─── 3. Frame health, rolled up ─────────────────────────────────────────────
+//  Not a frame rate counter. The number that mattered when the loop was forking
+//  itself was the WORST frame — 7,425ms against a median of 500 — and a median
+//  alone would have shown nothing wrong at all. So both, plus a count of the
+//  hitches, plus updateChunks' own peak, which section 57 already tracks.
+(function(){
+  //  Configurable so the suite does not have to wait a minute for one report.
+  Tel.windowMs = 60000;    // one report a minute is plenty
+  const LONG   = 100;      // a hitch you can feel
+  const STALL  = 500;      // a hitch you complain about
+
+  (function sample(){
+    const now = performance.now();
+    const dt = now - Tel.lastFrame;
+    Tel.lastFrame = now;
+    if (Tel.on && dt > 0 && dt < 60000){
+      Tel.frames.push(dt);
+      if (dt > LONG)  Tel.longFrames++;
+      if (dt > STALL) Tel.stalls++;
+      if (now - Tel.windowStart >= Tel.windowMs && Tel.frames.length > Tel.minFrames){
+        const f = Tel.frames.slice().sort((a, b) => a - b);
+        const at = (q) => f[Math.min(f.length - 1, Math.floor(f.length * q))];
+        shTel('frame_health', {
+          frames: f.length,
+          median_ms: +at(0.50).toFixed(1),
+          p95_ms:    +at(0.95).toFixed(1),
+          worst_ms:  +f[f.length - 1].toFixed(1),
+          long_frames: Tel.longFrames,
+          stalls: Tel.stalls,
+          chunks: (typeof State !== 'undefined' && State.chunkMap) ? State.chunkMap.size : 0,
+          queue: (typeof Stream !== 'undefined') ? Stream.queue.length : -1,
+          updatechunks_peak_ms: (typeof Stream !== 'undefined') ? +Stream.peakMs.toFixed(1) : -1,
+          minute: Math.round((now - Tel.t0) / 60000),
+        });
+        if (typeof Stream !== 'undefined') Stream.peakMs = 0;
+        Tel.frames.length = 0; Tel.longFrames = 0; Tel.stalls = 0;
+        Tel.windowStart = now;
+      }
+    }
+    requestAnimationFrame(sample);
+  })();
+})();
+
+// ─── 4. The shape of a session ──────────────────────────────────────────────
+//  Deliberately few. Every event added here is one more thing to read and one
+//  more thing to get wrong; these are the ones that answer "did anybody get
+//  past the opening, and what killed them".
+(function(){
+  const hook = (name, fn) => {
+    if (typeof window[name] !== 'function') return;
+    const orig = window[name];
+    window[name] = function(){
+      const r = orig.apply(this, arguments);
+      try { fn.apply(this, arguments); } catch (e){}
+      return r;
+    };
+  };
+
+  hook('newGame', (seed) => shTel('game_start', {
+    seed: String(seed || '').slice(0, 40),
+    campaign: (typeof Campaign !== 'undefined') && !!Campaign.active,
+    seconds_in: +((performance.now() - Tel.t0) / 1000).toFixed(0),
+  }));
+  hook('shEnterChapter', () => shTel('chapter', {
+    n: (typeof Campaign !== 'undefined') ? (Campaign.chapter || 0) + 1 : 0,
+    minutes: +((performance.now() - Tel.t0) / 60000).toFixed(1),
+  }));
+  hook('shStartShift',  () => shTel('shift_start', {}));
+  hook('shEndShift',    () => shTel('shift_end', {
+    minutes: +((performance.now() - Tel.t0) / 60000).toFixed(1),
+  }));
+  hook('onPlayerDeath', () => shTel('death', {
+    minutes: +((performance.now() - Tel.t0) / 60000).toFixed(1),
+    siege: (typeof Siege !== 'undefined') ? (Siege.kills || 0) : 0,
+  }));
+  hook('shSiegeStart',  () => shTel('siege_start', {}));
+
+  //  Leaving is a data point: how long did they stay, and how far did they get.
+  window.addEventListener('pagehide', () => {
+    shTel('session_end', {
+      minutes: +((performance.now() - Tel.t0) / 60000).toFixed(1),
+      chapter: (typeof Campaign !== 'undefined' && Campaign.active) ? (Campaign.chapter || 0) + 1 : 0,
+      chunks: (typeof State !== 'undefined' && State.chunkMap) ? State.chunkMap.size : 0,
+    });
+  });
+})();
+
+// ─── Start ──────────────────────────────────────────────────────────────────
+(function(){
+  const go = () => {
+    try {
+      if (!shTelInit()) return;
+      shTelBoot();
+      //  Uncaught errors are captured by PostHog directly; this is the belt to
+      //  that braces, and it is the one that carries the game's own version.
+      window.addEventListener('error', (e) => {
+        shTel('js_error', {
+          message: String(e.message || '').slice(0, 200),
+          source: String(e.filename || '').split('/').pop(),
+          line: e.lineno, col: e.colno,
+          version: (typeof SH_VERSION !== 'undefined') ? SH_VERSION : '?',
+        });
+      });
+      window.addEventListener('unhandledrejection', (e) => {
+        shTel('promise_rejection', {
+          reason: String((e.reason && e.reason.message) || e.reason || '').slice(0, 200),
+        });
+      });
+    } catch (e){}
+  };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', go);
+  else go();
+})();
+
+
+// =============================================================================
+//  62 · THE RELEASE GATE — three findings from the readiness report, verified
+// -----------------------------------------------------------------------------
+//  A release-readiness report was written against v0.23.0. I checked all seven
+//  of its findings against the code rather than accepting them, because one of
+//  them is wrong in an interesting way and two of the others were already true
+//  when it was written and are still true now.
+//
+//  THE ONE THAT IS WRONG. The report's only BLOCKER says the Town Square is
+//  broken because the new HN and Wikipedia fetcher is assigned to
+//  `window.shSquareFetchBrowser` while `shLoadSquare` still calls the lexical
+//  `shSquareFetchBrowser`, so the new channels fall through the Mastodon path.
+//  That reasoning is correct for a `const` and wrong for a function
+//  DECLARATION: a top-level `function f(){}` in a classic script becomes a
+//  property of the global object, so identifier resolution goes through that
+//  object and assigning `window.f` is what the later call sees.
+//  `shSquareFetchBrowser` is a declaration. The dispatcher is live, and the
+//  build test agrees — it records hn.algolia.com and en.wikipedia.org among the
+//  hosts actually requested, and those two hosts exist nowhere but the new
+//  path. (Bluesky is absent from that list because both Bluesky channels are
+//  off by default and live in the picker, which is deliberate.)
+//
+//  The three below were real. This section closes them.
+// =============================================================================
+
+// ─── 1. Version truth ───────────────────────────────────────────────────────
+//  "The archive calls itself v0.23.0 while visible UI copy still says v0.15."
+//  Still true at 0.26.0, in two places the earlier fix missed — it patched the
+//  pause-menu subtitle by hand and left the class-select screen and the front
+//  door alone. Hand-patching one element per release is how a version string
+//  goes stale in the first place, so this does it by rule instead: one
+//  constant, and anything that looks like a version in a heading is rewritten
+//  from it at boot.
+window.BUILD_VERSION = (typeof SH_VERSION !== 'undefined') ? SH_VERSION : '0.0.0';
+
+function shGateStampVersion(){
+  const pat = /v\d+\.\d+(\.\d+)?/g;
+  let n = 0;
+  //  A deliberately short list. A blanket sweep of the document would rewrite
+  //  any line of dialogue that happened to mention a version number, and this
+  //  game has a character who reads the news.
+  for (const el of document.querySelectorAll('.cs-sub, .subtitle, .ver, #hud-version, #menu-version')){
+    if (!pat.test(el.textContent)) { pat.lastIndex = 0; continue; }
+    pat.lastIndex = 0;
+    el.textContent = el.textContent.replace(pat, 'v' + BUILD_VERSION);
+    n++;
+  }
+  return n;
+}
+
+// ─── 2. The wire: sixty-one requests down to one ────────────────────────────
+//  "The FCN HN path requests a top-stories list plus up to sixty individual
+//  story records." True — `topstories.json`, then one `item/<id>.json` per
+//  story, eight at a time. The report undersells the existing mitigation (a
+//  45-minute cache means a reload costs nothing) and oversells the danger, but
+//  it is still sixty-one round trips on every cold start, on a phone, on the
+//  frame budget of a voxel city.
+//
+//  Algolia's index returns the same front page — title, url, points, author,
+//  timestamp — in ONE request. The original is kept as the fallback, because a
+//  second source that is only reached when the first fails is the difference
+//  between a quiet degradation and a blank ticker.
+(function(){
+  if (typeof shWireFetchBrowser !== 'function') return;
+  const orig = shWireFetchBrowser;
+
+  window.shWireFetchBrowser = async function(force){
+    let cached = null;
+    try { cached = await window.fracture.read(WIRE_CACHE_KEY); } catch (e){}
+    const age = cached && cached.fetchedAt ? Date.now() - Date.parse(cached.fetchedAt) : Infinity;
+    if (!force && cached && Array.isArray(cached.items) && age < WIRE_REFRESH_MS) return cached;
+
+    try {
+      const r = await fetch('https://hn.algolia.com/api/v1/search?tags=front_page&hitsPerPage=60',
+                            { mode: 'cors' });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const data = await r.json();
+      const hits = (data && data.hits) || [];
+      if (!hits.length) throw new Error('empty index');
+
+      const items = [];
+      for (const h of hits){
+        const title = h.title || h.story_title;
+        if (!title) continue;
+        //  The same editorial filter the original applied. Ned does not read
+        //  out everything that is merely popular.
+        if (typeof shWireOnBeat === 'function' && !shWireOnBeat(title)) continue;
+        let host = 'Hacker News';
+        const url = h.url || h.story_url;
+        if (url){ try { host = new URL(url).hostname.replace(/^www\./, ''); } catch (e){} }
+        items.push({
+          id: 'hn:' + h.objectID,
+          title: String(title),
+          url: url || 'https://news.ycombinator.com/item?id=' + h.objectID,
+          source: host, via: 'Hacker News',
+          at: new Date((h.created_at_i || 0) * 1000).toISOString(),
+          score: h.points || 0,
+        });
+      }
+      //  NOTE: an empty result after filtering is NOT a failure. The index
+      //  answered; Ned simply has nothing on his beat today. Falling through
+      //  to the sixty-one-request path here would re-fetch the same stories
+      //  and apply the same filter to them — sixty-one requests for a
+      //  guaranteed-identical empty answer. Only a broken INDEX falls through.
+      //  (The first version of this section got that wrong, and the gate test
+      //  caught it by feeding in forty off-beat headlines.)
+
+      items.sort((x, y) => Date.parse(y.at || 0) - Date.parse(x.at || 0));
+      const wire = { type: 'newswire.v1', fetchedAt: new Date().toISOString(),
+                     empty: items.length === 0,
+                     sources: { hn: { ok: true, count: items.length, via: 'algolia', requests: 1 } },
+                     items: items.slice(0, 40) };
+      try { await window.fracture.save(WIRE_CACHE_KEY, wire); } catch (e){}
+      return wire;
+    } catch (e){
+      //  The index is down or blocked. Fall through to the original sixty-one
+      //  request path rather than showing an empty ticker.
+      try { return await orig.call(this, force); } catch (e2){ return cached || null; }
+    }
+  };
+})();
+
+// ─── 3. Network truth ───────────────────────────────────────────────────────
+//  "README wording says the Town Square is the only internet feature, but FCN
+//  also fetches HN. The renderer has a CDN fallback despite the claim of no
+//  CDN." Both true. The README is rewritten and the beta build now strips the
+//  CDN fallback outright — but a document nobody opens is not a privacy
+//  control, so the game states it itself, in one place, from one list.
+//
+//  This list is the answer to "what leaves this machine". It is built from what
+//  the code actually contacts, and the build test reads the same set.
+const NETWORK_HOSTS = [
+  { host:'mastodon.social',            what:'Town Square · the six Mastodon boards',      always:false },
+  { host:'hn.algolia.com',             what:'Town Square · THE WIRE, and Ned’s ticker', always:false },
+  { host:'public.api.bsky.app',        what:'Town Square · Bluesky boards (off by default)', always:false },
+  { host:'en.wikipedia.org',           what:'Town Square · THE RECORD',                   always:false },
+  { host:'hacker-news.firebaseio.com', what:'Ned’s ticker, only if Algolia fails',   always:false },
+];
+
+function shGateNetworkReport(){
+  const rows = NETWORK_HOSTS.slice();
+  try {
+    if (window.FC_ANALYTICS && window.FC_ANALYTICS.key)
+      rows.push({ host: new URL(window.FC_ANALYTICS.host).host,
+                  what: 'anonymous crash and performance reports · fcTelemetry(false) to stop',
+                  always: false });
+  } catch (e){}
+  return {
+    hosts: rows,
+    //  The honest headline: nothing here is required to play.
+    playable_offline: true,
+    signals_on: !!(typeof Square !== 'undefined' ? Square.enabled !== false : true),
+  };
+}
+window.shGateNetworkReport = shGateNetworkReport;
+
+(function(){
+  const go = () => { try { shGateStampVersion(); } catch (e){} };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', go);
+  else go();
+  //  The class-select and front-door screens are built after boot in some
+  //  paths, so stamp again once when they first appear.
+  setTimeout(go, 1200);
+  setTimeout(go, 4000);
 })();
 
 (function(){
