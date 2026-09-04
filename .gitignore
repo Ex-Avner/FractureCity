@@ -21,3 +21,10 @@ shell/release/
 # Scratch. _to_delete is the holding pen for things the bridge cannot delete.
 _build/_to_delete/
 *.log
+
+# The desktop app's download folder. Every file I send lands here, so this
+# would otherwise commit a fresh 27,000-line copy of the game every session.
+Claude outputs/
+
+# Derived: build-beta.py regenerates this from apps/ + shared/ on demand.
+_build/webbeta-dist/
