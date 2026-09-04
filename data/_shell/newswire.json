@@ -1,0 +1,340 @@
+{
+  "type": "newswire.v1",
+  "fetchedAt": "2026-09-04T10:25:46.503Z",
+  "sources": {
+    "arxiv": {
+      "ok": true,
+      "count": 25
+    },
+    "hn": {
+      "ok": true,
+      "count": 11
+    }
+  },
+  "items": [
+    {
+      "id": "hn:49560260",
+      "title": "Grep beats LSP? Why coding agents ignore your fancier tools",
+      "url": "https://www.agentconnect.md/blog/grep-beat-lsp-harness/",
+      "source": "agentconnect.md",
+      "via": "Hacker News",
+      "at": "2026-09-04T03:40:26.000Z",
+      "score": 77
+    },
+    {
+      "id": "hn:49557206",
+      "title": "Which tools do Claude, Codex and Cursor choose? We measured 17k runs to find out",
+      "url": "https://armature.tech/blog/which-tools-coding-agents-install",
+      "source": "armature.tech",
+      "via": "Hacker News",
+      "at": "2026-09-03T21:20:34.000Z",
+      "score": 224
+    },
+    {
+      "id": "hn:49555691",
+      "title": "OpenAI's GPT-6 Astra on ARC-AGI-3",
+      "url": "https://arcprize.org/blog/astra",
+      "source": "arcprize.org",
+      "via": "Hacker News",
+      "at": "2026-09-03T19:45:00.000Z",
+      "score": 212
+    },
+    {
+      "id": "hn:49554643",
+      "title": "GPT-6 Astra",
+      "url": "https://openai.com/index/gpt-6-astra/",
+      "source": "openai.com",
+      "via": "Hacker News",
+      "at": "2026-09-03T18:41:05.000Z",
+      "score": 1829
+    },
+    {
+      "id": "arxiv:2609.04199v1",
+      "title": "Compile by Training: Turning Natural-Language Specifications into Local Neural Functions",
+      "url": "http://arxiv.org/abs/2609.04199v1",
+      "source": "arXiv",
+      "via": "arXiv cs.AI",
+      "at": "2026-09-03T17:59:49Z",
+      "score": 0
+    },
+    {
+      "id": "arxiv:2609.04198v1",
+      "title": "Clean Engineering, Unstable Measurement: A Preregistered Reliability Failure of Black-Box LLM Observers on Shared Endpoints",
+      "url": "http://arxiv.org/abs/2609.04198v1",
+      "source": "arXiv",
+      "via": "arXiv cs.AI",
+      "at": "2026-09-03T17:59:43Z",
+      "score": 0
+    },
+    {
+      "id": "arxiv:2609.04197v1",
+      "title": "ESPO: Error-Structured Prompt Optimization via Diagnose, Diversify, and Stabilize",
+      "url": "http://arxiv.org/abs/2609.04197v1",
+      "source": "arXiv",
+      "via": "arXiv cs.AI",
+      "at": "2026-09-03T17:59:37Z",
+      "score": 0
+    },
+    {
+      "id": "arxiv:2609.04194v1",
+      "title": "Legibility is Not Interpretability: Comparing Judged and Actual Importance in Chain-Of-Thought Reasoning",
+      "url": "http://arxiv.org/abs/2609.04194v1",
+      "source": "arXiv",
+      "via": "arXiv cs.AI",
+      "at": "2026-09-03T17:59:08Z",
+      "score": 0
+    },
+    {
+      "id": "arxiv:2609.04190v1",
+      "title": "One Editor, Many Edits: A Unified Training-Free Framework for Diverse Video Editing",
+      "url": "http://arxiv.org/abs/2609.04190v1",
+      "source": "arXiv",
+      "via": "arXiv cs.AI",
+      "at": "2026-09-03T17:59:01Z",
+      "score": 0
+    },
+    {
+      "id": "arxiv:2609.04189v1",
+      "title": "Robust PAC Learning of Concurrent Stochastic Games",
+      "url": "http://arxiv.org/abs/2609.04189v1",
+      "source": "arXiv",
+      "via": "arXiv cs.AI",
+      "at": "2026-09-03T17:58:57Z",
+      "score": 0
+    },
+    {
+      "id": "arxiv:2609.04183v1",
+      "title": "Seeing Before Synthesizing: VLM-Guided Transition Event Discovery for Weakly-Supervised Dense Video Captioning",
+      "url": "http://arxiv.org/abs/2609.04183v1",
+      "source": "arXiv",
+      "via": "arXiv cs.AI",
+      "at": "2026-09-03T17:58:02Z",
+      "score": 0
+    },
+    {
+      "id": "arxiv:2609.04180v1",
+      "title": "Knowledge Acquisition During Pre-training? Large Language Models Learn Better With Auxiliary Views",
+      "url": "http://arxiv.org/abs/2609.04180v1",
+      "source": "arXiv",
+      "via": "arXiv cs.AI",
+      "at": "2026-09-03T17:57:02Z",
+      "score": 0
+    },
+    {
+      "id": "arxiv:2609.04177v1",
+      "title": "A Computationally Feasible Framework for Causal Probabilistic Explanation",
+      "url": "http://arxiv.org/abs/2609.04177v1",
+      "source": "arXiv",
+      "via": "arXiv cs.AI",
+      "at": "2026-09-03T17:55:43Z",
+      "score": 0
+    },
+    {
+      "id": "arxiv:2609.04173v1",
+      "title": "Last Translation Benchmark",
+      "url": "http://arxiv.org/abs/2609.04173v1",
+      "source": "arXiv",
+      "via": "arXiv cs.AI",
+      "at": "2026-09-03T17:54:45Z",
+      "score": 0
+    },
+    {
+      "id": "arxiv:2609.04172v1",
+      "title": "Rethinking On-Policy Distillation of Large Language Models II: One Training Example",
+      "url": "http://arxiv.org/abs/2609.04172v1",
+      "source": "arXiv",
+      "via": "arXiv cs.AI",
+      "at": "2026-09-03T17:54:38Z",
+      "score": 0
+    },
+    {
+      "id": "arxiv:2609.04170v1",
+      "title": "A Case Study on Emergent Cheating and Whistleblowing in Autonomous Research Swarms",
+      "url": "http://arxiv.org/abs/2609.04170v1",
+      "source": "arXiv",
+      "via": "arXiv cs.AI",
+      "at": "2026-09-03T17:54:09Z",
+      "score": 0
+    },
+    {
+      "id": "arxiv:2609.04168v1",
+      "title": "Para-Pipe: Exploiting Hierarchical Operator Parallelism of ML Computational Graphs on SoCs",
+      "url": "http://arxiv.org/abs/2609.04168v1",
+      "source": "arXiv",
+      "via": "arXiv cs.AI",
+      "at": "2026-09-03T17:53:44Z",
+      "score": 0
+    },
+    {
+      "id": "arxiv:2609.04167v1",
+      "title": "SWE-Gate: Passing Functional Tests Is Not Enough for Software Engineering Agents",
+      "url": "http://arxiv.org/abs/2609.04167v1",
+      "source": "arXiv",
+      "via": "arXiv cs.AI",
+      "at": "2026-09-03T17:53:34Z",
+      "score": 0
+    },
+    {
+      "id": "arxiv:2609.04166v1",
+      "title": "From Deceptive Outputs to Deceptive Mechanisms: A Causal Framework for Language-Model Deception Research",
+      "url": "http://arxiv.org/abs/2609.04166v1",
+      "source": "arXiv",
+      "via": "arXiv cs.AI",
+      "at": "2026-09-03T17:52:19Z",
+      "score": 0
+    },
+    {
+      "id": "arxiv:2609.04165v1",
+      "title": "Parameterised graph theory for tensor networks: entanglement rerouting, structural simplification, and agnostic tomography",
+      "url": "http://arxiv.org/abs/2609.04165v1",
+      "source": "arXiv",
+      "via": "arXiv cs.AI",
+      "at": "2026-09-03T17:50:38Z",
+      "score": 0
+    },
+    {
+      "id": "arxiv:2609.04159v1",
+      "title": "SENTINEL-RL: Offloading Topological Reasoning from LLM Agents in the Security Operations Center",
+      "url": "http://arxiv.org/abs/2609.04159v1",
+      "source": "arXiv",
+      "via": "arXiv cs.AI",
+      "at": "2026-09-03T17:49:12Z",
+      "score": 0
+    },
+    {
+      "id": "arxiv:2609.04148v1",
+      "title": "Terminal-Universe: Turning Agent Trajectories into Scalable Terminal Environments",
+      "url": "http://arxiv.org/abs/2609.04148v1",
+      "source": "arXiv",
+      "via": "arXiv cs.AI",
+      "at": "2026-09-03T17:41:05Z",
+      "score": 0
+    },
+    {
+      "id": "arxiv:2609.04147v1",
+      "title": "A Low-Cost, Open Platform for End-to-End Autonomous Driving on a Miniature Ackermann Vehicle",
+      "url": "http://arxiv.org/abs/2609.04147v1",
+      "source": "arXiv",
+      "via": "arXiv cs.AI",
+      "at": "2026-09-03T17:40:20Z",
+      "score": 0
+    },
+    {
+      "id": "arxiv:2609.04141v1",
+      "title": "Efficient Test-Time Adaptation through Human-AI Interaction",
+      "url": "http://arxiv.org/abs/2609.04141v1",
+      "source": "arXiv",
+      "via": "arXiv cs.AI",
+      "at": "2026-09-03T17:33:18Z",
+      "score": 0
+    },
+    {
+      "id": "arxiv:2609.04135v1",
+      "title": "The Natural Language Interaction Protocol and Standard for AI Agents",
+      "url": "http://arxiv.org/abs/2609.04135v1",
+      "source": "arXiv",
+      "via": "arXiv cs.AI",
+      "at": "2026-09-03T17:30:17Z",
+      "score": 0
+    },
+    {
+      "id": "arxiv:2609.04134v1",
+      "title": "Prospective Coding Improves Learning in Deep Continuous-Time Recurrent Networks",
+      "url": "http://arxiv.org/abs/2609.04134v1",
+      "source": "arXiv",
+      "via": "arXiv cs.AI",
+      "at": "2026-09-03T17:30:11Z",
+      "score": 0
+    },
+    {
+      "id": "arxiv:2609.04128v1",
+      "title": "Environment Evolution for Terminal Agents",
+      "url": "http://arxiv.org/abs/2609.04128v1",
+      "source": "arXiv",
+      "via": "arXiv cs.AI",
+      "at": "2026-09-03T17:26:33Z",
+      "score": 0
+    },
+    {
+      "id": "arxiv:2609.04127v1",
+      "title": "Epistemic Warrant for LLM Recommendations: Characterizing the Basis for Reliance When Ground Truth Is Unavailable",
+      "url": "http://arxiv.org/abs/2609.04127v1",
+      "source": "arXiv",
+      "via": "arXiv cs.AI",
+      "at": "2026-09-03T17:25:20Z",
+      "score": 0
+    },
+    {
+      "id": "arxiv:2609.04113v1",
+      "title": "Constant regret in general games via higher-order optimism",
+      "url": "http://arxiv.org/abs/2609.04113v1",
+      "source": "arXiv",
+      "via": "arXiv cs.AI",
+      "at": "2026-09-03T17:16:13Z",
+      "score": 0
+    },
+    {
+      "id": "hn:49551096",
+      "title": "Ask HN: Why were OpenAI, Claude, and Grok simultaneously down?",
+      "url": "https://news.ycombinator.com/item?id=49551096",
+      "source": "Hacker News",
+      "via": "Hacker News",
+      "at": "2026-09-03T15:07:01.000Z",
+      "score": 373
+    },
+    {
+      "id": "hn:49550375",
+      "title": "Porting my 1993 Amiga game to Godot, with an LLM reading the 68000 assembly",
+      "url": "https://babyloniantwins.com/blog/porting-a-1993-amiga-game-to-godot/",
+      "source": "babyloniantwins.com",
+      "via": "Hacker News",
+      "at": "2026-09-03T14:28:18.000Z",
+      "score": 300
+    },
+    {
+      "id": "hn:49548952",
+      "title": "Nvidia to acquire Hugging Face",
+      "url": "https://www.cnbc.com/2026/09/03/nvidia-agrees-to-buy-hugging-face-for-almost-13-billion-ai-expansion.html",
+      "source": "cnbc.com",
+      "via": "Hacker News",
+      "at": "2026-09-03T12:10:33.000Z",
+      "score": 313
+    },
+    {
+      "id": "hn:49544762",
+      "title": "Go grandmaster Shin defeats AI KataGo with a two-stone handicap",
+      "url": "https://www.kedglobal.com/artificial-intelligence/newsView/ked202607210007",
+      "source": "kedglobal.com",
+      "via": "Hacker News",
+      "at": "2026-09-03T01:11:22.000Z",
+      "score": 320
+    },
+    {
+      "id": "hn:49537553",
+      "title": "Gemini 3.8 Flash and 3.8 Flash Cyber",
+      "url": "https://blog.google/innovation-and-ai/models-and-research/gemini-models/3-8-flash-and-3-8-flash-cyber/",
+      "source": "blog.google",
+      "via": "Hacker News",
+      "at": "2026-09-02T15:12:40.000Z",
+      "score": 1144
+    },
+    {
+      "id": "hn:49530169",
+      "title": "LLMs and self-referentiality",
+      "url": "https://scottaaronson.blog/?p=10046",
+      "source": "scottaaronson.blog",
+      "via": "Hacker News",
+      "at": "2026-09-02T00:20:06.000Z",
+      "score": 73
+    },
+    {
+      "id": "hn:49526298",
+      "title": "Xanadu was waiting for agents",
+      "url": "https://zed.dev/blog/agentic-xanadu",
+      "source": "zed.dev",
+      "via": "Hacker News",
+      "at": "2026-09-01T18:50:42.000Z",
+      "score": 122
+    }
+  ]
+}

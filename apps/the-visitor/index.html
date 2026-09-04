@@ -1,0 +1,2127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>The Visitor · Fracture City</title>
+<script>
+/* Fracture-City shim — works in shell and standalone */
+(function(){
+  if (window.fracture && window.fracture.shell) return;
+  const prefix = 'fracture::the-visitor::';
+  window.fracture = {
+    shell:false, appSlug:'the-visitor', received:null,
+    save(k,v){ try{ localStorage.setItem(prefix+k, JSON.stringify(v)); }catch(e){} return Promise.resolve(true); },
+    read(k){ try{ const r=localStorage.getItem(prefix+k); return Promise.resolve(r==null?null:JSON.parse(r)); }catch(e){ return Promise.resolve(null); } },
+    list(){ const o=[]; for(let i=0;i<localStorage.length;i++){ const k=localStorage.key(i); if(k&&k.startsWith(prefix)) o.push(k.slice(prefix.length)); } return Promise.resolve(o); },
+    delete(k){ localStorage.removeItem(prefix+k); return Promise.resolve(true); },
+    listApps(){ return Promise.resolve([]); },
+    openApp(){ return Promise.resolve({ok:false,error:'standalone'}); },
+    emit(){ return Promise.resolve(true); },
+    subscribe(){ return ()=>{}; },
+    onPayload(){},
+  };
+})();
+</script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Inter:wght@300;400;500&family=JetBrains+Mono:wght@400;500&display=swap');
+
+:root{
+  --warm-deep:#1a0d0a;
+  --warm-mid:#3a1a14;
+  --warm-glow:#c08850;
+  --warm-bright:#f0c890;
+  --cool-deep:#08060f;
+  --cool-mid:#1a1830;
+  --cool-glow:#4060a0;
+  --ink:#e8dfd2;
+  --ink-dim:#9a8f80;
+  --ink-fade:#5a5045;
+  --neon-mag:#ff60d0;
+  --neon-teal:#80ffff;
+  --neon-gold:#ffd47a;
+  --paper:#e8dfc8;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+html,body{
+  width:100%;height:100vh;overflow:hidden;
+  background:#000;color:var(--ink);
+  font-family:'Inter','Helvetica Neue',sans-serif;
+  -webkit-font-smoothing:antialiased;user-select:none;
+}
+/* Inputs and textareas must accept paste/select even though the body
+   blocks selection for ambient UI. Without this, Cmd+V into the Horde
+   key field silently does nothing in Electron / Chrome --app. */
+input, textarea, [contenteditable="true"]{
+  user-select:text;-webkit-user-select:text;
+}
+
+/* ════ APP STAGES ════ */
+.stage{position:fixed;inset:0;display:none;}
+.stage.active{display:block;}
+
+/* ════ WELCOME / SETUP ════ */
+#stage-welcome{
+  background:radial-gradient(ellipse at 50% 30%,#1a0f1a 0%,#04020a 65%);
+  display:flex;align-items:center;justify-content:center;flex-direction:column;
+  padding:40px 24px;overflow:auto;
+}
+.welcome-title{
+  font-family:'Cormorant Garamond',serif;font-style:italic;font-weight:500;
+  font-size:84px;letter-spacing:6px;line-height:1;margin-bottom:8px;
+  background:linear-gradient(180deg,#f0c890 0%,#c08850 50%,#80456a 100%);
+  -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
+  text-shadow:0 0 40px rgba(192,136,80,0.3);
+}
+.welcome-sub{
+  font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:8px;
+  color:var(--ink-dim);text-transform:uppercase;margin-bottom:36px;
+}
+.welcome-card{
+  background:rgba(20,12,18,0.85);border:1px solid rgba(192,136,80,0.3);
+  backdrop-filter:blur(8px);
+  border-radius:4px;padding:32px 36px;max-width:560px;width:100%;
+  box-shadow:0 0 60px rgba(0,0,0,0.6),inset 0 0 80px rgba(192,136,80,0.04);
+}
+.welcome-card h3{
+  font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:5px;
+  color:var(--warm-glow);text-transform:uppercase;margin-bottom:14px;
+  border-bottom:1px solid rgba(192,136,80,0.18);padding-bottom:10px;
+}
+.welcome-card .field{margin-bottom:18px;}
+.welcome-card label{
+  display:block;font-family:'Inter',sans-serif;font-size:11px;
+  letter-spacing:2px;color:var(--ink-dim);text-transform:uppercase;
+  margin-bottom:6px;
+}
+.welcome-card input[type=text],
+.welcome-card input[type=password],
+.welcome-card input[type=time],
+.welcome-card select{
+  width:100%;background:rgba(8,4,8,0.7);
+  border:1px solid rgba(192,136,80,0.3);color:var(--ink);
+  padding:10px 14px;border-radius:3px;
+  font-family:'JetBrains Mono',monospace;font-size:13px;outline:none;
+}
+.welcome-card input:focus,.welcome-card select:focus{
+  border-color:var(--warm-glow);box-shadow:0 0 0 2px rgba(192,136,80,0.15);
+}
+.welcome-card .helper{
+  font-family:'Cormorant Garamond',serif;font-style:italic;
+  font-size:13px;color:var(--ink-dim);margin-top:6px;line-height:1.5;
+}
+.welcome-card .helper a{color:var(--warm-glow);text-decoration:underline;cursor:pointer;}
+.welcome-card .btn{
+  display:block;width:100%;
+  background:linear-gradient(180deg,rgba(192,136,80,0.85),rgba(128,69,106,0.85));
+  color:#fff;border:none;
+  padding:14px;border-radius:3px;
+  font-family:'JetBrains Mono',monospace;font-size:12px;letter-spacing:5px;
+  cursor:pointer;text-transform:uppercase;transition:all 0.2s;
+  box-shadow:0 4px 18px rgba(192,136,80,0.3);
+}
+.welcome-card .btn:hover{
+  background:linear-gradient(180deg,rgba(240,200,144,0.95),rgba(192,136,80,0.95));
+  box-shadow:0 6px 24px rgba(240,200,144,0.4);
+}
+.welcome-card .btn:disabled{opacity:0.4;cursor:not-allowed;}
+.welcome-card .btn-secondary{
+  background:transparent;border:1px solid rgba(192,136,80,0.4);color:var(--warm-glow);
+  box-shadow:none;
+}
+.welcome-card .btn-secondary:hover{
+  background:rgba(192,136,80,0.15);box-shadow:none;
+}
+.step-status{
+  font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:3px;
+  color:var(--ink-fade);text-transform:uppercase;margin-top:14px;text-align:center;
+}
+
+/* ════ APARTMENT (main scene) ════ */
+#stage-apartment{background:#000;}
+#apartment-bg{
+  position:absolute;inset:0;width:100%;height:100%;
+  background-size:cover;background-position:center;background-color:#0a0608;
+}
+#apartment-bg::after{
+  /* Subtle vignette */
+  content:'';position:absolute;inset:0;
+  background:radial-gradient(ellipse at 50% 55%,
+    transparent 30%,rgba(0,0,0,0.35) 75%,rgba(0,0,0,0.85) 100%);
+  pointer-events:none;
+}
+
+/* Warm lamplight pool */
+#lamp-glow{
+  position:absolute;width:520px;height:520px;
+  background:radial-gradient(circle at 50% 50%,
+    rgba(255,200,130,0.30) 0%,
+    rgba(240,170,90,0.16) 30%,
+    rgba(192,136,80,0.04) 60%,
+    transparent 80%);
+  pointer-events:none;mix-blend-mode:screen;
+  filter:blur(2px);animation:lamp-flicker 7s ease-in-out infinite;
+}
+@keyframes lamp-flicker{
+  0%,100%{opacity:0.92;transform:translate(-50%,-50%) scale(1);}
+  43%{opacity:0.86;transform:translate(-50%,-50%) scale(1.01);}
+  61%{opacity:0.95;transform:translate(-50%,-50%) scale(0.995);}
+  78%{opacity:0.90;transform:translate(-50%,-50%) scale(1.005);}
+}
+
+/* Rain on window canvas overlay */
+#rain-canvas{position:absolute;inset:0;width:100%;height:100%;
+  pointer-events:none;mix-blend-mode:screen;opacity:0.7;}
+
+/* Dust motes canvas */
+#dust-canvas{position:absolute;inset:0;width:100%;height:100%;
+  pointer-events:none;mix-blend-mode:screen;}
+
+/* Top HUD strip */
+#hud-top{
+  position:absolute;top:0;left:0;right:0;
+  padding:16px 22px;display:flex;justify-content:space-between;
+  background:linear-gradient(180deg,rgba(0,0,0,0.45),transparent);
+  pointer-events:none;z-index:5;
+}
+#hud-top .left,#hud-top .right{
+  font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:3px;
+  color:var(--ink-dim);text-transform:uppercase;line-height:1.7;
+}
+#hud-top .right{text-align:right;}
+#hud-top .accent{color:var(--warm-bright);}
+
+/* Settings button */
+#btn-settings{
+  position:absolute;top:14px;right:14px;
+  background:rgba(8,4,8,0.5);border:1px solid rgba(192,136,80,0.3);
+  width:36px;height:36px;border-radius:50%;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  color:var(--warm-glow);font-size:14px;
+  z-index:11;backdrop-filter:blur(6px);
+}
+#btn-settings:hover{background:rgba(40,20,28,0.7);}
+
+/* The Door */
+#door-area{
+  position:absolute;cursor:pointer;z-index:3;
+}
+#door-hint{
+  position:absolute;bottom:18%;left:50%;transform:translateX(-50%);
+  padding:9px 22px;background:rgba(8,4,8,0.78);
+  border:1px solid rgba(192,136,80,0.4);
+  font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:4px;
+  color:var(--warm-bright);text-transform:uppercase;
+  pointer-events:none;opacity:0;transition:opacity 0.3s;z-index:6;
+  backdrop-filter:blur(8px);border-radius:2px;
+  box-shadow:0 4px 20px rgba(0,0,0,0.5);
+}
+#door-hint.show{opacity:1;}
+#door-hint .kbd{
+  display:inline-block;padding:1px 8px;background:rgba(192,136,80,0.25);
+  border:1px solid rgba(192,136,80,0.5);border-radius:2px;
+  margin-right:10px;color:#fff;font-weight:bold;
+}
+
+/* Knock indicator */
+#knock-indicator{
+  position:absolute;bottom:25%;left:50%;transform:translateX(-50%);
+  padding:14px 30px;background:rgba(24,12,10,0.92);
+  border:1px solid var(--warm-glow);
+  font-family:'Cormorant Garamond',serif;font-style:italic;font-size:18px;
+  color:var(--warm-bright);text-align:center;line-height:1.5;
+  pointer-events:none;opacity:0;z-index:7;
+  box-shadow:0 0 40px rgba(192,136,80,0.3);
+  animation:knock-pulse 1.5s ease-in-out infinite;
+}
+#knock-indicator.show{opacity:1;}
+#knock-indicator small{
+  display:block;font-family:'JetBrains Mono',monospace;font-style:normal;
+  font-size:9px;letter-spacing:3px;color:var(--ink-dim);
+  text-transform:uppercase;margin-top:6px;
+}
+@keyframes knock-pulse{
+  0%,100%{box-shadow:0 0 40px rgba(192,136,80,0.3);}
+  50%{box-shadow:0 0 60px rgba(192,136,80,0.5);}
+}
+
+/* ════ PEEPHOLE VIEW ════ */
+#peephole{
+  position:fixed;inset:0;z-index:50;
+  background:rgba(0,0,0,0.97);
+  display:none;align-items:center;justify-content:center;
+  cursor:pointer;
+}
+#peephole.show{display:flex;}
+#peephole-canvas{
+  border-radius:50%;
+  box-shadow:
+    0 0 0 12px rgba(20,12,8,0.95),
+    0 0 0 14px rgba(160,110,50,0.95),
+    0 0 0 18px rgba(60,38,18,0.95),
+    0 0 0 22px rgba(0,0,0,0.95),
+    0 0 100px rgba(192,136,80,0.25);
+}
+#peephole-hint{
+  position:absolute;bottom:32px;left:50%;transform:translateX(-50%);
+  font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:5px;
+  color:var(--ink-fade);text-transform:uppercase;
+}
+
+/* ════ CONVERSATION ════ */
+#conversation{
+  position:fixed;inset:0;z-index:40;
+  display:none;
+}
+#conversation.show{display:block;}
+
+#conv-bg{
+  position:absolute;inset:0;
+  background-size:cover;background-position:center;
+  filter:brightness(0.6);
+}
+#conv-bg::before{
+  content:'';position:absolute;inset:0;
+  background:linear-gradient(180deg,
+    transparent 0%,
+    rgba(0,0,0,0.2) 35%,
+    rgba(0,0,0,0.85) 70%,
+    rgba(0,0,0,0.97) 100%);
+}
+
+/* Visitor portrait */
+#visitor-portrait{
+  position:absolute;right:0;top:0;height:100%;
+  width:55%;background-size:cover;background-position:center;
+  background-color:#0a0608;
+  mask-image:linear-gradient(to left,
+    rgba(0,0,0,1) 0%,
+    rgba(0,0,0,1) 60%,
+    rgba(0,0,0,0.7) 80%,
+    rgba(0,0,0,0) 100%);
+  -webkit-mask-image:linear-gradient(to left,
+    rgba(0,0,0,1) 0%,
+    rgba(0,0,0,1) 60%,
+    rgba(0,0,0,0.7) 80%,
+    rgba(0,0,0,0) 100%);
+}
+
+/* Visitor name plate */
+#visitor-name-plate{
+  position:absolute;top:34px;right:50px;text-align:right;
+  z-index:42;color:var(--warm-bright);
+}
+#visitor-name-plate .v-name{
+  font-family:'Cormorant Garamond',serif;font-weight:500;
+  font-size:32px;letter-spacing:2px;line-height:1;margin-bottom:3px;
+  text-shadow:0 2px 8px rgba(0,0,0,0.9);
+}
+#visitor-name-plate .v-epithet{
+  font-family:'Cormorant Garamond',serif;font-style:italic;
+  font-size:14px;color:var(--ink-dim);max-width:380px;
+  text-shadow:0 1px 6px rgba(0,0,0,0.9);
+}
+
+/* Dialogue panel */
+#dialogue-panel{
+  position:absolute;left:0;right:0;bottom:0;
+  padding:42px 60px 44px;
+  background:linear-gradient(180deg,transparent 0%,rgba(0,0,0,0.92) 50%);
+  z-index:41;
+}
+.dialogue-speaker{
+  font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:5px;
+  color:var(--warm-glow);text-transform:uppercase;margin-bottom:10px;
+}
+.dialogue-speaker.self{color:var(--neon-teal);}
+.dialogue-text{
+  font-family:'Cormorant Garamond',serif;font-size:24px;line-height:1.45;
+  color:var(--ink);max-width:880px;font-weight:400;
+  min-height:74px;
+}
+.dialogue-text.self{font-style:italic;color:#c0e0e0;}
+
+#dialogue-choices{
+  display:flex;flex-direction:column;gap:8px;margin-top:24px;
+  max-width:720px;
+}
+.choice{
+  background:rgba(20,12,18,0.6);border:1px solid rgba(192,136,80,0.25);
+  padding:12px 18px;border-radius:2px;cursor:pointer;
+  font-family:'Cormorant Garamond',serif;font-size:17px;
+  color:var(--ink-dim);line-height:1.4;
+  transition:all 0.2s;backdrop-filter:blur(4px);
+}
+.choice:hover{
+  background:rgba(40,22,28,0.85);
+  border-color:var(--warm-glow);color:var(--warm-bright);
+  transform:translateX(4px);
+}
+.choice .marker{
+  display:inline-block;margin-right:14px;
+  font-family:'JetBrains Mono',monospace;font-size:10px;
+  color:var(--warm-glow);letter-spacing:2px;vertical-align:middle;
+}
+.choice.tone-help{border-left:3px solid #80ffff;}
+.choice.tone-probe{border-left:3px solid #ffd47a;}
+.choice.tone-refuse{border-left:3px solid #ff7088;}
+.choice.tone-listen{border-left:3px solid #a0b0d0;}
+
+/* Settings modal */
+#settings-modal{
+  position:fixed;inset:0;z-index:80;
+  background:rgba(0,0,0,0.92);backdrop-filter:blur(10px);
+  display:none;align-items:center;justify-content:center;
+}
+#settings-modal.show{display:flex;}
+.settings-card{
+  background:rgba(20,12,18,0.95);border:1px solid rgba(192,136,80,0.4);
+  border-radius:4px;padding:30px 36px;max-width:480px;width:90%;
+}
+.settings-card h3{
+  font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:5px;
+  color:var(--warm-glow);text-transform:uppercase;margin-bottom:18px;
+  padding-bottom:10px;border-bottom:1px solid rgba(192,136,80,0.2);
+}
+.settings-card .row{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:10px 0;font-family:'Inter',sans-serif;font-size:13px;
+}
+.settings-card .row .label{color:var(--ink-dim);letter-spacing:1px;font-size:11px;text-transform:uppercase;}
+.settings-card .row .val{color:var(--warm-bright);font-family:'JetBrains Mono',monospace;font-size:12px;}
+.settings-card button{
+  font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:3px;
+  background:rgba(40,20,28,0.6);color:var(--warm-glow);
+  border:1px solid rgba(192,136,80,0.35);
+  padding:8px 16px;border-radius:2px;cursor:pointer;text-transform:uppercase;
+}
+.settings-card button:hover{background:rgba(60,30,40,0.8);color:var(--warm-bright);}
+.settings-card button.danger{border-color:#ff7088;color:#ff7088;}
+.settings-card .actions{display:flex;gap:8px;margin-top:18px;flex-wrap:wrap;}
+
+/* Loading overlay */
+#loading{
+  position:fixed;inset:0;z-index:90;
+  background:rgba(4,2,8,0.94);backdrop-filter:blur(8px);
+  display:none;align-items:center;justify-content:center;flex-direction:column;
+  cursor:wait;
+}
+#loading.show{display:flex;}
+.loading-spinner{
+  width:48px;height:48px;border-radius:50%;
+  border:2px solid rgba(192,136,80,0.2);
+  border-top-color:var(--warm-glow);
+  animation:spin 1s linear infinite;margin-bottom:24px;
+}
+@keyframes spin{to{transform:rotate(360deg);}}
+.loading-text{
+  font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:4px;
+  color:var(--warm-bright);text-transform:uppercase;text-align:center;
+}
+.loading-detail{
+  font-family:'Cormorant Garamond',serif;font-style:italic;
+  font-size:14px;color:var(--ink-dim);margin-top:14px;max-width:480px;
+  text-align:center;line-height:1.5;
+}
+
+/* Toast */
+#toast{
+  position:fixed;bottom:24px;left:50%;transform:translateX(-50%);
+  background:rgba(20,12,18,0.95);border:1px solid rgba(192,136,80,0.4);
+  padding:10px 22px;border-radius:2px;
+  font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:2px;
+  color:var(--warm-bright);text-transform:uppercase;
+  opacity:0;transition:opacity 0.3s;pointer-events:none;z-index:100;
+}
+#toast.show{opacity:1;}
+#toast.error{color:#ff7088;border-color:#ff7088;}
+
+/* End-visit fade */
+#end-visit{
+  position:fixed;inset:0;z-index:70;
+  background:#000;opacity:0;pointer-events:none;
+  transition:opacity 1.2s;
+  display:flex;align-items:center;justify-content:center;flex-direction:column;
+}
+#end-visit.show{opacity:1;pointer-events:auto;}
+#end-visit .epitaph{
+  font-family:'Cormorant Garamond',serif;font-style:italic;font-size:26px;
+  color:var(--ink-dim);max-width:680px;text-align:center;line-height:1.5;
+  padding:0 24px;
+}
+#end-visit .continue{
+  font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:4px;
+  color:var(--warm-glow);margin-top:32px;text-transform:uppercase;
+  cursor:pointer;padding:10px 24px;border:1px solid rgba(192,136,80,0.4);
+  border-radius:2px;
+}
+#end-visit .continue:hover{background:rgba(192,136,80,0.15);}
+</style>
+</head>
+<body>
+
+<!-- ═════════════ WELCOME / SETUP ═════════════ -->
+<div class="stage active" id="stage-welcome">
+  <h1 class="welcome-title">The Visitor</h1>
+  <div class="welcome-sub">A Fracture City Daily Ritual</div>
+
+  <div class="welcome-card" id="welcome-card">
+    <h3 id="welcome-step-label">STEP 1 — YOUR API KEY</h3>
+
+    <!-- STEP 1: Image Provider -->
+    <div id="setup-step-1">
+      <div class="field">
+        <label>Image Provider</label>
+        <select id="api-provider">
+          <option value="pollinations">Pollinations.ai (free, no signup, ~5s) — recommended</option>
+          <option value="aihorde">AI Horde (free, no signup, slow queue 1-15min)</option>
+          <option value="huggingface">Hugging Face (free + free signup, may have CORS issues)</option>
+          <option value="openai">OpenAI (paid, ~$0.04 per visitor)</option>
+        </select>
+        <div class="helper">
+          <strong>Pollinations</strong> — no signup, ~5s per image, free. The fastest path to actually playing. Occasional 402 if their token policy changes; auto-falls-back to Horde if so.<br>
+          <strong>AI Horde</strong> — volunteer GPU network. Anonymous works but the queue is unpredictable (1-15min). Use if Pollinations rate-limits you. Register free at <a onclick="window.open('https://aihorde.net/register','_blank')">aihorde.net/register</a> for priority queue.<br>
+          <strong>Hugging Face</strong> — free token at <a onclick="window.open('https://huggingface.co/settings/tokens','_blank')">huggingface.co/settings/tokens</a>. Fastest if it works, but they've moved many models to paid tier.<br>
+          <strong>OpenAI</strong> — paid, premium quality, always works.
+        </div>
+      </div>
+
+      <!-- AI Horde fields -->
+      <div class="field provider-aihorde">
+        <label>AI Horde API Key (optional)</label>
+        <input type="password" id="horde-key" placeholder="leave blank for anonymous">
+        <div class="helper">
+          Anonymous works but goes to slow queue. Register free at <a onclick="window.open('https://aihorde.net/register','_blank')">aihorde.net/register</a> for priority (still free).
+        </div>
+      </div>
+      <div class="field provider-aihorde">
+        <label>AI Horde Model</label>
+        <select id="horde-model">
+          <option value="Flux.1-Schnell fp8 (Compact)">Flux.1-Schnell fp8 (painterly, default)</option>
+          <option value="Flux.1-Schnell fp16">Flux.1-Schnell fp16 (higher quality, slower)</option>
+          <option value="stable_diffusion">Stable Diffusion (legacy, very fast)</option>
+          <option value="Deliberate">Deliberate (SD1.5, painterly)</option>
+          <option value="Realistic Vision">Realistic Vision (SD1.5, photoreal)</option>
+        </select>
+      </div>
+
+      <!-- Pollinations fields -->
+      <div class="field provider-pollinations">
+        <label>Pollinations Model</label>
+        <select id="pollinations-model">
+          <option value="turbo">turbo (recommended — free, no token)</option>
+          <option value="flux">flux (painterly, requires free token)</option>
+          <option value="flux-realism">flux-realism (photographic, requires token)</option>
+          <option value="flux-anime">flux-anime (stylized, requires token)</option>
+          <option value="flux-3d">flux-3d (rendered look, requires token)</option>
+        </select>
+      </div>
+      <div class="field provider-pollinations">
+        <label>Pollinations Token (optional)</label>
+        <input type="password" id="pollinations-token" placeholder="paste if Pollinations gives a 402 error">
+        <div class="helper">
+          Only needed if you hit a 402 error. Free to obtain — visit <a onclick="window.open('https://pollinations.ai','_blank')">pollinations.ai</a> and sign up.
+        </div>
+      </div>
+
+      <!-- Hugging Face fields -->
+      <div class="field provider-huggingface" style="display:none;">
+        <label>Hugging Face Token</label>
+        <input type="password" id="hf-token" placeholder="hf_...">
+        <div class="helper">
+          Free. Sign up at <a onclick="window.open('https://huggingface.co/join','_blank')">huggingface.co/join</a>, then create a free read-token at <a onclick="window.open('https://huggingface.co/settings/tokens','_blank')">huggingface.co/settings/tokens</a>.
+          Stored locally only.
+        </div>
+      </div>
+      <div class="field provider-huggingface" style="display:none;">
+        <label>Hugging Face Model</label>
+        <select id="hf-model">
+          <option value="black-forest-labs/FLUX.1-schnell">FLUX.1-schnell (fast, default)</option>
+          <option value="black-forest-labs/FLUX.1-dev">FLUX.1-dev (slower, more detailed)</option>
+          <option value="stabilityai/stable-diffusion-xl-base-1.0">SDXL base (alternative)</option>
+        </select>
+      </div>
+
+      <!-- OpenAI fields -->
+      <div class="field provider-openai" style="display:none;">
+        <label>OpenAI API Key</label>
+        <input type="password" id="api-key" placeholder="sk-...">
+        <div class="helper">
+          Stored only in this browser. Get one at <a onclick="window.open('https://platform.openai.com/api-keys','_blank')">platform.openai.com/api-keys</a>.
+        </div>
+      </div>
+      <div class="field provider-openai" style="display:none;">
+        <label>OpenAI Model</label>
+        <select id="api-model">
+          <option value="gpt-image-1">gpt-image-1 (best, ~$0.04)</option>
+          <option value="dall-e-3">dall-e-3 (~$0.04)</option>
+        </select>
+      </div>
+
+      <button class="btn" id="btn-step-1">CONTINUE →</button>
+      <div class="step-status" id="step-1-status">FREE · NO ACCOUNT REQUIRED</div>
+    </div>
+
+    <!-- STEP 2: Your name + apartment vibe -->
+    <div id="setup-step-2" style="display:none;">
+      <div class="field">
+        <label>Your Name</label>
+        <input type="text" id="player-name" placeholder="What visitors will call you" maxlength="32">
+        <div class="helper">First name only. Doesn't have to be your real one.</div>
+      </div>
+      <div class="field">
+        <label>Your Apartment Mood</label>
+        <select id="apt-mood">
+          <option value="dusk-warm">Warm — Dusk light pooling on wood floors, kettle steaming, books</option>
+          <option value="rain-night">Rainy Night — Window streaming, neon bleeding through curtains</option>
+          <option value="dawn-cold">Cold Dawn — Pale grey light, half-empty bottle, unmade bed</option>
+          <option value="loft-late">Late Loft — Industrial windows, smoke, distant club bass</option>
+          <option value="modest-bright">Modest — Simple, lived-in, plant by the window, mismatched chairs</option>
+        </select>
+        <div class="helper">Sets the painted backdrop of your home. Generated once.</div>
+      </div>
+      <div class="field">
+        <label>Your Daily Visit Time</label>
+        <input type="time" id="visit-time" value="19:00">
+        <div class="helper">When someone will knock each day. 15-minute window.</div>
+      </div>
+      <!-- ── OR: Use your own apartment image ── -->
+      <div class="field" style="border-top:1px dashed rgba(255,255,255,.15);padding-top:14px;">
+        <label>Or use your own apartment image</label>
+        <div class="helper" style="margin-bottom:8px;">
+          Skip the API entirely. Generate the image in any AI tool (ChatGPT-image, Midjourney, Bing Image Creator, etc.) using the prompt for your selected mood, then upload it here.
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="btn btn-secondary" id="btn-copy-prompt" type="button" style="flex:1;min-width:180px;">📋 COPY PROMPT FOR THIS MOOD</button>
+          <label class="btn btn-secondary" for="apt-upload" style="flex:1;min-width:180px;text-align:center;cursor:pointer;">📁 UPLOAD IMAGE</label>
+          <input type="file" id="apt-upload" accept="image/*" style="display:none;">
+        </div>
+        <div class="helper" id="apt-upload-status" style="margin-top:8px;min-height:14px;"></div>
+      </div>
+      <button class="btn" id="btn-step-2">PAINT MY APARTMENT →</button>
+      <button class="btn btn-secondary" id="btn-back-1" style="margin-top:8px;">← BACK</button>
+    </div>
+
+    <!-- STEP 3: Ready -->
+    <div id="setup-step-3" style="display:none;">
+      <div style="text-align:center;padding:18px 0 28px;">
+        <div style="font-family:'Cormorant Garamond',serif;font-style:italic;font-size:20px;color:var(--ink);line-height:1.55;max-width:420px;margin:0 auto;">
+          Your apartment is ready. Step inside.
+          <br><br>
+          Once you enter, a stranger will arrive at your door — tonight, for testing, you can summon them whenever you like. In the full game they arrive only at your set time.
+        </div>
+      </div>
+      <button class="btn" id="btn-enter">ENTER THE APARTMENT</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═════════════ APARTMENT STAGE ═════════════ -->
+<div class="stage" id="stage-apartment">
+  <div id="apartment-bg"></div>
+  <canvas id="rain-canvas"></canvas>
+  <canvas id="dust-canvas"></canvas>
+  <div id="lamp-glow"></div>
+
+  <button id="btn-settings" title="Menu">⋯</button>
+
+  <div id="hud-top">
+    <div class="left">
+      <div><span class="accent" id="hud-name">—</span> · <span id="hud-mood">—</span></div>
+      <div>Day <span id="hud-day">1</span> · <span id="hud-time">—</span></div>
+    </div>
+    <div class="right">
+      <div>Visits: <span class="accent" id="hud-visits">0</span></div>
+      <div id="hud-next">Next visit at <span class="accent" id="hud-visit-time">—</span></div>
+    </div>
+  </div>
+
+  <div id="door-area" title="Door"></div>
+  <div id="door-hint"><span class="kbd">CLICK</span>Approach the door</div>
+  <div id="knock-indicator">
+    <em>Someone is at the door.</em>
+    <small>Click the door to look</small>
+  </div>
+</div>
+
+<!-- ═════════════ PEEPHOLE ═════════════ -->
+<div id="peephole">
+  <canvas id="peephole-canvas" width="600" height="600"></canvas>
+  <div id="peephole-hint">Click anywhere to step back</div>
+</div>
+
+<!-- ═════════════ CONVERSATION ═════════════ -->
+<div id="conversation">
+  <div id="conv-bg"></div>
+  <div id="visitor-portrait"></div>
+
+  <div id="visitor-name-plate">
+    <div class="v-name" id="visitor-name">—</div>
+    <div class="v-epithet" id="visitor-epithet">—</div>
+  </div>
+
+  <div id="dialogue-panel">
+    <div class="dialogue-speaker" id="dlg-speaker">—</div>
+    <div class="dialogue-text" id="dlg-text">—</div>
+    <div id="dialogue-choices"></div>
+  </div>
+</div>
+
+<!-- ═════════════ SETTINGS ═════════════ -->
+<div id="settings-modal">
+  <div class="settings-card">
+    <h3>Menu</h3>
+    <div class="row"><span class="label">Name</span><span class="val" id="set-name">—</span></div>
+    <div class="row"><span class="label">Visit Time</span><span class="val" id="set-visit">—</span></div>
+    <div class="row"><span class="label">Provider</span><span class="val" id="set-provider">—</span></div>
+    <div class="row"><span class="label">Model</span><span class="val" id="set-model">—</span></div>
+    <div class="row"><span class="label">Visits Logged</span><span class="val" id="set-visits">0</span></div>
+    <div class="actions">
+      <button id="btn-visit-now">⌗ SUMMON VISITOR NOW (TEST)</button>
+      <button id="btn-regen-apt">⌗ REGENERATE APARTMENT</button>
+      <label for="apt-upload-settings" id="btn-upload-apt-label" style="display:block;cursor:pointer;">⌗ UPLOAD MY OWN APARTMENT IMAGE</label>
+      <input type="file" id="apt-upload-settings" accept="image/*" style="display:none;">
+      <button id="btn-switch-provider">⌗ SWITCH PROVIDER</button>
+      <button id="btn-close-settings">CLOSE</button>
+      <button class="danger" id="btn-wipe">⌗ WIPE ALL DATA</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═════════════ LOADING ═════════════ -->
+<div id="loading">
+  <div class="loading-spinner"></div>
+  <div class="loading-text" id="loading-text">PAINTING</div>
+  <div class="loading-detail" id="loading-detail">The light is gathering in the corners.</div>
+</div>
+
+<!-- ═════════════ END VISIT ═════════════ -->
+<div id="end-visit">
+  <div class="epitaph" id="end-epitaph">—</div>
+  <div class="continue" id="end-continue">RETURN TO YOUR ROOMS</div>
+</div>
+
+<!-- ═════════════ TOAST ═════════════ -->
+<div id="toast"></div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════════
+//  THE VISITOR — v0.1
+//  Painterly daily-window narrative game. AI-generated apartment + visitors.
+// ═══════════════════════════════════════════════════════════════════════
+
+const $ = id => document.getElementById(id);
+
+const State = {
+  provider: 'pollinations',          // 'pollinations' | 'aihorde' | 'huggingface' | 'openai'
+  hordeKey: '0000000000',            // anonymous AI Horde key (or registered)
+  hordeModel: 'Flux.1-Schnell fp8 (Compact)', // horde model name
+  pollinationsModel: 'turbo',        // 'flux' now needs a token; 'turbo' is still free
+  pollinationsToken: null,
+  hfToken: null,
+  hfModel: 'black-forest-labs/FLUX.1-schnell',
+  apiKey: null,
+  apiModel: 'gpt-image-1',
+  playerName: null,
+  aptMood: 'dusk-warm',
+  visitTime: '19:00',
+  apartmentImg: null,
+  visits: [],
+  currentVisit: null,
+  startedAt: null,
+  audioCtx: null,
+};
+
+// ═══════════════════════════════════════════════════════════════════════
+//  SETTINGS PERSISTENCE
+// ═══════════════════════════════════════════════════════════════════════
+async function loadState(){
+  const stored = await window.fracture.read('state');
+  if (!stored) return false;
+  Object.assign(State, stored);
+  return true;
+}
+async function saveState(){
+  const snapshot = {
+    provider: State.provider,
+    hordeKey: State.hordeKey,
+    hordeModel: State.hordeModel,
+    pollinationsModel: State.pollinationsModel,
+    pollinationsToken: State.pollinationsToken,
+    hfToken: State.hfToken,
+    hfModel: State.hfModel,
+    apiKey: State.apiKey,
+    apiModel: State.apiModel,
+    playerName: State.playerName,
+    aptMood: State.aptMood,
+    visitTime: State.visitTime,
+    apartmentImg: State.apartmentImg,
+    visits: State.visits,
+    startedAt: State.startedAt,
+  };
+  await window.fracture.save('state', snapshot);
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  IMAGE GENERATION — multi-provider dispatcher
+// ═══════════════════════════════════════════════════════════════════════
+// ── Local bank — checked FIRST before any API call ──────────────────────
+// Pre-generated images sitting in banks/<kind>/<slug>/ pick uniformly at
+// random. Zero network, zero queue. If the bank's empty for this kind/slug,
+// fall through to the configured provider.
+let _bankManifest = null;
+let _bankFetched = false;
+async function loadBankManifest(){
+  if (_bankFetched) return _bankManifest;
+  _bankFetched = true;
+  try {
+    const r = await fetch('banks/manifest.json');
+    if (r.ok) _bankManifest = await r.json();
+  } catch(e){
+    _bankManifest = null;
+  }
+  return _bankManifest;
+}
+async function pickFromBank(opts={}){
+  const m = await loadBankManifest();
+  if (!m || !opts.bankKind || !opts.bankSlug) return null;
+  const list = (m[opts.bankKind] || {})[opts.bankSlug] || [];
+  if (list.length === 0) return null;
+  const pick = list[Math.floor(Math.random() * list.length)];
+  const path = `banks/${opts.bankKind}/${opts.bankSlug}/${pick}`;
+  try {
+    const resp = await fetch(path);
+    if (!resp.ok) return null;
+    const blob = await resp.blob();
+    return await blobToDataURL(blob);
+  } catch(e){
+    return null;
+  }
+}
+async function generateImage(prompt, opts={}){
+  // 1. Try the local bank first if the call specified bankKind + bankSlug.
+  if (opts.bankKind && opts.bankSlug){
+    const banked = await pickFromBank(opts);
+    if (banked) return banked;
+  }
+  // 2. Fall through to the configured provider.
+  if (State.provider === 'openai')      return generateOpenAI(prompt, opts);
+  if (State.provider === 'huggingface') return generateHuggingFace(prompt, opts);
+  if (State.provider === 'aihorde')     return generateAIHorde(prompt, opts);
+  return generatePollinations(prompt, opts);
+}
+
+// ── AI Horde (free volunteer GPU network, anonymous OK) ─────────────────
+// Slower than other options (queue-based, 30s-10min) but works without keys or CORS issues.
+async function generateAIHorde(prompt, opts={}){
+  const apikey = State.hordeKey || '0000000000';
+  let width = 1024, height = 1024;
+  if (opts.size){
+    const m = opts.size.match(/^(\d+)x(\d+)$/);
+    if (m){ width = parseInt(m[1], 10); height = parseInt(m[2], 10); }
+  }
+  // Horde requires multiples of 64, max ~1024 for anonymous
+  width  = Math.min(1024, Math.round(width / 64) * 64);
+  height = Math.min(1024, Math.round(height / 64) * 64);
+
+  const model = opts.hordeModel || State.hordeModel || 'Flux.1-Schnell fp8 (Compact)';
+  const isFlux = model.toLowerCase().includes('flux');
+
+  const body = {
+    prompt,
+    params: {
+      width, height,
+      steps: isFlux ? 8 : 25,
+      cfg_scale: isFlux ? 1 : 7,
+      sampler_name: isFlux ? 'k_euler' : 'k_dpmpp_2m',
+      karras: !isFlux,
+      n: 1,
+    },
+    models: [model],
+    // nsfw:true tells workers "I accept anything classified NSFW" — so
+    // tame prompts that happen to trigger false positives (bed, bottle, etc.)
+    // come through instead of being replaced with text placeholders.
+    nsfw: true,
+    censor_nsfw: false,
+    trusted_workers: false,
+    r2: true,
+    shared: true,
+  };
+
+  // Submit async generation request
+  const submitResp = await fetch('https://aihorde.net/api/v2/generate/async', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'apikey': apikey,
+      'Client-Agent': 'FractureCityVisitor:0.1:avner-media',
+    },
+    body: JSON.stringify(body),
+  });
+  if (!submitResp.ok){
+    const text = await submitResp.text();
+    // Surface the actual Horde reason instead of a generic message — the
+    // real text usually says "insufficient kudos for model X", "anonymous
+    // not allowed for this model", or "invalid api key".
+    let hordeMsg = text.slice(0, 300);
+    try {
+      const parsed = JSON.parse(text);
+      if (parsed.message) hordeMsg = parsed.message;
+      if (parsed.errors)  hordeMsg += ' · ' + JSON.stringify(parsed.errors);
+    } catch(e){}
+    const usingAnon = apikey === '0000000000' || !apikey;
+    // ── Auto-retry on 401/403 with the universal-access model ──
+    // Flux on Horde often rejects new accounts (kudos cost). stable_diffusion
+    // works on any account, anonymous or registered, with minimal kudos.
+    // Try once before failing — keeps the player playing.
+    if ((submitResp.status === 401 || submitResp.status === 403)
+        && !opts._modelFellBack
+        && model !== 'stable_diffusion'){
+      const detailEl = document.getElementById('loading-detail');
+      if (detailEl){
+        detailEl.textContent = `Horde rejected the "${model}" model — retrying with Stable Diffusion (universal access)…`;
+      }
+      return await generateAIHorde(prompt, { ...opts, hordeModel: 'stable_diffusion', _modelFellBack: true });
+    }
+    if (submitResp.status === 401 || submitResp.status === 403){
+      const hint = usingAnon
+        ? 'No API key was sent (anonymous). Open Settings → Switch Provider and paste your key in the AI Horde API Key field.'
+        : `Horde rejected your request even on Stable Diffusion. Most common causes: (1) your account is brand-new and the email isn't verified yet — check aihorde.net for a verification email; (2) the key was pasted with whitespace or wrong characters — re-copy from aihorde.net/account and re-paste; (3) the key got truncated in settings.`;
+      throw new Error(`AI Horde ${submitResp.status}: ${hordeMsg}\n\n${hint}`);
+    }
+    throw new Error(`AI Horde submit failed (${submitResp.status}): ${hordeMsg}`);
+  }
+  const { id, message } = await submitResp.json();
+  if (!id){
+    throw new Error('AI Horde did not return a job ID. ' + (message || ''));
+  }
+
+  // Poll for completion — show progress updates in loading screen.
+  // SMART FALLBACK: on the first status check, if the queue looks brutal
+  // (position > 30 or wait > 180s), cancel and fall back to Pollinations
+  // instead of letting the player watch a 10-minute spinner. The user
+  // can disable this in settings (allowHordeFallback).
+  const startTs = Date.now();
+  const TIMEOUT_MS = 15 * 60 * 1000; // 15 min — anonymous queue can be slow
+  let lastWait = -1;
+  let firstStatusChecked = false;
+  while (Date.now() - startTs < TIMEOUT_MS){
+    await new Promise(r => setTimeout(r, 5000));
+    const checkResp = await fetch(`https://aihorde.net/api/v2/generate/check/${id}`);
+    if (!checkResp.ok){
+      // Transient — keep retrying a few times
+      if (checkResp.status >= 500) continue;
+      throw new Error(`AI Horde check failed (${checkResp.status})`);
+    }
+    const status = await checkResp.json();
+    if (status.faulted){
+      throw new Error('AI Horde worker failed. Try again, or switch model.');
+    }
+    // First-poll fallback decision — gated on !_fellBack to prevent the
+    // Pollinations→Horde→Pollinations infinite ping-pong.
+    if (!firstStatusChecked && !status.done && State.allowHordeFallback !== false
+        && !opts._fellBack){
+      firstStatusChecked = true;
+      const pos  = status.queue_position;
+      const wait = status.wait_time;
+      if ((pos != null && pos > 30) || (wait != null && wait > 180)){
+        // Cancel and fall back to Pollinations
+        try { await fetch(`https://aihorde.net/api/v2/generate/status/${id}`, { method: 'DELETE' }); } catch(e){}
+        const detailEl = document.getElementById('loading-detail');
+        if (detailEl){
+          detailEl.textContent = `Horde queue is at position ${pos} (~${wait}s wait) — switching to Pollinations for this image…`;
+        }
+        return await generatePollinations(prompt, { ...opts, _fellBack: true });
+      }
+    }
+    if (status.done){
+      const finalResp = await fetch(`https://aihorde.net/api/v2/generate/status/${id}`);
+      const finalData = await finalResp.json();
+      if (!finalData.generations || finalData.generations.length === 0){
+        throw new Error('AI Horde returned no images.');
+      }
+      const gen = finalData.generations[0];
+      if (gen.img.startsWith('http')){
+        // R2 URL — fetch the image and convert to data URL
+        const imgResp = await fetch(gen.img);
+        const blob = await imgResp.blob();
+        return await blobToDataURL(blob);
+      } else {
+        // base64 webp
+        return `data:image/webp;base64,${gen.img}`;
+      }
+    }
+    // Update loading screen with queue position / wait estimate
+    const wait = status.wait_time != null ? status.wait_time : -1;
+    const pos  = status.queue_position != null ? status.queue_position : '?';
+    if (wait !== lastWait){
+      const detailEl = document.getElementById('loading-detail');
+      if (detailEl){
+        const elapsed = Math.floor((Date.now() - startTs) / 1000);
+        detailEl.textContent = `Queue position ${pos} · estimated wait ${wait}s · elapsed ${elapsed}s. AI Horde uses volunteer GPUs — be patient.`;
+      }
+      lastWait = wait;
+    }
+  }
+  // Cancel the job to avoid orphaned requests
+  try { await fetch(`https://aihorde.net/api/v2/generate/status/${id}`, { method: 'DELETE' }); } catch(e){}
+  throw new Error('AI Horde timed out after 15 minutes. Try again, or use Pollinations / OpenAI.');
+}
+
+// ── Pollinations.ai (free, optional token + referrer) ───────────────────
+async function generatePollinations(prompt, opts={}){
+  let width = 1024, height = 1024;
+  if (opts.size){
+    const m = opts.size.match(/^(\d+)x(\d+)$/);
+    if (m){ width = parseInt(m[1], 10); height = parseInt(m[2], 10); }
+  }
+  width = Math.min(width, 1792);
+  height = Math.min(height, 1792);
+  const model = opts.pollinationsModel || State.pollinationsModel || 'turbo';
+  const seed = Math.floor(Math.random() * 1000000);
+  // Pollinations now requires a referrer (or token) to avoid 402s.
+  // Always pass a referrer; optionally pass a free token.
+  let url = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}` +
+            `?width=${width}&height=${height}&model=${model}` +
+            `&nologo=true&private=true&seed=${seed}` +
+            `&referrer=fracture-city-visitor`;
+  if (State.pollinationsToken){
+    url += `&token=${encodeURIComponent(State.pollinationsToken)}`;
+  }
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 120000);
+  try {
+    const resp = await fetch(url, { signal: controller.signal });
+    clearTimeout(timeout);
+    if (!resp.ok){
+      // ── Auto-fallback to AI Horde on 402 / 429 ──
+      // Pollinations gated their Flux model behind a token. If the current
+      // request fails (most commonly 402 'token required'), route to Horde
+      // for this image instead of dead-ending the player. The opts._fellBack
+      // flag prevents Horde→Pollinations→Horde infinite loops.
+      if ((resp.status === 402 || resp.status === 429) && !opts._fellBack
+          && State.allowHordeFallback !== false){
+        const detailEl = document.getElementById('loading-detail');
+        if (detailEl){
+          detailEl.textContent = `Pollinations ${resp.status} (token required for this model) — switching to AI Horde for this image…`;
+        }
+        return await generateAIHorde(prompt, { ...opts, _fellBack: true });
+      }
+      let msg;
+      if (resp.status === 402){
+        msg = `Pollinations 402 — token required for the "${model}" model. Try the 'turbo' model (free), or register a token at pollinations.ai and paste it in settings. Auto-fallback to Horde is disabled.`;
+      } else if (resp.status === 429){
+        msg = `Pollinations 429 — rate-limited. Wait a minute, or switch provider in settings.`;
+      } else {
+        msg = `Pollinations returned ${resp.status}. Try again, or switch provider in settings.`;
+      }
+      throw new Error(msg);
+    }
+    const blob = await resp.blob();
+    return await blobToDataURL(blob);
+  } catch(e){
+    clearTimeout(timeout);
+    if (e.name === 'AbortError'){
+      throw new Error('Pollinations timed out after 2 minutes. Try again or switch provider.');
+    }
+    throw e;
+  }
+}
+
+// ── Hugging Face Inference API (free with free token) ───────────────────
+async function generateHuggingFace(prompt, opts={}){
+  if (!State.hfToken){
+    throw new Error('Hugging Face token required. Get one at huggingface.co/settings/tokens (free).');
+  }
+  let width = 1024, height = 1024;
+  if (opts.size){
+    const m = opts.size.match(/^(\d+)x(\d+)$/);
+    if (m){ width = parseInt(m[1], 10); height = parseInt(m[2], 10); }
+  }
+  width = Math.min(width, 1536);
+  height = Math.min(height, 1536);
+  const model = opts.hfModel || State.hfModel || 'black-forest-labs/FLUX.1-schnell';
+  const body = {
+    inputs: prompt,
+    parameters: { width, height, num_inference_steps: model.includes('schnell') ? 4 : 25 },
+  };
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 180000); // 3 min — cold starts can be slow
+  try {
+    const resp = await fetch(`https://api-inference.huggingface.co/models/${model}`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${State.hfToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
+    if (!resp.ok){
+      let msg;
+      if (resp.status === 503){
+        // Model is cold-loading
+        const json = await resp.json().catch(()=>({}));
+        const wait = json.estimated_time ? Math.ceil(json.estimated_time) : 30;
+        msg = `Hugging Face model is cold-starting. Wait ~${wait}s and try again.`;
+      } else if (resp.status === 401){
+        msg = `Hugging Face 401 — token invalid or missing. Get one at huggingface.co/settings/tokens.`;
+      } else if (resp.status === 429){
+        msg = `Hugging Face 429 — rate-limited. Wait a few minutes.`;
+      } else {
+        msg = `Hugging Face returned ${resp.status}. Try again or switch provider.`;
+      }
+      throw new Error(msg);
+    }
+    // HF returns raw image bytes
+    const blob = await resp.blob();
+    if (blob.type.startsWith('application/json')){
+      // Sometimes returns an error JSON masquerading as success
+      const text = await blob.text();
+      throw new Error(`Hugging Face returned JSON instead of image: ${text.slice(0, 200)}`);
+    }
+    return await blobToDataURL(blob);
+  } catch(e){
+    clearTimeout(timeout);
+    if (e.name === 'AbortError'){
+      throw new Error('Hugging Face timed out. Cold start may be in progress — try again in 60 seconds.');
+    }
+    if (e instanceof TypeError && e.message.includes('fetch')){
+      throw new Error('Hugging Face fetch failed. Likely causes: (1) FLUX models moved to paid "Inference Providers" — try the SDXL model in the dropdown, or (2) you need to accept the model license at huggingface.co/' + (State.hfModel || '') + ', or (3) switch to AI Horde for true anonymous free.');
+    }
+    throw e;
+  }
+}
+
+// ── OpenAI (paid, requires key) ──────────────────────────────────────────
+async function generateOpenAI(prompt, opts={}){
+  if (!State.apiKey){
+    throw new Error('OpenAI provider selected but no API key configured.');
+  }
+  const model = opts.model || State.apiModel;
+  const size = opts.size || '1024x1024';
+  const quality = opts.quality || 'medium';
+  const body = { model, prompt, size, n: 1 };
+  if (model === 'gpt-image-1'){
+    body.quality = quality;
+  } else if (model === 'dall-e-3'){
+    body.quality = quality === 'high' ? 'hd' : 'standard';
+    body.response_format = 'b64_json';
+  }
+  const resp = await fetch('https://api.openai.com/v1/images/generations', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${State.apiKey}`,
+    },
+    body: JSON.stringify(body),
+  });
+  if (!resp.ok){
+    const text = await resp.text();
+    throw new Error(`OpenAI error ${resp.status}: ${text.slice(0,200)}`);
+  }
+  const data = await resp.json();
+  const item = data.data[0];
+  if (item.b64_json){
+    return 'data:image/png;base64,' + item.b64_json;
+  }
+  if (item.url){
+    const imgResp = await fetch(item.url);
+    const blob = await imgResp.blob();
+    return await blobToDataURL(blob);
+  }
+  throw new Error('No image data in OpenAI response');
+}
+
+function blobToDataURL(blob){
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  PROMPT BUILDERS
+// ═══════════════════════════════════════════════════════════════════════
+const APT_MOOD_PROMPTS = {
+  'dusk-warm': `Painterly oil painting of a small near-future urban apartment interior at dusk, view facing one wall from inside the room.
+Warm pooled lamplight from a single floor lamp on the left casts amber light across worn wood-paneled walls.
+A heavy wooden front door in the center-right of the frame with brass handle, small peephole, and faded scratches.
+A large window to the right of the door shows the silhouette of a Bladerunner-style cyberpunk megacity far below with blurred neon signs in pink and teal and gold, rain streaks on the glass, low fog.
+A small round table with a steaming teapot, a worn velvet armchair facing the door, a tall bookshelf on the left wall packed with old hardcovers, a faded woven rug on the wooden floor.
+Painterly brushwork in the style of Disco Elysium and Kentucky Route Zero. Moody, contemplative, melancholy near-future cyberpunk. Warm orange and deep umber palette with cool blue-violet from the window. Empty room, no figures. Wide cinematic composition.`,
+
+  'rain-night': `Painterly oil painting of a small urban apartment interior late at night during heavy rain, near-future cyberpunk setting.
+A dim room lit only by neon city light bleeding through tall windows on the right — magenta and cyan glow streaming through rain-streaked glass.
+A heavy wooden door center-frame with peephole and chain lock. Dark wallpaper, scuffed parquet floor.
+A low table near the window holds a closed leather notebook and a teacup. A leather armchair turned partway toward the door. A standing brass coatrack in the corner.
+Painterly brushwork like Norco and Disco Elysium. Wet, atmospheric, melancholy. Cool blue-violet shadows, warm magenta highlights, deep umber midtones. Empty room, no figures. Wide cinematic composition.`,
+
+  'dawn-cold': `Painterly oil painting of a small urban apartment interior at cold pre-dawn, near-future setting.
+Pale grey light filters through thin linen curtains. The apartment is sparse — a folded woolen throw across a low futon couch against the back wall, a teacup on a side table, a heavy door center-right with multiple deadbolts and a peephole.
+A small window to the left shows the distant city silhouette in flat early morning light, no neon yet, just grey on grey.
+Painterly brushwork like Kentucky Route Zero. Cold, quiet, contemplative. Pale blue and dove-grey palette with one warm sliver of light from a single bare bulb. Empty room, no figures. Wide cinematic composition.`,
+
+  'loft-late': `Painterly oil painting of a small urban loft apartment interior late at night, near-future cyberpunk setting.
+Industrial tall windows on both sides showing rooftops with distant club neon — pink and gold and teal — bleeding through. A stick of incense in a small dish on a metal table releases a thin curl of smoke.
+A heavy steel-reinforced door center-frame with peephole, slightly battered. Concrete walls, exposed pipes, a folded futon couch with a wool blanket against one wall.
+Painterly brushwork like Disco Elysium. Late, smoky, alive. Deep purple shadows, hot pink and amber highlights, the distant city visible as glowing atmosphere. Empty room, no figures. Wide cinematic composition.`,
+
+  'modest-bright': `Painterly oil painting of a small modest urban apartment interior in soft afternoon light, near-future setting.
+A lived-in space — mismatched wooden chairs around a small table, a potted plant by a window showing low rooflines and a few signs of city beyond, dishes drying on a wooden rack.
+A simple wooden front door center-frame with a peephole and a hook beside it where a coat hangs. Warm beige walls, warm wood floor.
+Painterly brushwork like Florence and Kentucky Route Zero. Quiet, ordinary, warm. Soft amber and dust-cream palette with green from the plants. Empty room, no figures. Wide cinematic composition.`,
+};
+
+const APT_MOOD_LABELS = {
+  'dusk-warm': 'Warm Dusk',
+  'rain-night': 'Rainy Night',
+  'dawn-cold': 'Cold Dawn',
+  'loft-late': 'Late Loft',
+  'modest-bright': 'Modest',
+};
+
+// ═══════════════════════════════════════════════════════════════════════
+//  RAIN + DUST CANVAS EFFECTS
+// ═══════════════════════════════════════════════════════════════════════
+let rainCtx, dustCtx, raindrops = [], dustmotes = [];
+
+function resizeAtmosphere(){
+  const rc = $('rain-canvas');
+  const dc = $('dust-canvas');
+  rc.width = window.innerWidth;
+  rc.height = window.innerHeight;
+  dc.width = window.innerWidth;
+  dc.height = window.innerHeight;
+  rainCtx = rc.getContext('2d');
+  dustCtx = dc.getContext('2d');
+  initRain();
+  initDust();
+}
+
+function initRain(){
+  raindrops = [];
+  const count = State.aptMood === 'rain-night' ? 120 : 50;
+  for (let i = 0; i < count; i++){
+    raindrops.push({
+      x: Math.random() * window.innerWidth,
+      y: Math.random() * window.innerHeight,
+      vy: 4 + Math.random() * 8,
+      len: 8 + Math.random() * 18,
+      alpha: 0.15 + Math.random() * 0.45,
+    });
+  }
+}
+
+function initDust(){
+  dustmotes = [];
+  for (let i = 0; i < 50; i++){
+    dustmotes.push({
+      x: Math.random() * window.innerWidth,
+      y: Math.random() * window.innerHeight,
+      vx: (Math.random() - 0.5) * 0.3,
+      vy: -0.2 + Math.random() * 0.5,
+      size: 0.5 + Math.random() * 1.6,
+      alpha: 0.1 + Math.random() * 0.5,
+      phase: Math.random() * 6.28,
+    });
+  }
+}
+
+function animateAtmosphere(){
+  if (!rainCtx || !dustCtx){ requestAnimationFrame(animateAtmosphere); return; }
+  // Rain — only show on window region (right portion of screen)
+  const winX = window.innerWidth * 0.62;
+  const winW = window.innerWidth * 0.36;
+  rainCtx.clearRect(0, 0, rainCtx.canvas.width, rainCtx.canvas.height);
+  rainCtx.strokeStyle = '#c0d0e8';
+  rainCtx.lineWidth = 1.3;
+  for (const drop of raindrops){
+    drop.y += drop.vy;
+    drop.x += drop.vy * 0.18;
+    if (drop.y > window.innerHeight) { drop.y = -drop.len; drop.x = winX + Math.random() * winW; }
+    if (drop.x > winX + winW) drop.x = winX;
+    rainCtx.globalAlpha = drop.alpha;
+    rainCtx.beginPath();
+    rainCtx.moveTo(drop.x, drop.y);
+    rainCtx.lineTo(drop.x - drop.vy * 0.18 * drop.len/drop.vy, drop.y - drop.len);
+    rainCtx.stroke();
+  }
+  rainCtx.globalAlpha = 1;
+
+  // Dust motes
+  dustCtx.clearRect(0, 0, dustCtx.canvas.width, dustCtx.canvas.height);
+  for (const mote of dustmotes){
+    mote.x += mote.vx + Math.sin(mote.phase) * 0.1;
+    mote.y += mote.vy;
+    mote.phase += 0.02;
+    if (mote.y < -10) { mote.y = window.innerHeight + 10; }
+    if (mote.x < -10) mote.x = window.innerWidth + 10;
+    if (mote.x > window.innerWidth + 10) mote.x = -10;
+    const flicker = 0.6 + 0.4 * Math.sin(mote.phase * 1.7);
+    dustCtx.fillStyle = `rgba(255,210,150,${mote.alpha * flicker})`;
+    dustCtx.beginPath();
+    dustCtx.arc(mote.x, mote.y, mote.size, 0, Math.PI*2);
+    dustCtx.fill();
+  }
+  requestAnimationFrame(animateAtmosphere);
+}
+
+// Position the lamp glow procedurally over the apartment
+function positionLamp(){
+  // Place over left third of screen — adjusted per mood
+  let lx = window.innerWidth * 0.22;
+  let ly = window.innerHeight * 0.62;
+  if (State.aptMood === 'rain-night') { lx = window.innerWidth * 0.68; ly = window.innerHeight * 0.55; }
+  if (State.aptMood === 'dawn-cold')  { lx = window.innerWidth * 0.32; ly = window.innerHeight * 0.40; }
+  if (State.aptMood === 'loft-late')  { lx = window.innerWidth * 0.55; ly = window.innerHeight * 0.48; }
+  $('lamp-glow').style.left = lx + 'px';
+  $('lamp-glow').style.top = ly + 'px';
+}
+
+// Position the door area procedurally — center-right where prompts place it
+function positionDoor(){
+  const door = $('door-area');
+  // Use a wide invisible region; tweak per mood if needed
+  door.style.left = (window.innerWidth * 0.40) + 'px';
+  door.style.top = (window.innerHeight * 0.20) + 'px';
+  door.style.width = (window.innerWidth * 0.25) + 'px';
+  door.style.height = (window.innerHeight * 0.62) + 'px';
+}
+
+window.addEventListener('resize', () => {
+  resizeAtmosphere();
+  positionLamp();
+  positionDoor();
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+//  PROCEDURAL AMBIENT AUDIO
+// ═══════════════════════════════════════════════════════════════════════
+function startAmbient(){
+  if (State.audioCtx) return;
+  const ctx = new (window.AudioContext || window.webkitAudioContext)();
+  State.audioCtx = ctx;
+  // Low hum drone
+  const osc1 = ctx.createOscillator(); osc1.type = 'sine'; osc1.frequency.value = 55;
+  const osc2 = ctx.createOscillator(); osc2.type = 'sine'; osc2.frequency.value = 82.5; // perfect 5th
+  const osc3 = ctx.createOscillator(); osc3.type = 'triangle'; osc3.frequency.value = 110;
+  // Slow LFO to wobble pitch
+  const lfo = ctx.createOscillator(); lfo.frequency.value = 0.07;
+  const lfoGain = ctx.createGain(); lfoGain.gain.value = 0.8;
+  lfo.connect(lfoGain);
+  lfoGain.connect(osc1.frequency);
+  // Filter for warmth
+  const filter = ctx.createBiquadFilter();
+  filter.type = 'lowpass'; filter.frequency.value = 320; filter.Q.value = 0.6;
+  // Main gain
+  const masterGain = ctx.createGain();
+  masterGain.gain.value = 0;
+  masterGain.gain.linearRampToValueAtTime(0.04, ctx.currentTime + 2.0);
+  osc1.connect(filter); osc2.connect(filter); osc3.connect(filter);
+  filter.connect(masterGain);
+  masterGain.connect(ctx.destination);
+  osc1.start(); osc2.start(); osc3.start(); lfo.start();
+  State.audioMaster = masterGain;
+}
+
+function knockSound(){
+  if (!State.audioCtx) return;
+  const ctx = State.audioCtx;
+  for (let i = 0; i < 3; i++){
+    setTimeout(() => {
+      const t = ctx.currentTime;
+      const osc = ctx.createOscillator(); osc.type = 'sine';
+      osc.frequency.setValueAtTime(180, t);
+      osc.frequency.exponentialRampToValueAtTime(60, t + 0.15);
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.18, t);
+      g.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
+      osc.connect(g); g.connect(ctx.destination);
+      osc.start(t); osc.stop(t + 0.20);
+    }, i * 360);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  SETUP FLOW
+// ═══════════════════════════════════════════════════════════════════════
+// Provider dropdown — toggle field visibility
+function updateProviderUI(){
+  const p = $('api-provider').value;
+  document.querySelectorAll('.provider-aihorde').forEach(el => el.style.display = p === 'aihorde' ? 'block' : 'none');
+  document.querySelectorAll('.provider-pollinations').forEach(el => el.style.display = p === 'pollinations' ? 'block' : 'none');
+  document.querySelectorAll('.provider-huggingface').forEach(el => el.style.display = p === 'huggingface' ? 'block' : 'none');
+  document.querySelectorAll('.provider-openai').forEach(el => el.style.display = p === 'openai' ? 'block' : 'none');
+  const status = {
+    'aihorde':      'FREE · NO SIGNUP · SLOW QUEUE BUT JUST WORKS',
+    'pollinations': 'FREE · NO ACCOUNT REQUIRED (TOKEN OPTIONAL)',
+    'huggingface':  'FREE · FREE SIGNUP REQUIRED',
+    'openai':       'PAID · YOUR KEY STAYS LOCAL',
+  };
+  $('step-1-status').textContent = status[p] || '';
+}
+$('api-provider').onchange = updateProviderUI;
+
+$('btn-step-1').onclick = () => {
+  const provider = $('api-provider').value;
+  State.provider = provider;
+  if (provider === 'openai'){
+    const key = $('api-key').value.trim();
+    if (!key.startsWith('sk-')){
+      toast('That doesn\'t look like a valid OpenAI key.', 'error');
+      return;
+    }
+    State.apiKey = key;
+    State.apiModel = $('api-model').value;
+  } else if (provider === 'huggingface'){
+    const token = $('hf-token').value.trim();
+    if (!token.startsWith('hf_')){
+      toast('Hugging Face tokens start with "hf_". Get one at huggingface.co/settings/tokens (free).', 'error');
+      return;
+    }
+    State.hfToken = token;
+    State.hfModel = $('hf-model').value;
+  } else if (provider === 'aihorde'){
+    const k = $('horde-key').value.trim();
+    State.hordeKey = k || '0000000000';
+    State.hordeModel = $('horde-model').value;
+  } else {
+    State.pollinationsModel = $('pollinations-model').value;
+    State.pollinationsToken = $('pollinations-token').value.trim() || null;
+  }
+  $('setup-step-1').style.display = 'none';
+  $('setup-step-2').style.display = 'block';
+  $('welcome-step-label').textContent = 'STEP 2 — YOU + YOUR ROOM';
+};
+$('btn-back-1').onclick = () => {
+  $('setup-step-2').style.display = 'none';
+  $('setup-step-1').style.display = 'block';
+  $('welcome-step-label').textContent = 'STEP 1 — YOUR API KEY';
+};
+// Holds an externally-uploaded apartment image (data URL) so the step-2
+// button can use it directly instead of calling the generation API.
+let _uploadedApartmentImg = null;
+$('btn-copy-prompt').onclick = async () => {
+  const mood = $('apt-mood').value;
+  const prompt = APT_MOOD_PROMPTS[mood];
+  try {
+    await navigator.clipboard.writeText(prompt);
+    $('apt-upload-status').textContent = `✓ Prompt copied (${APT_MOOD_LABELS[mood]}). Paste it into your image generator.`;
+    $('apt-upload-status').style.color = 'var(--ink-warm)';
+  } catch(e){
+    // Fallback: select-and-copy via a hidden textarea
+    const ta = document.createElement('textarea');
+    ta.value = prompt; document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); } catch(_){}
+    document.body.removeChild(ta);
+    $('apt-upload-status').textContent = '✓ Prompt copied.';
+    $('apt-upload-status').style.color = 'var(--ink-warm)';
+  }
+};
+$('apt-upload').onchange = async (ev) => {
+  const f = ev.target.files && ev.target.files[0];
+  if (!f) return;
+  if (!f.type.startsWith('image/')){
+    $('apt-upload-status').textContent = '✗ That file isn\'t an image. Try a .png, .jpg, or .webp.';
+    $('apt-upload-status').style.color = '#ff7070';
+    return;
+  }
+  if (f.size > 12 * 1024 * 1024){
+    $('apt-upload-status').textContent = '✗ Image is over 12MB. Resize it to ~1280px wide first.';
+    $('apt-upload-status').style.color = '#ff7070';
+    return;
+  }
+  $('apt-upload-status').textContent = 'Loading image…';
+  $('apt-upload-status').style.color = 'var(--ink)';
+  try {
+    const dataUrl = await new Promise((res, rej) => {
+      const r = new FileReader();
+      r.onload = () => res(r.result);
+      r.onerror = () => rej(r.error);
+      r.readAsDataURL(f);
+    });
+    _uploadedApartmentImg = dataUrl;
+    $('apt-upload-status').textContent = `✓ "${f.name}" loaded (${(f.size/1024).toFixed(0)} KB). Click PAINT MY APARTMENT to use it.`;
+    $('apt-upload-status').style.color = 'var(--ink-warm)';
+    // Switch the button label so it's obvious we're skipping generation
+    $('btn-step-2').textContent = 'USE THIS IMAGE →';
+  } catch(e){
+    $('apt-upload-status').textContent = '✗ Failed to load image: ' + e.message;
+    $('apt-upload-status').style.color = '#ff7070';
+  }
+};
+$('btn-step-2').onclick = async () => {
+  const name = $('player-name').value.trim();
+  if (!name){ toast('Tell us your name.', 'error'); return; }
+  State.playerName = name;
+  State.aptMood = $('apt-mood').value;
+  State.visitTime = $('visit-time').value;
+  if (!State.startedAt) State.startedAt = Date.now();
+
+  // ── Uploaded-image path: skip the generation API entirely ──
+  if (_uploadedApartmentImg){
+    State.apartmentImg = _uploadedApartmentImg;
+    await saveState();
+    $('setup-step-2').style.display = 'none';
+    $('setup-step-3').style.display = 'block';
+    $('welcome-step-label').textContent = 'STEP 3 — READY';
+    return;
+  }
+
+  const loadingDetail =
+    State.provider === 'aihorde'      ? 'AI Horde volunteer GPUs — anonymous queue can take 1-10 minutes. Updates will appear as we wait.'
+    : State.provider === 'pollinations' ? 'Free service — usually 30-90 seconds. The light is gathering in the corners.'
+    : State.provider === 'huggingface' ? 'Hugging Face model warming up (first time may take 30-60s). The light is gathering in the corners.'
+    : 'This takes about a minute. The light is gathering in the corners.';
+  showLoading('PAINTING YOUR APARTMENT', loadingDetail);
+
+  try {
+    const prompt = APT_MOOD_PROMPTS[State.aptMood];
+    const size = State.provider === 'openai' ? '1536x1024' :
+                 State.provider === 'huggingface' ? '1024x640' :
+                 State.provider === 'aihorde' ? '1024x640' : '1280x768';
+    const img = await generateImage(prompt, { size, model: State.apiModel, quality: 'medium',
+      bankKind:'apartments', bankSlug: State.aptMood });
+    State.apartmentImg = img;
+    await saveState();
+    hideLoading();
+    $('setup-step-2').style.display = 'none';
+    $('setup-step-3').style.display = 'block';
+    $('welcome-step-label').textContent = 'STEP 3 — READY';
+  } catch (e){
+    hideLoading();
+    toast('Image generation failed: ' + e.message + ' · Tip: use the UPLOAD IMAGE button below to skip the API entirely.', 'error');
+    console.error(e);
+  }
+};
+$('btn-enter').onclick = enterApartment;
+
+// ═══════════════════════════════════════════════════════════════════════
+//  APARTMENT
+// ═══════════════════════════════════════════════════════════════════════
+function enterApartment(){
+  $('apartment-bg').style.backgroundImage = `url(${State.apartmentImg})`;
+  setStage('stage-apartment');
+  resizeAtmosphere();
+  positionLamp();
+  positionDoor();
+  animateAtmosphere();
+  startAmbient();
+  refreshHud();
+  // Show door hint briefly
+  const door = $('door-area');
+  const hint = $('door-hint');
+  door.onmouseenter = () => hint.classList.add('show');
+  door.onmouseleave = () => hint.classList.remove('show');
+  door.onclick = handleDoorClick;
+}
+
+function refreshHud(){
+  $('hud-name').textContent = State.playerName || 'Unnamed';
+  $('hud-mood').textContent = APT_MOOD_LABELS[State.aptMood] || 'Unknown';
+  $('hud-visits').textContent = State.visits.length;
+  $('hud-visit-time').textContent = State.visitTime;
+  const startedAt = State.startedAt || Date.now();
+  const day = Math.floor((Date.now() - startedAt) / (24 * 3600 * 1000)) + 1;
+  $('hud-day').textContent = day;
+  const now = new Date();
+  $('hud-time').textContent = now.toTimeString().slice(0, 5);
+}
+setInterval(refreshHud, 30000);
+
+function handleDoorClick(){
+  if (State.currentVisit){
+    // Visitor is at the door — show peephole
+    showPeephole();
+  } else {
+    // Nothing happening — just a quiet moment
+    toast('All quiet. Wait, or summon a visit from the menu.', 'info');
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  VISITOR GENERATION
+// ═══════════════════════════════════════════════════════════════════════
+const FIRST_NAMES = ['Mira','Theron','Sable','Kestrel','Cassian','Vesper','Iolanthe','Bram','Lior','Anouk','Severin','Yael','Tovin','Reni','Calix','Mahir','Sef','Idrien','Olwen','Pyre','Hain','Nessa','Auron','Bren','Mavi','Halen','Esmer','Kade','Talia','Orion','Vela','Niko','Sorrel','Marek','Aria','Cyrus','Liraz','Dane'];
+const LAST_NAMES = ['Vey','Solm','Ardent','Halloran','Crest','Marrow','Tann','Vox','Embers','Thren','Cinderhand','Greythorne','Mott','Vasque','Hollow','Briar','Caine','Nox','Wren','Astor','Brackish','Caelin','Drumm','Fenwick','Gale','Iverson','Jin','Kassel'];
+
+const VISITOR_KINDS = [
+  {
+    key: 'lost',
+    name: 'The Lost',
+    epithet: 'looking for someone who used to live here',
+    appearance: 'middle-aged, weather-worn, holding a folded paper',
+    age: 'middle-aged',
+    promptDetails: 'a tired middle-aged person with cropped grey hair under a knit cap, wearing a long worn overcoat, holding a folded paper in one hand, looking uncertain. They have the bearing of someone who has been walking the city for hours. Soft melancholy.',
+    opener: "I'm sorry to knock so late. I'm looking for someone who used to live in this building. They said apartment number — I have a number written down but it doesn't make sense to me anymore. Is this 4B?",
+    inquireChoices: [
+      { text: "What's the name?", tone: 'probe', leads: 'reveal-name' },
+      { text: "Yes, this is 4B. Who are you looking for?", tone: 'help', leads: 'reveal-name' },
+      { text: "Whoever they were, they're not here now.", tone: 'refuse', leads: 'dismissed' },
+      { text: "Come in out of the hall.", tone: 'help', leads: 'come-in' },
+    ],
+    revealLine: "Her name is {targetName}. I haven't seen her in eleven years. We didn't end well. I had a feeling she'd be here. I had a feeling — I don't know how to explain it.",
+  },
+  {
+    key: 'witness',
+    name: 'The Witness',
+    epithet: 'has seen something they would like to set down',
+    appearance: 'young, sharp-eyed, soaked from the rain',
+    age: 'young adult',
+    promptDetails: 'a young person in their twenties with sharp watchful eyes, short dark hair, wearing a high-collar raincoat zipped to the throat, holding their phone close to their chest like a shield. They have the look of someone who knows something they shouldn\'t.',
+    opener: "I — I'm sorry. I don't know you. I just — I saw something tonight and I picked your door because the light was on. Can I — would you let me tell you something? You don't have to do anything with it. I just need to say it to a person.",
+    inquireChoices: [
+      { text: "Tell me. Quietly.", tone: 'help', leads: 'tell' },
+      { text: "What did you see?", tone: 'probe', leads: 'tell' },
+      { text: "Are you in danger right now?", tone: 'probe', leads: 'safe-check' },
+      { text: "I don't want to be involved.", tone: 'refuse', leads: 'dismissed' },
+    ],
+    revealLine: "I saw two men on the 17th floor of the tower across the way. They were arguing. One of them — I think one of them is dead. I watched them for almost a minute. Then the lights went out. I don't know if I should call. I don't know if it was real.",
+  },
+  {
+    key: 'returning',
+    name: 'The Returning',
+    epithet: 'used to live here, once',
+    appearance: 'older, well-dressed in an old-fashioned way',
+    age: 'older adult',
+    promptDetails: 'an older well-dressed person with silver hair and slightly old-fashioned clothes, standing with their hands clasped in front of them. They have the patient sadness of someone who has been gone a long time.',
+    opener: "Hello. I'm sorry to disturb you. I lived in this apartment thirty years ago. I'm in the city for one afternoon and I wondered if you might let me stand inside it for ten minutes. I won't touch anything. I just want to see the window again.",
+    inquireChoices: [
+      { text: "Of course. Come in.", tone: 'help', leads: 'come-in' },
+      { text: "What years did you live here?", tone: 'probe', leads: 'tell-years' },
+      { text: "I'd rather you didn't. I'm sorry.", tone: 'refuse', leads: 'dismissed' },
+      { text: "What's your name?", tone: 'probe', leads: 'tell-years' },
+    ],
+    revealLine: "Nineteen-ninety-three to ninety-nine. I was thirty-one when I left. The window — I want to see if the view is the same. It probably isn't. I know it won't be the same. I'd just like to see.",
+  },
+  {
+    key: 'bearer',
+    name: 'The Bearer',
+    epithet: 'has something to deliver, but isn\'t sure to whom',
+    appearance: 'practical, hooded, holding a small parcel',
+    age: 'any',
+    promptDetails: 'a practical-looking person in a hooded rain shell, holding a small wrapped parcel in both hands. Mostly in shadow except where the doorway light catches their face. They seem unhurried but uncertain.',
+    opener: "Are you {playerName}? I have something for you. I don't know what's in it. A man asked me to deliver it last Tuesday. He paid me. I didn't recognize him. He described you and gave me this address. Are you {playerName}?",
+    inquireChoices: [
+      { text: "Yes. Hand it over.", tone: 'help', leads: 'accept' },
+      { text: "Who paid you?", tone: 'probe', leads: 'describe-man' },
+      { text: "I'm not who you're looking for.", tone: 'refuse', leads: 'dismissed' },
+      { text: "Wait. Tell me everything first.", tone: 'probe', leads: 'describe-man' },
+    ],
+    revealLine: "He was older. He had a scar above his right eye — like this. He told me you'd know him. He paid me in cash and asked me not to look inside. He said if you weren't here, to take it back. So. Are you here?",
+  },
+];
+
+// ── Coherence Assessment profile → archetype bias ──────────────────────
+// Reads the most recently saved tot.profile.v1 from coherence-assessment's
+// data folder (only works inside Present Palm — outside the hub, returns
+// null and the visitor selection stays uniform random).
+async function loadLatestProfile(){
+  if (!window.fracture || !window.fracture.shell || !window.fracture.listFrom) return null;
+  try {
+    const keys = await window.fracture.listFrom('coherence-assessment');
+    if (!keys || keys.length === 0) return null;
+    const profileKeys = keys.filter(k => k.startsWith('profile_'));
+    if (profileKeys.length === 0) return null;
+    // Read all, return the most recent by created/timestamp field
+    let best = null;
+    for (const k of profileKeys){
+      const p = await window.fracture.readFrom('coherence-assessment', k);
+      if (!p) continue;
+      const ts = p.created || p.timestamp || p.completed_at || 0;
+      if (!best || ts > (best.created || best.timestamp || best.completed_at || 0)) best = p;
+    }
+    return best;
+  } catch(e){ return null; }
+}
+// Map zone/stamp/subtype → archetype weighting.
+// The profile shapes who comes to your door. People whose orientation
+// resonates (or actively conflicts) with you show up more often.
+function weightVisitorKindsByProfile(profile){
+  const w = { lost: 1, witness: 1, returning: 1, bearer: 1 };
+  if (!profile) return w;
+  // Zone hints: each zone biases toward an archetype that resonates with it
+  const zone = (profile.zone && profile.zone.name) || profile.zone_name || '';
+  if (/exile|outsider|drift/i.test(zone))        w.wanderer = (w.wanderer || 1) + 2, w.lost += 1.5;
+  if (/keeper|hold|guard/i.test(zone))           w.returning += 2;
+  if (/seeker|witness|seer/i.test(zone))         w.witness += 2;
+  if (/courier|carrier|messenger/i.test(zone))   w.bearer += 2;
+  // Stamp signatures — top-detected stamps bias archetypes
+  const stamps = profile.stamps || profile.stamp_signatures || {};
+  for (const [name, val] of Object.entries(stamps)){
+    if (typeof val !== 'number' || val < 0.4) continue;
+    if (/lost|broken|severed/i.test(name))    w.lost      += val * 2;
+    if (/witness|observ|see/i.test(name))     w.witness   += val * 2;
+    if (/return|home|reun/i.test(name))       w.returning += val * 2;
+    if (/bear|carry|messeng/i.test(name))     w.bearer    += val * 2;
+  }
+  return w;
+}
+function weightedRandomKind(weights){
+  const entries = VISITOR_KINDS.map(k => [k, weights[k.key] || 1]);
+  const total = entries.reduce((s, [,w]) => s + w, 0);
+  let r = Math.random() * total;
+  for (const [k, w] of entries){
+    r -= w;
+    if (r <= 0) return k;
+  }
+  return entries[entries.length-1][0];
+}
+let _profileWeights = null;
+async function ensureProfileWeights(){
+  if (_profileWeights) return _profileWeights;
+  const profile = await loadLatestProfile();
+  _profileWeights = weightVisitorKindsByProfile(profile);
+  if (profile){
+    console.log('[Visitor] biased by Coherence profile:', profile.participant_id || '(no id)', _profileWeights);
+  }
+  return _profileWeights;
+}
+function generateVisitor(){
+  // Bias by Coherence Assessment profile if running inside Present Palm and
+  // a profile exists. Falls back to uniform random otherwise.
+  // (Note: _profileWeights is cached; populated by summonVisitor's
+  // ensureProfileWeights() call before this fires.)
+  const weights = _profileWeights || { lost:1, witness:1, returning:1, bearer:1 };
+  const kind = weightedRandomKind(weights);
+  const first = FIRST_NAMES[Math.floor(Math.random() * FIRST_NAMES.length)];
+  const last = LAST_NAMES[Math.floor(Math.random() * LAST_NAMES.length)];
+  const targetName = FIRST_NAMES[Math.floor(Math.random() * FIRST_NAMES.length)];
+  const visitor = {
+    kind: kind.key,
+    kindName: kind.name,
+    name: first,
+    fullName: `${first} ${last}`,
+    epithet: kind.epithet,
+    targetName,
+    portraitImg: null,
+    portraitPrompt: buildVisitorPortraitPrompt(kind, first, last),
+    opener: kind.opener.replace(/\{playerName\}/g, State.playerName).replace(/\{targetName\}/g, targetName),
+    inquireChoices: kind.inquireChoices,
+    revealLine: kind.revealLine.replace(/\{playerName\}/g, State.playerName).replace(/\{targetName\}/g, targetName),
+    timestamp: Date.now(),
+  };
+  return visitor;
+}
+
+function buildVisitorPortraitPrompt(kind, first, last){
+  return `Painterly oil painting portrait of ${kind.promptDetails}. Fully clothed in long coat and layered clothing, modest dress.
+Standing in a dimly-lit apartment hallway at night, near-future cyberpunk setting.
+Warm orange lamplight catches them from one side (from the apartment doorway), cool blue-violet shadow on the other side. Slightly out-of-focus dim hallway behind them with a brass wall sconce.
+Half-body framing, facing slightly toward the viewer but not directly at the camera. Calm dignified expression.
+Painterly brushwork in the style of Disco Elysium and Kentucky Route Zero. Cinematic, moody, melancholy. Real human warmth in the face. Single subject, head and shoulders visible.`;
+}
+
+async function summonVisitor(){
+  const knockDetail = State.provider === 'aihorde'
+    ? 'AI Horde is painting them as they climb the stairs. Updates will appear as we wait.'
+    : 'Someone is coming up the stairs. We are painting them as they climb.';
+  showLoading('A KNOCK AT THE DOOR', knockDetail);
+  // Ensure Coherence Assessment profile (if any) has biased the archetype
+  // weights before we pick this visit's archetype.
+  await ensureProfileWeights();
+  try {
+    const visitor = generateVisitor();
+    const portraitSize = State.provider === 'openai' ? '1024x1536' :
+                         State.provider === 'huggingface' ? '768x1024' :
+                         State.provider === 'aihorde' ? '768x1024' : '768x1152';
+    visitor.portraitImg = await generateImage(visitor.portraitPrompt, {
+      size: portraitSize, model: State.apiModel, quality: 'medium',
+      bankKind: 'visitors', bankSlug: visitor.kind.key,
+    });
+    State.currentVisit = visitor;
+    hideLoading();
+    // Show knock indicator
+    $('knock-indicator').classList.add('show');
+    knockSound();
+    setTimeout(() => { knockSound(); }, 2500);
+  } catch (e){
+    hideLoading();
+    toast('Visitor generation failed: ' + e.message, 'error');
+    console.error(e);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  PEEPHOLE — fisheye distortion
+// ═══════════════════════════════════════════════════════════════════════
+function showPeephole(){
+  $('peephole').classList.add('show');
+  $('knock-indicator').classList.remove('show');
+  const canvas = $('peephole-canvas');
+  const cw = canvas.width, ch = canvas.height;
+  const ctx = canvas.getContext('2d');
+  // Load visitor portrait into image
+  const img = new Image();
+  img.onload = () => {
+    // Render with fisheye distortion
+    ctx.fillStyle = '#1a0d0a';
+    ctx.fillRect(0, 0, cw, ch);
+    // Draw image centered with barrel distortion approximation
+    const offscreen = document.createElement('canvas');
+    offscreen.width = img.width; offscreen.height = img.height;
+    const octx = offscreen.getContext('2d');
+    octx.drawImage(img, 0, 0);
+    const src = octx.getImageData(0, 0, img.width, img.height);
+    const dst = ctx.createImageData(cw, ch);
+    const cx = cw/2, cy = ch/2;
+    const maxR = Math.min(cw, ch) / 2;
+    for (let y = 0; y < ch; y++){
+      for (let x = 0; x < cw; x++){
+        const dx = x - cx, dy = y - cy;
+        const r = Math.sqrt(dx*dx + dy*dy);
+        if (r > maxR){
+          const di = (y*cw + x)*4;
+          dst.data[di] = 8; dst.data[di+1] = 4; dst.data[di+2] = 6; dst.data[di+3] = 255;
+          continue;
+        }
+        // Barrel distortion: source radius = dest radius normalized through fisheye
+        const rn = r / maxR;
+        // Fisheye: theta = rn * pi/2 (so edge maps to 90deg)
+        const theta = rn * Math.PI / 2;
+        const srcR = Math.sin(theta) * maxR * 1.4; // exaggerate
+        const angle = Math.atan2(dy, dx);
+        const sx = cx + Math.cos(angle) * srcR;
+        const sy = cy + Math.sin(angle) * srcR;
+        // Map dst (cw x ch) to src (img.width x img.height) — center-fit
+        const scaleX = img.width / cw;
+        const scaleY = img.height / ch;
+        const six = Math.floor(sx * scaleX);
+        const siy = Math.floor(sy * scaleY);
+        if (six < 0 || six >= img.width || siy < 0 || siy >= img.height){
+          const di = (y*cw + x)*4;
+          dst.data[di] = 8; dst.data[di+1] = 4; dst.data[di+2] = 6; dst.data[di+3] = 255;
+          continue;
+        }
+        const si = (siy*img.width + six)*4;
+        const di = (y*cw + x)*4;
+        // Darken at edges (vignette) — multiply by (1 - rn^2 * 0.7)
+        const v = 1 - rn * rn * 0.6;
+        // Warm tint at center
+        const warm = 1 - rn * 0.4;
+        dst.data[di]   = Math.min(255, src.data[si]   * v * warm);
+        dst.data[di+1] = Math.min(255, src.data[si+1] * v);
+        dst.data[di+2] = Math.min(255, src.data[si+2] * v * (1 - rn * 0.15));
+        dst.data[di+3] = 255;
+      }
+    }
+    ctx.putImageData(dst, 0, 0);
+    // Soft outer dark ring
+    const grad = ctx.createRadialGradient(cx, cy, maxR * 0.55, cx, cy, maxR);
+    grad.addColorStop(0, 'rgba(0,0,0,0)');
+    grad.addColorStop(1, 'rgba(0,0,0,0.65)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, cw, ch);
+  };
+  img.src = State.currentVisit.portraitImg;
+
+  // Click anywhere to close peephole and present door choice
+  $('peephole').onclick = () => {
+    $('peephole').classList.remove('show');
+    // Auto-open the door for now (could add a confirm step)
+    setTimeout(openTheDoor, 200);
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  CONVERSATION
+// ═══════════════════════════════════════════════════════════════════════
+function openTheDoor(){
+  const v = State.currentVisit;
+  if (!v) return;
+  $('conv-bg').style.backgroundImage = `url(${State.apartmentImg})`;
+  $('visitor-portrait').style.backgroundImage = `url(${v.portraitImg})`;
+  $('visitor-name').textContent = v.fullName;
+  $('visitor-epithet').textContent = v.epithet;
+  setStage('conversation', true);
+  // Visitor opens
+  presentLine('THEM', v.name.toUpperCase(), v.opener, v.inquireChoices, 'visitor');
+}
+
+let typeTimer = null;
+function presentLine(speakerRole, speakerName, text, choices, who){
+  // Typewriter the text
+  const txtEl = $('dlg-text');
+  const choicesEl = $('dialogue-choices');
+  $('dlg-speaker').textContent = speakerName;
+  $('dlg-speaker').classList.toggle('self', who === 'self');
+  txtEl.classList.toggle('self', who === 'self');
+  choicesEl.innerHTML = '';
+  txtEl.textContent = '';
+  if (typeTimer){ clearInterval(typeTimer); typeTimer = null; }
+  let i = 0;
+  typeTimer = setInterval(() => {
+    txtEl.textContent = text.slice(0, i+1);
+    i++;
+    if (i >= text.length){
+      clearInterval(typeTimer); typeTimer = null;
+      renderChoices(choices);
+    }
+  }, 22);
+  // Skip typewriter on click
+  txtEl.onclick = () => {
+    if (typeTimer){
+      clearInterval(typeTimer); typeTimer = null;
+      txtEl.textContent = text;
+      renderChoices(choices);
+    }
+  };
+}
+
+function renderChoices(choices){
+  const el = $('dialogue-choices');
+  el.innerHTML = '';
+  if (!choices || choices.length === 0){
+    // Final beat — show "end visit" button
+    const btn = document.createElement('div');
+    btn.className = 'choice';
+    btn.innerHTML = `<span class="marker">▸</span>Let the silence settle. Close the door.`;
+    btn.onclick = () => endVisit();
+    el.appendChild(btn);
+    return;
+  }
+  choices.forEach((c, i) => {
+    const div = document.createElement('div');
+    div.className = `choice tone-${c.tone}`;
+    div.innerHTML = `<span class="marker">${(i+1).toString().padStart(2,'0')}</span>${c.text}`;
+    div.onclick = () => handleChoice(c);
+    el.appendChild(div);
+  });
+}
+
+function handleChoice(choice){
+  const v = State.currentVisit;
+  // Echo player choice as their dialogue
+  setTimeout(() => {
+    if (choice.leads === 'reveal-name' || choice.leads === 'tell' || choice.leads === 'tell-years' ||
+        choice.leads === 'describe-man' || choice.leads === 'safe-check'){
+      presentLine('THEM', v.name.toUpperCase(), v.revealLine, [
+        { text: "I'm sorry. I want to help, but I can't right now.", tone: 'refuse', leads: 'closed' },
+        { text: "Come in. Sit. Tell me everything.", tone: 'help', leads: 'in' },
+        { text: "Stay where you are. I need to think.", tone: 'probe', leads: 'pause' },
+        { text: "I don't think this is for me.", tone: 'refuse', leads: 'closed' },
+      ], 'visitor');
+    } else if (choice.leads === 'come-in' || choice.leads === 'accept'){
+      presentLine('THEM', v.name.toUpperCase(),
+        "Thank you. I — thank you. I won't take long.",
+        null, 'visitor');
+    } else if (choice.leads === 'dismissed'){
+      presentLine('THEM', v.name.toUpperCase(),
+        "I see. I'm sorry to have disturbed you. Goodnight.",
+        null, 'visitor');
+    } else if (choice.leads === 'in'){
+      presentLine('NARRATOR', 'NARRATOR',
+        `${v.name} stepped past the threshold. The door closed behind them. The hour belonged to whatever happened next.`,
+        null, 'self');
+    } else if (choice.leads === 'closed'){
+      presentLine('THEM', v.name.toUpperCase(),
+        "Alright. Alright. I understand.",
+        null, 'visitor');
+    } else if (choice.leads === 'pause'){
+      presentLine('NARRATOR', 'NARRATOR',
+        `Silence stretched between them. ${v.name} did not move. Neither did you.`,
+        null, 'self');
+    } else {
+      presentLine('NARRATOR', 'NARRATOR', `The conversation closes around itself.`, null, 'self');
+    }
+  }, 320);
+}
+
+function endVisit(){
+  const v = State.currentVisit;
+  // Pick an epitaph
+  const epitaphs = [
+    `You closed the door. The hallway light bled out under it for a moment, then was gone.`,
+    `The peephole was dark again. The kettle was still warm.`,
+    `It was 15 minutes. ${v ? v.name : 'They'} would either come back, or not. You sat down.`,
+    `In the morning you wouldn't remember the exact words. You would remember the rain.`,
+    `Outside, the city kept going. Inside, you were still here.`,
+  ];
+  $('end-epitaph').textContent = epitaphs[Math.floor(Math.random() * epitaphs.length)];
+  $('end-visit').classList.add('show');
+
+  // Log the visit
+  if (v){
+    State.visits.push({
+      timestamp: v.timestamp,
+      visitor: { name: v.fullName, epithet: v.epithet, kind: v.kind },
+    });
+  }
+  State.currentVisit = null;
+  saveState();
+  if (window.fracture.shell){
+    window.fracture.emit('visit.log.v1', {
+      visitor: v ? { name: v.fullName, kind: v.kind } : null,
+      timestamp: Date.now(),
+    });
+  }
+}
+
+$('end-continue').onclick = () => {
+  $('end-visit').classList.remove('show');
+  setStage('stage-apartment');
+  refreshHud();
+};
+
+// ═══════════════════════════════════════════════════════════════════════
+//  SETTINGS
+// ═══════════════════════════════════════════════════════════════════════
+$('btn-settings').onclick = () => {
+  $('set-name').textContent = State.playerName;
+  $('set-visit').textContent = State.visitTime;
+  const providerLabels = {
+    'aihorde':      'AI Horde (free, anonymous)',
+    'pollinations': 'Pollinations (free)',
+    'huggingface':  'Hugging Face (free w/ token)',
+    'openai':       'OpenAI (paid)',
+  };
+  const modelLabels = {
+    'aihorde':      State.hordeModel,
+    'pollinations': State.pollinationsModel,
+    'huggingface':  (State.hfModel || '').split('/').pop(),
+    'openai':       State.apiModel,
+  };
+  $('set-provider').textContent = providerLabels[State.provider] || State.provider;
+  $('set-model').textContent = modelLabels[State.provider] || '—';
+  $('set-visits').textContent = State.visits.length;
+  $('settings-modal').classList.add('show');
+};
+$('btn-close-settings').onclick = () => $('settings-modal').classList.remove('show');
+$('btn-visit-now').onclick = () => {
+  $('settings-modal').classList.remove('show');
+  if (State.currentVisit){
+    toast('A visitor is already here.', 'info');
+    return;
+  }
+  summonVisitor();
+};
+// In-game upload — same as setup-step-2 upload, but applies live.
+$('apt-upload-settings').onchange = async (ev) => {
+  const f = ev.target.files && ev.target.files[0];
+  if (!f) return;
+  if (!f.type.startsWith('image/')){ toast('Not an image file.', 'error'); return; }
+  if (f.size > 12 * 1024 * 1024){ toast('Image is over 12MB. Resize first.', 'error'); return; }
+  try {
+    const dataUrl = await new Promise((res, rej) => {
+      const r = new FileReader();
+      r.onload = () => res(r.result);
+      r.onerror = () => rej(r.error);
+      r.readAsDataURL(f);
+    });
+    State.apartmentImg = dataUrl;
+    $('apartment-bg').style.backgroundImage = `url(${dataUrl})`;
+    await saveState();
+    $('settings-modal').classList.remove('show');
+    toast(`Apartment updated from "${f.name}".`);
+  } catch(e){
+    toast('Failed to load image: ' + e.message, 'error');
+  }
+  ev.target.value = ''; // allow re-uploading the same file later
+};
+$('btn-regen-apt').onclick = async () => {
+  $('settings-modal').classList.remove('show');
+  showLoading('REPAINTING', 'The corners are being repainted.');
+  try {
+    const prompt = APT_MOOD_PROMPTS[State.aptMood];
+    const size = State.provider === 'openai' ? '1536x1024' :
+                 State.provider === 'huggingface' ? '1024x640' :
+                 State.provider === 'aihorde' ? '1024x640' : '1280x768';
+    State.apartmentImg = await generateImage(prompt, { size, model: State.apiModel, quality: 'medium',
+      bankKind:'apartments', bankSlug: State.aptMood });
+    $('apartment-bg').style.backgroundImage = `url(${State.apartmentImg})`;
+    await saveState();
+    hideLoading();
+    toast('Apartment refreshed.');
+  } catch(e){
+    hideLoading();
+    toast('Repaint failed: ' + e.message, 'error');
+  }
+};
+
+$('btn-switch-provider').onclick = () => {
+  $('settings-modal').classList.remove('show');
+  // Pre-populate setup step 1 with current values
+  $('api-provider').value = State.provider;
+  updateProviderUI();
+  if (State.provider === 'openai'){
+    $('api-key').value = State.apiKey || '';
+    $('api-model').value = State.apiModel;
+  } else if (State.provider === 'huggingface'){
+    $('hf-token').value = State.hfToken || '';
+    $('hf-model').value = State.hfModel;
+  } else if (State.provider === 'aihorde'){
+    $('horde-key').value = (State.hordeKey && State.hordeKey !== '0000000000') ? State.hordeKey : '';
+    $('horde-model').value = State.hordeModel;
+  } else {
+    $('pollinations-model').value = State.pollinationsModel;
+    $('pollinations-token').value = State.pollinationsToken || '';
+  }
+  $('player-name').value = State.playerName || '';
+  $('apt-mood').value = State.aptMood;
+  $('visit-time').value = State.visitTime;
+  $('setup-step-1').style.display = 'block';
+  $('setup-step-2').style.display = 'none';
+  $('setup-step-3').style.display = 'none';
+  $('welcome-step-label').textContent = 'CHANGE PROVIDER';
+  setStage('stage-welcome');
+};
+$('btn-wipe').onclick = async () => {
+  if (!confirm('Erase everything? This cannot be undone.')) return;
+  await window.fracture.delete('state');
+  location.reload();
+};
+
+// ═══════════════════════════════════════════════════════════════════════
+//  STAGE / TOAST / LOADING HELPERS
+// ═══════════════════════════════════════════════════════════════════════
+function setStage(id, isConversation=false){
+  document.querySelectorAll('.stage').forEach(s => s.classList.remove('active'));
+  const el = $(id);
+  if (el) el.classList.add('active');
+  // Conversation modal toggle
+  if (isConversation || id === 'conversation'){
+    $('conversation').classList.add('show');
+  } else {
+    $('conversation').classList.remove('show');
+  }
+}
+
+let toastTimer = null;
+function toast(msg, kind='info'){
+  const el = $('toast');
+  el.textContent = msg;
+  el.classList.toggle('error', kind === 'error');
+  el.classList.add('show');
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 3500);
+}
+
+function showLoading(text, detail){
+  $('loading-text').textContent = text;
+  $('loading-detail').textContent = detail || '';
+  $('loading').classList.add('show');
+}
+function hideLoading(){ $('loading').classList.remove('show'); }
+
+// ═══════════════════════════════════════════════════════════════════════
+//  BOOT
+// ═══════════════════════════════════════════════════════════════════════
+(async function boot(){
+  const ok = await loadState();
+  // Default to AI Horde on fresh install (free, no signup, no CORS issues)
+  if (!ok || !State.provider){
+    $('api-provider').value = 'aihorde';
+  } else {
+    $('api-provider').value = State.provider;
+  }
+  updateProviderUI();
+  if (ok && State.apartmentImg && State.playerName){
+    enterApartment();
+  }
+})();
+</script>
+</body>
+</html>

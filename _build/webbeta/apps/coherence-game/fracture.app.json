@@ -1,0 +1,16 @@
+{
+  "slug": "coherence-game",
+  "name": "Coherence",
+  "version": "1.0.0",
+  "icon": "icon.png",
+  "entry": "index.html",
+  "runtime": "html5",
+  "description": "Dark fantasy platformer based on the Triadic Coherence Framework. Three rings — FORM, BOND, THREAD — govern color, link, and echo mechanics across 10 stages. Three playable classes mirror the three axes of orientation.",
+  "inputs":  [],
+  "outputs": [],
+  "tags": ["game", "platformer", "coherence", "narrative", "triadic"],
+  "author": "P.R. Erickson · Avner Media",
+  "license": "personal-use",
+  "window_width": 1280,
+  "window_height": 760
+}

@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Present Palm — public beta</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%230b141b'/%3E%3Crect x='6' y='6' width='9' height='20' fill='%23ff5268'/%3E%3Crect x='18' y='6' width='8' height='9' fill='%232cb8c7'/%3E%3Crect x='18' y='18' width='8' height='8' fill='%23f4bb3d'/%3E%3C/svg%3E">
+<meta name="description" content="Fracture City and the Present Palm arcade. A block city, a survival game, and the tools that build them. Free public beta.">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --paper:#f5f0e4; --ink:#0b141b; --ink-2:#12202a;
+  --coral:#ff5268; --cyan:#2cb8c7; --violet:#7956c9; --amber:#f4bb3d; --green:#51c68f;
+  --dim:#8a94a0; --fade:#5a6470; --line:rgba(245,240,228,.14);
+}
+html{scroll-behavior:smooth}
+body{
+  background:var(--ink); color:var(--paper); min-height:100%;
+  font:16px/1.6 Georgia,'Iowan Old Style',serif;
+  background-image:
+    radial-gradient(ellipse at 20% -10%, rgba(121,86,201,.20), transparent 55%),
+    radial-gradient(ellipse at 90% 5%, rgba(255,82,104,.14), transparent 50%),
+    repeating-linear-gradient(0deg, rgba(255,255,255,.014) 0 1px, transparent 1px 3px);
+}
+.wrap{max-width:1080px;margin:0 auto;padding:0 24px}
+.mono{font:700 10px/1.4 'SF Mono',Menlo,monospace;letter-spacing:.22em;text-transform:uppercase}
+
+header{padding:76px 0 54px;border-bottom:1px solid var(--line)}
+.kicker{color:var(--cyan)}
+h1{font-size:clamp(46px,8.5vw,104px);line-height:.92;letter-spacing:-.04em;margin:18px 0 0;font-weight:700}
+h1 em{font-style:normal;color:var(--coral)}
+.lede{max-width:660px;margin-top:24px;font-size:20px;line-height:1.62;color:#d8d2c4}
+.lede b{color:var(--paper);font-weight:700}
+.badges{display:flex;gap:10px;flex-wrap:wrap;margin-top:26px}
+.badge{padding:7px 13px;border:1px solid var(--line);color:var(--dim)}
+.badge.hot{border-color:rgba(255,82,104,.5);color:var(--coral)}
+
+.play{
+  display:inline-flex;align-items:center;gap:14px;margin-top:34px;padding:19px 34px;
+  background:var(--coral);color:var(--ink);text-decoration:none;
+  font:700 13px/1 'SF Mono',Menlo,monospace;letter-spacing:.22em;text-transform:uppercase;
+  transition:transform .14s ease, box-shadow .14s ease;
+}
+.play:hover{transform:translate(-2px,-2px);box-shadow:6px 6px 0 var(--amber)}
+.play span{font-size:19px}
+
+section{padding:56px 0}
+h2{font-size:13px;letter-spacing:.24em;text-transform:uppercase;font-family:'SF Mono',Menlo,monospace;
+   color:var(--fade);border-bottom:1px solid var(--line);padding-bottom:12px;margin-bottom:28px;font-weight:700}
+
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(268px,1fr));gap:16px}
+.card{
+  display:block;padding:22px;text-decoration:none;color:inherit;position:relative;
+  background:rgba(245,240,228,.035);border:1px solid var(--line);
+  transition:background .16s, border-color .16s, transform .16s;
+}
+.card:hover{background:rgba(245,240,228,.075);border-color:rgba(245,240,228,.34);transform:translateY(-3px)}
+.card .tag{color:var(--fade)}
+.card h3{font-size:25px;line-height:1.12;letter-spacing:-.02em;margin:10px 0 9px;font-weight:700}
+.card p{font-size:15px;line-height:1.55;color:var(--dim)}
+.card .ver{position:absolute;top:20px;right:20px;font:700 9px/1 'SF Mono',monospace;
+  letter-spacing:.12em;color:var(--fade)}
+.card.big{grid-column:1/-1;padding:32px;background:rgba(255,82,104,.07);border-color:rgba(255,82,104,.34)}
+.card.big h3{font-size:clamp(34px,5vw,50px);margin-top:12px}
+.card.big p{font-size:17px;max-width:640px}
+.c-coral .tag{color:var(--coral)} .c-cyan .tag{color:var(--cyan)}
+.c-violet .tag{color:var(--violet)} .c-amber .tag{color:var(--amber)}
+.c-green .tag{color:var(--green)}
+
+.note{border-left:3px solid var(--amber);padding:16px 20px;background:rgba(244,187,61,.06);
+  margin-top:26px;font-size:15px;line-height:1.6;color:#ddd7c9}
+.note strong{display:block;margin-bottom:6px;color:var(--amber);
+  font:700 9px/1.4 'SF Mono',monospace;letter-spacing:.18em;text-transform:uppercase}
+
+dl.keys{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px 22px;margin-top:6px}
+dl.keys div{display:flex;gap:11px;align-items:baseline}
+dl.keys dt{font:700 10px/1.5 'SF Mono',monospace;letter-spacing:.1em;color:var(--paper);
+  background:rgba(245,240,228,.1);padding:3px 8px;white-space:nowrap}
+dl.keys dd{font-size:14px;color:var(--dim)}
+
+footer{padding:48px 0 72px;border-top:1px solid var(--line);color:var(--fade);font-size:14px}
+footer p+p{margin-top:10px}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <p class="mono kicker">Avner Media // public beta</p>
+    <h1>Present<br><em>Palm</em></h1>
+    <p class="lede">
+      A block city you can take apart, a survival game under it, an arcade of things
+      that run inside it, and the tools that made all of them. <b>Everything here runs
+      in the browser and costs nothing.</b> It is a beta: rough in places, and honest about it.
+    </p>
+    <div class="badges">
+      <span class="badge mono hot">Beta</span>
+      <span class="badge mono">Free</span>
+      <span class="badge mono">No account</span>
+      <span class="badge mono">Nothing leaves your machine</span>
+      <span class="badge mono">Desktop · keyboard &amp; mouse</span>
+    </div>
+    <a class="play" href="apps/fracture-city-game/index.html"><span>▶</span> Enter Fracture City</a>
+  </div>
+</header>
+
+<section>
+  <div class="wrap">
+    <h2>Games</h2>
+    <div class="grid">
+
+      <a class="card big c-coral" href="apps/fracture-city-game/index.html">
+        <span class="ver">v0.10.0</span>
+        <p class="mono tag">Open world · voxel · first person</p>
+        <h3>Fracture City</h3>
+        <p>They told Newsman Ned it was temporary. The broadcast ended anyway, and he has been
+           in the block world since. Mine it, build in it, drive through it, talk to the people
+           who live there — and press <b>shift+Z</b> if you would rather it were a siege.
+           There is an arcade inside the city that runs the other games on this page.</p>
+      </a>
+
+      <a class="card c-green" href="apps/still-human/index.html">
+        <span class="ver">v0.2.0</span>
+        <p class="mono tag">Round survival</p>
+        <h3>Still Human</h3>
+        <p>Hold a yard against the turned. Between waves a hatch opens onto a lab maze with a man
+           in it who knows how to change them back — after that, killing stops being the only option.</p>
+      </a>
+
+      <a class="card c-green" href="apps/sun-fall/index.html">
+        <span class="ver">v0.2.0</span>
+        <p class="mono tag">Sci-fi horror</p>
+        <h3>Sun Fall</h3>
+        <p>A dying station, a reactor that needs restarting, and things patrolling the dark
+           between you and it.</p>
+      </a>
+
+      <a class="card c-amber" href="apps/coherence-game/index.html">
+        <span class="ver">v1.0.0</span>
+        <p class="mono tag">Dark platformer</p>
+        <h3>Coherence</h3>
+        <p>Side-on, and about holding yourself together while the ground argues.</p>
+      </a>
+
+      <a class="card c-violet" href="apps/palm-drive/index.html">
+        <span class="ver">v3.0.0</span>
+        <p class="mono tag">Pseudo-3D racer</p>
+        <h3>Palm Drive</h3>
+        <p>Sunset, a long road, and a horizon that keeps bending. The oldest thing here
+           and still the fastest.</p>
+      </a>
+
+      <a class="card c-cyan" href="apps/the-visitor/index.html">
+        <span class="ver">v0.1.0</span>
+        <p class="mono tag">One stranger, daily</p>
+        <h3>The Visitor</h3>
+        <p>Somebody turns up. You decide what that is worth.</p>
+      </a>
+
+    </div>
+
+    <div class="note">
+      <strong>If the mouse will not lock</strong>
+      Fracture City, Still Human and Sun Fall use mouse-look, which needs pointer lock. If the page
+      is running inside an embed and the camera will not turn, open it in its own tab — everything
+      works normally there.
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>Make things</h2>
+    <div class="grid">
+
+      <a class="card c-coral" href="apps/character-forge/index.html">
+        <span class="ver">v1.0.0</span>
+        <p class="mono tag">Character maker</p>
+        <h3>Forge</h3>
+        <p>Build a person — face, build, clothes, handle — and keep them. Everything else here
+           can use one once it exists.</p>
+      </a>
+
+      <a class="card c-cyan" href="apps/scene-composer/index.html">
+        <span class="ver">v1.0.0</span>
+        <p class="mono tag">Scene builder</p>
+        <h3>Scene Composer</h3>
+        <p>Put a cast in a place and stage what happens between them.</p>
+      </a>
+
+      <a class="card c-violet" href="apps/episode-generator/index.html">
+        <span class="ver">v2.0.0</span>
+        <p class="mono tag">Episodes</p>
+        <h3>Episode Generator</h3>
+        <p>Scenes into an episode, with the cast carried through rather than retyped.</p>
+      </a>
+
+      <a class="card c-violet" href="apps/episode-stitcher/index.html">
+        <span class="ver">v1.0.0</span>
+        <p class="mono tag">Assembly</p>
+        <h3>Episode Stitcher</h3>
+        <p>Episodes into a run of them, in an order that holds.</p>
+      </a>
+
+      <a class="card c-amber" href="apps/works/index.html">
+        <span class="ver">v0.1.0</span>
+        <p class="mono tag">3D gallery</p>
+        <h3>The Works</h3>
+        <p>A room you walk through, hung with whatever you have made.</p>
+      </a>
+
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>Write and keep</h2>
+    <div class="grid">
+
+      <a class="card c-cyan" href="apps/essays/index.html">
+        <span class="ver">v0.1.0</span>
+        <p class="mono tag">Writing · publishing</p>
+        <h3>Essays</h3>
+        <p>Write under your own name, in markdown, with drafts and a reading view. Export turns
+           everything you have published into one static page you own and can host anywhere.</p>
+      </a>
+
+      <a class="card c-green" href="apps/character-library/index.html">
+        <span class="ver">v1.0.0</span>
+        <p class="mono tag">Cast</p>
+        <h3>Character Library</h3>
+        <p>Everyone you have made, in one place, readable by everything else.</p>
+      </a>
+
+      <a class="card c-green" href="apps/profile-library/index.html">
+        <span class="ver">v1.0.0</span>
+        <p class="mono tag">Profiles</p>
+        <h3>Profile Library</h3>
+        <p>The longer form of a person: what they want, what they will not do.</p>
+      </a>
+
+      <a class="card c-amber" href="apps/coherence-assessment/index.html">
+        <span class="ver">v1.0.0</span>
+        <p class="mono tag">Assessment</p>
+        <h3>Coherence Assessment</h3>
+        <p>A set of questions and what they add up to. Feeds The Visitor.</p>
+      </a>
+
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>Controls — Fracture City</h2>
+    <dl class="keys">
+      <div><dt>WASD</dt><dd>move</dd></div>
+      <div><dt>MOUSE</dt><dd>look</dd></div>
+      <div><dt>SHIFT</dt><dd>sprint</dd></div>
+      <div><dt>SPACE</dt><dd>jump</dd></div>
+      <div><dt>E</dt><dd>interact, talk, enter</dd></div>
+      <div><dt>1 2 3</dt><dd>baton, pistol, scatter</dd></div>
+      <div><dt>B</dt><dd>build mode</dd></div>
+      <div><dt>T</dt><dd>write a thought</dd></div>
+      <div><dt>I</dt><dd>inventory</dd></div>
+      <div><dt>SHIFT + Z</dt><dd>start or end a siege</dd></div>
+      <div><dt>ESC</dt><dd>menu</dd></div>
+    </dl>
+
+    <div class="note">
+      <strong>What a beta means here</strong>
+      Your progress is saved in this browser only — clearing site data clears it, and it does not
+      follow you to another machine. There is no sound yet. It needs a keyboard and a mouse, so
+      phones and tablets are out. On a modest laptop the city can be heavy; the other games are light.
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <p class="mono">Present Palm · Avner Media</p>
+    <p>Made as a hub of small self-contained things rather than one large thing. Each app on this
+       page is a single HTML file that runs on its own, keeps its own data on your machine, and
+       talks to the others only when you ask it to.</p>
+    <p>Found something broken? That is the point of a beta — say what you were doing when it happened.</p>
+  </div>
+</footer>
+
+</body>
+</html>

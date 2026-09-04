@@ -1,0 +1,26 @@
+{
+  "slug": "episode-stitcher",
+  "name": "Episode Stitcher",
+  "version": "1.0.0",
+  "icon": "icon.png",
+  "entry": "index.html",
+  "runtime": "html5",
+  "description": "Arranges 3-13 scenes into a 5-act episode of the Fracture City animated show. Generates connective transitions, infers themes, composes title and logline, plots the tension arc, tracks character continuity. Consumes scene.moment.v1; produces episode.outline.v1 ready for animation production.",
+  "inputs": [
+    {
+      "type": "scene.moment.v1",
+      "description": "Individual scenes — selected from the saved scene library and arranged into act structure."
+    }
+  ],
+  "outputs": [
+    {
+      "type": "episode.outline.v1",
+      "description": "Full episode record: title, logline, themes, ordered scenes with transitions, tension arc, character continuity, runtime estimate."
+    }
+  ],
+  "tags": ["episode", "story", "show", "production", "arc", "fracture-city", "tv"],
+  "author": "Avner Media",
+  "license": "personal-use",
+  "window_width": 1340,
+  "window_height": 880
+}

@@ -1,0 +1,21 @@
+{
+  "slug": "character-library",
+  "name": "Character Library",
+  "version": "1.0.0",
+  "icon": "icon.png",
+  "entry": "index.html",
+  "runtime": "html5",
+  "description": "Browse, search, and inspect every character saved from Character Forge. Listens on the bus for character.identity.v1 events. Filter by zone, class, stamp, origin stage. Open any character directly into Scene Composer.",
+  "inputs": [
+    {
+      "type": "character.identity.v1",
+      "description": "All characters created in Character Forge automatically appear here. Subscribed live."
+    }
+  ],
+  "outputs": [],
+  "tags": ["library", "archive", "characters", "cast", "fracture-city", "browser"],
+  "author": "Avner Media",
+  "license": "personal-use",
+  "window_width": 1180,
+  "window_height": 820
+}

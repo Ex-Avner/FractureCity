@@ -1,0 +1,26 @@
+{
+  "slug": "works",
+  "name": "The Works",
+  "version": "0.1.0",
+  "icon": "icon.png",
+  "entry": "index.html",
+  "runtime": "html5",
+  "description": "Interactive 3D gallery of Ex Avner's collected works. The book 'The Collapse of Meaning' sits at the center as the primary shard; surrounding shards open into Fracture City — the animated show, the game, the visitor, and the toolchain that builds them. Each shard is a piece of a fractured mirror; clicking one reveals the work it reflects.",
+  "inputs": [
+    {
+      "type": "tot.profile.v1",
+      "description": "Optional. A Coherence Assessment profile subtly tints the reading palette."
+    }
+  ],
+  "outputs": [
+    {
+      "type": "reading.session.v1",
+      "description": "Which chapters of The Collapse of Meaning were opened, and how long."
+    }
+  ],
+  "tags": ["portfolio", "book", "fracture-city", "3d", "interactive", "the-collapse-of-meaning", "ex-avner", "showcase"],
+  "author": "Ex Avner",
+  "license": "personal-use",
+  "window_width": 1440,
+  "window_height": 900
+}

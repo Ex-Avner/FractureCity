@@ -1,0 +1,73 @@
+{
+  "stage": "The Archive",
+  "location": "the high stacks",
+  "time": {
+    "key": "evening",
+    "label": "evening",
+    "light": "lamplight",
+    "warmth": 0.6
+  },
+  "weather": "dry and warm",
+  "type": {
+    "key": "revelation",
+    "label": "revelation — truth surfaces"
+  },
+  "tension": "high — about to break",
+  "seed": "scene_mt3viyk1_1w4",
+  "title": "Threads, Evening",
+  "cast": [
+    {
+      "name": "Orion Fenwick of the Hive Choir",
+      "first": "Orion",
+      "zone": "V",
+      "subtype": "The Burden-Bearer",
+      "class": "Weaver of Bond",
+      "stamp": "Abandonment"
+    },
+    {
+      "name": "Sorrel Vey from before the Tally",
+      "first": "Sorrel",
+      "zone": "IV",
+      "subtype": "The Greenhouse",
+      "class": "Blade of Form",
+      "stamp": "None"
+    }
+  ],
+  "beats": [
+    {
+      "prose": "The high stacks at evening. Dry and warm. The light here is lamplight, and no one looks up at it — and beneath it, the light here is lamplight, and it changes everything.",
+      "label": "Establish"
+    },
+    {
+      "prose": "Orion and Sorrel steps through. The room registers them the way a place registers anything: the light here is lamplight, and it changes nothing.",
+      "label": "Enter"
+    },
+    {
+      "prose": "For a moment, Orion thinks Sorrel is someone else. The mistake corrects itself, but the corrected version carries the ghost of the first one.",
+      "label": "Recognize"
+    },
+    {
+      "prose": "Orion sets the bag down without unpacking it. A railing that has held more than it remembers.",
+      "label": "Engage"
+    },
+    {
+      "prose": "Sorrel stands. They had not meant to. The motion changes everything that follows.",
+      "label": "Turn"
+    },
+    {
+      "prose": "Something about Orion that has been carefully constructed comes loose. Not all of it. Enough that someone paying attention would see it.",
+      "label": "Reveal"
+    },
+    {
+      "prose": "Nothing is finished. Orion and Sorrel sit, or stand, or walk slowly toward the door, and what is between them stays between them. The cold of the stone through their cloak.",
+      "label": "Settle (open)"
+    }
+  ],
+  "moods": [
+    "tender",
+    "tense",
+    "breaking-open"
+  ],
+  "tensionNum": 0.9,
+  "timestamp": "2026-08-22T04:25:05.073Z"
+}

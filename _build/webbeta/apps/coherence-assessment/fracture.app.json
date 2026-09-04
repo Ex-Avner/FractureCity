@@ -1,0 +1,21 @@
+{
+  "slug": "coherence-assessment",
+  "name": "Coherence Assessment",
+  "version": "1.0.0",
+  "icon": "icon.png",
+  "entry": "index.html",
+  "runtime": "html5",
+  "description": "Condensed 36-item Triadic Orientation Assessment. Measures Vertical (Depth), Horizontal (Breath), and Temporal (Obligation) axes; reports zone, subtype, shape parameter, capture, and stamp signatures.",
+  "inputs":  [],
+  "outputs": [
+    {
+      "type": "tot.profile.v1",
+      "description": "Full TOT profile: pole scores, axes, zone, subtype, shape parameter, asymmetric geometry, capture analysis, stamp signatures."
+    }
+  ],
+  "tags": ["assessment", "psychometric", "tot", "coherence", "triadic", "erickson"],
+  "author": "Avner Media",
+  "license": "research-use",
+  "window_width": 1000,
+  "window_height": 820
+}

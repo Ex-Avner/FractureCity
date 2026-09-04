@@ -1,0 +1,38 @@
+{
+  "slug": "works",
+  "name": "The Works",
+  "version": "0.2.0",
+  "icon": "icon.png",
+  "entry": "index.html",
+  "runtime": "html5",
+  "description": "Interactive 3D gallery of Ex Avner's collected works, built around a reader for The Collapse of Meaning. The book sits at the centre of the room as a mirror cracked in thirty-two places; every chapter you finish fills one of those cracks with gold. The reader remembers where you stopped, searches all 34,221 words, keeps your marks, and turns pages on the arrow keys. Surrounding shards open into Fracture City — the show, the game, the visitor, and the toolchain that builds them.",
+  "inputs": [
+    {
+      "type": "tot.profile.v1",
+      "description": "Optional. A Coherence Assessment profile subtly tints the reading palette."
+    }
+  ],
+  "outputs": [
+    {
+      "type": "reading.session.v1",
+      "description": "Chapters read, furthest position in each, resume point, bookmarks and type settings."
+    }
+  ],
+  "tags": [
+    "portfolio",
+    "book",
+    "fracture-city",
+    "3d",
+    "interactive",
+    "the-collapse-of-meaning",
+    "ex-avner",
+    "showcase",
+    "reader",
+    "kintsugi",
+    "offline"
+  ],
+  "author": "Ex Avner",
+  "license": "personal-use",
+  "window_width": 1440,
+  "window_height": 900
+}

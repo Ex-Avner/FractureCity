@@ -1,0 +1,36 @@
+{
+  "slug": "light-bearer",
+  "name": "The Light Bearer",
+  "version": "1.0.1",
+  "entry": "index.html",
+  "runtime": "html5",
+  "description": "Chapter one of The Collapse of Meaning, made playable. You carry light, and the light is not yours \u2014 it comes from behind you and passes through. You have nine panes, and every act of certainty bricks one shut. Two numbers are on screen and only one of them matters: radiance, which rises every time you assert yourself and feels like a score, and transmission, which falls as the panes close. Eight scenes follow the chapter: the room where lighting the dark costs you nothing, three doors that answer with silence, a garden your light cannot reach, the high places where every follower you win closes another pane, the audience where the question is offered once, the fall, the kingdom you build and rule alone, and the coda. The one way out is the question the chapter says he never asked \u2014 and it can only be reached while enough of the window is still open to see through. Every line of prose is the book's, by index, generated from the Works app's own copy so it cannot drift.",
+  "inputs": [
+    {
+      "type": "person.v1",
+      "description": "The player \u2014 read from the shell so a reading is filed under the same name you use everywhere else in the hub."
+    }
+  ],
+  "outputs": [
+    {
+      "type": "lightbearer.run.v1",
+      "description": "A finished reading \u2014 which ending you reached, whether you asked the question, how many panes were still open, your radiance against your transmission, and how many followed you."
+    }
+  ],
+  "tags": [
+    "storybook",
+    "narrative",
+    "adaptation",
+    "the-collapse-of-meaning",
+    "chapter-one",
+    "canvas",
+    "no-dependencies"
+  ],
+  "author": "Ex Avner",
+  "source": {
+    "book": "The Collapse of Meaning",
+    "chapter": 1,
+    "chapterTitle": "THE LIGHT BEARER",
+    "prose": "Verbatim, generated from apps/works/data/book.json. The game never rewrites the chapter; its own voice appears only in stage directions, prompts, and a counterfactual ending that says on screen that it is not what happened."
+  }
+}

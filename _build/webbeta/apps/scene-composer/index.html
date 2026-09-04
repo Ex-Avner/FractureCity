@@ -1,0 +1,1253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Scene Composer · Fracture City</title>
+<script>
+(function(){
+  if (window.fracture && window.fracture.shell) return;
+  const prefix = 'fracture::scene-composer::';
+  window.fracture = {
+    shell:false, appSlug:'scene-composer', received:null,
+    save(k,v){ try{ localStorage.setItem(prefix+k, JSON.stringify(v)); }catch(e){} return Promise.resolve(true); },
+    read(k){ try{ const r=localStorage.getItem(prefix+k); return Promise.resolve(r==null?null:JSON.parse(r)); }catch(e){ return Promise.resolve(null); } },
+    list(){ const o=[]; for(let i=0;i<localStorage.length;i++){ const k=localStorage.key(i); if(k&&k.startsWith(prefix)) o.push(k.slice(prefix.length)); } return Promise.resolve(o); },
+    delete(k){ localStorage.removeItem(prefix+k); return Promise.resolve(true); },
+    listApps(){ return Promise.resolve([]); },
+    openApp(){ return Promise.resolve({ok:false,error:'standalone'}); },
+    emit(){ return Promise.resolve(true); },
+    subscribe(){ return ()=>{}; },
+    onPayload(){},
+  };
+})();
+</script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+:root{
+  --bg:#080614; --bg-2:#11091d; --panel:rgba(20,12,38,.82);
+  --line:rgba(120,200,255,.18); --line-2:rgba(180,140,255,.55);
+  --ink:#e7e2ff; --ink-dim:#9c93c6; --ink-fade:#6a608a;
+  --teal:#80ffff; --magenta:#ff60d0; --violet:#a040ff;
+  --gold:#ffd47a; --green:#7dffb3; --red:#ff7088;
+}
+html,body{
+  background:radial-gradient(ellipse at 50% 0%,#1a0f33 0%,#080614 70%);
+  min-height:100vh;color:var(--ink);
+  font-family:'Inter','Helvetica Neue',sans-serif;
+  -webkit-font-smoothing:antialiased;
+  overflow-x:hidden;
+}
+body{padding:20px 16px 60px;}
+.shell{max-width:1360px;margin:0 auto;}
+.mono{font-family:'SF Mono','Menlo','Courier New',monospace;}
+
+.hdr{display:flex;align-items:center;gap:18px;
+  border-bottom:1px solid var(--line);padding-bottom:14px;margin-bottom:16px;}
+.hdr .mark{width:46px;height:46px;}
+.hdr h1{font-family:'Courier New',monospace;font-size:22px;letter-spacing:8px;
+  background:linear-gradient(180deg,#80ffff 0%,#ff60d0 65%,#a040ff 100%);
+  -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
+  line-height:1;margin-bottom:4px;}
+.hdr .sub{font-family:'Courier New',monospace;font-size:10px;letter-spacing:4px;
+  color:var(--ink-dim);text-transform:uppercase;}
+.hdr .ctx{margin-left:auto;font-size:10px;color:var(--ink-fade);
+  font-family:'Courier New',monospace;letter-spacing:2px;}
+
+.toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;
+  margin-bottom:18px;padding:12px 14px;
+  background:var(--panel);border:1px solid var(--line);border-radius:5px;}
+.btn{font-family:'Courier New',monospace;font-size:11px;letter-spacing:3px;
+  text-transform:uppercase;background:rgba(40,20,80,.6);color:var(--teal);
+  border:1px solid var(--line-2);padding:8px 14px;cursor:pointer;border-radius:3px;
+  transition:all .15s;}
+.btn:hover{background:rgba(80,40,160,.7);color:#fff;
+  box-shadow:0 0 14px rgba(255,80,220,.4);}
+.btn.primary{background:linear-gradient(180deg,rgba(120,80,200,.5),rgba(60,20,120,.6));
+  color:#fff;border-color:rgba(255,140,220,.6);}
+
+.stage{display:grid;grid-template-columns:300px 1fr 320px;gap:14px;align-items:start;}
+@media (max-width:1180px){.stage{grid-template-columns:1fr;}}
+.col{background:var(--panel);border:1px solid var(--line);border-radius:5px;padding:18px;}
+.col h3{font-family:'Courier New',monospace;font-size:11px;letter-spacing:4px;
+  color:var(--magenta);text-transform:uppercase;margin:18px 0 8px;}
+.col h3:first-child{margin-top:0;}
+
+/* Parameters */
+.param{margin-bottom:10px;}
+.param label{display:block;font-family:'Courier New',monospace;font-size:10px;
+  letter-spacing:2px;color:var(--ink-fade);text-transform:uppercase;margin-bottom:4px;}
+.param select, .param input[type=text]{width:100%;background:rgba(8,4,16,.7);
+  border:1px solid var(--line);color:var(--ink);padding:6px 10px;border-radius:3px;
+  font-family:'SF Mono',monospace;font-size:12px;outline:none;}
+.param select:focus, .param input:focus{border-color:var(--magenta);}
+
+/* Cast picker */
+.cast-list{max-height:240px;overflow-y:auto;border:1px solid var(--line);
+  border-radius:3px;background:rgba(8,4,16,.5);padding:8px;}
+.cast-entry{display:flex;align-items:center;gap:8px;padding:6px;cursor:pointer;
+  border-radius:3px;transition:background .12s;}
+.cast-entry:hover{background:rgba(80,40,160,.2);}
+.cast-entry input{cursor:pointer;}
+.cast-entry .ce-name{flex:1;font-size:12px;color:var(--ink);}
+.cast-entry .ce-tag{font-family:'Courier New',monospace;font-size:9px;letter-spacing:1px;
+  color:var(--ink-fade);}
+.cast-empty{color:var(--ink-fade);font-size:12px;text-align:center;padding:14px;
+  font-family:'Inter',sans-serif;}
+.cast-empty a{color:var(--teal);cursor:pointer;text-decoration:underline;}
+
+.cast-active{margin-top:6px;display:flex;flex-direction:column;gap:4px;}
+.cast-active .ca-row{display:flex;align-items:center;gap:8px;padding:5px 8px;
+  background:rgba(40,20,80,.4);border:1px solid var(--line);border-radius:3px;
+  font-size:11.5px;}
+.cast-active .ca-rm{margin-left:auto;background:none;border:none;color:var(--ink-fade);
+  cursor:pointer;font-size:14px;line-height:1;padding:0 4px;}
+.cast-active .ca-rm:hover{color:var(--red);}
+
+/* CENTER — scene */
+.scene-head{display:flex;align-items:flex-start;gap:14px;
+  border-bottom:1px solid var(--line);padding-bottom:14px;margin-bottom:14px;}
+.atmos-wrap{flex:0 0 200px;height:130px;border-radius:4px;overflow:hidden;
+  border:1px solid var(--line);background:#0a0518;position:relative;}
+#atmos-svg{width:100%;height:100%;display:block;}
+.scene-title{flex:1;}
+.scene-title h2{font-family:'Cormorant Garamond',Georgia,serif;font-size:28px;
+  color:var(--ink);line-height:1.15;letter-spacing:.5px;font-weight:500;margin-bottom:4px;}
+.scene-title .stitle-meta{font-family:'Courier New',monospace;font-size:10px;
+  letter-spacing:2px;color:var(--ink-fade);text-transform:uppercase;}
+.scene-title .stitle-meta strong{color:var(--ink-dim);font-weight:normal;}
+
+.beats{font-family:'Cormorant Garamond',Georgia,serif;font-size:16px;
+  line-height:1.8;color:var(--ink);}
+.beat{margin-bottom:16px;position:relative;padding-left:0;}
+.beat-label{font-family:'Courier New',monospace;font-size:9px;letter-spacing:4px;
+  color:var(--gold);text-transform:uppercase;margin-bottom:6px;
+  display:flex;align-items:center;gap:10px;}
+.beat-regen{background:none;border:1px solid var(--line);color:var(--ink-fade);
+  font-family:inherit;font-size:8px;letter-spacing:1px;padding:1px 6px;border-radius:2px;
+  cursor:pointer;text-transform:uppercase;margin-left:auto;}
+.beat-regen:hover{color:var(--teal);border-color:var(--teal);}
+.beat p{margin-bottom:8px;}
+
+.dialogue{margin:8px 0 10px;padding:0 0 0 18px;border-left:2px solid var(--magenta);}
+.dialogue .speaker{font-family:'Courier New',monospace;font-size:10px;letter-spacing:2px;
+  color:var(--magenta);text-transform:uppercase;}
+.dialogue .line{font-style:italic;color:var(--ink);font-size:15.5px;margin-bottom:6px;}
+
+.sense-anchor{display:block;font-style:italic;color:var(--ink-dim);font-size:13.5px;
+  margin-top:4px;padding-left:14px;border-left:1px solid var(--line);}
+
+/* RIGHT — production card */
+.prod{font-family:'Inter',sans-serif;font-size:12.5px;color:var(--ink-dim);line-height:1.6;}
+.prod .pk{font-family:'Courier New',monospace;font-size:10px;letter-spacing:2px;
+  color:var(--ink-fade);text-transform:uppercase;margin-top:14px;margin-bottom:4px;}
+.prod .pv{color:var(--ink);font-size:13px;}
+.prod .pv strong{color:var(--teal);}
+.tension-bar{height:6px;background:rgba(20,12,38,.7);border:1px solid var(--line);
+  border-radius:2px;overflow:hidden;margin-top:4px;}
+.tension-fill{height:100%;background:linear-gradient(90deg,var(--gold),var(--magenta),var(--red));}
+.mood-tags{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px;}
+.mood-tag{font-family:'Courier New',monospace;font-size:9px;letter-spacing:1px;
+  text-transform:uppercase;background:rgba(80,40,160,.3);color:var(--ink-dim);
+  border:1px solid var(--line);padding:2px 6px;border-radius:2px;}
+
+@media print {
+  body{background:#fff;color:#111;padding:0;}
+  .toolbar,.col:first-child,.col:last-child,.beat-regen,.btn,.hdr .ctx{display:none!important;}
+  .stage{grid-template-columns:1fr;}
+  .col{background:#fff;border:1px solid #ccc;}
+  .scene-title h2{color:#222;}
+  .beats{color:#222;}
+  .beat-label{color:#888;}
+  .dialogue{border-color:#888;}
+  .dialogue .speaker{color:#888;}
+  .dialogue .line{color:#222;}
+  .sense-anchor{color:#555;border-color:#ccc;}
+  .hdr h1{color:#444;background:none;-webkit-text-fill-color:initial;}
+}
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <div class="hdr">
+    <div class="mark" id="hdr-mark"></div>
+    <div>
+      <h1>SCENE COMPOSER</h1>
+      <div class="sub">Fracture City · Story-driven Life Moments</div>
+    </div>
+    <div class="ctx" id="ctx">—</div>
+  </div>
+
+  <div class="toolbar">
+    <button class="btn primary" onclick="Scene.generate()">⟲ NEW SCENE</button>
+    <button class="btn" onclick="Scene.shuffleParams()">SHUFFLE</button>
+    <button class="btn" onclick="Scene.save()">SAVE</button>
+    <button class="btn" onclick="window.print()">PRINT</button>
+    <button class="btn" onclick="Scene.exportJSON()">EXPORT JSON</button>
+    <button class="btn" onclick="Scene.exportProse()">EXPORT PROSE</button>
+  </div>
+
+  <div class="stage">
+
+    <!-- LEFT: cast + params -->
+    <div class="col">
+      <h3>Cast</h3>
+      <div class="cast-list" id="cast-list">
+        <div class="cast-empty">No characters saved yet.<br>
+          <a onclick="Scene.openForge()">Open Character Forge</a> to make some.</div>
+      </div>
+      <div class="cast-active" id="cast-active"></div>
+
+      <h3>Setting</h3>
+      <div class="param">
+        <label>Stage</label>
+        <select id="p-stage"></select>
+      </div>
+      <div class="param">
+        <label>Location</label>
+        <select id="p-location"></select>
+      </div>
+      <div class="param">
+        <label>Time</label>
+        <select id="p-time"></select>
+      </div>
+      <div class="param">
+        <label>Weather</label>
+        <select id="p-weather"></select>
+      </div>
+
+      <h3>Story</h3>
+      <div class="param">
+        <label>Scene Type</label>
+        <select id="p-type"></select>
+      </div>
+      <div class="param">
+        <label>Tension</label>
+        <select id="p-tension"></select>
+      </div>
+      <div class="param">
+        <label>Seed</label>
+        <input type="text" id="p-seed" placeholder="(auto)">
+      </div>
+    </div>
+
+    <!-- CENTER: scene -->
+    <div class="col">
+      <div class="scene-head">
+        <div class="atmos-wrap"><svg id="atmos-svg" viewBox="0 0 200 130"></svg></div>
+        <div class="scene-title">
+          <h2 id="scene-title">—</h2>
+          <div class="stitle-meta" id="scene-meta">—</div>
+        </div>
+      </div>
+      <div class="beats" id="beats">—</div>
+    </div>
+
+    <!-- RIGHT: production card -->
+    <div class="col">
+      <h3>Production</h3>
+      <div class="prod" id="prod-card">—</div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// =============================================================================
+// RNG
+// =============================================================================
+function hashSeed(str){
+  let h=1779033703 ^ str.length;
+  for(let i=0;i<str.length;i++){
+    h=Math.imul(h ^ str.charCodeAt(i), 3432918353);
+    h=h<<13 | h>>>19;
+  }
+  return (h^=h>>>16) >>> 0;
+}
+function mulberry32(seed){
+  let s=seed;
+  return function(){
+    let t=s+=0x6D2B79F5;
+    t=Math.imul(t ^ t>>>15, t|1);
+    t^=t+Math.imul(t ^ t>>>7, t|61);
+    return ((t ^ t>>>14)>>>0)/4294967296;
+  };
+}
+class RNG{
+  constructor(seed){
+    this.seed=typeof seed==='string'?hashSeed(seed):(seed>>>0);
+    this.next=mulberry32(this.seed);
+  }
+  pick(arr){ return arr[Math.floor(this.next()*arr.length)]; }
+  pickN(arr,n){
+    const a=arr.slice();const out=[];
+    for(let i=0;i<n && a.length;i++){
+      const idx=Math.floor(this.next()*a.length);
+      out.push(a.splice(idx,1)[0]);
+    }
+    return out;
+  }
+  int(min,max){ return Math.floor(this.next()*(max-min+1))+min; }
+  bool(p=0.5){ return this.next()<p; }
+}
+
+// =============================================================================
+// WORLD CONSTANTS
+// =============================================================================
+const STAGES = [
+  'The Outer Ruins','Fracture City','The Forge','The Flood Gate','The Archive',
+  'The Undercroft','The Burning Maze','The Void Below','The Spire','The Ascent',
+];
+
+const LOCATIONS = {
+  'The Outer Ruins':['the husk quarter','the long salt flats','the hollow mile','the tally house','a half-fallen wall along the old road','the broken aqueduct'],
+  'Fracture City':['the tin lanes','the sundered row','the lower veins','the watch district','the river docks at low tide','the rooftops above the lamplighters','an alley behind the bell house','the cracked plaza'],
+  'The Forge':['the iron belows','the glass mouth','the heat-year halls','the bellows hall','the slag stairs','a forge-master\'s antechamber','the cooling sluice'],
+  'The Flood Gate':['the drowned step','the bitter tide','the sluice houses','the high water mark','the dock chapels','a half-submerged stair','the floodwall walk'],
+  'The Archive':['the stack halls','the spent-light reading room','a marginalia annex','the reading vaults','the high stacks','the cataloguer\'s desk','a cold corridor between collections'],
+  'The Undercroft':['the hum','the hive choir','the soft dark','the knit cells','the sleeping chambers','a passage between two warmths','the singing well'],
+  'The Burning Maze':['coalshade','the smoke lattice','an ember run','a twice-burned alley','the lit corridors','a soot-walled junction','the watcher\'s notch'],
+  'The Void Below':['the rift edge','the no-above','the unseamed','the quiet','the spinning floor','a ledge above the long fall','a chamber that should not exist'],
+  'The Spire':['the high step','the cold air terrace','the watchspires','the bell-tower','the upper terrace','a balcony that overlooks all of it','the long stair just below the light'],
+  'The Ascent':['the long climb','the final stair','the sky-mark','the final light','the threshold','the empty platform at the top','a ledge with nothing below or above'],
+};
+
+const TIMES = [
+  {key:'pre-dawn',     label:'pre-dawn',      light:'blue-grey',   warmth:0.1},
+  {key:'dawn',         label:'dawn',          light:'gold-rose',   warmth:0.4},
+  {key:'mid-morning',  label:'mid-morning',   light:'clean white', warmth:0.5},
+  {key:'midday',       label:'midday',        light:'harsh',       warmth:0.6},
+  {key:'afternoon',    label:'afternoon',     light:'amber',       warmth:0.7},
+  {key:'dusk',         label:'dusk',          light:'violet',      warmth:0.5},
+  {key:'evening',      label:'evening',       light:'lamplight',   warmth:0.6},
+  {key:'late-night',   label:'late night',    light:'almost-none', warmth:0.2},
+  {key:'midnight',     label:'midnight',      light:'distant moon',warmth:0.15},
+  {key:'bleak-hour',   label:'the bleak hour',light:'no light',    warmth:0.05},
+];
+
+const WEATHER = [
+  'clear and still','a thin rain','heavy rain','rain ending','wind off the river',
+  'fog settling','fog lifting','dry and cold','dry and warm','heat that refuses to lift',
+  'frost on the stones','snow not yet falling','first snow','the air after lightning',
+  'air that smells of smoke','air that smells of salt','breath visible',
+];
+
+const SCENE_TYPES = [
+  {key:'encounter',    label:'encounter — characters meet'},
+  {key:'confrontation',label:'confrontation — direct conflict'},
+  {key:'quiet-beat',   label:'quiet beat — atmosphere over action'},
+  {key:'revelation',   label:'revelation — truth surfaces'},
+  {key:'parting',      label:'parting — a farewell'},
+  {key:'threshold',    label:'threshold — a choice to enter or leave'},
+  {key:'passage',      label:'passage — moving through, observing'},
+  {key:'memory',       label:'memory surfaces — the past intrudes'},
+  {key:'exchange',     label:'exchange — something is offered and received'},
+  {key:'vigil',        label:'vigil — keeping watch'},
+];
+
+const TENSIONS = [
+  'low — companionable, easy',
+  'low — solitary, settled',
+  'medium — something unresolved',
+  'medium — almost said',
+  'high — about to break',
+  'high — already breaking',
+  'high — survival',
+];
+
+// =============================================================================
+// SENSORY POOLS — by time + weather + stage
+// =============================================================================
+
+const SOUNDS_BY_TIME = {
+  'pre-dawn':   ['a single watchman\'s bell two streets away','water moving somewhere below','the first birds, hesitating','a cart on cobbles, slow'],
+  'dawn':       ['gulls or their cousins','a bell-rope creaking','the long opening of a shutter','someone calling a name across a courtyard'],
+  'mid-morning':['voices threading through markets','iron on stone','a child laughing somewhere unseen','the brisk closing of a door'],
+  'midday':     ['the muffled sound of work being done','a hammer\'s rhythm','distant wagons','an argument carrying too far'],
+  'afternoon':  ['a long-held conversation in another room','the slow turn of a clock','a wagon pulling away','wind through a high opening'],
+  'dusk':       ['lamplighters\' poles tapping','a dog calling from across the rooftops','the small percussion of doors being closed','a song from a kitchen'],
+  'evening':    ['the soft commerce of a tavern next door','a window being latched','muted laughter','the clink of glass'],
+  'late-night': ['the city\'s low and constant breath','footsteps that may not be footsteps','a single shutter banging','the watch calling the hour'],
+  'midnight':   ['nothing — or what passes for nothing here','a clock pretending to be the only thing alive','an owl, or its absence','one\'s own pulse'],
+  'bleak-hour': ['silence with weight in it','the smallest possible sound, far away','the room\'s own breathing','no birds at all yet'],
+};
+
+const SMELLS_BY_STAGE = {
+  'The Outer Ruins':   ['the salt and dust','old stone','rotting wood','the air of a place no one tends'],
+  'Fracture City':     ['wet brick','coal-smoke','rendered fat from somewhere below','the river when the wind shifts'],
+  'The Forge':         ['hot iron','tallow and oil','the sweetness of cooling slag','old sweat on canvas'],
+  'The Flood Gate':    ['brine','wet rope','algae warming on stone','the inside of a long-emptied bucket'],
+  'The Archive':       ['old paper','beeswax','dust that has been here longer than any of them','the cold of a long-closed room'],
+  'The Undercroft':    ['warmth and bodies','grain stored too long','the faint smell of milk','a closeness that is also a comfort'],
+  'The Burning Maze':  ['soot','char','something resinous burning slowly','the dryness of air that has held fire too long'],
+  'The Void Below':    ['nothing — and the suggestion of more nothing','the cold metal taste of deep stone','a wind from nowhere','the absence of anything organic'],
+  'The Spire':         ['cold thin air','snow that hasn\'t arrived','stone that has never been warm','the sharpness of altitude'],
+  'The Ascent':        ['a thinness, like the world emptying','a faint perfume nobody can place','the air just before something opens','no smell at all and the knowledge of it'],
+};
+
+const TEXTURES = [
+  'the cold of the stone through their cloak','the grain of the wood where a thumb has rested for years',
+  'a thread loose at a cuff','rain that has begun to find skin','the small heat held in a held cup',
+  'the give of a doorframe under a leaning shoulder','the smooth metal of a key worn round',
+  'dust that comes off into the palm','a railing that has held more than it remembers',
+];
+
+// =============================================================================
+// SCENE TITLE GENERATOR — two-part, evocative
+// =============================================================================
+const TITLE_NOUNS = [
+  'Lanterns','Doors','Stones','Names','Ash','Promises','Bells','Crossings',
+  'Silences','Hands','Letters','Mirrors','Threads','Owls','Hours','Pages',
+  'Steps','Boots','Cups','Rooms','Windows','Coats','Threadbare Coins','Bones',
+  'Bread','Salt','Coats','Maps','Vows','Songs','Watches','Shadows',
+];
+const TITLE_CONNECTORS = ['and One','Before','Between','Without','After','Within','Beyond','Beneath','Among'];
+
+function makeTitle(rng, scene){
+  const pattern = rng.int(1,4);
+  if (pattern === 1){
+    const n1 = rng.pick(TITLE_NOUNS), n2 = rng.pick(TITLE_NOUNS.filter(x=>x!==n1));
+    const conn = rng.pick(TITLE_CONNECTORS);
+    return `${n1} ${conn} ${n2}`;
+  } else if (pattern === 2){
+    const n = rng.pick(TITLE_NOUNS);
+    const place = scene.location.replace(/^a |^the /,'');
+    return `${n} at ${place.charAt(0).toUpperCase()+place.slice(1)}`;
+  } else if (pattern === 3){
+    const n = rng.pick(TITLE_NOUNS);
+    const time = scene.time.label.charAt(0).toUpperCase()+scene.time.label.slice(1);
+    return `${n}, ${time}`;
+  } else {
+    const adj = rng.pick(['Late','Long','Brief','Bare','Last','First','Slow','Quiet','Heavy','Cold','Bright']);
+    const n = rng.pick(TITLE_NOUNS);
+    return `${adj} ${n}`;
+  }
+}
+
+// =============================================================================
+// BEAT TEMPLATES
+// Each beat takes context (scene, cast, rng) and returns prose + optional dialogue.
+// =============================================================================
+
+function pickCharName(rng, cast){
+  if (!cast.length) return 'they';
+  const c = rng.pick(cast);
+  return c.name?.first || c.name?.full || 'they';
+}
+
+function casteJoiner(cast){
+  if (!cast.length) return 'no one';
+  if (cast.length === 1) return cast[0].name.first;
+  if (cast.length === 2) return `${cast[0].name.first} and ${cast[1].name.first}`;
+  return cast.slice(0,-1).map(c=>c.name.first).join(', ') + ', and ' + cast.slice(-1)[0].name.first;
+}
+
+// Sensory anchor — woven through beats
+function makeSensoryAnchor(rng, scene){
+  const choice = rng.int(1,4);
+  if (choice === 1){
+    return rng.pick(SOUNDS_BY_TIME[scene.time.key]);
+  } else if (choice === 2){
+    return rng.pick(SMELLS_BY_STAGE[scene.stage]);
+  } else if (choice === 3){
+    return rng.pick(TEXTURES);
+  } else {
+    return `the light here is ${scene.time.light}, and ${rng.pick(['it changes nothing','it changes everything','no one looks up at it','everyone is briefly inside it'])}`;
+  }
+}
+
+// ── Beat: ESTABLISH ─────────────────────────────────────────────────────────
+function beatEstablish(scene, cast, rng){
+  const t = scene.time.label;
+  const place = scene.location;
+  const weather = scene.weather;
+  const sense1 = makeSensoryAnchor(rng, scene);
+  const sense2 = makeSensoryAnchor(rng, scene);
+  const templates = [
+    `${place.charAt(0).toUpperCase()+place.slice(1)} at ${t}. ${weather.charAt(0).toUpperCase()+weather.slice(1)}. ${sense1.charAt(0).toUpperCase()+sense1.slice(1)} — and beneath it, ${sense2}.`,
+    `It is ${t} at ${place}. ${weather.charAt(0).toUpperCase()+weather.slice(1)}, and ${sense1}. The air is the kind that registers in the small of the back before the rest of the body catches up.`,
+    `${t.charAt(0).toUpperCase()+t.slice(1)} comes slowly to ${place}. ${sense1.charAt(0).toUpperCase()+sense1.slice(1)}. The weather is ${weather}, but here, indoors or otherwise, that means almost nothing.`,
+    `${place.charAt(0).toUpperCase()+place.slice(1)}. ${t.charAt(0).toUpperCase()+t.slice(1)}, ${weather}. There is ${sense1}, and the long, settled quality of a place that does not particularly care who is in it.`,
+  ];
+  return { prose: rng.pick(templates), label: 'Establish' };
+}
+
+// ── Beat: ENTER ─────────────────────────────────────────────────────────────
+function beatEnter(scene, cast, rng){
+  if (cast.length === 0){
+    const ts = [
+      `Nobody arrives. Nobody is expected. The room (or its open equivalent) holds itself, the way ${scene.stage} tends to.`,
+      `The place is occupied only by its own habits — ${makeSensoryAnchor(rng,scene)}, ${makeSensoryAnchor(rng,scene)} — and by whatever a place can be said to remember.`,
+    ];
+    return { prose: rng.pick(ts), label: 'Enter' };
+  }
+
+  const arrival = casteJoiner(cast);
+  const verb = rng.pick(['comes in','arrives','steps through','crosses the threshold','reaches it','finds the door','climbs the last stair','walks the last length of it']);
+  const adverb = rng.pick(['without speaking','with the look of someone who has already been walking too long','with the kind of attention that is also a small wariness','as if they have done this on this same evening, several lives in a row','later than expected','exactly on time','early, by enough to mean something']);
+  const sense = makeSensoryAnchor(rng, scene);
+
+  const templates = [
+    `${arrival} ${verb}, ${adverb}. ${sense.charAt(0).toUpperCase()+sense.slice(1)}.`,
+    `${arrival} ${verb}. ${adverb.charAt(0).toUpperCase()+adverb.slice(1)}. Behind ${cast.length>1?'them':'them'}, the door (or its open equivalent) ${rng.pick(['closes by itself','does not close','holds for a moment','swings back into stillness'])}.`,
+    `${arrival.charAt(0).toUpperCase()+arrival.slice(1)} ${verb}. The room registers them the way a place registers anything: ${sense}.`,
+  ];
+  return { prose: rng.pick(templates), label: 'Enter' };
+}
+
+// ── Beat: RECOGNIZE ─────────────────────────────────────────────────────────
+function beatRecognize(scene, cast, rng){
+  if (cast.length === 0){
+    const ts = [
+      `What is here is here. ${makeSensoryAnchor(rng,scene).charAt(0).toUpperCase()+makeSensoryAnchor(rng,scene).slice(1)}, and the slight, hard-to-describe sense that the space has been recently used or recently abandoned — it is sometimes hard to tell which.`,
+      `The place reveals itself slowly. ${makeSensoryAnchor(rng,scene).charAt(0).toUpperCase()+makeSensoryAnchor(rng,scene).slice(1)}. Anyone listening would notice ${makeSensoryAnchor(rng,scene)}.`,
+    ];
+    return { prose: rng.pick(ts), label: 'Recognize' };
+  }
+  const name = pickCharName(rng, cast);
+  const c = cast.find(x => x.name.first === name) || cast[0];
+  const mann = (c.mannerisms && c.mannerisms[0]) || 'pauses three beats before answering anything difficult';
+
+  const recognitions = cast.length >= 2 ? [
+    `${cast[0].name.first} sees ${cast[1].name.first} first, or pretends to. The recognition is small — a one-degree shift in shoulder — and it carries more than it should.`,
+    `${cast[0].name.first} and ${cast[1].name.first} register one another. It is the kind of recognition that does not require greeting; the greeting will come later, if it comes at all.`,
+    `For a moment, ${cast[0].name.first} thinks ${cast[1].name.first} is someone else. The mistake corrects itself, but the corrected version carries the ghost of the first one.`,
+  ] : [
+    `${name} notices what they came for, or its absence. The body settles or refuses to. ${mann.charAt(0).toUpperCase()+mann.slice(1)}.`,
+    `${name} stops just inside, and stays there. Whatever they came for has not quite arrived in them yet.`,
+    `${name} reads the room before doing anything else. ${rng.pick(['Nothing is wrong','Something is wrong','Nothing has changed','Something has changed'])}, and ${rng.pick(['that is the problem','that is the comfort','that is the news','that is what they will have to explain later'])}.`,
+  ];
+  return { prose: rng.pick(recognitions), label: 'Recognize' };
+}
+
+// ── Beat: ENGAGE ────────────────────────────────────────────────────────────
+function beatEngage(scene, cast, rng){
+  // This is where dialogue can land
+  if (cast.length === 0){
+    const ts = [
+      `The place does its work. ${makeSensoryAnchor(rng,scene).charAt(0).toUpperCase()+makeSensoryAnchor(rng,scene).slice(1)}, and then ${makeSensoryAnchor(rng,scene)}.`,
+      `A breeze (or what passes for one here) moves a single object — ${rng.pick(['a curtain','a sheet of paper','a hanging lamp','a piece of cloth on a chair'])} — and stillness returns.`,
+    ];
+    return { prose: rng.pick(ts), label: 'Engage' };
+  }
+
+  // With dialogue
+  if (cast.length >= 2 && rng.bool(0.7)){
+    const a = cast[0], b = cast[1];
+    const opener = rng.pick([
+      `"You came," ${a.name.first} said.`,
+      `"You're here," ${a.name.first} said, in the voice they used when they were trying not to make it sound like a question.`,
+      `${a.name.first} spoke first. "I wasn't sure."`,
+      `"It's been a while," ${a.name.first} said, more to the floor than to ${b.name.first}.`,
+      `"I almost didn't," ${a.name.first} said. The end of the sentence stayed unspoken.`,
+    ]);
+    const reply = rng.pick([
+      `${b.name.first} did not answer for a moment. Then: "${rng.pick(['I know.','You knew I would.','I almost didn\'t either.','I came anyway.','I was on my way back.','I had to.','Not for you, exactly. But yes.'])}"`,
+      `"${rng.pick(['I told you I would.','We both knew this was coming.','We have been here before.','We have not been here before — not really.','It was always going to be this evening or one like it.'])}" ${b.name.first} said.`,
+      `${b.name.first} looked at ${a.name.first} the way ${a.name.first} had not been looked at in a long time. "I haven't slept."`,
+    ]);
+    const between = rng.pick([
+      `Between sentences, ${makeSensoryAnchor(rng,scene)}.`,
+      `In the gap, ${makeSensoryAnchor(rng,scene)}.`,
+      `Neither moved. ${makeSensoryAnchor(rng,scene).charAt(0).toUpperCase()+makeSensoryAnchor(rng,scene).slice(1)}.`,
+    ]);
+    return {
+      prose: between,
+      dialogue: [
+        { speaker: a.name.first, line: opener },
+        { speaker: b.name.first, line: reply },
+      ],
+      label: 'Engage',
+    };
+  }
+
+  // Solo
+  const name = pickCharName(rng, cast);
+  const c = cast.find(x => x.name.first === name) || cast[0];
+  const verb = rng.pick(['takes off their coat','sets the bag down without unpacking it','reads the line once, then again','pours the kettle without lighting it','opens the letter and does not begin reading','sits down before they have decided to','leans against the doorframe instead of crossing the room']);
+  const sense = makeSensoryAnchor(rng, scene);
+  return { prose: `${name} ${verb}. ${sense.charAt(0).toUpperCase()+sense.slice(1)}.`, label: 'Engage' };
+}
+
+// ── Beat: TURN ──────────────────────────────────────────────────────────────
+function beatTurn(scene, cast, rng){
+  const tensionLevel = scene.tension.includes('high') ? 'high' : scene.tension.includes('medium') ? 'medium' : 'low';
+  const sense = makeSensoryAnchor(rng, scene);
+
+  if (cast.length === 0){
+    return { prose: `Something in the place shifts. Not dramatically — a candle gutters, or the sound of water changes pitch, or a draft finds a different gap. ${sense.charAt(0).toUpperCase()+sense.slice(1)}.`, label: 'Turn' };
+  }
+
+  const name = pickCharName(rng, cast);
+  if (cast.length >= 2){
+    const a = cast[0].name.first, b = cast[1].name.first;
+    const ts = {
+      low: [
+        `${a} says something small, almost not meant to be heard. ${b} hears it anyway, and lets it sit. The conversation, if that is what it is, turns slightly.`,
+        `${b} laughs once — not at anything in particular — and the room rearranges itself around the sound.`,
+      ],
+      medium: [
+        `It is the thing they have not been talking about that turns it. Neither names it, but it moves between them like a third presence.`,
+        `${a} stops mid-sentence. The half-finished thought hangs there long enough that it counts as something said.`,
+      ],
+      high: [
+        `${b} stands. They had not meant to. The motion changes everything that follows.`,
+        `Something is said that cannot be unsaid. The temperature of the room — and not only the room — drops a degree.`,
+      ],
+    };
+    return { prose: rng.pick(ts[tensionLevel]), label: 'Turn' };
+  }
+
+  const ts = {
+    low: [
+      `${name} notices the time, or notices noticing it. Something is decided without quite being decided.`,
+      `A small object catches the light — ${rng.pick(['a coin','a button','a key','a pen','a glass'])} — and ${name} looks at it for longer than they need to.`,
+    ],
+    medium: [
+      `${name} realizes, as one does, that they are not going to do the thing they came here to do. Or that they are.`,
+      `Something the place is doing — ${sense} — gets through to ${name}. They sit down inside whatever it is.`,
+    ],
+    high: [
+      `${name} understands, all at once, the thing they had been refusing to. The understanding does not improve their situation.`,
+      `${name} stops pretending. It is not a relief. It is, however, the truth of where they are.`,
+    ],
+  };
+  return { prose: rng.pick(ts[tensionLevel]), label: 'Turn' };
+}
+
+// ── Beat: REVEAL ────────────────────────────────────────────────────────────
+function beatReveal(scene, cast, rng){
+  if (cast.length === 0){
+    return { prose: `What the place is for becomes briefly legible. ${rng.pick(['Whether anyone reads it is a different question.','No one is here to read it.','It will be readable again tomorrow.','It has been readable for years; no one has noticed.'])}`, label: 'Reveal' };
+  }
+  const name = pickCharName(rng, cast);
+  const c = cast.find(x => x.name.first === name) || cast[0];
+  const wound = c.wound || 'a thing they have not said aloud in years';
+  const secret = c.secret || 'a thing they keep close';
+
+  const ts = [
+    `${name} is, for a moment, exactly who they are. The framework of habit drops, and what is underneath shows itself — ${wound}, or some shape of it, becomes briefly visible.`,
+    `Something about ${name} that has been carefully constructed comes loose. Not all of it. Enough that someone paying attention would see it.`,
+    `In ${name}, what surfaces is ${secret} — not the thing itself, but its shadow, the way it changes how they are sitting, the small ways they hold the cup.`,
+    `For one moment, ${name} is honest. With themselves. With the room. With whoever is watching. The moment passes; the honesty stays in the room afterward, the way certain smells do.`,
+  ];
+  return { prose: rng.pick(ts), label: 'Reveal' };
+}
+
+// ── Beat: SETTLE ────────────────────────────────────────────────────────────
+function beatSettle(scene, cast, rng){
+  const sense = makeSensoryAnchor(rng, scene);
+  const openClosed = rng.bool(0.5) ? 'open' : 'closed';
+
+  if (cast.length === 0){
+    if (openClosed === 'open'){
+      return { prose: `Nothing concludes. ${sense.charAt(0).toUpperCase()+sense.slice(1)}, and the place continues to be itself, which is enough.`, label: 'Settle (open)' };
+    }
+    return { prose: `The scene closes around itself. A door, somewhere, finds its frame. ${sense.charAt(0).toUpperCase()+sense.slice(1)}, and then the place is the place again.`, label: 'Settle (closed)' };
+  }
+
+  if (cast.length >= 2){
+    const a = cast[0].name.first, b = cast[1].name.first;
+    if (openClosed === 'open'){
+      const ts = [
+        `Nothing is finished. ${a} and ${b} sit, or stand, or walk slowly toward the door, and what is between them stays between them. ${sense.charAt(0).toUpperCase()+sense.slice(1)}.`,
+        `${a} will go. ${b} will stay, or follow, or wait — they have not decided. The scene does not require them to decide tonight.`,
+        `Neither of them apologizes. Neither of them needs to. It is enough that they were both here. ${sense.charAt(0).toUpperCase()+sense.slice(1)}, and the next thing has not yet started.`,
+      ];
+      return { prose: rng.pick(ts), label: 'Settle (open)' };
+    }
+    const ts = [
+      `${a} leaves first. ${b} watches the doorway after ${a} has gone, the way one watches a doorway when something has just been decided.`,
+      `They part without elaborate ceremony. ${a} turns; ${b} does not. The room takes them back into the rest of the evening.`,
+      `It is finished. Whatever it was — and neither of them is sure they could name it correctly — is finished. ${sense.charAt(0).toUpperCase()+sense.slice(1)}.`,
+    ];
+    return { prose: rng.pick(ts), label: 'Settle (closed)' };
+  }
+
+  const name = pickCharName(rng, cast);
+  if (openClosed === 'open'){
+    return { prose: `${name} stays a while. The thing they came for is somewhere in the room, somewhere in themselves, ${rng.pick(['within reach','still not within reach','closer than it was an hour ago','exactly as far as it ever was'])}. ${sense.charAt(0).toUpperCase()+sense.slice(1)}.`, label: 'Settle (open)' };
+  }
+  return { prose: `${name} leaves the way they came. ${sense.charAt(0).toUpperCase()+sense.slice(1)}. Behind them, the place ${rng.pick(['holds the silhouette of where they had been','does not register the absence','closes around it','keeps the chair warm a little longer'])}.`, label: 'Settle (closed)' };
+}
+
+// =============================================================================
+// SCENE COMPOSITION
+// =============================================================================
+function composeScene(params, cast, rng){
+  const scene = {
+    stage: params.stage,
+    location: params.location,
+    time: TIMES.find(t=>t.key===params.timeKey) || TIMES[5],
+    weather: params.weather,
+    type: SCENE_TYPES.find(t=>t.key===params.typeKey) || SCENE_TYPES[0],
+    tension: params.tension,
+    seed: params.seed,
+  };
+
+  const title = makeTitle(rng, scene);
+  scene.title = title;
+
+  // Beat order varies slightly by scene type
+  const beatBuilders = [beatEstablish, beatEnter, beatRecognize, beatEngage, beatTurn, beatReveal, beatSettle];
+  if (scene.type.key === 'quiet-beat'){
+    // Drop the high-tension beat
+    beatBuilders.splice(4, 1);
+  }
+  if (scene.type.key === 'passage'){
+    // Light on dialogue/turn; emphasize sensory
+    beatBuilders.splice(5, 1);
+  }
+
+  const beats = beatBuilders.map(b => b(scene, cast, rng));
+
+  // Production card
+  scene.cast = cast.map(c => ({
+    name: c.name.full,
+    first: c.name.first,
+    zone: c.zone,
+    subtype: c.subtype,
+    class: c.class,
+    stamp: c.stamp,
+  }));
+  scene.beats = beats;
+
+  // Mood derivation — from cast + scene type + tension
+  const moods = [];
+  if (cast.some(c=>c.stamp==='Violence')) moods.push('charged');
+  if (cast.some(c=>c.stamp==='Silencing')) moods.push('held-back');
+  if (cast.some(c=>c.stamp==='Abandonment')) moods.push('tender');
+  if (cast.some(c=>c.stamp==='Displacement')) moods.push('untethered');
+  if (cast.every(c=>['III','IV','VII','VIII'].includes(c.zone))) moods.push('contemplative');
+  if (cast.every(c=>['I','II','V','VI'].includes(c.zone))) moods.push('worldly');
+  if (scene.tension.includes('high')) moods.push('tense');
+  if (scene.tension.includes('low')) moods.push('quiet');
+  if (scene.type.key === 'revelation') moods.push('breaking-open');
+  if (scene.type.key === 'vigil') moods.push('held');
+  scene.moods = moods.length ? moods : ['observed'];
+
+  // Tension numeric
+  scene.tensionNum = scene.tension.includes('high') ? 0.9 :
+                     scene.tension.includes('medium') ? 0.55 : 0.25;
+
+  return scene;
+}
+
+// =============================================================================
+// ATMOSPHERE PANEL (small SVG mood preview at top of scene)
+// =============================================================================
+function renderAtmosphere(scene){
+  const W=200, H=130;
+  const t = scene.time;
+  // Sky gradient by time
+  const skyMap = {
+    'pre-dawn':    ['#0a0d24','#19133d'],
+    'dawn':        ['#3a2447','#f9c386'],
+    'mid-morning': ['#5e6da6','#d0d6e0'],
+    'midday':      ['#7888c2','#e6e9f0'],
+    'afternoon':   ['#774038','#f0a868'],
+    'dusk':        ['#1f1240','#8a4488'],
+    'evening':     ['#0e0a22','#3a1c47'],
+    'late-night':  ['#06061a','#100a28'],
+    'midnight':    ['#020210','#060a1a'],
+    'bleak-hour':  ['#04031a','#0a0617'],
+  };
+  const [skyA, skyB] = skyMap[t.key] || ['#1a0f33','#080614'];
+  const fgWeight = scene.tensionNum;
+
+  let svg = `<defs>
+    <linearGradient id="sky" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="${skyA}"/>
+      <stop offset="100%" stop-color="${skyB}"/>
+    </linearGradient>
+  </defs>`;
+  svg += `<rect width="${W}" height="${H}" fill="url(#sky)"/>`;
+
+  // Suggest a horizon and an architectural element based on stage
+  const stage = scene.stage;
+  const horizon = H * 0.62;
+  // Distant features
+  let arch = '';
+  if (stage === 'The Spire' || stage === 'The Ascent'){
+    // Vertical spires
+    for(let i=0;i<5;i++){
+      const x = 20 + i*38 + (Math.random()-0.5)*8;
+      const h = 50 + Math.random()*40;
+      arch += `<rect x="${x}" y="${horizon - h}" width="6" height="${h}" fill="rgba(180,140,255,.35)"/>`;
+    }
+  } else if (stage === 'The Forge' || stage === 'The Burning Maze'){
+    // Glow at horizon
+    arch += `<ellipse cx="${W/2}" cy="${horizon+10}" rx="${W*0.6}" ry="20" fill="rgba(255,180,120,.4)"/>`;
+    for(let i=0;i<3;i++){
+      const x = 30 + i*60;
+      arch += `<polygon points="${x},${horizon} ${x+30},${horizon} ${x+15},${horizon-25}" fill="rgba(40,20,30,.7)"/>`;
+    }
+  } else if (stage === 'The Archive' || stage === 'The Undercroft'){
+    // Indoor — pillars or arches
+    for(let i=0;i<4;i++){
+      const x = 18 + i*48;
+      arch += `<rect x="${x}" y="20" width="14" height="${H-20}" fill="rgba(40,30,60,.7)" stroke="rgba(180,140,255,.3)" stroke-width=".5"/>`;
+    }
+  } else if (stage === 'The Flood Gate' || stage === 'Fracture City'){
+    // Cityscape low silhouette
+    const xs = [10, 40, 80, 130, 170];
+    const hs = [30, 50, 35, 60, 40];
+    let pts = `0,${H} `;
+    xs.forEach((x,i)=>{ pts += `${x},${horizon-hs[i]} ${x+25},${horizon-hs[i]} `; });
+    pts += `${W},${H}`;
+    arch += `<polygon points="${pts}" fill="rgba(30,20,50,.85)"/>`;
+    // Distant warm windows
+    for(let i=0;i<6;i++){
+      const x = 20 + Math.random()*(W-40);
+      const y = horizon - 5 - Math.random()*40;
+      arch += `<rect x="${x}" y="${y}" width="2" height="3" fill="rgba(255,200,120,.7)"/>`;
+    }
+  } else if (stage === 'The Outer Ruins'){
+    // Broken low silhouette
+    const pts = `0,${H} 0,${horizon-10} 30,${horizon-20} 30,${horizon-5} 60,${horizon-12} 60,${horizon-8} 110,${horizon-25} 140,${horizon-10} 200,${horizon-15} 200,${H}`;
+    arch += `<polygon points="${pts}" fill="rgba(40,30,40,.85)"/>`;
+  } else { // Void Below or other
+    arch += `<rect x="0" y="${horizon}" width="${W}" height="${H-horizon}" fill="rgba(10,8,18,.85)"/>`;
+  }
+  svg += arch;
+
+  // Horizon line
+  svg += `<line x1="0" y1="${horizon}" x2="${W}" y2="${horizon}" stroke="rgba(180,140,255,.18)" stroke-width="1"/>`;
+
+  // Tension marker — corner gradient overlay
+  if (fgWeight > 0.5){
+    svg += `<rect x="${W-40}" y="0" width="40" height="${H}" fill="url(#tension)"/>`;
+    svg = svg.replace('</defs>',
+      `<linearGradient id="tension" x1="100%" y1="50%" x2="0%" y2="50%">
+        <stop offset="0%" stop-color="rgba(255,112,136,${fgWeight*0.35})"/>
+        <stop offset="100%" stop-color="rgba(255,112,136,0)"/>
+       </linearGradient></defs>`);
+  }
+
+  // Constellation dots at upper area (rare, for night times)
+  if (['midnight','late-night','bleak-hour','pre-dawn'].includes(t.key)){
+    for(let i=0;i<8;i++){
+      const x = Math.random()*W;
+      const y = Math.random()*(horizon-20);
+      svg += `<circle cx="${x}" cy="${y}" r="${Math.random()*1+.5}" fill="rgba(255,255,255,.7)"/>`;
+    }
+  }
+
+  return svg;
+}
+
+// =============================================================================
+// APP CONTROLLER
+// =============================================================================
+const Scene = (function(){
+  let state = {
+    characters: [],   // available cast (from forge bus)
+    selectedCast: [], // character objects currently in the scene
+    params: null,
+    scene: null,
+  };
+
+  function $(id){ return document.getElementById(id); }
+
+  function paintHdrMark(){
+    let svg = `<svg viewBox="0 0 46 46" xmlns="http://www.w3.org/2000/svg">
+      <defs><radialGradient id="hm" cx="50%" cy="50%" r="50%">
+        <stop offset="0%" stop-color="rgba(255,212,122,.4)"/>
+        <stop offset="100%" stop-color="rgba(0,0,0,0)"/></radialGradient></defs>
+      <ellipse cx="23" cy="20" rx="14" ry="16" fill="url(#hm)"/>
+      <!-- Arch -->
+      <path d="M 9 36 L 9 18 Q 23 6, 37 18 L 37 36" fill="none" stroke="rgba(180,140,255,.8)" stroke-width="1.5"/>
+      <line x1="6" y1="36" x2="40" y2="36" stroke="rgba(180,140,255,.6)" stroke-width="1"/>
+      <!-- Tiny figures -->
+      <ellipse cx="16" cy="29" rx="2" ry="2.5" fill="rgba(255,96,208,.95)"/>
+      <ellipse cx="23" cy="28" rx="2.5" ry="3" fill="rgba(255,212,122,.95)"/>
+      <ellipse cx="30" cy="30" rx="1.8" ry="2.3" fill="rgba(128,255,255,.95)"/>
+    </svg>`;
+    $('hdr-mark').innerHTML = svg;
+  }
+
+  // ── Cast UI ──────────────────────────────────────────────────────────────
+  function renderCastPicker(){
+    const list = $('cast-list');
+    if (state.characters.length === 0){
+      list.innerHTML = `<div class="cast-empty">No characters saved yet.<br>
+        <a onclick="Scene.openForge()">Open Character Forge</a> to make some.</div>`;
+    } else {
+      list.innerHTML = state.characters.map(c => {
+        const checked = state.selectedCast.find(x => x.seed === c.seed) ? 'checked' : '';
+        return `<label class="cast-entry">
+          <input type="checkbox" ${checked} onchange="Scene.toggleCast('${c.seed}')">
+          <span class="ce-name">${c.name.first} <em style="color:var(--ink-fade);">${c.name.last}</em></span>
+          <span class="ce-tag">Z${c.zone}</span>
+        </label>`;
+      }).join('');
+    }
+    const active = $('cast-active');
+    if (state.selectedCast.length === 0){
+      active.innerHTML = '';
+    } else {
+      active.innerHTML = state.selectedCast.map(c => `
+        <div class="ca-row">
+          <span>${c.name.first} ${c.name.last}</span>
+          <span class="ce-tag">${c.subtype || ''}</span>
+          <button class="ca-rm" onclick="Scene.toggleCast('${c.seed}')" title="Remove">×</button>
+        </div>`).join('');
+    }
+  }
+
+  function toggleCast(seed){
+    const idx = state.selectedCast.findIndex(c => c.seed === seed);
+    if (idx >= 0){
+      state.selectedCast.splice(idx, 1);
+    } else {
+      const c = state.characters.find(x => x.seed === seed);
+      if (c) state.selectedCast.push(c);
+    }
+    renderCastPicker();
+  }
+
+  // ── Params UI ────────────────────────────────────────────────────────────
+  function buildParams(){
+    const sel = id => $(id);
+    sel('p-stage').innerHTML = STAGES.map(s=>`<option value="${s}">${s}</option>`).join('');
+    sel('p-stage').addEventListener('change', () => updateLocations());
+    updateLocations();
+    sel('p-time').innerHTML = TIMES.map(t=>`<option value="${t.key}">${t.label}</option>`).join('');
+    sel('p-weather').innerHTML = WEATHER.map(w=>`<option value="${w}">${w}</option>`).join('');
+    sel('p-type').innerHTML = SCENE_TYPES.map(t=>`<option value="${t.key}">${t.label}</option>`).join('');
+    sel('p-tension').innerHTML = TENSIONS.map(t=>`<option value="${t}">${t}</option>`).join('');
+  }
+  function updateLocations(){
+    const stage = $('p-stage').value;
+    const opts = (LOCATIONS[stage] || []).map(l=>`<option value="${l}">${l}</option>`).join('');
+    $('p-location').innerHTML = opts;
+  }
+
+  function gatherParams(){
+    return {
+      stage: $('p-stage').value,
+      location: $('p-location').value,
+      timeKey: $('p-time').value,
+      weather: $('p-weather').value,
+      typeKey: $('p-type').value,
+      tension: $('p-tension').value,
+      seed: $('p-seed').value || ('scene_' + Date.now().toString(36) + '_' + Math.floor(Math.random()*1e6).toString(36)),
+    };
+  }
+
+  function shuffleParams(){
+    const rng = new RNG('shuffle::' + Date.now() + ':' + Math.random());
+    $('p-stage').value = rng.pick(STAGES);
+    updateLocations();
+    $('p-location').value = rng.pick(LOCATIONS[$('p-stage').value]);
+    $('p-time').value = rng.pick(TIMES).key;
+    $('p-weather').value = rng.pick(WEATHER);
+    $('p-type').value = rng.pick(SCENE_TYPES).key;
+    $('p-tension').value = rng.pick(TENSIONS);
+    generate();
+  }
+
+  // ── Generation ───────────────────────────────────────────────────────────
+  function generate(){
+    state.params = gatherParams();
+    $('p-seed').value = state.params.seed;
+    const rng = new RNG(state.params.seed);
+    state.scene = composeScene(state.params, state.selectedCast, rng);
+    render();
+  }
+
+  function render(){
+    if (!state.scene) return;
+    const s = state.scene;
+    $('atmos-svg').innerHTML = renderAtmosphere(s);
+    $('scene-title').textContent = s.title;
+    $('scene-meta').innerHTML =
+      `<strong>${s.location.toUpperCase()}</strong> · <strong>${s.time.label.toUpperCase()}</strong> · ${s.weather.toUpperCase()} · ${s.type.label.split('—')[0].trim().toUpperCase()}`;
+
+    const beatsHtml = s.beats.map((b,i) => {
+      let html = `<div class="beat">
+        <div class="beat-label">${b.label}
+          <button class="beat-regen" onclick="Scene.regenBeat(${i})">↻ regen</button>
+        </div>
+        <p>${b.prose}</p>`;
+      if (b.dialogue){
+        html += `<div class="dialogue">`;
+        for (const line of b.dialogue){
+          html += `<div><span class="speaker">${line.speaker}</span></div>
+                   <div class="line">${line.line}</div>`;
+        }
+        html += `</div>`;
+      }
+      html += `</div>`;
+      return html;
+    }).join('');
+    $('beats').innerHTML = beatsHtml;
+
+    // Production card
+    const castRows = s.cast.length ?
+      s.cast.map(c => `<div class="pv"><strong>${c.first}</strong> ${c.name.split(' ').slice(1).join(' ')} · Z${c.zone}/${c.subtype || '—'} · ${c.class || '—'}${c.stamp && c.stamp!=='None'?' · '+c.stamp+' stamp':''}</div>`).join('') :
+      '<div class="pv" style="color:var(--ink-fade);font-style:italic;">No cast — atmospheric scene.</div>';
+    $('prod-card').innerHTML = `
+      <div class="pk">Stage</div><div class="pv"><strong>${s.stage}</strong></div>
+      <div class="pk">Location</div><div class="pv">${s.location}</div>
+      <div class="pk">Time</div><div class="pv">${s.time.label} · light: ${s.time.light}</div>
+      <div class="pk">Weather</div><div class="pv">${s.weather}</div>
+      <div class="pk">Scene Type</div><div class="pv">${s.type.label}</div>
+      <div class="pk">Tension</div>
+        <div class="tension-bar"><div class="tension-fill" style="width:${s.tensionNum*100}%"></div></div>
+        <div class="pv" style="font-size:11px;color:var(--ink-fade);margin-top:2px;">${s.tension}</div>
+      <div class="pk">Mood</div>
+        <div class="mood-tags">${s.moods.map(m=>`<span class="mood-tag">${m}</span>`).join('')}</div>
+      <div class="pk">Cast (${s.cast.length})</div>
+      ${castRows}
+      <div class="pk">Beats</div>
+      <div class="pv">${s.beats.map(b=>b.label).join(' · ')}</div>
+      <div class="pk" style="margin-top:18px;">Seed</div>
+      <div class="pv mono" style="font-size:10px;">${s.seed}</div>
+    `;
+  }
+
+  function regenBeat(idx){
+    if (!state.scene) return;
+    const rng = new RNG(state.scene.seed + '::beat::' + idx + '::' + Math.random());
+    const builders = [beatEstablish, beatEnter, beatRecognize, beatEngage, beatTurn, beatReveal, beatSettle];
+    // Find which builder matches the existing beat by label prefix
+    const targetLabel = state.scene.beats[idx].label.split(' ')[0];
+    const builder = builders.find(b => b(state.scene, [], rng).label.startsWith(targetLabel));
+    if (!builder) return;
+    state.scene.beats[idx] = builder(state.scene, state.selectedCast, rng);
+    render();
+  }
+
+  // ── Persistence ──────────────────────────────────────────────────────────
+  async function save(){
+    if (!state.scene) return;
+    const record = {
+      ...state.scene,
+      timestamp: new Date().toISOString(),
+    };
+    await window.fracture.save('scene_' + state.scene.seed, record);
+    if (window.fracture.shell) await window.fracture.emit('scene.moment.v1', record);
+    flashStatus('Saved.');
+  }
+
+  function exportJSON(){
+    if (!state.scene) return;
+    const blob = new Blob([JSON.stringify(state.scene, null, 2)], {type:'application/json'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `scene_${state.scene.title.replace(/[^a-zA-Z0-9]+/g,'_')}.json`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  }
+
+  function exportProse(){
+    if (!state.scene) return;
+    const s = state.scene;
+    const lines = [];
+    lines.push(s.title.toUpperCase());
+    lines.push('');
+    lines.push(`${s.location.toUpperCase()} · ${s.time.label.toUpperCase()} · ${s.weather.toUpperCase()}`);
+    lines.push(`${s.type.label} · tension: ${s.tension}`);
+    if (s.cast.length){
+      lines.push(`Cast: ${s.cast.map(c=>c.first).join(', ')}`);
+    }
+    lines.push('');
+    for (const b of s.beats){
+      lines.push(`[${b.label.toUpperCase()}]`);
+      lines.push(b.prose);
+      if (b.dialogue){
+        for (const d of b.dialogue){
+          lines.push('');
+          lines.push(`  ${d.speaker.toUpperCase()}:`);
+          lines.push(`  ${d.line}`);
+        }
+      }
+      lines.push('');
+    }
+    const blob = new Blob([lines.join('\n')], {type:'text/plain'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `scene_${s.title.replace(/[^a-zA-Z0-9]+/g,'_')}.txt`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  }
+
+  async function openForge(){
+    if (window.fracture && window.fracture.shell){
+      await window.fracture.openApp('character-forge');
+    } else {
+      alert('Open Character Forge from the Fracture City shell.');
+    }
+  }
+
+  function flashStatus(msg){
+    const el = $('ctx');
+    const before = el.textContent;
+    el.textContent = msg;
+    setTimeout(() => { el.textContent = before; }, 2000);
+  }
+
+  // ── Bus + character loading ──────────────────────────────────────────────
+// ─── References, not copies ─────────────────────────────────────────────────
+//  Apps in this hub used to keep a full private copy of everything they were
+//  sent: cached_character_<seed>, cached_profile_<id>, cached_scene_<seed>.
+//  Ten characters existed as twenty files, and the copies agreed with their
+//  originals only because nobody had edited one yet — rename a character in
+//  Character Forge and every copy kept the old name silently, forever.
+//
+//  A received record is now stored as a reference — ref_<kind>_<id> holding
+//  {$ref:"<slug>/<key>"} — and resolved through the shell on load, so what an
+//  app shows is whatever the source currently says.
+//
+//  Legacy cached_ copies are still read, so nothing disappears if the source no
+//  longer has the original, and are converted to references on sight when they
+//  can be resolved.
+const PalmRefs = {
+  //  kind: 'character' | 'profile' | 'scene'  — names the local key prefix
+  //  type: the contract type recorded against the person (claim)
+  //  source(id): "slug/key" where the real record lives
+  //  idOf(rec): the field that identifies it
+  //  valid(rec): does this look like a real record of this kind
+  make({ kind, type, source, idOf, valid }){
+    const refPrefix    = 'ref_'    + kind + '_';
+    const legacyPrefix = 'cached_' + kind + '_';
+    const F = () => (typeof window !== 'undefined' && window.fracture) || null;
+
+    const api = {
+      kind, type, refPrefix, legacyPrefix, source, idOf, valid,
+
+      supported(){ return !!(F() && typeof F().resolve === 'function'); },
+
+      //  Record a received item by reference. Falls back to a copy on a shell
+      //  too old to resolve, so this is safe to ship ahead of the shell update.
+      async receive(payload){
+        const f = F(); if (!f || !payload) return;
+        const id = idOf(payload); if (!id) return;
+        if (api.supported()){
+          await f.save(refPrefix + id, {
+            $ref: source(id), id, receivedAt: new Date().toISOString(),
+          });
+          if (f.claim){ try { await f.claim(type, source(id)); } catch (e){} }
+        } else {
+          await f.save(legacyPrefix + id, payload);
+        }
+      },
+
+      //  Everything this app holds of this kind, resolved live.
+      //  Returns [{ key, id, data, missing?, legacy? }].
+      async loadAll(){
+        const f = F(); if (!f) return [];
+        const out = [], seen = new Set();
+        const keys = await f.list();
+
+        for (const k of keys.filter(k => k.startsWith(refPrefix))){
+          const rec = await f.read(k);
+          if (!rec || !rec.$ref) continue;
+          // Tolerate an id under any of the names a reference has been written
+          // with, and fall back to the key itself, so a record can never lose
+          // its identity just because the field was renamed.
+          const rid = rec.id || rec.seed || rec.participant_id || k.slice(refPrefix.length);
+          const data = api.supported() ? await f.resolve(rec.$ref) : null;
+          if (data && valid(data)){ out.push({ key:k, id:rid, data }); }
+          else {
+            // Keep the record rather than dropping the user's row, but say so
+            // instead of rendering something blank.
+            out.push({ key:k, id:rid, missing:true, ref:rec.$ref });
+          }
+          seen.add(rid);
+        }
+
+        for (const k of keys.filter(k => k.startsWith(legacyPrefix))){
+          const data = await f.read(k);
+          if (!data || !valid(data)) continue;
+          const id = idOf(data) || k.slice(legacyPrefix.length);
+          if (seen.has(id)){ await api._retire(k); continue; }
+          if (api.supported() && await f.resolve(source(id))){
+            await api.receive(data);
+            await api._retire(k);
+            out.push({ key: refPrefix + id, id, data: await f.resolve(source(id)) });
+          } else {
+            out.push({ key:k, id, data, legacy:true });
+          }
+          seen.add(id);
+        }
+        return out;
+      },
+
+      //  The common case: just the records, skipping anything unresolvable.
+      async values(){
+        return (await api.loadAll()).filter(r => !r.missing).map(r => r.data);
+      },
+
+      async _retire(key){
+        const f = F();
+        try { if (f && f.delete) await f.delete(key); } catch (e){}
+      },
+    };
+    return api;
+  },
+};
+
+//  The three kinds this hub actually passes around.
+const CharRefs = PalmRefs.make({
+  kind: 'character', type: 'character.identity.v1',
+  source: id => 'character-forge/character_' + id,
+  idOf:  r => r && r.seed,
+  valid: r => !!(r && r.name),
+});
+const ProfileRefs = PalmRefs.make({
+  kind: 'profile', type: 'tot.profile.v1',
+  source: id => 'coherence-assessment/profile_' + id,
+  idOf:  r => r && r.participant_id,
+  valid: r => !!(r && r.zone),
+});
+const SceneRefs = PalmRefs.make({
+  kind: 'scene', type: 'scene.moment.v1',
+  source: id => 'scene-composer/scene_' + id,
+  idOf:  r => r && r.seed,
+  valid: r => !!(r && r.title),
+});
+
+if (typeof window !== 'undefined'){
+  window.PalmRefs = PalmRefs;          /* debug + tests */
+  window.CharRefs = CharRefs;
+  window.ProfileRefs = ProfileRefs;
+  window.SceneRefs = SceneRefs;
+}
+
+  async function loadCharacters(){
+    // Live from Character Forge — see PalmRefs above.
+    state.characters = await CharRefs.values();
+    renderCastPicker();
+  }
+
+  function setupBus(){
+    if (window.fracture && window.fracture.shell){
+      window.fracture.subscribe('character.identity.v1', async (payload) => {
+        if (payload && payload.seed){
+          await CharRefs.receive(payload);
+          await loadCharacters();
+          flashStatus('Character received.');
+        }
+      });
+    }
+  }
+
+  // ── Boot ─────────────────────────────────────────────────────────────────
+  async function boot(){
+    paintHdrMark();
+    $('ctx').textContent = window.fracture?.shell ? 'IN SHELL · LIVE BUS' : 'STANDALONE';
+    buildParams();
+    setupBus();
+    await loadCharacters();
+    generate();
+  }
+  document.addEventListener('DOMContentLoaded', boot);
+
+  return { generate, shuffleParams, toggleCast, save, exportJSON, exportProse,
+           regenBeat, openForge };
+})();
+</script>
+</body>
+</html>

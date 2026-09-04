@@ -1,0 +1,900 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Character Library · Fracture City</title>
+<script>
+(function(){
+  if (window.fracture && window.fracture.shell) return;
+  const prefix = 'fracture::character-library::';
+  window.fracture = {
+    shell:false, appSlug:'character-library', received:null,
+    save(k,v){ try{ localStorage.setItem(prefix+k, JSON.stringify(v)); }catch(e){} return Promise.resolve(true); },
+    read(k){ try{ const r=localStorage.getItem(prefix+k); return Promise.resolve(r==null?null:JSON.parse(r)); }catch(e){ return Promise.resolve(null); } },
+    list(){ const o=[]; for(let i=0;i<localStorage.length;i++){ const k=localStorage.key(i); if(k&&k.startsWith(prefix)) o.push(k.slice(prefix.length)); } return Promise.resolve(o); },
+    delete(k){ localStorage.removeItem(prefix+k); return Promise.resolve(true); },
+    listApps(){ return Promise.resolve([]); },
+    openApp(){ return Promise.resolve({ok:false,error:'standalone'}); },
+    emit(){ return Promise.resolve(true); },
+    subscribe(){ return ()=>{}; },
+    onPayload(){},
+  };
+})();
+</script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+:root{
+  --bg:#080614; --bg-2:#11091d; --panel:rgba(20,12,38,.82);
+  --line:rgba(120,200,255,.18); --line-2:rgba(180,140,255,.55);
+  --ink:#e7e2ff; --ink-dim:#9c93c6; --ink-fade:#6a608a;
+  --teal:#80ffff; --magenta:#ff60d0; --violet:#a040ff;
+  --gold:#ffd47a; --green:#7dffb3; --red:#ff7088;
+}
+html,body{
+  background:radial-gradient(ellipse at 50% 0%,#1a0f33 0%,#080614 70%);
+  min-height:100vh;color:var(--ink);
+  font-family:'Inter','Helvetica Neue',sans-serif;
+  -webkit-font-smoothing:antialiased;
+}
+body{padding:20px 16px 60px;}
+.shell{max-width:1240px;margin:0 auto;}
+.mono{font-family:'SF Mono','Menlo','Courier New',monospace;}
+
+.hdr{display:flex;align-items:center;gap:18px;
+  border-bottom:1px solid var(--line);padding-bottom:14px;margin-bottom:16px;}
+.hdr .mark{width:46px;height:46px;}
+.hdr h1{font-family:'Courier New',monospace;font-size:22px;letter-spacing:8px;
+  background:linear-gradient(180deg,#80ffff 0%,#ff60d0 65%,#a040ff 100%);
+  -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
+  line-height:1;margin-bottom:4px;}
+.hdr .sub{font-family:'Courier New',monospace;font-size:10px;letter-spacing:4px;
+  color:var(--ink-dim);text-transform:uppercase;}
+.hdr .ctx{margin-left:auto;font-size:10px;color:var(--ink-fade);
+  font-family:'Courier New',monospace;letter-spacing:2px;}
+
+.toolbar{display:flex;gap:12px;flex-wrap:wrap;align-items:center;
+  margin-bottom:14px;padding:12px 14px;
+  background:var(--panel);border:1px solid var(--line);border-radius:5px;}
+#search{flex:1;min-width:220px;background:rgba(8,4,16,.6);border:1px solid var(--line);
+  color:var(--ink);padding:8px 12px;border-radius:3px;
+  font-family:inherit;font-size:13px;outline:none;}
+#search:focus{border-color:var(--magenta);}
+.toolbar .count{font-family:'Courier New',monospace;font-size:11px;
+  letter-spacing:3px;color:var(--ink-fade);}
+.btn{font-family:'Courier New',monospace;font-size:11px;letter-spacing:3px;
+  text-transform:uppercase;background:rgba(40,20,80,.6);color:var(--teal);
+  border:1px solid var(--line-2);padding:8px 14px;cursor:pointer;border-radius:3px;
+  transition:all .15s;}
+.btn:hover{background:rgba(80,40,160,.7);color:#fff;
+  box-shadow:0 0 14px rgba(255,80,220,.4);}
+.btn.danger{border-color:var(--red);color:var(--red);}
+
+.filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px;
+  padding:10px 14px;background:rgba(8,4,16,.4);border:1px solid var(--line);
+  border-radius:4px;}
+.filter-group{display:flex;align-items:center;gap:6px;}
+.filter-group label{font-family:'Courier New',monospace;font-size:9px;letter-spacing:2px;
+  color:var(--ink-fade);text-transform:uppercase;}
+.filter-group select{background:rgba(8,4,16,.7);border:1px solid var(--line);
+  color:var(--ink);padding:4px 8px;border-radius:3px;
+  font-family:'SF Mono',monospace;font-size:11px;outline:none;}
+.filter-group select:focus{border-color:var(--magenta);}
+
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px;}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:5px;
+  padding:14px;cursor:pointer;transition:all .15s;position:relative;overflow:hidden;}
+.card::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;
+  background:linear-gradient(90deg,transparent, var(--magenta), transparent);
+  opacity:0;transition:opacity .2s;}
+.card:hover{border-color:var(--line-2);transform:translateY(-2px);
+  box-shadow:0 8px 24px rgba(160,64,255,.18);}
+.card:hover::before{opacity:.6;}
+.card .portrait{width:100%;aspect-ratio:1/1.2;border-radius:4px;overflow:hidden;
+  background:#04020a;margin-bottom:10px;border:1px solid var(--line);}
+.card .portrait svg{width:100%;height:100%;display:block;}
+.card .c-name{font-family:'Cormorant Garamond',Georgia,serif;font-size:17px;
+  color:var(--ink);line-height:1.15;font-weight:500;margin-bottom:2px;}
+.card .c-epithet{font-family:'Cormorant Garamond',Georgia,serif;font-style:italic;
+  font-size:11.5px;color:var(--magenta);line-height:1.35;margin-bottom:8px;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+.card .c-tags{display:flex;flex-wrap:wrap;gap:4px;}
+.card .c-tag{font-family:'Courier New',monospace;font-size:9px;letter-spacing:1px;
+  text-transform:uppercase;background:rgba(80,40,160,.3);color:var(--ink-dim);
+  border:1px solid var(--line);padding:2px 5px;border-radius:2px;}
+.card .c-tag.z{color:var(--teal);}
+.card .c-tag.cls{color:var(--gold);}
+.card .c-tag.stamp{color:var(--red);}
+
+.empty{text-align:center;padding:80px 20px;color:var(--ink-fade);}
+.empty .e-title{font-family:'Courier New',monospace;font-size:14px;letter-spacing:6px;
+  color:var(--ink-dim);margin-bottom:14px;}
+.empty .e-body{font-size:13px;line-height:1.7;max-width:480px;margin:0 auto;}
+.empty code{background:rgba(80,40,160,.3);color:var(--teal);
+  padding:1px 6px;border-radius:2px;font-family:'SF Mono',monospace;}
+.empty a{color:var(--teal);cursor:pointer;text-decoration:underline;}
+
+/* Detail overlay */
+.detail-overlay{position:fixed;inset:0;background:rgba(8,4,16,.9);
+  backdrop-filter:blur(8px);z-index:100;
+  display:none;align-items:flex-start;justify-content:center;
+  padding:32px 16px;overflow:auto;}
+.detail-overlay.show{display:flex;}
+.detail-panel{background:linear-gradient(180deg,#11091d 0%,#080614 100%);
+  border:1px solid var(--line-2);border-radius:6px;
+  max-width:900px;width:100%;padding:24px;
+  box-shadow:0 0 60px rgba(160,64,255,.3);}
+.detail-panel .d-close{float:right;background:none;border:none;color:var(--ink-dim);
+  font-size:22px;cursor:pointer;line-height:1;padding:4px 8px;}
+.detail-panel .d-close:hover{color:var(--magenta);}
+
+.detail-grid{display:grid;grid-template-columns:280px 1fr;gap:24px;}
+@media (max-width:760px){.detail-grid{grid-template-columns:1fr;}}
+.detail-portrait{background:#04020a;border:1px solid var(--line-2);border-radius:8px;
+  overflow:hidden;}
+.detail-portrait svg{width:100%;height:auto;display:block;}
+.detail-body{font-family:'Inter',sans-serif;}
+.detail-body .d-name{font-family:'Cormorant Garamond',Georgia,serif;font-size:30px;
+  color:var(--ink);line-height:1.1;font-weight:500;margin-bottom:4px;}
+.detail-body .d-epithet{font-family:'Cormorant Garamond',Georgia,serif;font-style:italic;
+  font-size:16px;color:var(--magenta);margin-bottom:14px;}
+.detail-body .d-tags{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:18px;}
+.detail-body .d-tag{font-family:'Courier New',monospace;font-size:9px;letter-spacing:2px;
+  text-transform:uppercase;background:rgba(80,40,160,.3);color:var(--ink-dim);
+  border:1px solid var(--line);padding:3px 7px;border-radius:2px;}
+.detail-body .d-tag.z{color:var(--teal);border-color:rgba(128,255,255,.4);}
+.detail-body .d-tag.st{color:var(--magenta);border-color:rgba(255,96,208,.4);}
+.detail-body .d-tag.cls{color:var(--gold);border-color:rgba(255,212,122,.4);}
+.detail-body .d-tag.stamp{color:var(--red);border-color:rgba(255,112,136,.4);}
+
+.dh{font-family:'Courier New',monospace;font-size:10px;letter-spacing:4px;
+  color:var(--gold);text-transform:uppercase;margin:14px 0 6px;
+  border-bottom:1px dotted var(--line);padding-bottom:4px;}
+.kv{display:grid;grid-template-columns:90px 1fr;gap:4px 10px;font-size:12.5px;
+  margin-bottom:8px;}
+.kv .k{font-family:'Courier New',monospace;font-size:10px;letter-spacing:1px;
+  color:var(--ink-fade);text-transform:uppercase;align-self:start;line-height:1.55;}
+.kv .v{color:var(--ink);line-height:1.55;}
+
+.mlist{font-size:13px;color:var(--ink);line-height:1.55;padding-left:18px;}
+.mlist li{margin-bottom:3px;}
+
+.tri{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:4px;}
+.tri-cell{background:rgba(8,4,16,.5);border:1px solid var(--line);
+  border-radius:3px;padding:8px;}
+.tri-cell .tl{font-family:'Courier New',monospace;font-size:9px;letter-spacing:2px;
+  color:var(--ink-fade);text-transform:uppercase;margin-bottom:4px;}
+.tri-cell .tv{font-size:12px;color:var(--ink);font-style:italic;
+  font-family:'Cormorant Garamond',Georgia,serif;line-height:1.4;}
+
+.backstory{font-family:'Cormorant Garamond',Georgia,serif;font-size:14.5px;
+  line-height:1.75;color:var(--ink);margin-top:4px;}
+.backstory h5{font-family:'Courier New',monospace;font-size:9px;letter-spacing:3px;
+  color:var(--ink-fade);text-transform:uppercase;margin:14px 0 6px;font-weight:normal;}
+.backstory h5:first-child{margin-top:0;}
+.backstory p{margin-bottom:8px;}
+.backstory .threads{display:flex;flex-direction:column;gap:8px;margin-top:4px;}
+.backstory .thread{background:rgba(8,4,16,.4);border-left:2px solid var(--magenta);
+  padding:6px 10px;}
+.backstory .thread .tname{font-family:'Courier New',monospace;font-size:9px;
+  letter-spacing:2px;color:var(--magenta);text-transform:uppercase;margin-bottom:2px;}
+.backstory .thread .tdesc{font-size:12.5px;font-style:italic;line-height:1.5;}
+
+.actions{display:flex;gap:10px;margin-top:20px;flex-wrap:wrap;
+  border-top:1px solid var(--line);padding-top:16px;}
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <div class="hdr">
+    <div class="mark" id="hdr-mark"></div>
+    <div>
+      <h1>CHARACTER LIBRARY</h1>
+      <div class="sub">Fracture City · The Cast</div>
+    </div>
+    <div class="ctx" id="ctx">—</div>
+  </div>
+
+  <div class="toolbar">
+    <input type="text" id="search" placeholder="search names, epithets, zones, stamps...">
+    <span class="count" id="count">0 CHARACTERS</span>
+    <button class="btn" id="refresh-btn">↻ REFRESH</button>
+    <button class="btn" id="forge-btn">+ FORGE NEW</button>
+  </div>
+
+  <div class="filters">
+    <div class="filter-group">
+      <label>Zone</label>
+      <select id="f-zone"><option value="">all</option></select>
+    </div>
+    <div class="filter-group">
+      <label>Class</label>
+      <select id="f-class"><option value="">all</option></select>
+    </div>
+    <div class="filter-group">
+      <label>Stamp</label>
+      <select id="f-stamp"><option value="">all</option></select>
+    </div>
+    <div class="filter-group">
+      <label>Origin</label>
+      <select id="f-origin"><option value="">all</option></select>
+    </div>
+    <div class="filter-group">
+      <label>Sort</label>
+      <select id="f-sort">
+        <option value="recent">most recent</option>
+        <option value="name">by name</option>
+        <option value="zone">by zone</option>
+        <option value="origin">by origin</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="grid" id="grid"></div>
+  <div class="empty" id="empty">
+    <div class="e-title">NO CHARACTERS YET</div>
+    <div class="e-body">
+      Open <code>Character Forge</code> and save a few characters.
+      Each saved character automatically appears here as a
+      <code>character.identity.v1</code> output.
+      <br><br>
+      <a onclick="Lib.openForge()">Open Character Forge</a>
+    </div>
+  </div>
+
+</div>
+
+<div class="detail-overlay" id="detail-overlay">
+  <div class="detail-panel" id="detail-panel">
+    <button class="d-close" onclick="Lib.closeDetail()">×</button>
+    <div id="detail-content"></div>
+  </div>
+</div>
+
+<script>
+// =============================================================================
+// RNG (mulberry32 — same as Forge for portrait reproducibility)
+// =============================================================================
+function hashSeed(str){
+  let h=1779033703 ^ str.length;
+  for(let i=0;i<str.length;i++){
+    h=Math.imul(h ^ str.charCodeAt(i), 3432918353);
+    h=h<<13 | h>>>19;
+  }
+  return (h^=h>>>16) >>> 0;
+}
+function mulberry32(seed){
+  let s=seed;
+  return function(){
+    let t=s+=0x6D2B79F5;
+    t=Math.imul(t ^ t>>>15, t|1);
+    t^=t+Math.imul(t ^ t>>>7, t|61);
+    return ((t ^ t>>>14)>>>0)/4294967296;
+  };
+}
+class RNG{
+  constructor(seed){
+    this.seed=typeof seed==='string'?hashSeed(seed):(seed>>>0);
+    this.next=mulberry32(this.seed);
+  }
+  pick(arr){ return arr[Math.floor(this.next()*arr.length)]; }
+}
+
+// =============================================================================
+// PORTRAIT RENDERER (matches Character Forge's renderer)
+// =============================================================================
+const AXIS_COLOR = { V:'#ffd47a', H:'#80ffff', T:'#ff60d0' };
+const SKIN_RGB = {
+  ash:'#ddd0e6', bronze:'#caa67d', copper:'#c47a55', umber:'#7b4a30',
+  pearl:'#f3e9d8', obsidian:'#2c2233','silver-blue':'#b5c3d4','rose-ochre':'#cf9785',
+};
+const HAIR_FORM = {
+  'close-cropped':'crop','long and braided':'braid','short and tangled':'tangle',
+  'shaved bald':'bald','silver and falling':'fall','pulled back severe':'pulled',
+  'wild and curling':'curl','grey at the temples':'temples','a hood that hides it':'hood',
+};
+const EYE_COLOR = { gold:'#ffd47a', teal:'#80ffff', magenta:'#ff60d0', silver:'#dde3ef',
+                    black:'#1a1626', green:'#7dffb3', violet:'#a040ff', amber:'#f3a64d', grey:'#9aa0b3' };
+const ZONES_ORDER = ['I','III','V','VII','II','IV','VI','VIII'];
+
+function renderPortrait(character, rng){
+  let primaryAxis = ['V','H','T'][ZONES_ORDER.indexOf(character.zone) % 3];
+  const aura = AXIS_COLOR[primaryAxis];
+  const secondary = primaryAxis === 'V' ? 'H' : primaryAxis === 'H' ? 'T' : 'V';
+  const garmentColor = AXIS_COLOR[secondary];
+
+  const W = 380, H = 460, cx = W/2;
+  const skinHex = SKIN_RGB[character.physical.skin] || '#caa67d';
+  const eyeHex = EYE_COLOR[character.physical.eyes] || '#dde3ef';
+  const headR = 52;
+  const headCy = 150;
+  const buildScale = {
+    Slight:0.85, Lean:0.92, Average:1.0, Strong:1.1, Heavy:1.18, Tall:0.95, Compact:1.08
+  }[character.physical.build] || 1.0;
+  const shoulderW = 100 * buildScale;
+
+  let svg = `<defs>
+    <radialGradient id="aura-${character.seed}" cx="50%" cy="32%" r="50%">
+      <stop offset="0%" stop-color="${aura}" stop-opacity="0.45"/>
+      <stop offset="60%" stop-color="${aura}" stop-opacity="0.06"/>
+      <stop offset="100%" stop-color="${aura}" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="garment-${character.seed}" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="${garmentColor}" stop-opacity="0.55"/>
+      <stop offset="100%" stop-color="${garmentColor}" stop-opacity="0.12"/>
+    </linearGradient>
+    <radialGradient id="bg-${character.seed}" cx="50%" cy="0%" r="80%">
+      <stop offset="0%" stop-color="#1a0f33"/>
+      <stop offset="100%" stop-color="#04020a"/>
+    </radialGradient>
+  </defs>`;
+
+  svg += `<rect width="${W}" height="${H}" fill="url(#bg-${character.seed})" rx="8"/>`;
+
+  const ORIGINS_LIST = ['The Outer Ruins','Fracture City','The Forge','The Flood Gate',
+    'The Archive','The Undercroft','The Burning Maze','The Void Below','The Spire','The Ascent'];
+  const originIdx = ORIGINS_LIST.indexOf(character.origin);
+  const horizonY = 280 + (originIdx - 5) * 6;
+  svg += `<line x1="20" y1="${horizonY}" x2="${W-20}" y2="${horizonY}"
+            stroke="rgba(180,140,255,.15)" stroke-width="1" stroke-dasharray="2 5"/>`;
+
+  const dotCount = {I:1,II:2,III:3,IV:4,V:5,VI:6,VII:7,VIII:8}[character.zone] || 3;
+  for(let i=0;i<dotCount;i++){
+    const x = 40 + rng.next()*(W-80);
+    const y = 30 + rng.next()*60;
+    const r = 1 + rng.next()*1.5;
+    svg += `<circle cx="${x}" cy="${y}" r="${r}" fill="rgba(255,255,255,.5)"/>`;
+  }
+
+  svg += `<ellipse cx="${cx}" cy="${headCy}" rx="170" ry="180" fill="url(#aura-${character.seed})"/>`;
+
+  const garmentTop = headCy + headR - 6;
+  const garmentBottom = H - 20;
+  const garment = character.physical.garment || '';
+
+  if (garment.includes('cloak') || garment.includes('shroud') || garment.includes('mantle') || garment.includes('robe')) {
+    svg += `<path d="M ${cx-shoulderW} ${garmentTop}
+                     C ${cx-shoulderW-20} ${garmentTop+80}, ${cx-shoulderW*1.7-20} ${garmentBottom-60}, ${cx-shoulderW*1.7} ${garmentBottom}
+                     L ${cx+shoulderW*1.7} ${garmentBottom}
+                     C ${cx+shoulderW*1.7+20} ${garmentBottom-60}, ${cx+shoulderW+20} ${garmentTop+80}, ${cx+shoulderW} ${garmentTop}
+                     Z"
+                fill="url(#garment-${character.seed})" stroke="rgba(180,140,255,.4)" stroke-width="1"/>`;
+  } else if (garment.includes('coat') || garment.includes('vest') || garment.includes('harness') || garment.includes('wraps')) {
+    svg += `<path d="M ${cx-shoulderW} ${garmentTop}
+                     L ${cx-shoulderW*0.95} ${garmentBottom}
+                     L ${cx+shoulderW*0.95} ${garmentBottom}
+                     L ${cx+shoulderW} ${garmentTop} Z"
+                fill="url(#garment-${character.seed})" stroke="rgba(180,140,255,.5)" stroke-width="1"/>`;
+    svg += `<line x1="${cx}" y1="${garmentTop+4}" x2="${cx}" y2="${garmentBottom-10}"
+              stroke="rgba(180,140,255,.5)" stroke-width="1.2"/>`;
+  } else {
+    svg += `<path d="M ${cx-shoulderW-15} ${garmentTop}
+                     C ${cx-shoulderW-25} ${headCy-30}, ${cx-headR-10} ${headCy-headR-20}, ${cx} ${headCy-headR-30}
+                     C ${cx+headR+10} ${headCy-headR-20}, ${cx+shoulderW+25} ${headCy-30}, ${cx+shoulderW+15} ${garmentTop}
+                     L ${cx+shoulderW*1.5} ${garmentBottom}
+                     L ${cx-shoulderW*1.5} ${garmentBottom} Z"
+                fill="url(#garment-${character.seed})" stroke="rgba(180,140,255,.4)" stroke-width="1"/>`;
+  }
+
+  svg += `<rect x="${cx-12}" y="${headCy+headR-8}" width="24" height="22" fill="${skinHex}" opacity="0.85"/>`;
+  svg += `<ellipse cx="${cx}" cy="${headCy}" rx="${headR}" ry="${headR*1.05}" fill="${skinHex}"
+            stroke="rgba(0,0,0,.25)" stroke-width="1"/>`;
+
+  const hf = HAIR_FORM[character.physical.hair];
+  const hairColor = ['silver and falling','grey at the temples'].includes(character.physical.hair) ? '#d8d6e8'
+                  : ['shaved bald'].includes(character.physical.hair) ? null
+                  : '#2b1f3a';
+  if (hf === 'bald' || hf === 'hood') {
+  } else if (hf === 'pulled' || hf === 'crop') {
+    svg += `<path d="M ${cx-headR} ${headCy-15}
+                     Q ${cx} ${headCy-headR-12}, ${cx+headR} ${headCy-15}
+                     L ${cx+headR-4} ${headCy-headR*0.4}
+                     L ${cx-headR+4} ${headCy-headR*0.4} Z"
+                fill="${hairColor}"/>`;
+  } else if (hf === 'braid') {
+    svg += `<path d="M ${cx-headR} ${headCy-15}
+                     Q ${cx} ${headCy-headR-15}, ${cx+headR} ${headCy-15}
+                     L ${cx+headR-4} ${headCy} L ${cx-headR+4} ${headCy} Z"
+                fill="${hairColor}"/>`;
+    svg += `<path d="M ${cx-headR+8} ${headCy-headR*0.2}
+                     C ${cx-headR-6} ${headCy+30}, ${cx-headR-2} ${headCy+80}, ${cx-headR+14} ${headCy+120}"
+                fill="none" stroke="${hairColor}" stroke-width="6" stroke-linecap="round"/>`;
+  } else if (hf === 'tangle' || hf === 'curl') {
+    svg += `<path d="M ${cx-headR-6} ${headCy-10}
+                     Q ${cx-headR} ${headCy-headR-18}, ${cx-15} ${headCy-headR-12}
+                     Q ${cx} ${headCy-headR-22}, ${cx+15} ${headCy-headR-12}
+                     Q ${cx+headR} ${headCy-headR-18}, ${cx+headR+6} ${headCy-10}
+                     L ${cx+headR-4} ${headCy} L ${cx-headR+4} ${headCy} Z"
+                fill="${hairColor}"/>`;
+  } else if (hf === 'fall') {
+    svg += `<path d="M ${cx-headR-2} ${headCy-15}
+                     Q ${cx} ${headCy-headR-15}, ${cx+headR+2} ${headCy-15}
+                     L ${cx+headR+8} ${headCy+headR+20}
+                     L ${cx-headR-8} ${headCy+headR+20} Z"
+                fill="${hairColor}"/>`;
+  } else if (hf === 'temples') {
+    svg += `<path d="M ${cx-headR} ${headCy-12}
+                     Q ${cx} ${headCy-headR-10}, ${cx+headR} ${headCy-12}
+                     L ${cx+headR-4} ${headCy-headR*0.3} L ${cx-headR+4} ${headCy-headR*0.3} Z"
+                fill="${hairColor}"/>`;
+    svg += `<path d="M ${cx-headR+2} ${headCy-headR*0.3} L ${cx-headR+8} ${headCy+5} L ${cx-headR+2} ${headCy+5} Z" fill="#d8d6e8"/>`;
+    svg += `<path d="M ${cx+headR-2} ${headCy-headR*0.3} L ${cx+headR-8} ${headCy+5} L ${cx+headR-2} ${headCy+5} Z" fill="#d8d6e8"/>`;
+  }
+
+  const eyeY = headCy - 4, eyeOffset = 14;
+  svg += `<circle cx="${cx-eyeOffset}" cy="${eyeY}" r="6" fill="${eyeHex}" opacity="0.18"/>`;
+  svg += `<circle cx="${cx+eyeOffset}" cy="${eyeY}" r="6" fill="${eyeHex}" opacity="0.18"/>`;
+  svg += `<ellipse cx="${cx-eyeOffset}" cy="${eyeY}" rx="3.5" ry="2.2" fill="${eyeHex}"/>`;
+  svg += `<ellipse cx="${cx+eyeOffset}" cy="${eyeY}" rx="3.5" ry="2.2" fill="${eyeHex}"/>`;
+  svg += `<circle cx="${cx-eyeOffset}" cy="${eyeY}" r="1.2" fill="rgba(0,0,0,.85)"/>`;
+  svg += `<circle cx="${cx+eyeOffset}" cy="${eyeY}" r="1.2" fill="rgba(0,0,0,.85)"/>`;
+
+  const mouthY = headCy + 18;
+  const subtype = character.subtype || '';
+  const mouthCurve = subtype.includes('Hermit')||subtype.includes('Martyr')||
+                     subtype.includes('Burden')||subtype.includes('Ghost') ? -2 :
+                     subtype.includes('Influencer')||subtype.includes('Revival')||
+                     subtype.includes('Bridge')||subtype.includes('Moment') ? 2 : 0;
+  svg += `<path d="M ${cx-10} ${mouthY} Q ${cx} ${mouthY+mouthCurve}, ${cx+10} ${mouthY}"
+            fill="none" stroke="rgba(0,0,0,.4)" stroke-width="1.3" stroke-linecap="round"/>`;
+
+  svg += `<path d="M ${cx+headR-3} ${headCy-25} Q ${cx+headR+5} ${headCy+10}, ${cx+headR-8} ${headCy+headR*0.6}"
+            fill="none" stroke="rgba(0,0,0,.12)" stroke-width="4"/>`;
+
+  const sigilCy = H - 50;
+  const cls = character.class || '';
+  if (cls.includes('Form')) {
+    svg += `<polygon points="${cx},${sigilCy-12} ${cx+12},${sigilCy} ${cx},${sigilCy+12} ${cx-12},${sigilCy}"
+              fill="none" stroke="${AXIS_COLOR.V}" stroke-width="1.5"/>`;
+  } else if (cls.includes('Thread')) {
+    svg += `<path d="M ${cx-16} ${sigilCy} Q ${cx-8} ${sigilCy-8}, ${cx} ${sigilCy} T ${cx+16} ${sigilCy}"
+              fill="none" stroke="${AXIS_COLOR.T}" stroke-width="1.5" stroke-linecap="round"/>`;
+  } else {
+    svg += `<circle cx="${cx-7}" cy="${sigilCy}" r="6" fill="none" stroke="${AXIS_COLOR.H}" stroke-width="1.5"/>`;
+    svg += `<circle cx="${cx+7}" cy="${sigilCy}" r="6" fill="none" stroke="${AXIS_COLOR.H}" stroke-width="1.5"/>`;
+  }
+
+  svg += `<circle cx="${cx}" cy="${headCy-headR+8}" r="3" fill="${AXIS_COLOR.V}" opacity="0.9"/>`;
+  svg += `<circle cx="${cx}" cy="${headCy+headR+10}" r="3" fill="${AXIS_COLOR.H}" opacity="0.9"/>`;
+  svg += `<circle cx="${cx-6}" cy="${garmentTop+45}" r="3" fill="${AXIS_COLOR.T}" opacity="0.9"/>`;
+
+  if (character.stamp && character.stamp !== 'None') {
+    const stampColor = { Scarcity:'#a87330', Displacement:'#7390c0', Violence:'#b03050',
+                          Silencing:'#6a6a8a', Abandonment:'#a06090' }[character.stamp];
+    svg += `<rect x="${W-50}" y="${H-50}" width="30" height="30" rx="3"
+              fill="none" stroke="${stampColor}" stroke-width="1.3"/>`;
+    svg += `<text x="${W-35}" y="${H-30}" text-anchor="middle"
+              font-family="Courier New, monospace" font-size="14" fill="${stampColor}"
+              letter-spacing="1">${character.stamp[0]}</text>`;
+  }
+
+  return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">${svg}</svg>`;
+}
+
+// =============================================================================
+// LIBRARY CONTROLLER
+// =============================================================================
+const Lib = (function(){
+  let state = {
+    characters: [],   // [{key, data}]
+    filter: '',
+    filters: { zone: '', cls: '', stamp: '', origin: '' },
+    sort: 'recent',
+    current: null,
+  };
+
+  function $(id){ return document.getElementById(id); }
+
+  function paintHdrMark(){
+    // Library mini-mark: 3 small portrait cells
+    let svg = `<svg viewBox="0 0 46 46" xmlns="http://www.w3.org/2000/svg">
+      <defs><radialGradient id="lm" cx="50%" cy="50%" r="50%">
+        <stop offset="0%" stop-color="rgba(160,64,255,.4)"/>
+        <stop offset="100%" stop-color="rgba(0,0,0,0)"/></radialGradient></defs>
+      <circle cx="23" cy="23" r="22" fill="url(#lm)"/>`;
+    const cells = [
+      [6,8,12,30,'#ffd47a'],
+      [17,8,12,30,'#80ffff'],
+      [28,8,12,30,'#ff60d0'],
+    ];
+    for (const [x,y,w,h,c] of cells){
+      svg += `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="2"
+        fill="rgba(8,4,16,.7)" stroke="${c}" stroke-width="1"/>`;
+      // tiny figure
+      svg += `<circle cx="${x+w/2}" cy="${y+10}" r="2.5" fill="${c}"/>`;
+      svg += `<path d="M ${x+w/2-3} ${y+13} L ${x+w/2+3} ${y+13} L ${x+w/2+4} ${y+22} L ${x+w/2-4} ${y+22} Z"
+        fill="rgba(8,4,16,.95)" stroke="${c}" stroke-width="0.6"/>`;
+    }
+    svg += `</svg>`;
+    $('hdr-mark').innerHTML = svg;
+  }
+
+  function buildFilters(){
+    const ZONES = ['I','II','III','IV','V','VI','VII','VIII'];
+    const CLASSES = ['Blade of Form','Keeper of Thread','Weaver of Bond'];
+    const STAMPS = ['None','Scarcity','Displacement','Violence','Silencing','Abandonment'];
+    const ORIGINS = ['The Outer Ruins','Fracture City','The Forge','The Flood Gate',
+      'The Archive','The Undercroft','The Burning Maze','The Void Below','The Spire','The Ascent'];
+    $('f-zone').innerHTML = '<option value="">all</option>' + ZONES.map(z=>`<option value="${z}">Zone ${z}</option>`).join('');
+    $('f-class').innerHTML = '<option value="">all</option>' + CLASSES.map(c=>`<option value="${c}">${c}</option>`).join('');
+    $('f-stamp').innerHTML = '<option value="">all</option>' + STAMPS.map(s=>`<option value="${s}">${s}</option>`).join('');
+    $('f-origin').innerHTML = '<option value="">all</option>' + ORIGINS.map(o=>`<option value="${o}">${o}</option>`).join('');
+  }
+
+// ─── References, not copies ─────────────────────────────────────────────────
+//  Apps in this hub used to keep a full private copy of everything they were
+//  sent: cached_character_<seed>, cached_profile_<id>, cached_scene_<seed>.
+//  Ten characters existed as twenty files, and the copies agreed with their
+//  originals only because nobody had edited one yet — rename a character in
+//  Character Forge and every copy kept the old name silently, forever.
+//
+//  A received record is now stored as a reference — ref_<kind>_<id> holding
+//  {$ref:"<slug>/<key>"} — and resolved through the shell on load, so what an
+//  app shows is whatever the source currently says.
+//
+//  Legacy cached_ copies are still read, so nothing disappears if the source no
+//  longer has the original, and are converted to references on sight when they
+//  can be resolved.
+const PalmRefs = {
+  //  kind: 'character' | 'profile' | 'scene'  — names the local key prefix
+  //  type: the contract type recorded against the person (claim)
+  //  source(id): "slug/key" where the real record lives
+  //  idOf(rec): the field that identifies it
+  //  valid(rec): does this look like a real record of this kind
+  make({ kind, type, source, idOf, valid }){
+    const refPrefix    = 'ref_'    + kind + '_';
+    const legacyPrefix = 'cached_' + kind + '_';
+    const F = () => (typeof window !== 'undefined' && window.fracture) || null;
+
+    const api = {
+      kind, type, refPrefix, legacyPrefix, source, idOf, valid,
+
+      supported(){ return !!(F() && typeof F().resolve === 'function'); },
+
+      //  Record a received item by reference. Falls back to a copy on a shell
+      //  too old to resolve, so this is safe to ship ahead of the shell update.
+      async receive(payload){
+        const f = F(); if (!f || !payload) return;
+        const id = idOf(payload); if (!id) return;
+        if (api.supported()){
+          await f.save(refPrefix + id, {
+            $ref: source(id), id, receivedAt: new Date().toISOString(),
+          });
+          if (f.claim){ try { await f.claim(type, source(id)); } catch (e){} }
+        } else {
+          await f.save(legacyPrefix + id, payload);
+        }
+      },
+
+      //  Everything this app holds of this kind, resolved live.
+      //  Returns [{ key, id, data, missing?, legacy? }].
+      async loadAll(){
+        const f = F(); if (!f) return [];
+        const out = [], seen = new Set();
+        const keys = await f.list();
+
+        for (const k of keys.filter(k => k.startsWith(refPrefix))){
+          const rec = await f.read(k);
+          if (!rec || !rec.$ref) continue;
+          // Tolerate an id under any of the names a reference has been written
+          // with, and fall back to the key itself, so a record can never lose
+          // its identity just because the field was renamed.
+          const rid = rec.id || rec.seed || rec.participant_id || k.slice(refPrefix.length);
+          const data = api.supported() ? await f.resolve(rec.$ref) : null;
+          if (data && valid(data)){ out.push({ key:k, id:rid, data }); }
+          else {
+            // Keep the record rather than dropping the user's row, but say so
+            // instead of rendering something blank.
+            out.push({ key:k, id:rid, missing:true, ref:rec.$ref });
+          }
+          seen.add(rid);
+        }
+
+        for (const k of keys.filter(k => k.startsWith(legacyPrefix))){
+          const data = await f.read(k);
+          if (!data || !valid(data)) continue;
+          const id = idOf(data) || k.slice(legacyPrefix.length);
+          if (seen.has(id)){ await api._retire(k); continue; }
+          if (api.supported() && await f.resolve(source(id))){
+            await api.receive(data);
+            await api._retire(k);
+            out.push({ key: refPrefix + id, id, data: await f.resolve(source(id)) });
+          } else {
+            out.push({ key:k, id, data, legacy:true });
+          }
+          seen.add(id);
+        }
+        return out;
+      },
+
+      //  The common case: just the records, skipping anything unresolvable.
+      async values(){
+        return (await api.loadAll()).filter(r => !r.missing).map(r => r.data);
+      },
+
+      async _retire(key){
+        const f = F();
+        try { if (f && f.delete) await f.delete(key); } catch (e){}
+      },
+    };
+    return api;
+  },
+};
+
+//  The three kinds this hub actually passes around.
+const CharRefs = PalmRefs.make({
+  kind: 'character', type: 'character.identity.v1',
+  source: id => 'character-forge/character_' + id,
+  idOf:  r => r && r.seed,
+  valid: r => !!(r && r.name),
+});
+const ProfileRefs = PalmRefs.make({
+  kind: 'profile', type: 'tot.profile.v1',
+  source: id => 'coherence-assessment/profile_' + id,
+  idOf:  r => r && r.participant_id,
+  valid: r => !!(r && r.zone),
+});
+const SceneRefs = PalmRefs.make({
+  kind: 'scene', type: 'scene.moment.v1',
+  source: id => 'scene-composer/scene_' + id,
+  idOf:  r => r && r.seed,
+  valid: r => !!(r && r.title),
+});
+
+if (typeof window !== 'undefined'){
+  window.PalmRefs = PalmRefs;          /* debug + tests */
+  window.CharRefs = CharRefs;
+  window.ProfileRefs = ProfileRefs;
+  window.SceneRefs = SceneRefs;
+}
+
+  async function loadCharacters(){
+    // Resolved live from Character Forge rather than read from local copies,
+    // so an edit in the Forge shows here without any sync step.
+    state.characters = (await CharRefs.loadAll())
+      .filter(r => !r.missing).map(({ key, data }) => ({ key, data }));
+    render();
+  }
+
+  function render(){
+    const grid = $('grid');
+    const empty = $('empty');
+    const f = state.filter.trim().toLowerCase();
+    let arr = state.characters.filter(({data}) => {
+      if (f){
+        const hay = [data.name?.full, data.name?.first, data.epithet,
+          data.zone, data.subtype, data.class, data.stamp, data.origin,
+          (data.tags||[]).join(' ')].join(' ').toLowerCase();
+        if (!hay.includes(f)) return false;
+      }
+      if (state.filters.zone && data.zone !== state.filters.zone) return false;
+      if (state.filters.cls && data.class !== state.filters.cls) return false;
+      if (state.filters.stamp && data.stamp !== state.filters.stamp) return false;
+      if (state.filters.origin && data.origin !== state.filters.origin) return false;
+      return true;
+    });
+
+    // Sort
+    if (state.sort === 'recent'){
+      arr.sort((a,b) => new Date(b.data.timestamp || 0) - new Date(a.data.timestamp || 0));
+    } else if (state.sort === 'name'){
+      arr.sort((a,b) => (a.data.name?.first || '').localeCompare(b.data.name?.first || ''));
+    } else if (state.sort === 'zone'){
+      const zo = {I:1,II:2,III:3,IV:4,V:5,VI:6,VII:7,VIII:8};
+      arr.sort((a,b) => (zo[a.data.zone]||0) - (zo[b.data.zone]||0));
+    } else if (state.sort === 'origin'){
+      arr.sort((a,b) => (a.data.origin || '').localeCompare(b.data.origin || ''));
+    }
+
+    $('count').textContent = `${state.characters.length} CHARACTER${state.characters.length===1?'':'S'}` +
+      ((f || Object.values(state.filters).some(v=>v)) ? ` · ${arr.length} MATCH` : '');
+
+    if (state.characters.length === 0){
+      grid.innerHTML = '';
+      empty.style.display = 'block';
+      return;
+    }
+    empty.style.display = 'none';
+
+    grid.innerHTML = arr.map(({key, data}) => {
+      const rng = new RNG((data.seed || key) + '::portrait');
+      const portrait = renderPortrait(data, rng);
+      const tags = [
+        `<span class="c-tag z">Z${data.zone}</span>`,
+        `<span class="c-tag">${data.subtype || '—'}</span>`,
+        data.class ? `<span class="c-tag cls">${data.class.split(' ')[0]}</span>` : '',
+        data.stamp && data.stamp !== 'None' ? `<span class="c-tag stamp">${data.stamp}</span>` : '',
+      ].join('');
+      return `<div class="card" data-key="${key}">
+        <div class="portrait">${portrait}</div>
+        <div class="c-name">${data.name.first} ${data.name.last}</div>
+        <div class="c-epithet">${data.epithet ? '"'+data.epithet+'"' : ''}</div>
+        <div class="c-tags">${tags}</div>
+      </div>`;
+    }).join('');
+
+    for (const card of grid.querySelectorAll('.card')){
+      card.addEventListener('click', () => openDetail(card.dataset.key));
+    }
+  }
+
+  function openDetail(key){
+    const entry = state.characters.find(c => c.key === key);
+    if (!entry) return;
+    state.current = entry;
+    const c = entry.data;
+    const rng = new RNG((c.seed || key) + '::portrait');
+    const portrait = renderPortrait(c, rng);
+
+    const bs = c.backstory;
+    const backstoryHtml = bs ? `
+      <h5>Origin</h5><p>${bs.origin || ''}</p>
+      <h5>The Weight Behind</h5><p>${bs.weight || ''}</p>
+      <h5>The Fracture</h5><p>${bs.fracture || ''}</p>
+      <h5>The Years Between</h5><p>${bs.between || ''}</p>
+      <h5>Three Threads</h5>
+      <p style="font-style:italic;color:var(--ink-dim);font-size:13px;">${(bs.threadsIntro||'').replace(/\{name\}/g, c.name.first)}</p>
+      <div class="threads">
+        ${(bs.threads||[]).map(t => `
+          <div class="thread">
+            <div class="tname">${t.kind}</div>
+            <div class="tdesc">${t.desc.replace(/\{name\}/g, c.name.first)}</div>
+          </div>`).join('')}
+      </div>
+      <h5>Where They Stand Now</h5><p>${bs.present || ''}</p>
+    ` : '<p style="color:var(--ink-fade);">(No backstory recorded.)</p>';
+
+    const tags = [
+      `<span class="d-tag z">Zone ${c.zone}</span>`,
+      `<span class="d-tag st">${c.subtype || '—'}</span>`,
+      c.class ? `<span class="d-tag cls">${c.class}</span>` : '',
+      c.stamp && c.stamp !== 'None' ? `<span class="d-tag stamp">${c.stamp} Stamp</span>` : '',
+      c.capture && c.capture !== 'None' ? `<span class="d-tag">${c.capture} Capture</span>` : '',
+    ].join('');
+
+    const content = `
+      <div class="detail-grid">
+        <div>
+          <div class="detail-portrait">${portrait}</div>
+        </div>
+        <div class="detail-body">
+          <div class="d-name">${c.name.full}</div>
+          <div class="d-epithet">${c.epithet ? '"'+c.epithet+'"' : ''}</div>
+          <div class="d-tags">${tags}</div>
+
+          <div class="dh">Identity</div>
+          <div class="kv">
+            <div class="k">Origin</div><div class="v">${c.origin || '—'}</div>
+            <div class="k">Age</div><div class="v">${c.age || '—'}</div>
+            <div class="k">Build</div><div class="v">${c.physical?.build || '—'}</div>
+            <div class="k">Skin</div><div class="v">${c.physical?.skin || '—'}</div>
+            <div class="k">Hair</div><div class="v">${c.physical?.hair || '—'}</div>
+            <div class="k">Eyes</div><div class="v">${c.physical?.eyes || '—'}</div>
+            <div class="k">Garment</div><div class="v">${c.physical?.garment || '—'}</div>
+            <div class="k">Voice</div><div class="v" style="font-style:italic;">${c.voice || '—'}</div>
+          </div>
+
+          <div class="dh">Mannerisms</div>
+          <ul class="mlist">${(c.mannerisms || []).map(m => `<li>${m}</li>`).join('')}</ul>
+
+          <div class="dh">Gift · Wound · Secret</div>
+          <div class="tri">
+            <div class="tri-cell"><div class="tl">Gift</div><div class="tv">${c.gift || '—'}</div></div>
+            <div class="tri-cell"><div class="tl">Wound</div><div class="tv">${c.wound || '—'}</div></div>
+            <div class="tri-cell"><div class="tl">Secret</div><div class="tv">${c.secret || '—'}</div></div>
+          </div>
+
+          <div class="dh">Aspiration · Fear</div>
+          <ul class="mlist">
+            <li><strong style="color:var(--gold);">Aspires:</strong> ${c.aspiration || '—'}</li>
+            <li><strong style="color:var(--red);">Fears:</strong> ${c.fear || '—'}</li>
+          </ul>
+
+          <div class="dh">Backstory</div>
+          <div class="backstory">${backstoryHtml}</div>
+
+          <div class="actions">
+            <button class="btn" onclick="Lib.openInScene()">→ OPEN IN SCENE COMPOSER</button>
+            <button class="btn" onclick="Lib.exportCurrent()">EXPORT JSON</button>
+            <button class="btn danger" onclick="Lib.deleteCurrent()">DELETE</button>
+          </div>
+          <div class="dh">Seed</div>
+          <div class="kv">
+            <div class="k">Seed</div><div class="v mono" style="font-size:11px;">${c.seed || '—'}</div>
+            <div class="k">Saved</div><div class="v mono" style="font-size:11px;">${c.timestamp ? new Date(c.timestamp).toLocaleString() : '—'}</div>
+          </div>
+        </div>
+      </div>
+    `;
+    $('detail-content').innerHTML = content;
+    $('detail-overlay').classList.add('show');
+  }
+
+  function closeDetail(){
+    $('detail-overlay').classList.remove('show');
+    state.current = null;
+  }
+
+  async function openInScene(){
+    if (!state.current) return;
+    const c = state.current.data;
+    if (window.fracture && window.fracture.shell){
+      // Emit the character on the bus so Scene Composer picks it up
+      await window.fracture.emit('character.identity.v1', c);
+      await window.fracture.openApp('scene-composer', { focus_character: c.seed });
+      closeDetail();
+    } else {
+      alert('Open Scene Composer from the Fracture City shell to hand off a character.');
+    }
+  }
+
+  function exportCurrent(){
+    if (!state.current) return;
+    const c = state.current.data;
+    const blob = new Blob([JSON.stringify(c, null, 2)], {type:'application/json'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `character_${c.name.first}_${c.name.last}.json`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  }
+
+  async function deleteCurrent(){
+    if (!state.current) return;
+    const c = state.current.data;
+    if (!confirm(`Delete ${c.name.full}?`)) return;
+    await window.fracture.delete(state.current.key);
+    closeDetail();
+    await loadCharacters();
+  }
+
+  async function openForge(){
+    if (window.fracture && window.fracture.shell){
+      await window.fracture.openApp('character-forge');
+    } else {
+      alert('Open Character Forge from the Fracture City shell.');
+    }
+  }
+
+  function setupBus(){
+    if (window.fracture && window.fracture.shell){
+      window.fracture.subscribe('character.identity.v1', async (payload) => {
+        if (payload && payload.seed){
+          await CharRefs.receive(payload);
+          await loadCharacters();
+          flashStatus('Character received.');
+        }
+      });
+    }
+  }
+
+  function flashStatus(msg){
+    const el = $('ctx');
+    const before = el.textContent;
+    el.textContent = msg;
+    setTimeout(() => { el.textContent = before; }, 2000);
+  }
+
+  async function boot(){
+    paintHdrMark();
+    buildFilters();
+    $('ctx').textContent = window.fracture?.shell ? 'IN SHELL · LIVE BUS' : 'STANDALONE';
+    $('search').addEventListener('input', e => { state.filter = e.target.value; render(); });
+    $('f-zone').addEventListener('change', e => { state.filters.zone = e.target.value; render(); });
+    $('f-class').addEventListener('change', e => { state.filters.cls = e.target.value; render(); });
+    $('f-stamp').addEventListener('change', e => { state.filters.stamp = e.target.value; render(); });
+    $('f-origin').addEventListener('change', e => { state.filters.origin = e.target.value; render(); });
+    $('f-sort').addEventListener('change', e => { state.sort = e.target.value; render(); });
+    $('refresh-btn').addEventListener('click', loadCharacters);
+    $('forge-btn').addEventListener('click', openForge);
+    setupBus();
+    await loadCharacters();
+  }
+
+  document.addEventListener('DOMContentLoaded', boot);
+
+  return { openInScene, exportCurrent, deleteCurrent, closeDetail, openForge };
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Essays · Fracture City</title>
+<script>
+(function(){
+  if (window.fracture && window.fracture.shell) return;
+  const prefix = 'fracture::essays::';
+  window.fracture = {
+    shell:false, appSlug:'essays', received:null,
+    save(k,v){ try{ localStorage.setItem(prefix+k, JSON.stringify(v)); }catch(e){} return Promise.resolve(true); },
+    read(k){ try{ const r=localStorage.getItem(prefix+k); return Promise.resolve(r==null?null:JSON.parse(r)); }catch(e){ return Promise.resolve(null); } },
+    list(){ const o=[]; for(let i=0;i<localStorage.length;i++){ const k=localStorage.key(i); if(k&&k.startsWith(prefix)) o.push(k.slice(prefix.length)); } return Promise.resolve(o); },
+    delete(k){ localStorage.removeItem(prefix+k); return Promise.resolve(true); },
+    listApps(){ return Promise.resolve([]); },
+    openApp(){ return Promise.resolve({ok:false,error:'standalone'}); },
+    emit(){ return Promise.resolve(true); },
+    subscribe(){ return ()=>{}; },
+    onPayload(){},
+    /* person.v1 — the shell owns this on disk; standalone keeps it locally. */
+    me(){
+      try { const r = localStorage.getItem('pp:person'); if (r) return Promise.resolve(JSON.parse(r)); } catch(e){}
+      const now = new Date().toISOString();
+      const p = { type:'person.v1', id:'p_'+Math.random().toString(36).slice(2,10),
+                  username:'resident', displayName:'', bio:'', avatar:null,
+                  created:now, updated:now, holds:{} };
+      try { localStorage.setItem('pp:person', JSON.stringify(p)); } catch(e){}
+      return Promise.resolve(p);
+    },
+    updateMe(patch){
+      return this.me().then(cur => {
+        const next = { ...cur, ...(patch||{}) };
+        next.id = cur.id; next.type = 'person.v1'; next.created = cur.created;
+        next.updated = new Date().toISOString();
+        const u = String(next.username||'').toLowerCase().replace(/[^a-z0-9_-]/g,'').slice(0,24);
+        next.username = u || cur.username;
+        try { localStorage.setItem('pp:person', JSON.stringify(next)); } catch(e){}
+        return next;
+      });
+    },
+    claim(type, ref){
+      return this.me().then(p => {
+        const cur = p.holds[type];
+        if (Array.isArray(cur)){ if(!cur.includes(ref)) cur.push(ref); }
+        else if (typeof cur === 'string'){ if(cur!==ref) p.holds[type]=[cur,ref]; }
+        else p.holds[type] = ref;
+        return this.updateMe({ holds: p.holds });
+      });
+    },
+    release(type, ref){
+      return this.me().then(p => {
+        const cur = p.holds[type];
+        if (Array.isArray(cur)){
+          const left = cur.filter(r => r !== ref);
+          if (!left.length) delete p.holds[type]; else p.holds[type] = left.length===1?left[0]:left;
+        } else if (cur === ref) delete p.holds[type];
+        return this.updateMe({ holds: p.holds });
+      });
+    },
+    resolve(ref){ const i=String(ref).indexOf('/'); return i<0?Promise.resolve(null):this.read(String(ref).slice(i+1)); },
+    resolveAll(type){
+      return this.me().then(p => {
+        const cur = p.holds[type];
+        const refs = Array.isArray(cur)?cur:(cur?[cur]:[]);
+        return Promise.all(refs.map(r=>this.resolve(r).then(v=>v?{ref:r,value:v}:null))).then(a=>a.filter(Boolean));
+      });
+    },
+  };
+})();
+</script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+:root{
+  --bg:#080614; --bg-2:#11091d; --panel:rgba(20,12,38,.82);
+  --line:rgba(120,200,255,.18); --line-2:rgba(180,140,255,.55);
+  --ink:#e7e2ff; --ink-dim:#9c93c6; --ink-fade:#6a608a;
+  --teal:#80ffff; --magenta:#ff60d0; --violet:#a040ff;
+  --gold:#ffd47a; --green:#7dffb3; --red:#ff7088;
+  --paper:#f5f1e8; --paper-ink:#1a1720;
+}
+html,body{
+  background:radial-gradient(ellipse at 50% 0%,#1a0f33 0%,#080614 70%);
+  min-height:100vh;color:var(--ink);
+  font-family:'Inter','Helvetica Neue',sans-serif;-webkit-font-smoothing:antialiased;
+}
+body{padding:20px 16px 60px;}
+.shell{max-width:1240px;margin:0 auto;}
+.mono{font-family:'SF Mono','Menlo','Courier New',monospace;}
+
+.hdr{display:flex;align-items:center;gap:18px;
+  border-bottom:1px solid var(--line);padding-bottom:14px;margin-bottom:16px;flex-wrap:wrap;}
+.hdr h1{font-family:'Courier New',monospace;font-size:22px;letter-spacing:8px;
+  background:linear-gradient(180deg,#80ffff 0%,#ff60d0 65%,#a040ff 100%);
+  -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
+  line-height:1;margin-bottom:4px;}
+.hdr .sub{font-family:'Courier New',monospace;font-size:10px;letter-spacing:4px;
+  color:var(--ink-dim);text-transform:uppercase;}
+.hdr .who{margin-left:auto;display:flex;align-items:center;gap:10px;
+  font-family:'Courier New',monospace;font-size:11px;color:var(--ink-fade);letter-spacing:1px;}
+.hdr .who b{color:var(--teal);font-weight:400;}
+.hdr .who .dot{width:6px;height:6px;border-radius:50%;background:var(--green);}
+.hdr .who .dot.local{background:var(--gold);}
+
+button{font-family:'Courier New',monospace;font-size:11px;letter-spacing:2px;
+  text-transform:uppercase;background:rgba(8,4,16,.6);color:var(--ink);
+  border:1px solid var(--line);border-radius:3px;padding:9px 14px;cursor:pointer;
+  transition:border-color .12s,background .12s,color .12s;}
+button:hover{border-color:var(--line-2);background:rgba(160,64,255,.14);}
+button.primary{border-color:rgba(128,255,255,.5);color:var(--teal);}
+button.primary:hover{background:rgba(128,255,255,.12);}
+button.danger:hover{border-color:var(--red);color:var(--red);background:rgba(255,112,136,.1);}
+button:disabled{opacity:.35;cursor:not-allowed;}
+button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid var(--teal);outline-offset:1px;}
+
+.bar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px;
+  padding:12px 14px;background:var(--panel);border:1px solid var(--line);border-radius:5px;}
+.bar .spacer{margin-left:auto;}
+.stat{font-family:'Courier New',monospace;font-size:10px;letter-spacing:2px;
+  color:var(--ink-fade);text-transform:uppercase;}
+.stat b{color:var(--ink-dim);font-weight:400;}
+
+.cols{display:grid;grid-template-columns:290px 1fr;gap:16px;align-items:start;}
+@media (max-width:900px){.cols{grid-template-columns:1fr;}}
+
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:5px;padding:14px;}
+/* Direct child only. As `.panel h2` this also styled the h2s inside a rendered
+   essay — same specificity as `.read h2`, so font-family, letter-spacing,
+   colour and text-transform all leaked through and set the prose headings in
+   uppercase monospace. */
+.panel > h2{font-family:'Courier New',monospace;font-size:10px;letter-spacing:3px;
+  color:var(--ink-dim);text-transform:uppercase;margin-bottom:10px;
+  padding-bottom:8px;border-bottom:1px solid var(--line);}
+
+.list{display:flex;flex-direction:column;gap:6px;max-height:62vh;overflow-y:auto;}
+.item{text-align:left;width:100%;padding:10px 11px;border:1px solid transparent;
+  border-radius:3px;background:rgba(8,4,16,.4);cursor:pointer;
+  text-transform:none;letter-spacing:0;font-family:inherit;font-size:13px;}
+.item:hover{border-color:var(--line);background:rgba(160,64,255,.1);}
+.item.sel{border-color:var(--line-2);background:rgba(160,64,255,.16);}
+.item .t{color:var(--ink);margin-bottom:3px;line-height:1.3;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.item .m{font-family:'Courier New',monospace;font-size:9.5px;letter-spacing:1.4px;
+  color:var(--ink-fade);text-transform:uppercase;display:flex;gap:8px;align-items:center;}
+.item .m .pub{color:var(--green);}
+.item .m .drf{color:var(--gold);}
+.empty{color:var(--ink-fade);font-size:13px;line-height:1.6;padding:14px 4px;}
+
+#title{width:100%;background:transparent;border:none;border-bottom:1px solid var(--line);
+  color:var(--ink);font-family:'Georgia',serif;font-size:27px;line-height:1.25;
+  padding:4px 0 12px;margin-bottom:14px;outline:none;}
+#title::placeholder{color:var(--ink-fade);}
+#body{width:100%;min-height:52vh;background:rgba(8,4,16,.4);border:1px solid var(--line);
+  border-radius:3px;color:var(--ink);padding:16px 18px;resize:vertical;outline:none;
+  font-family:'Georgia',serif;font-size:16px;line-height:1.75;}
+#body::placeholder{color:var(--ink-fade);}
+#body:focus,#title:focus{border-color:var(--line-2);}
+
+.editbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:12px;}
+.saved{font-family:'Courier New',monospace;font-size:10px;letter-spacing:2px;
+  color:var(--ink-fade);text-transform:uppercase;transition:color .2s;}
+.saved.on{color:var(--green);}
+
+/* reading view */
+.read{background:var(--paper);color:var(--paper-ink);border-radius:4px;padding:44px 46px;
+  font-family:'Georgia',serif;font-size:17px;line-height:1.75;}
+@media (max-width:700px){.read{padding:26px 22px;}}
+.read h1{font-size:31px;line-height:1.15;margin-bottom:6px;letter-spacing:-.01em;}
+.read .by{font-family:'SF Mono','Menlo',monospace;font-size:10.5px;letter-spacing:2px;
+  text-transform:uppercase;color:#6b6478;margin-bottom:26px;
+  padding-bottom:14px;border-bottom:1px solid #ddd6c8;}
+.read h1,.read h2,.read h3{font-family:'Georgia',serif;letter-spacing:normal;
+  text-transform:none;color:var(--paper-ink);border:none;padding:0;}
+.read h2{font-size:22px;margin:26px 0 8px;}
+.read h3{font-size:18px;margin:22px 0 6px;}
+.read p{margin-bottom:16px;}
+.read ul,.read ol{margin:0 0 16px 24px;}
+.read li{margin-bottom:5px;}
+.read blockquote{border-left:3px solid #c9c0ae;padding-left:16px;margin:0 0 16px;color:#4d4757;font-style:italic;}
+.read code{font-family:'SF Mono','Menlo',monospace;font-size:.86em;background:#e8e2d5;padding:1px 5px;border-radius:2px;}
+.read pre{background:#e8e2d5;padding:14px 16px;border-radius:3px;overflow-x:auto;margin-bottom:16px;}
+.read pre code{background:none;padding:0;}
+.read a{color:#2f6f8a;}
+.read hr{border:none;border-top:1px solid #ddd6c8;margin:26px 0;}
+
+.toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);
+  background:rgba(20,12,38,.96);border:1px solid var(--line-2);border-radius:4px;
+  padding:11px 20px;font-family:'Courier New',monospace;font-size:11px;letter-spacing:2px;
+  text-transform:uppercase;color:var(--teal);opacity:0;pointer-events:none;
+  transition:opacity .2s;z-index:50;}
+.toast.on{opacity:1;}
+
+.note{font-size:12px;line-height:1.6;color:var(--ink-fade);margin-top:10px;}
+.note b{color:var(--ink-dim);font-weight:400;}
+.hide{display:none!important;}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;}}
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <div class="hdr">
+    <div>
+      <h1>ESSAYS</h1>
+      <div class="sub">Present Palm · essay.v1</div>
+    </div>
+    <div class="who">
+      <span class="dot" id="who-dot"></span>
+      <span>BY <b id="who-name">…</b></span>
+      <button id="btn-who" style="padding:5px 9px;font-size:9.5px">Edit</button>
+    </div>
+  </div>
+
+  <div class="bar">
+    <button class="primary" id="btn-new">+ New essay</button>
+    <button id="btn-read">Read</button>
+    <button id="btn-publish">Publish</button>
+    <button id="btn-export">Export site</button>
+    <button class="danger" id="btn-delete">Delete</button>
+    <div class="spacer"></div>
+    <span class="stat" id="stat">—</span>
+  </div>
+
+  <div class="cols">
+    <div class="panel">
+      <h2>Your writing</h2>
+      <div class="list" id="list"></div>
+      <p class="note" id="libnote"></p>
+    </div>
+
+    <div class="panel">
+      <div id="edit">
+        <input id="title" placeholder="Title" maxlength="140" autocomplete="off">
+        <textarea id="body" placeholder="Write. Markdown works — # heading, **bold**, _italic_, > quote, - list, [link](url), `code`."></textarea>
+        <div class="editbar">
+          <span class="saved" id="saved">Not saved</span>
+          <div class="spacer" style="margin-left:auto"></div>
+          <span class="stat" id="words">0 words</span>
+        </div>
+      </div>
+      <div id="reader" class="hide"></div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+  'use strict';
+  const $ = id => document.getElementById(id);
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  //  essay.v1
+  // ---------------------------------------------------------------------------
+  //  An essay is { id, author, title, body, … }. The only field that made this
+  //  app possible is `author`, and the only reason it can exist is that the
+  //  shell now owns a person.v1 record: before that, there was no id in the
+  //  system that meant "a human", only ids that meant "an app's data".
+  //
+  //  The author is stored as person.id — a reference, not a copy of the name.
+  //  Rename yourself and every essay you have ever written is by the new name,
+  //  because none of them wrote it down.
+  // ═══════════════════════════════════════════════════════════════════════════
+  const state = { essays: [], selected: null, person: null, dirty: false, reading: false };
+  let saveTimer = null;
+
+  const now = () => new Date().toISOString();
+  const newId = () => 'essay_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2,6);
+  const esc = s => String(s == null ? '' : s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#039;');
+  const countWords = s => (String(s||'').trim().match(/\S+/g) || []).length;
+
+  function makeEssay(){
+    return { type:'essay.v1', id:newId(), author: state.person ? state.person.id : null,
+             title:'', body:'', tags:[], status:'draft',
+             created:now(), updated:now(), published:null, words:0 };
+  }
+
+  function toast(msg){
+    const t = $('toast'); t.textContent = msg; t.classList.add('on');
+    clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove('on'), 2000);
+  }
+
+  // ─── Markdown, small and self-contained ───────────────────────────────────
+  //  Deliberately hand-rolled: this app ships as one file with no network, and
+  //  a full parser would be more surface than the format needs. Everything is
+  //  escaped first, so no input can inject markup.
+  function md(src){
+    const lines = String(src || '').replace(/\r\n?/g, '\n').split('\n');
+    const out = [];
+    let para = [], list = null, inCode = false, code = [];
+
+    const flushPara = () => {
+      if (!para.length) return;
+      out.push('<p>' + inline(para.join(' ')) + '</p>');
+      para = [];
+    };
+    const flushList = () => {
+      if (!list) return;
+      out.push(`<${list.tag}>` + list.items.map(i => '<li>' + inline(i) + '</li>').join('') + `</${list.tag}>`);
+      list = null;
+    };
+    const flushAll = () => { flushPara(); flushList(); };
+
+    for (const raw of lines){
+      const line = raw;
+      if (/^```/.test(line.trim())){
+        if (inCode){ out.push('<pre><code>' + esc(code.join('\n')) + '</code></pre>'); code = []; inCode = false; }
+        else { flushAll(); inCode = true; }
+        continue;
+      }
+      if (inCode){ code.push(line); continue; }
+
+      if (!line.trim()){ flushAll(); continue; }
+
+      const h = /^(#{1,3})\s+(.*)$/.exec(line);
+      if (h){ flushAll(); const n = h[1].length; out.push(`<h${n}>` + inline(h[2]) + `</h${n}>`); continue; }
+
+      if (/^\s*(---+|\*\*\*+)\s*$/.test(line)){ flushAll(); out.push('<hr>'); continue; }
+
+      const q = /^>\s?(.*)$/.exec(line);
+      if (q){ flushAll(); out.push('<blockquote>' + inline(q[1]) + '</blockquote>'); continue; }
+
+      const ul = /^\s*[-*]\s+(.*)$/.exec(line);
+      const ol = /^\s*\d+[.)]\s+(.*)$/.exec(line);
+      if (ul || ol){
+        const tag = ul ? 'ul' : 'ol';
+        flushPara();
+        if (list && list.tag !== tag) flushList();
+        if (!list) list = { tag, items: [] };
+        list.items.push((ul || ol)[1]);
+        continue;
+      }
+      flushList();
+      para.push(line.trim());
+    }
+    if (inCode) out.push('<pre><code>' + esc(code.join('\n')) + '</code></pre>');
+    flushAll();
+    return out.join('\n');
+  }
+
+  function inline(s){
+    let t = esc(s);
+    t = t.replace(/`([^`]+)`/g, (m,a) => '<code>' + a + '</code>');
+    t = t.replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g,
+      (m,txt,href) => `<a href="${href}" target="_blank" rel="noopener noreferrer">${txt}</a>`);
+    t = t.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+    t = t.replace(/(^|[^\w*])\*([^*\n]+)\*(?![\w*])/g, '$1<em>$2</em>');
+    t = t.replace(/(^|[^\w_])_([^_\n]+)_(?![\w_])/g, '$1<em>$2</em>');
+    return t;
+  }
+
+  function excerpt(body, n){
+    const flat = String(body||'').replace(/[#>*_`\[\]]/g,' ').replace(/\s+/g,' ').trim();
+    return flat.length > n ? flat.slice(0, n - 1).trimEnd() + '…' : flat;
+  }
+
+  // ─── Who is writing ───────────────────────────────────────────────────────
+  async function loadPerson(){
+    if (!window.fracture || typeof window.fracture.me !== 'function'){
+      state.person = null; return;
+    }
+    try { state.person = await window.fracture.me(); }
+    catch (e){ state.person = null; }
+  }
+
+  function personLabel(){
+    if (!state.person) return 'unknown';
+    return state.person.displayName || ('@' + state.person.username);
+  }
+
+  function renderWho(){
+    $('who-name').textContent = personLabel();
+    const dot = $('who-dot');
+    const inShell = !!(window.fracture && window.fracture.shell);
+    dot.classList.toggle('local', !inShell);
+    dot.title = inShell ? 'person.v1 — shared across Present Palm'
+                        : 'standalone — this person lives in this browser only';
+  }
+
+  async function editWho(){
+    if (!state.person){ toast('No person record'); return; }
+    const name = prompt('Display name — how you are credited on an essay:',
+                        state.person.displayName || '');
+    if (name === null) return;
+    const user = prompt('Username — the handle that follows you across Present Palm:',
+                        state.person.username || '');
+    if (user === null) return;
+    state.person = await window.fracture.updateMe({ displayName: name.trim(), username: user });
+    renderWho(); renderList(); if (state.reading) openReader();
+    toast('Person updated');
+  }
+
+  // ─── Storage ──────────────────────────────────────────────────────────────
+  async function loadEssays(){
+    state.essays = [];
+    if (!window.fracture) return;
+    const keys = await window.fracture.list();
+    for (const k of keys.filter(k => k.startsWith('essay_'))){
+      const e = await window.fracture.read(k);
+      if (e && e.type === 'essay.v1') state.essays.push(e);
+    }
+    state.essays.sort((a,b) => String(b.updated).localeCompare(String(a.updated)));
+  }
+
+  async function persist(e){
+    e.words = countWords(e.body);
+    await window.fracture.save(e.id, e);
+    if (window.fracture.claim){
+      try { await window.fracture.claim('essay.v1', 'essays/' + e.id); } catch (err){}
+    }
+  }
+
+  function scheduleSave(){
+    state.dirty = true;
+    $('saved').textContent = 'Unsaved';
+    $('saved').classList.remove('on');
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(saveNow, 700);
+  }
+
+  async function saveNow(){
+    const e = state.selected;
+    if (!e || !state.dirty) return;
+    e.title = $('title').value;
+    e.body  = $('body').value;
+    e.updated = now();
+    if (!e.author && state.person) e.author = state.person.id;
+    await persist(e);
+    state.dirty = false;
+    $('saved').textContent = 'Saved';
+    $('saved').classList.add('on');
+    renderList(); renderStat();
+  }
+
+  // ─── Rendering ────────────────────────────────────────────────────────────
+  function renderList(){
+    const el = $('list');
+    if (!state.essays.length){
+      el.innerHTML = '<p class="empty">Nothing written yet. “New essay” starts one.</p>';
+      $('libnote').textContent = '';
+      return;
+    }
+    el.innerHTML = state.essays.map(e => {
+      const sel = state.selected && state.selected.id === e.id ? ' sel' : '';
+      const when = new Date(e.updated).toLocaleDateString(undefined,{month:'short',day:'numeric'});
+      const badge = e.status === 'published'
+        ? '<span class="pub">● published</span>' : '<span class="drf">○ draft</span>';
+      return `<button class="item${sel}" data-id="${esc(e.id)}">
+        <div class="t">${esc(e.title || 'Untitled')}</div>
+        <div class="m">${badge}<span>${e.words||0}w</span><span>${when}</span></div>
+      </button>`;
+    }).join('');
+    el.querySelectorAll('.item').forEach(b =>
+      b.addEventListener('click', () => select(b.dataset.id)));
+
+    const pub = state.essays.filter(e => e.status === 'published').length;
+    $('libnote').textContent = `${state.essays.length} essay${state.essays.length===1?'':'s'}` +
+      (pub ? ` · ${pub} published` : '') + ' · stored as essay.v1';
+  }
+
+  function renderStat(){
+    const words = state.essays.reduce((n,e) => n + (e.words||0), 0);
+    $('stat').innerHTML = `<b>${state.essays.length}</b> essays · <b>${words.toLocaleString()}</b> words`;
+    const e = state.selected;
+    $('words').textContent = e ? `${countWords($('body').value)} words · ` +
+      `${Math.max(1, Math.round(countWords($('body').value)/220))} min read` : '0 words';
+  }
+
+  function select(id){
+    const e = state.essays.find(x => x.id === id);
+    if (!e) return;
+    saveNow();
+    state.selected = e;
+    $('title').value = e.title || '';
+    $('body').value  = e.body || '';
+    state.dirty = false;
+    $('saved').textContent = 'Saved'; $('saved').classList.add('on');
+    if (state.reading) openReader(); else closeReader();
+    renderList(); renderStat();
+    updateButtons();
+  }
+
+  function updateButtons(){
+    const has = !!state.selected;
+    ['btn-read','btn-publish','btn-delete'].forEach(b => $(b).disabled = !has);
+    $('btn-export').disabled = !state.essays.some(e => e.status === 'published');
+    if (has) $('btn-publish').textContent = state.selected.status === 'published' ? 'Unpublish' : 'Publish';
+  }
+
+  function openReader(){
+    const e = state.selected; if (!e) return;
+    state.reading = true;
+    const when = e.published || e.updated;
+    $('reader').innerHTML = `<div class="read">
+      <h1>${esc(e.title || 'Untitled')}</h1>
+      <div class="by">By ${esc(personLabel())} · ${new Date(when).toLocaleDateString(undefined,
+        {year:'numeric',month:'long',day:'numeric'})} · ${e.words||0} words</div>
+      ${md(e.body)}
+    </div>`;
+    $('edit').classList.add('hide'); $('reader').classList.remove('hide');
+    $('btn-read').textContent = 'Write';
+  }
+  function closeReader(){
+    state.reading = false;
+    $('edit').classList.remove('hide'); $('reader').classList.add('hide');
+    $('btn-read').textContent = 'Read';
+  }
+
+  // ─── Publish means export ─────────────────────────────────────────────────
+  //  Deliberately not "post it to a server". A local-first hub where you write
+  //  and export is a tool. The moment it hosts other people's writing in public
+  //  it is a regulated service — the UK Online Safety Act has no small-service
+  //  exemption and the EU DSA attaches duties at any size. That is a decision
+  //  worth making on purpose rather than backing into, so publishing here marks
+  //  an essay finished, and Export writes a static site you own and upload.
+  function exportSite(){
+    const pub = state.essays.filter(e => e.status === 'published')
+                            .sort((a,b) => String(b.published).localeCompare(String(a.published)));
+    if (!pub.length){ toast('Publish something first'); return; }
+    const who = esc(personLabel());
+    const site = `<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${who}</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#f5f1e8;--ink:#1a1720;--dim:#6b6478;--rule:#ddd6c8;--link:#2f6f8a}
+@media (prefers-color-scheme:dark){:root{--bg:#12101a;--ink:#e6e2d8;--dim:#8f889c;--rule:#2e2a3a;--link:#7fb8d4}}
+body{background:var(--bg);color:var(--ink);font:17px/1.75 Georgia,'Times New Roman',serif;
+ padding:60px 22px 100px}
+.w{max-width:44rem;margin:0 auto}
+header{border-bottom:2px solid var(--ink);padding-bottom:18px;margin-bottom:44px}
+h1.site{font-size:33px;letter-spacing:-.01em;line-height:1.1}
+.sub{font:11px/1.5 ui-monospace,'SF Mono',Menlo,monospace;letter-spacing:.2em;
+ text-transform:uppercase;color:var(--dim);margin-top:8px}
+article{margin-bottom:64px}
+article h2{font-size:26px;line-height:1.2;margin-bottom:6px}
+.by{font:10.5px/1.5 ui-monospace,'SF Mono',Menlo,monospace;letter-spacing:.16em;
+ text-transform:uppercase;color:var(--dim);margin-bottom:22px;padding-bottom:12px;
+ border-bottom:1px solid var(--rule)}
+article h3{font-size:20px;margin:24px 0 8px}
+article p{margin-bottom:16px}
+article ul,article ol{margin:0 0 16px 24px}
+article blockquote{border-left:3px solid var(--rule);padding-left:16px;margin:0 0 16px;
+ color:var(--dim);font-style:italic}
+article code{font:.86em ui-monospace,'SF Mono',Menlo,monospace;
+ background:rgba(128,128,128,.14);padding:1px 5px;border-radius:2px}
+article pre{background:rgba(128,128,128,.14);padding:14px 16px;border-radius:3px;
+ overflow-x:auto;margin-bottom:16px}
+article pre code{background:none;padding:0}
+a{color:var(--link)}
+footer{border-top:1px solid var(--rule);padding-top:16px;
+ font:11px/1.6 ui-monospace,'SF Mono',Menlo,monospace;color:var(--dim)}
+</style></head><body><div class="w">
+<header><h1 class="site">${who}</h1>
+<div class="sub">${pub.length} essay${pub.length===1?'':'s'}</div></header>
+${pub.map(e => `<article>
+<h2>${esc(e.title || 'Untitled')}</h2>
+<div class="by">${new Date(e.published || e.updated).toLocaleDateString('en-GB',
+  {year:'numeric',month:'long',day:'numeric'})} · ${e.words||0} words</div>
+${md(e.body)}
+</article>`).join('\n')}
+<footer>Written in Present Palm. This page is a static file — yours to host wherever you like.</footer>
+</div></body></html>`;
+
+    const blob = new Blob([site], { type:'text/html' });
+    const url  = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = (state.person && state.person.username ? state.person.username : 'essays') + '.html';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+    // Keep a copy in the hub too, so it is recoverable without the download.
+    window.fracture.save('export-latest', { type:'essay.site.v1', html:site,
+                                            count:pub.length, exported:now() });
+    toast(`Exported ${pub.length} essay${pub.length===1?'':'s'}`);
+  }
+
+  // ─── Wiring ───────────────────────────────────────────────────────────────
+  $('btn-new').addEventListener('click', async () => {
+    await saveNow();
+    const e = makeEssay();
+    state.essays.unshift(e);
+    await persist(e);
+    select(e.id);
+    closeReader();
+    $('title').focus();
+    toast('New essay');
+  });
+
+  $('btn-read').addEventListener('click', async () => {
+    await saveNow();
+    if (state.reading) closeReader(); else openReader();
+  });
+
+  $('btn-publish').addEventListener('click', async () => {
+    const e = state.selected; if (!e) return;
+    await saveNow();
+    if (e.status === 'published'){ e.status = 'draft'; e.published = null; toast('Back to draft'); }
+    else {
+      if (!String(e.title).trim()){ toast('Give it a title first'); $('title').focus(); return; }
+      e.status = 'published'; e.published = now(); toast('Published');
+    }
+    e.updated = now();
+    await persist(e);
+    if (window.fracture.emit) { try { window.fracture.emit('essay.v1', e); } catch(err){} }
+    renderList(); updateButtons();
+  });
+
+  $('btn-delete').addEventListener('click', async () => {
+    const e = state.selected; if (!e) return;
+    if (!confirm(`Delete “${e.title || 'Untitled'}”? This cannot be undone.`)) return;
+    await window.fracture.delete(e.id);
+    if (window.fracture.release){ try { await window.fracture.release('essay.v1', 'essays/' + e.id); } catch(err){} }
+    state.essays = state.essays.filter(x => x.id !== e.id);
+    state.selected = null;
+    $('title').value = ''; $('body').value = '';
+    closeReader(); renderList(); renderStat(); updateButtons();
+    toast('Deleted');
+  });
+
+  $('btn-export').addEventListener('click', exportSite);
+  $('btn-who').addEventListener('click', editWho);
+
+  $('title').addEventListener('input', () => { scheduleSave(); });
+  $('body').addEventListener('input', () => { scheduleSave(); renderStat(); });
+  window.addEventListener('beforeunload', () => { if (state.dirty) saveNow(); });
+  document.addEventListener('keydown', e => {
+    if ((e.metaKey || e.ctrlKey) && e.key === 's'){ e.preventDefault(); saveNow(); toast('Saved'); }
+  });
+
+  (async function init(){
+    await loadPerson();
+    renderWho();
+    await loadEssays();
+    // Adopt any essay written before this install had a person record.
+    if (state.person){
+      for (const e of state.essays){
+        if (!e.author){ e.author = state.person.id; await persist(e); }
+      }
+    }
+    renderList(); renderStat(); updateButtons();
+    if (state.essays.length) select(state.essays[0].id);
+    window.__essays = state;   /* debug + tests */
+    window.__md = md;
+  })();
+})();
+</script>
+</body>
+</html>

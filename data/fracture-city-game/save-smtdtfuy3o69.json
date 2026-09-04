@@ -1,0 +1,56 @@
+{
+  "seed": "fc-k2ckwr",
+  "mode": "freeroam",
+  "chapter": 0,
+  "chapterTitle": "THE EVENING REPORT",
+  "finished": false,
+  "updatedAt": 1787973806955,
+  "playTime": 0,
+  "credits": 0,
+  "built": 0,
+  "id": "smtdtfuy3o69",
+  "name": "City K2CKWR",
+  "campaign": {
+    "chapter": 0,
+    "progress": {},
+    "done": {},
+    "seenSeconds": 0,
+    "districtsSeen": [],
+    "finished": false,
+    "caseDecision": null,
+    "caseFiled": false,
+    "active": false
+  },
+  "player": {
+    "x": 0,
+    "y": 4.7,
+    "z": 5,
+    "yaw": 0,
+    "pitch": 0,
+    "classKey": "bruiser",
+    "hp": 160
+  },
+  "dayTime": 1080,
+  "hud": {
+    "credits": 0,
+    "tasksDone": 0,
+    "distanceWalked": 0,
+    "distanceDriven": 0,
+    "playTime": 0,
+    "blocksMined": 0,
+    "blocksPlaced": 0
+  },
+  "inventory": [],
+  "hotbar": [
+    3,
+    11,
+    7,
+    9,
+    4,
+    8,
+    6,
+    2,
+    12
+  ],
+  "peaceful": false
+}

@@ -1,0 +1,73 @@
+{
+  "name": {
+    "first": "Halen",
+    "last": "Crest",
+    "full": "Halen Crest of the Soft Dark",
+    "origin_descriptor": "of the Soft Dark"
+  },
+  "epithet": "who carried a stillness like a held breath",
+  "zone": "III",
+  "subtype": "The Psychonaut",
+  "class": "Keeper of Thread",
+  "stamp": "Silencing",
+  "capture": "None",
+  "origin": "The Undercroft",
+  "age": "Elder",
+  "physical": {
+    "build": "Slight",
+    "skin": "copper",
+    "hair": "short and tangled",
+    "eyes": "teal",
+    "garment": "scholar wraps"
+  },
+  "mannerisms": [
+    "walks past mirrors without looking",
+    "touches the back of their own left hand when listening",
+    "will not say a name they have not earned",
+    "has a notebook nobody is allowed to read"
+  ],
+  "voice": "precise as cut glass and just as hard to argue with",
+  "aspiration": "to be left alone long enough to finish what they started",
+  "fear": "finding their voice has stopped working when it matters",
+  "gift": "they can sit with someone dying and not flinch",
+  "wound": "a manuscript burned by someone who claimed to love them",
+  "secret": "that they have been keeping a child they cannot afford",
+  "threads": [
+    {
+      "kind": "A child",
+      "desc": "(theirs, or theirs by acclamation) who carries the same wound at half the speed"
+    },
+    {
+      "kind": "A teacher",
+      "desc": "whose own work was unfinished and is now {name}'s to finish or set down"
+    },
+    {
+      "kind": "A stranger",
+      "desc": "who said the right sentence at the right moment, and is unaware of any of it"
+    }
+  ],
+  "seed": "seed_mpx5ypcb_1ch9",
+  "timestamp": "2026-06-02T21:44:21.093Z",
+  "backstory": {
+    "origin": "The story Halen tells about their beginnings starts in The Undercroft, of the Soft Dark, with two parents who shared a silence that lasted longer than either of their lives.",
+    "weight": "Generations of Halen's line learned to keep their mouths small. There was a thing one did not say, and then another, and the list grew. Halen was born holding the list without yet knowing what was on it.",
+    "fracture": "Somewhere in their thirtys, the floor gave way. What they touched on the other side has not left them, and they have, since then, been more interested in what is under things than what is on them.",
+    "between": "They drifted through a stretch of years that produced fewer stories than the decade before. Halen grew quieter, then briefly louder, then quieter again. There was a project — a translation — that almost worked.",
+    "present": "Now, Halen works in a trade older than the city, lives in rooms they keep neat enough that no one would know how few possessions they own, and spends most of their evenings reading or pretending to. They are, by their own measure, older than they expected to live.",
+    "threadsIntro": "Three relationships, alive or otherwise, hold the architecture in place:",
+    "threads": [
+      {
+        "kind": "A child",
+        "desc": "(theirs, or theirs by acclamation) who carries the same wound at half the speed"
+      },
+      {
+        "kind": "A teacher",
+        "desc": "whose own work was unfinished and is now {name}'s to finish or set down"
+      },
+      {
+        "kind": "A stranger",
+        "desc": "who said the right sentence at the right moment, and is unaware of any of it"
+      }
+    ]
+  }
+}

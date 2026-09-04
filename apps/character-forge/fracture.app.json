@@ -1,0 +1,26 @@
+{
+  "slug": "character-forge",
+  "name": "Character Forge",
+  "version": "1.0.0",
+  "icon": "icon.png",
+  "entry": "index.html",
+  "runtime": "html5",
+  "description": "Procedural character creator for the Fracture City world and animated show. Assembles deep identities from the framework (zone, subtype, class, stamp, capture, origin stage) and generates a multi-section backstory + stylized SVG portrait. Can build a character directly from a Coherence Assessment profile.",
+  "inputs": [
+    {
+      "type": "tot.profile.v1",
+      "description": "Optional. Seeds the character's zone, subtype, shape, and stamp from a real assessment profile."
+    }
+  ],
+  "outputs": [
+    {
+      "type": "character.identity.v1",
+      "description": "Full character record: identity layers, physical features, mannerisms, backstory paragraphs, portrait SVG, and origin context."
+    }
+  ],
+  "tags": ["character", "creator", "narrative", "worldbuilding", "fracture-city", "show", "art"],
+  "author": "Avner Media",
+  "license": "personal-use",
+  "window_width": 1280,
+  "window_height": 860
+}

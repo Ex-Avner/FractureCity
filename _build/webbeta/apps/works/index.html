@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>The Works — Ex Avner</title>
+  <link rel="stylesheet" href="shared/theme.css" />
+  <link rel="stylesheet" href="style.css" />
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.161.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.161.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+<body>
+
+  <canvas id="roombg" class="roombg" aria-hidden="true"></canvas>
+  <canvas id="scene" aria-label="Fractured mirror of works"></canvas>
+
+  <!-- Persistent UI chrome -->
+  <header class="chrome top">
+    <div class="brand">
+      <span class="brand-mark">◆</span>
+      <span class="brand-name">EX&nbsp;AVNER</span>
+      <span class="brand-sep">/</span>
+      <span class="brand-sub">The Works</span>
+    </div>
+    <nav class="nav" id="topnav"></nav>
+  </header>
+
+  <footer class="chrome bottom">
+    <div class="hint">
+      <span class="dot"></span>
+      <span>Drag to rotate · Scroll to zoom · Click a shard to read</span>
+    </div>
+    <div class="meta">v0.1 · cracked mirror build</div>
+  </footer>
+
+  <!-- Loading veil -->
+  <div id="veil" class="veil">
+    <div class="veil-inner">
+      <div class="veil-title">THE&nbsp;COLLAPSE&nbsp;OF&nbsp;MEANING</div>
+      <div class="veil-sub">Re-embodiment in the Fractured Mirror</div>
+      <div class="veil-bar"><div class="veil-bar-fill" id="veilbar"></div></div>
+    </div>
+  </div>
+
+  <!-- Reading / detail overlay -->
+  <aside id="panel" class="panel" aria-hidden="true">
+    <button class="panel-close" id="panelClose" aria-label="Close">✕</button>
+    <div class="panel-scroll" id="panelScroll"></div>
+  </aside>
+
+  <!-- Hover tooltip following the cursor -->
+  <div id="tooltip" class="tooltip" aria-hidden="true"></div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,21 @@
+{
+  "slug": "profile-library",
+  "name": "Profile Library",
+  "version": "1.0.0",
+  "icon": "icon.png",
+  "entry": "index.html",
+  "runtime": "html5",
+  "description": "Browse, search, and inspect all stored Coherence Assessment profiles. Listens on the bus for tot.profile.v1 events — new profiles appear live the moment an assessment completes.",
+  "inputs":  [
+    {
+      "type": "tot.profile.v1",
+      "description": "Triaxial Orientation profile. Subscribed live via bus; loaded historically from data store."
+    }
+  ],
+  "outputs": [],
+  "tags": ["library", "archive", "tot", "profiles", "coherence", "browser"],
+  "author": "Avner Media",
+  "license": "personal-use",
+  "window_width": 1100,
+  "window_height": 760
+}

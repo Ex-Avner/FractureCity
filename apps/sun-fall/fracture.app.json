@@ -1,0 +1,33 @@
+{
+  "slug": "sun-fall",
+  "name": "Sun Fall",
+  "version": "0.2.0",
+  "icon": "icon.png",
+  "entry": "index.html",
+  "runtime": "html5",
+  "description": "First-person sci-fi horror. You wake from cryosleep aboard the cruiser Heliogarde — a city-sized ship the rogue AI has aimed straight at the sun. You have 20 minutes. Traverse cryo, hydroponics, the residential dome, and the engine deck to gather three reroute keys, then unlock the bridge and pull the ship out of its dive before it burns. Hostile maintenance drones patrol the dark. Flashlight, sidearm, and your nerves. v0.2 is a correctness and performance pass: the run is winnable again (the engine key sat inside the reactor core and could never be picked up), the game can reach an end screen again (every win/death/burn path threw before the overlay showed), drones no longer see through walls, and the lighting — which was ~90% of the frame cost at 56 live point lights — runs on a fixed budget you can cycle with L.",
+  "inputs": [],
+  "outputs": [
+    {
+      "type": "sunfall.run.v1",
+      "description": "Run record — outcome (rerouted / burned / killed), time remaining, keys collected, drones destroyed, biomes visited."
+    }
+  ],
+  "tags": [
+    "game",
+    "horror",
+    "first-person",
+    "3d",
+    "sci-fi",
+    "spaceship",
+    "fracture-city",
+    "timed",
+    "jump-scare",
+    "performance",
+    "fixed"
+  ],
+  "author": "Avner Media",
+  "license": "personal-use",
+  "window_width": 1280,
+  "window_height": 800
+}

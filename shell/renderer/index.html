@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Present Palm</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- Title bar drag region (matches hiddenInset style) -->
+<div class="titlebar"></div>
+
+<div class="shell">
+
+  <header class="brand">
+    <div class="brand-mark" id="brand-mark"></div>
+    <div class="brand-text">
+      <div class="brand-title">PRESENT PALM</div>
+      <div class="brand-sub">avner media · hub · v0.1</div>
+    </div>
+    <div class="brand-meta">
+      <button class="ico-btn" id="rescan-btn" title="Rescan apps (⌘R)">↻</button>
+    </div>
+  </header>
+
+  <nav class="nav">
+    <button class="nav-btn active" data-view="apps">APPS</button>
+    <button class="nav-btn" data-view="you">YOU</button>
+    <button class="nav-btn" data-view="graph">DATA GRAPH</button>
+    <button class="nav-btn" data-view="ideas">IDEAS</button>
+    <button class="nav-btn" data-view="settings">SETTINGS</button>
+    <button class="nav-btn" data-view="about">ABOUT</button>
+  </nav>
+
+  <main>
+    <!-- APPS VIEW -->
+    <section class="view" id="view-apps">
+      <div class="search-bar">
+        <input type="text" id="search-input" placeholder="search apps · tags · descriptions">
+        <span class="count" id="app-count">0 INSTALLED</span>
+      </div>
+      <div class="grid" id="app-grid"></div>
+      <div class="empty hide" id="empty-state">
+        <div class="empty-title">NO APPS REGISTERED</div>
+        <div class="empty-body">
+          Drop an app folder containing a <code>fracture.app.json</code> manifest
+          into <code>~/Fracture City/apps/</code> and press ↻ rescan.
+        </div>
+      </div>
+    </section>
+
+    <!-- DATA GRAPH VIEW -->
+    <section class="view hide" id="view-graph">
+      <div class="graph-header">
+        <div>
+          <div class="graph-title">DATA GRAPH</div>
+          <div class="graph-sub">Inputs · Outputs · Connections between installed apps</div>
+        </div>
+        <div class="graph-legend">
+          <span class="lg-dot lg-producer"></span> PRODUCER
+          <span class="lg-dot lg-both"></span> BOTH
+          <span class="lg-dot lg-consumer"></span> CONSUMER
+          <span class="lg-dot lg-island"></span> STANDALONE
+        </div>
+      </div>
+      <div class="graph-stats" id="graph-stats"></div>
+      <div class="graph-canvas-wrap">
+        <svg id="graph-canvas" preserveAspectRatio="xMidYMid meet"></svg>
+      </div>
+      <div class="graph-detail" id="graph-detail"></div>
+    </section>
+
+    <!-- IDEAS VIEW -->
+    <section class="view hide" id="view-ideas">
+      <div class="placeholder">
+        <div class="ph-title">IDEA ENGINE</div>
+        <div class="ph-body">
+          Generates new app concepts from gaps in the manifest graph
+          (unbridged output types, unmatched input types, missing tag clusters).
+          Comes online in Phase 4 once ≥5 apps exist.
+        </div>
+        <div class="ph-stats">
+          <div class="stat"><span class="stat-label">APPS</span><span class="stat-val" id="ideas-app-count">0</span></div>
+          <div class="stat"><span class="stat-label">DRAFTED IDEAS</span><span class="stat-val" id="ideas-draft-count">0</span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SETTINGS VIEW — central provider config shared by all apps -->
+    <section class="view hide" id="view-you">
+      <div class="settings-panel">
+        <h2>YOU</h2>
+        <p class="settings-intro">One record at <code>data/_shell/person.json</code>, owned by the shell rather than by any app. Every app reads it through <code>window.fracture.me()</code>, so your name and your look are the same everywhere in Present Palm — change them here and they change in all of them at once. Everything else an app stores stays that app's own.</p>
+
+        <div class="you-head">
+          <div class="you-face" id="you-face"></div>
+          <div class="you-id">
+            <div class="you-name" id="you-name">—</div>
+            <div class="you-handle" id="you-handle">—</div>
+            <div class="you-meta mono" id="you-meta">—</div>
+          </div>
+        </div>
+
+        <div class="settings-field">
+          <label>Username</label>
+          <input type="text" id="you-username" maxlength="24" placeholder="exavner" autocomplete="off">
+          <div class="settings-helper">Lower case, letters, numbers, dash and underscore. This is the handle that goes on an essay and follows you into every app.</div>
+        </div>
+        <div class="settings-field">
+          <label>Display name</label>
+          <input type="text" id="you-display" maxlength="48" placeholder="Ex Avner" autocomplete="off">
+          <div class="settings-helper">Leave blank to be credited by your username alone.</div>
+        </div>
+        <div class="settings-field">
+          <label>Bio</label>
+          <textarea id="you-bio" rows="3" maxlength="400" placeholder="One or two lines."></textarea>
+        </div>
+
+        <div class="settings-section">
+          <div class="settings-section-h">LOOK</div>
+          <div class="settings-helper" style="margin-bottom:10px">Shared with every app that draws you — the figure in your Fracture City doorway is this.</div>
+          <div class="you-swatches" id="you-swatches"></div>
+        </div>
+
+        <div class="settings-section">
+          <div class="settings-section-h">WHAT YOU HOLD</div>
+          <div class="settings-helper" style="margin-bottom:10px">Things recorded as belonging to you — stored as references, resolved live, so an edit at the source shows here immediately. Nothing below is a copy.</div>
+          <div class="you-holds" id="you-holds"></div>
+        </div>
+
+        <div class="settings-actions">
+          <button class="settings-save" id="you-save">SAVE</button>
+          <span class="settings-status" id="you-status"></span>
+        </div>
+      </div>
+    </section>
+
+    <section class="view hide" id="view-settings">
+      <div class="settings-panel">
+        <h2>SETTINGS</h2>
+        <p class="settings-intro">Provider keys stored once in <code>data/_shell/providers.json</code>. Any app launched from Present Palm can read these via <code>window.fracture.getProvider()</code> — no more entering the same key in every app.</p>
+
+        <div class="settings-field">
+          <label>Preferred provider</label>
+          <select id="set-preferred">
+            <option value="pollinations">Pollinations (free · no signup · ~5s)</option>
+            <option value="aihorde">AI Horde (free · slow queue without key)</option>
+            <option value="huggingface">Hugging Face (free with token)</option>
+            <option value="openai">OpenAI (paid · ~$0.04/image)</option>
+          </select>
+          <div class="settings-helper">Apps respect this as their default. They can still override per-call.</div>
+        </div>
+
+        <div class="settings-section">
+          <div class="settings-section-h">AI HORDE</div>
+          <div class="settings-field">
+            <label>API key</label>
+            <input type="password" id="set-aihorde-key" placeholder="leave blank for anonymous queue">
+          </div>
+          <div class="settings-field">
+            <label>Model</label>
+            <select id="set-aihorde-model">
+              <option value="stable_diffusion">Stable Diffusion (universal access · fastest)</option>
+              <option value="Flux.1-Schnell fp8 (Compact)">Flux.1-Schnell fp8 (painterly · needs kudos)</option>
+              <option value="Deliberate">Deliberate (SD1.5 · painterly)</option>
+              <option value="Realistic Vision">Realistic Vision (SD1.5 · photoreal)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="settings-section">
+          <div class="settings-section-h">POLLINATIONS</div>
+          <div class="settings-field">
+            <label>Token (optional)</label>
+            <input type="password" id="set-poll-token" placeholder="only needed for Flux models">
+          </div>
+          <div class="settings-field">
+            <label>Model</label>
+            <select id="set-poll-model">
+              <option value="turbo">turbo (free · no token)</option>
+              <option value="flux">flux (painterly · needs free token)</option>
+              <option value="flux-realism">flux-realism (photographic · needs token)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="settings-section">
+          <div class="settings-section-h">HUGGING FACE</div>
+          <div class="settings-field">
+            <label>Read token</label>
+            <input type="password" id="set-hf-token" placeholder="hf_…  (from huggingface.co/settings/tokens)">
+          </div>
+          <div class="settings-field">
+            <label>Model</label>
+            <input type="text" id="set-hf-model" value="black-forest-labs/FLUX.1-schnell">
+          </div>
+        </div>
+
+        <div class="settings-section">
+          <div class="settings-section-h">OPENAI</div>
+          <div class="settings-field">
+            <label>API key</label>
+            <input type="password" id="set-openai-key" placeholder="sk-…">
+          </div>
+          <div class="settings-field">
+            <label>Model</label>
+            <input type="text" id="set-openai-model" value="gpt-image-1">
+          </div>
+        </div>
+
+        <div class="settings-actions">
+          <button class="settings-save" id="set-save">SAVE</button>
+          <span class="settings-status" id="set-status"></span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ABOUT VIEW -->
+    <section class="view hide" id="view-about">
+      <div class="about">
+        <h2>Present Palm</h2>
+        <p>The hub. An ecosystem of interconnected HTML5 applications around the
+           Triadic Coherence framework and the Fracture City world. Each app
+           lives in <code>apps/&lt;slug&gt;/</code> with a <code>fracture.app.json</code>
+           manifest declaring its name, inputs, and outputs.</p>
+        <p>Apps run in sandboxed BrowserWindows opened by Present Palm.
+           Inside the hub, they receive a <code>window.fracture</code> API:
+           <code>save</code>, <code>read</code>, <code>openApp</code>,
+           <code>emit</code>, <code>subscribe</code>, <code>getProvider</code>.
+           Outside the hub, the same HTML still works — it falls back to
+           localStorage and per-app provider config.</p>
+        <p class="faint">Based on P.R. Erickson's Triaxial Orientation / Coherence framework.<br>
+           Avner Media · 2026.</p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="status-bar">
+    <span id="status">Ready.</span>
+    <span class="status-right" id="root-path"></span>
+  </footer>
+
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,73 @@
+{
+  "name": {
+    "first": "Nessa",
+    "last": "Brackish",
+    "full": "Nessa Brackish of the Bitter Tide",
+    "origin_descriptor": "of the Bitter Tide"
+  },
+  "epithet": "whose joy had no road home",
+  "zone": "IV",
+  "subtype": "The Circle",
+  "class": "Blade of Form",
+  "stamp": "Silencing",
+  "capture": "None",
+  "origin": "The Flood Gate",
+  "age": "Elder",
+  "physical": {
+    "build": "Average",
+    "skin": "pearl",
+    "hair": "wild and curling",
+    "eyes": "magenta",
+    "garment": "soldier vest"
+  },
+  "mannerisms": [
+    "never sits with their back to a door",
+    "holds silences past what is comfortable",
+    "touches the back of their own left hand when listening",
+    "will not say a name they have not earned"
+  ],
+  "voice": "precise as cut glass and just as hard to argue with",
+  "aspiration": "to build a temple their children will recognize",
+  "fear": "being right and remaining unheard",
+  "gift": "they make ordinary objects feel ceremonial",
+  "wound": "the silence that grew between them and a parent who could not bear it",
+  "secret": "that the founder they revere was a fraud",
+  "threads": [
+    {
+      "kind": "A parent",
+      "desc": "who never said it and is unlikely to"
+    },
+    {
+      "kind": "A rival",
+      "desc": "whom {name} cannot quite forgive, and cannot quite stop calling"
+    },
+    {
+      "kind": "A friend",
+      "desc": "who left without an argument, and whose silence {name} still rehearses answers to"
+    }
+  ],
+  "seed": "seed_mq2oni8t_1hd0",
+  "timestamp": "2026-06-06T18:24:51.834Z",
+  "backstory": {
+    "origin": "Born in The Flood Gate, of the Bitter Tide, Nessa grew up in a household where meals were taken in shifts and the table never sat all of them at once.",
+    "weight": "Their mother had been told to be quiet, and her mother before her, and the inheritance of that arrives in Nessa as a slight delay before any honest sentence.",
+    "fracture": "At thirty-four, Nessa entered a circle that was both deep and shared, and they have spent every year afterward trying to find another room of the same shape.",
+    "between": "Between then and now, they did most of the ordinary things. They lived in a barge that never finished its route for a time, learned a language they no longer speak, and grew briefly close to a person whose name they will not say in mixed company.",
+    "present": "Currently, Nessa is keeping one person's number alive in their book, refusing to be made comfortable when comfort would cost the truth, and watching for for the right person to ask. The plan, if one can call it that, is to do all three for as long as it takes.",
+    "threadsIntro": "Three threads run through what Nessa carries:",
+    "threads": [
+      {
+        "kind": "A parent",
+        "desc": "who never said it and is unlikely to"
+      },
+      {
+        "kind": "A rival",
+        "desc": "whom {name} cannot quite forgive, and cannot quite stop calling"
+      },
+      {
+        "kind": "A friend",
+        "desc": "who left without an argument, and whose silence {name} still rehearses answers to"
+      }
+    ]
+  }
+}

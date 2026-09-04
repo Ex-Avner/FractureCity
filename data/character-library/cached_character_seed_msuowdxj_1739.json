@@ -1,0 +1,73 @@
+{
+  "name": {
+    "first": "Aria",
+    "last": "Gale",
+    "full": "Aria Gale of the Heat-Year",
+    "origin_descriptor": "of the Heat-Year"
+  },
+  "epithet": "who tended a meaning they no longer believed",
+  "zone": "VI",
+  "subtype": "The Institution",
+  "class": "Weaver of Bond",
+  "stamp": "Abandonment",
+  "capture": "Face",
+  "origin": "The Forge",
+  "age": "Elder",
+  "physical": {
+    "build": "Tall",
+    "skin": "ash",
+    "hair": "long and braided",
+    "eyes": "silver",
+    "garment": "scholar wraps"
+  },
+  "mannerisms": [
+    "touches the back of their own left hand when listening",
+    "speaks of certain things only at dusk",
+    "traces patterns in the air with a finger when bored",
+    "writes letters they never send"
+  ],
+  "voice": "distant, like a voice through water",
+  "aspiration": "to preserve what they were given, intact",
+  "fear": "the last person walking out without saying anything",
+  "gift": "they finish what they begin",
+  "wound": "a parent who left and called it work",
+  "secret": "that the tradition was invented in their lifetime",
+  "threads": [
+    {
+      "kind": "A parent",
+      "desc": "who never said it and is unlikely to"
+    },
+    {
+      "kind": "A teacher",
+      "desc": "who taught them by example and would have hated being thanked"
+    },
+    {
+      "kind": "A stranger",
+      "desc": "who once needed help in a station and got it; {name} has been quietly waiting for the chance to receive the favor back"
+    }
+  ],
+  "seed": "seed_msuowdxj_1739",
+  "timestamp": "2026-08-15T18:11:08.921Z",
+  "backstory": {
+    "origin": "Aria came up in The Forge, of the Heat-Year. Their dyer was easily angered, their gardener was known for laughter that did not last long.",
+    "weight": "The family is built on a series of leavings. Two generations back, a father vanished into work and never quite returned. Aria's parent learned to expect this kind of departure, and so did Aria.",
+    "fracture": "Their job, at nineteen, was to keep the form intact while the meaning quietly drained out of it. Aria discovered they were good at this, and the discovery shaped them.",
+    "between": "They drifted through a stretch of years that produced fewer stories than the decade before. Aria grew quieter, then briefly louder, then quieter again. There was a project — a book — that almost worked.",
+    "present": "These days, Aria can be found at the same café most mornings. They have a stack of unanswered letters that they will not throw away, and a habit of rereading the same page until they fall asleep that even their oldest friends find slightly strange.",
+    "threadsIntro": "Three relationships, alive or otherwise, hold the architecture in place:",
+    "threads": [
+      {
+        "kind": "A parent",
+        "desc": "who never said it and is unlikely to"
+      },
+      {
+        "kind": "A teacher",
+        "desc": "who taught them by example and would have hated being thanked"
+      },
+      {
+        "kind": "A stranger",
+        "desc": "who once needed help in a station and got it; {name} has been quietly waiting for the chance to receive the favor back"
+      }
+    ]
+  }
+}

@@ -1,0 +1,23 @@
+# Dependencies — 500MB of them, and reproducible from package-lock.json
+shell/node_modules/
+node_modules/
+
+# Electron build output
+shell/dist/
+shell/out/
+shell/release/
+
+# macOS
+.DS_Store
+._*
+.Spotlight-V100
+.Trashes
+
+# Editor
+.vscode/
+.idea/
+*.swp
+
+# Scratch. _to_delete is the holding pen for things the bridge cannot delete.
+_build/_to_delete/
+*.log

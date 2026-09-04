@@ -1,0 +1,73 @@
+{
+  "name": {
+    "first": "Kestrel",
+    "last": "Gale",
+    "full": "Kestrel Gale of the Final Stair",
+    "origin_descriptor": "of the Final Stair"
+  },
+  "epithet": "whose joy had no road home",
+  "zone": "IV",
+  "subtype": "The Circle",
+  "class": "Keeper of Thread",
+  "stamp": "Displacement",
+  "capture": "Face",
+  "origin": "The Ascent",
+  "age": "Adolescent",
+  "physical": {
+    "build": "Strong",
+    "skin": "silver-blue",
+    "hair": "pulled back severe",
+    "eyes": "gold",
+    "garment": "mourner shroud"
+  },
+  "mannerisms": [
+    "pauses three beats before answering anything difficult",
+    "speaks of certain things only at dusk",
+    "writes letters they never send",
+    "will not say a name they have not earned"
+  ],
+  "voice": "careful and metered, as if each word were being paid for",
+  "aspiration": "to feel that joy again, the one with no edges",
+  "fear": "losing the last word in a language nobody else speaks",
+  "gift": "they keep their word in conditions that release others from theirs",
+  "wound": "the cousin whose name they cannot remember in the right language",
+  "secret": "that they have been writing letters in another's name",
+  "threads": [
+    {
+      "kind": "A friend",
+      "desc": "who left without an argument, and whose silence {name} still rehearses answers to"
+    },
+    {
+      "kind": "A rival",
+      "desc": "whom {name} cannot quite forgive, and cannot quite stop calling"
+    },
+    {
+      "kind": "A stranger",
+      "desc": "who appears in their dreams more often than makes sense"
+    }
+  ],
+  "seed": "seed_mpxcnga8_1gm6",
+  "timestamp": "2026-06-03T00:50:04.171Z",
+  "backstory": {
+    "origin": "Born in The Ascent, of the Final Stair, Kestrel grew up in a household where guests were rare, and treated like a small disaster.",
+    "weight": "The line was elsewhere first. Kestrel's grandparents crossed a border in a year nobody in the family will agree on, and the country they left does not exist now in the form they remember it.",
+    "fracture": "They were seventeen the night the singing did not stop. Kestrel found themselves inside something larger than themselves, and the memory of that warmth has organized every choice since.",
+    "between": "Between then and now, they did most of the ordinary things. They lived in three rooms above a bakery for a time, learned the names of the local birds, and grew briefly close to a person whose name they will not say in mixed company.",
+    "present": "These days, Kestrel can be found at the watch wall most mornings. They have a small icon they did not buy that they will not throw away, and a habit of walking three blocks past where they need to go that even their oldest friends find slightly strange.",
+    "threadsIntro": "Three people belong, in different ways, to the shape of Kestrel's life:",
+    "threads": [
+      {
+        "kind": "A friend",
+        "desc": "who left without an argument, and whose silence {name} still rehearses answers to"
+      },
+      {
+        "kind": "A rival",
+        "desc": "whom {name} cannot quite forgive, and cannot quite stop calling"
+      },
+      {
+        "kind": "A stranger",
+        "desc": "who appears in their dreams more often than makes sense"
+      }
+    ]
+  }
+}

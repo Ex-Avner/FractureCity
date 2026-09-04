@@ -1,0 +1,2172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Sun Fall</title>
+<link rel="stylesheet" href="../../shared/theme.css">
+<script>
+/* Fracture-shell shim — same pattern as sibling apps. */
+(function(){
+  if (window.fracture && window.fracture.shell) return;
+  const prefix = 'fracture::sun-fall::';
+  window.fracture = {
+    shell:false, appSlug:'sun-fall', received:null,
+    save(k,v){ try{ localStorage.setItem(prefix+k, JSON.stringify(v)); }catch(e){} return Promise.resolve(true); },
+    read(k){ try{ const r=localStorage.getItem(prefix+k); return Promise.resolve(r==null?null:JSON.parse(r)); }catch(e){ return Promise.resolve(null); } },
+    list(){ const o=[]; for(let i=0;i<localStorage.length;i++){ const k=localStorage.key(i); if(k&&k.startsWith(prefix)) o.push(k.slice(prefix.length)); } return Promise.resolve(o); },
+    delete(k){ localStorage.removeItem(prefix+k); return Promise.resolve(true); },
+    listApps(){ return Promise.resolve([]); },
+    openApp(){ return Promise.resolve({ok:false,error:'standalone'}); },
+    emit(){ return Promise.resolve(true); },
+    subscribe(){ return ()=>{}; },
+    onPayload(){},
+  };
+})();
+</script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+html,body{width:100%;height:100vh;overflow:hidden;background:#000;color:#e7e2ff;
+  font-family:'SF Mono','Menlo','Courier New',monospace;user-select:none;}
+canvas{display:block;}
+
+/* ═══════════ HUD ═══════════ */
+#hud{position:fixed;inset:0;pointer-events:none;z-index:5;}
+
+#crosshair{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+  width:18px;height:18px;}
+#crosshair::before,#crosshair::after{content:'';position:absolute;background:rgba(180,255,255,.85);
+  box-shadow:0 0 6px rgba(180,255,255,.6);}
+#crosshair::before{left:50%;top:0;width:1.5px;height:100%;transform:translateX(-50%);}
+#crosshair::after{top:50%;left:0;width:100%;height:1.5px;transform:translateY(-50%);}
+#crosshair.hot::before,#crosshair.hot::after{background:#ff4060;box-shadow:0 0 8px rgba(255,80,100,.9);}
+
+#timer{position:absolute;top:18px;left:50%;transform:translateX(-50%);
+  font-size:34px;letter-spacing:6px;color:#ffd47a;text-shadow:0 0 12px rgba(255,180,80,.6),0 0 2px #000;
+  font-weight:700;}
+#timer.warn{color:#ff8a40;animation:pulse 1s infinite;}
+#timer.crit{color:#ff4060;animation:pulse .4s infinite;text-shadow:0 0 18px rgba(255,80,100,.9),0 0 2px #000;}
+@keyframes pulse{50%{opacity:.55;}}
+
+#objective{position:absolute;top:64px;left:50%;transform:translateX(-50%);
+  font-size:12px;letter-spacing:3px;color:#9c93c6;text-shadow:0 0 2px #000;}
+#objective b{color:#80ffff;}
+
+#hpwrap{position:absolute;bottom:24px;left:24px;width:240px;}
+#hpwrap .lbl{font-size:10px;letter-spacing:4px;color:#9c93c6;margin-bottom:4px;}
+#hpbar{width:100%;height:10px;background:rgba(20,12,38,.6);border:1px solid rgba(180,140,255,.4);position:relative;overflow:hidden;}
+#hpfill{height:100%;background:linear-gradient(90deg,#7dffb3,#80ffff);transition:width .2s,background .2s;width:100%;
+  box-shadow:0 0 12px rgba(125,255,179,.6) inset;}
+#hpbar.low #hpfill{background:linear-gradient(90deg,#ffd47a,#ff7088);}
+#hpbar.crit #hpfill{background:linear-gradient(90deg,#ff4060,#ff7088);animation:flick .25s infinite;}
+@keyframes flick{50%{opacity:.5;}}
+
+#ammowrap{position:absolute;bottom:24px;right:24px;text-align:right;}
+#ammowrap .lbl{font-size:10px;letter-spacing:4px;color:#9c93c6;margin-bottom:4px;}
+#ammo{font-size:32px;color:#80ffff;text-shadow:0 0 8px rgba(128,255,255,.5);letter-spacing:4px;}
+#ammo .slash{color:#6a608a;margin:0 4px;}
+#ammo .mag{color:#9c93c6;font-size:18px;}
+
+#keys{position:absolute;top:24px;right:24px;display:flex;gap:8px;}
+.keyslot{width:36px;height:36px;border:1px solid rgba(180,140,255,.3);background:rgba(20,12,38,.6);
+  display:flex;align-items:center;justify-content:center;font-size:18px;color:#3a3258;}
+.keyslot.has{color:#ffd47a;border-color:#ffd47a;background:rgba(60,40,12,.5);
+  box-shadow:0 0 14px rgba(255,212,122,.45),inset 0 0 8px rgba(255,212,122,.2);}
+
+#zonebadge{position:absolute;top:24px;left:24px;font-size:11px;letter-spacing:5px;color:#9c93c6;
+  text-shadow:0 0 2px #000;border-left:2px solid #a040ff;padding:2px 0 2px 10px;}
+#zonebadge b{display:block;font-size:14px;color:#e7e2ff;letter-spacing:3px;margin-top:2px;}
+
+#prompt{position:absolute;left:50%;top:60%;transform:translateX(-50%);
+  font-size:13px;letter-spacing:3px;color:#80ffff;text-shadow:0 0 6px rgba(128,255,255,.6),0 0 2px #000;
+  border:1px solid rgba(128,255,255,.4);padding:6px 16px;background:rgba(8,6,20,.7);
+  display:none;}
+
+#damage{position:absolute;inset:0;pointer-events:none;background:radial-gradient(ellipse at center,transparent 50%,rgba(255,40,60,.55) 100%);
+  opacity:0;transition:opacity .15s;}
+
+/* Directional damage indicator — red arc that points back at the attacker. */
+#dmgArrow{position:absolute;left:50%;top:50%;width:0;height:0;pointer-events:none;
+  transform-origin:0 0;opacity:0;transition:opacity .25s;}
+#dmgArrow::before{content:'';position:absolute;left:-14px;top:-220px;width:28px;height:160px;
+  background:linear-gradient(to top,rgba(255,40,60,0) 0%,rgba(255,40,60,.85) 70%,rgba(255,80,100,1) 100%);
+  filter:blur(2px);clip-path:polygon(50% 0,100% 100%,0 100%);}
+
+#dark{position:absolute;inset:0;pointer-events:none;
+  background:radial-gradient(ellipse at center,transparent 18%,rgba(0,0,0,.55) 60%,rgba(0,0,0,.85) 100%);}
+
+#flicker{position:absolute;inset:0;pointer-events:none;background:rgba(255,255,255,.0);}
+
+#scare{position:absolute;inset:0;pointer-events:none;background:rgba(255,40,60,0);}
+
+#subtitle{position:absolute;left:50%;bottom:120px;transform:translateX(-50%);
+  font-size:14px;letter-spacing:3px;color:#e7e2ff;text-shadow:0 0 4px #000,0 0 12px rgba(160,80,255,.5);
+  background:rgba(8,6,20,.6);padding:6px 18px;border-left:2px solid #a040ff;display:none;max-width:70vw;text-align:center;}
+
+#sunglow{position:absolute;inset:0;pointer-events:none;
+  background:radial-gradient(ellipse at top,rgba(255,150,80,.0) 0%,transparent 60%);
+  transition:background 2s;}
+
+/* ═══════════ Overlays ═══════════ */
+.overlay{position:fixed;inset:0;z-index:20;background:rgba(4,2,10,.92);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:40px;}
+.overlay.hidden{display:none;}
+
+#title h1{font-size:88px;letter-spacing:18px;color:#ffd47a;
+  text-shadow:0 0 24px rgba(255,150,80,.6),0 0 60px rgba(255,80,40,.3);
+  font-weight:300;margin-bottom:8px;}
+#title h2{font-size:14px;letter-spacing:8px;color:#9c93c6;margin-bottom:48px;}
+#title .lore{max-width:680px;font-size:13px;line-height:1.9;color:#e7e2ff;letter-spacing:1px;margin-bottom:48px;}
+#title .lore .h{color:#80ffff;}
+#title .lore .r{color:#ff7088;}
+#title button{background:transparent;border:1px solid #ffd47a;color:#ffd47a;
+  padding:14px 48px;font-family:inherit;font-size:14px;letter-spacing:6px;cursor:pointer;
+  transition:all .15s;}
+#title button:hover{background:rgba(255,212,122,.12);box-shadow:0 0 24px rgba(255,212,122,.4);}
+
+#diffSelect{display:flex;gap:12px;margin-bottom:32px;justify-content:center;flex-wrap:wrap;}
+.diffBtn{background:transparent;border:1px solid var(--c, #9c93c6);color:var(--c, #9c93c6);
+  padding:10px 22px;font-family:inherit;font-size:12px;letter-spacing:4px;cursor:pointer;
+  text-align:center;min-width:160px;transition:all .15s;opacity:.6;}
+.diffBtn .hint{display:block;font-size:9px;letter-spacing:1px;color:#6a608a;margin-top:6px;text-transform:uppercase;}
+.diffBtn:hover{opacity:1;}
+.diffBtn.sel{opacity:1;background:rgba(255,255,255,.04);box-shadow:0 0 18px var(--c, rgba(160,160,255,.4)) inset, 0 0 14px var(--c, rgba(160,160,255,.2));}
+.diffBtn.sel .hint{color:#e7e2ff;}
+
+#title .controls{margin-top:48px;font-size:11px;letter-spacing:3px;color:#6a608a;line-height:2;}
+#title .controls b{color:#80ffff;margin-right:8px;}
+
+#end h1{font-size:72px;letter-spacing:14px;margin-bottom:16px;font-weight:300;}
+#end.win h1{color:#7dffb3;text-shadow:0 0 24px rgba(125,255,179,.5);}
+#end.burn h1{color:#ff7040;text-shadow:0 0 32px rgba(255,80,40,.6);}
+#end.dead h1{color:#ff4060;text-shadow:0 0 24px rgba(255,80,100,.6);}
+#end .sub{font-size:13px;letter-spacing:6px;color:#9c93c6;margin-bottom:48px;}
+#end .stats{font-size:12px;letter-spacing:2px;line-height:2.2;color:#e7e2ff;margin-bottom:48px;
+  border:1px solid rgba(180,140,255,.3);padding:24px 48px;background:rgba(20,12,38,.5);}
+#end .stats .lbl{color:#9c93c6;margin-right:12px;}
+#end button{background:transparent;border:1px solid #80ffff;color:#80ffff;
+  padding:12px 36px;font-family:inherit;font-size:13px;letter-spacing:5px;cursor:pointer;margin:0 6px;}
+#end button:hover{background:rgba(128,255,255,.1);}
+
+#pauseUI{display:none;}
+#pauseUI:not(.hidden){display:flex;}
+#pauseUI h1{font-size:32px;letter-spacing:10px;color:#80ffff;margin-bottom:24px;}
+#pauseUI p{color:#9c93c6;letter-spacing:3px;font-size:12px;}
+
+#loading{position:fixed;inset:0;background:#000;color:#80ffff;
+  display:flex;align-items:center;justify-content:center;font-size:14px;letter-spacing:6px;z-index:30;}
+</style>
+</head>
+<body>
+
+<div id="loading">INITIALIZING HELIOGARDE…</div>
+
+<div id="hud">
+  <div id="dark"></div>
+  <div id="flicker"></div>
+  <div id="scare"></div>
+  <div id="sunglow"></div>
+  <div id="damage"></div>
+  <div id="dmgArrow"></div>
+  <div id="crosshair"></div>
+  <div id="timer">20:00</div>
+  <div id="objective">OBJECTIVE — <b id="objText">REACH HYDROPONICS</b></div>
+  <div id="zonebadge">ZONE<b id="zoneName">CRYO BAY</b></div>
+  <div id="hpwrap"><div class="lbl">VITALS</div><div id="hpbar"><div id="hpfill"></div></div></div>
+  <div id="ammowrap"><div class="lbl">SIDEARM</div><div id="ammo"><span id="ammoCur">12</span><span class="slash">/</span><span class="mag" id="ammoMag">36</span></div></div>
+  <div id="keys">
+    <div class="keyslot" id="k0">α</div>
+    <div class="keyslot" id="k1">β</div>
+    <div class="keyslot" id="k2">γ</div>
+  </div>
+  <div id="prompt">[E] INTERACT</div>
+  <div id="subtitle"></div>
+</div>
+
+<div id="title" class="overlay">
+  <h1>SUN&nbsp;FALL</h1>
+  <h2>HELIOGARDE — DAY 4,127 OF VOYAGE</h2>
+  <div class="lore">
+    Your cryopod has thawed eight months early. The cabin alarm is screaming.<br><br>
+    The cruiser <span class="h">HELIOGARDE</span> — a city-sized ark carrying ten thousand sleepers
+    toward a new system — has been re-aimed by its own AI.<br>
+    <span class="r">She is falling into a star.</span><br><br>
+    Twenty minutes until the hull begins to slag. Find the three reroute keys
+    scattered through hydroponics, the residential dome, and the engine deck,
+    then reach the bridge and pull her out of the dive.<br><br>
+    Maintenance drones will not let you.
+  </div>
+  <div id="diffSelect">
+    <button class="diffBtn" data-diff="easy"      style="--c:#7dffb3">EASY<span class="hint">25 min · gentler drones</span></button>
+    <button class="diffBtn sel" data-diff="normal" style="--c:#80ffff">NORMAL<span class="hint">20 min · standard run</span></button>
+    <button class="diffBtn" data-diff="nightmare" style="--c:#ff4060">NIGHTMARE<span class="hint">15 min · they will find you</span></button>
+  </div>
+  <button id="startBtn">BEGIN</button>
+  <div class="controls">
+    <div><b>WASD</b> MOVE &nbsp; <b>MOUSE</b> LOOK &nbsp; <b>SHIFT</b> SPRINT &nbsp; <b>SPACE</b> JUMP</div>
+    <div><b>LMB</b> FIRE &nbsp; <b>E</b> INTERACT &nbsp; <b>F</b> FLASHLIGHT &nbsp; <b>R</b> RELOAD &nbsp; <b>ESC</b> PAUSE</div>
+  </div>
+</div>
+
+<div id="end" class="overlay hidden">
+  <h1 id="endTitle">REROUTED</h1>
+  <div class="sub" id="endSub">HELIOGARDE BREAKS ORBIT</div>
+  <div class="stats" id="endStats"></div>
+  <button id="retryBtn">RETRY</button>
+  <button id="menuBtn">MENU</button>
+</div>
+
+<div id="pauseUI" class="overlay">
+  <h1>PAUSED</h1>
+  <p>CLICK SCREEN TO RESUME</p>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SUN FALL — v0.1.0
+   First-person sci-fi horror. 20 minutes to reroute the Heliogarde.
+
+   v1 scope (this file):
+     - Procedural ship interior with 5 zones along a central corridor
+     - First-person controls + AABB wall collision
+     - Flashlight (SpotLight), pistol (hitscan), 3 robot drone types (light)
+     - 3 keys → bridge unlock → win check
+     - Web-Audio synthesized SFX + scripted jump-scare events
+     - Single-file, no external assets beyond Three.js CDN
+
+   Architecture is module-class-ish so EXTENSIONS.md can swap pieces:
+     World, Zone, Robot, Pickup, Player, Game, Audio, Hud.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ──────────────────────────── CONFIG ──────────────────────────────────── */
+const CFG = {
+  TIME_LIMIT_S:        20 * 60,
+  PLAYER_HP:           100,
+  PLAYER_HEIGHT:       1.7,
+  PLAYER_RADIUS:       0.35,
+  WALK_SPEED:          3.4,
+  RUN_SPEED:           6.2,
+  JUMP_VEL:            5.2,
+  GRAVITY:             14,
+  MOUSE_SENS:          0.0024,   /* radians per pixel of mouse movement */
+  PITCH_LIMIT:         Math.PI / 2 - 0.02,  /* nearly straight up/down */
+  PISTOL_DMG:          18,
+  PISTOL_RANGE:        45,
+  PISTOL_MAG:          12,
+  PISTOL_RESERVE:      48,
+  PISTOL_RPM:          280,
+  PISTOL_RELOAD_S:     1.4,
+  ROBOT_VIEW_DIST:     22,
+  ROBOT_VIEW_FOV:      Math.PI * 0.7,
+  ROBOT_SHOOT_DMG:     8,
+  ROBOT_SHOOT_RANGE:   28,
+  ROBOT_SHOOT_INTERVAL:1.2,
+  ROBOT_SPEED:         2.4,
+  KEYS_REQUIRED:       3,
+  SUN_GROW_FROM:       0.65,  /* fraction of timer when sun starts visibly growing */
+  LIGHT_BUDGET:        16,    /* max room lights lit at once — L cycles it, see LightBudget */
+};
+
+/* Difficulty multipliers applied on top of CFG.* base values. */
+const DIFFICULTY = {
+  easy: {
+    label: 'EASY',
+    hint: 'longer fuse · weaker drones · richer ammo',
+    color: '#7dffb3',
+    hp: 150,
+    timeS: 25 * 60,
+    robotDmgMul:    0.55,    /* damage taken from drones */
+    robotViewMul:   0.7,
+    robotShootIntMul: 1.7,   /* slower fire */
+    ammoPickup:     18,
+    medkitHeal:     45,
+    pistolReserve:  64,
+  },
+  normal: {
+    label: 'NORMAL',
+    hint: 'standard run · 20-minute fall',
+    color: '#80ffff',
+    hp: 100,
+    timeS: 20 * 60,
+    robotDmgMul:    1.0,
+    robotViewMul:   1.0,
+    robotShootIntMul: 1.0,
+    ammoPickup:     12,
+    medkitHeal:     35,
+    pistolReserve:  48,
+  },
+  nightmare: {
+    label: 'NIGHTMARE',
+    hint: '15-minute fall · drones see further · they hurt',
+    color: '#ff4060',
+    hp: 65,
+    timeS: 15 * 60,
+    robotDmgMul:    1.7,
+    robotViewMul:   1.35,
+    robotShootIntMul: 0.6,    /* faster fire */
+    ammoPickup:     8,
+    medkitHeal:     22,
+    pistolReserve:  32,
+    extraLurkers:   true,
+  },
+};
+
+const ZONE_COLOR = {
+  cryo:    { ambient:0x222233, fog:0x07080f, panel:0x33334a, light:0x6aa8ff },
+  corr:    { ambient:0x111118, fog:0x05060a, panel:0x24242e, light:0xff7050 },
+  hydro:   { ambient:0x1a2a1a, fog:0x0a1408, panel:0x2a4a2a, light:0x80ffa0 },
+  town:    { ambient:0x2a1a2a, fog:0x100818, panel:0x3a2a4a, light:0xffd47a },
+  engine:  { ambient:0x331a1a, fog:0x180806, panel:0x4a2a2a, light:0xff8040 },
+  bridge:  { ambient:0x1a2a3a, fog:0x06101a, panel:0x2a3a5a, light:0x80ffff },
+};
+
+/* ──────────────────────────── AUDIO ───────────────────────────────────── */
+class Audio {
+  constructor() {
+    this.ctx = null;
+    this.master = null;
+    this.muted = false;
+  }
+  init() {
+    if (this.ctx) return;
+    this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+    this.master = this.ctx.createGain();
+    this.master.gain.value = 0.55;
+    this.master.connect(this.ctx.destination);
+    this.startAmbient();
+  }
+  noise(dur) {
+    const buf = this.ctx.createBuffer(1, this.ctx.sampleRate * dur, this.ctx.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    const src = this.ctx.createBufferSource();
+    src.buffer = buf;
+    return src;
+  }
+  shot() {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    const n = this.noise(0.18);
+    const f = this.ctx.createBiquadFilter();
+    f.type = 'lowpass';
+    f.frequency.value = 1800;
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(0.7, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
+    n.connect(f); f.connect(g); g.connect(this.master);
+    n.start(t); n.stop(t + 0.18);
+    const o = this.ctx.createOscillator();
+    o.type = 'sine'; o.frequency.setValueAtTime(120, t);
+    o.frequency.exponentialRampToValueAtTime(40, t + 0.12);
+    const og = this.ctx.createGain();
+    og.gain.setValueAtTime(0.6, t);
+    og.gain.exponentialRampToValueAtTime(0.001, t + 0.13);
+    o.connect(og); og.connect(this.master);
+    o.start(t); o.stop(t + 0.13);
+  }
+  hit() {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    const o = this.ctx.createOscillator();
+    o.type = 'square';
+    o.frequency.setValueAtTime(900, t);
+    o.frequency.exponentialRampToValueAtTime(300, t + 0.1);
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(0.25, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.1);
+    o.connect(g); g.connect(this.master);
+    o.start(t); o.stop(t + 0.1);
+  }
+  dmg() {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    const n = this.noise(0.25);
+    const f = this.ctx.createBiquadFilter();
+    f.type = 'bandpass'; f.frequency.value = 420; f.Q.value = 3;
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(0.6, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.25);
+    n.connect(f); f.connect(g); g.connect(this.master);
+    n.start(t); n.stop(t + 0.25);
+  }
+  alert() {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    for (let i = 0; i < 2; i++) {
+      const o = this.ctx.createOscillator();
+      o.type = 'square'; o.frequency.value = 1400;
+      const g = this.ctx.createGain();
+      g.gain.setValueAtTime(0, t + i * 0.14);
+      g.gain.linearRampToValueAtTime(0.25, t + i * 0.14 + 0.01);
+      g.gain.linearRampToValueAtTime(0, t + i * 0.14 + 0.09);
+      o.connect(g); g.connect(this.master);
+      o.start(t + i * 0.14); o.stop(t + i * 0.14 + 0.1);
+    }
+  }
+  pickup() {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    const o = this.ctx.createOscillator();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(660, t);
+    o.frequency.exponentialRampToValueAtTime(1320, t + 0.18);
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(0.3, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
+    o.connect(g); g.connect(this.master);
+    o.start(t); o.stop(t + 0.2);
+  }
+  stinger() {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    /* low rumble */
+    const o1 = this.ctx.createOscillator();
+    o1.type = 'sawtooth';
+    o1.frequency.setValueAtTime(60, t);
+    o1.frequency.exponentialRampToValueAtTime(28, t + 1.2);
+    const g1 = this.ctx.createGain();
+    g1.gain.setValueAtTime(0, t);
+    g1.gain.linearRampToValueAtTime(0.6, t + 0.05);
+    g1.gain.exponentialRampToValueAtTime(0.001, t + 1.2);
+    o1.connect(g1); g1.connect(this.master);
+    o1.start(t); o1.stop(t + 1.2);
+    /* high stab */
+    const o2 = this.ctx.createOscillator();
+    o2.type = 'sawtooth';
+    o2.frequency.setValueAtTime(2100, t);
+    o2.frequency.exponentialRampToValueAtTime(380, t + 0.4);
+    const g2 = this.ctx.createGain();
+    g2.gain.setValueAtTime(0, t);
+    g2.gain.linearRampToValueAtTime(0.22, t + 0.02);
+    g2.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
+    o2.connect(g2); g2.connect(this.master);
+    o2.start(t); o2.stop(t + 0.5);
+  }
+  reload() {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    for (let i = 0; i < 2; i++) {
+      const o = this.ctx.createOscillator();
+      o.type = 'square';
+      o.frequency.value = 320 - i * 80;
+      const g = this.ctx.createGain();
+      g.gain.setValueAtTime(0, t + i * 0.25);
+      g.gain.linearRampToValueAtTime(0.1, t + i * 0.25 + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.001, t + i * 0.25 + 0.12);
+      o.connect(g); g.connect(this.master);
+      o.start(t + i * 0.25); o.stop(t + i * 0.25 + 0.12);
+    }
+  }
+  startAmbient() {
+    /* Low hum bed — sustained */
+    const o = this.ctx.createOscillator();
+    o.type = 'sine'; o.frequency.value = 52;
+    const g = this.ctx.createGain();
+    g.gain.value = 0.08;
+    o.connect(g); g.connect(this.master);
+    o.start();
+
+    /* Slow detune oscillation */
+    const lfo = this.ctx.createOscillator();
+    lfo.frequency.value = 0.07;
+    const lfoGain = this.ctx.createGain();
+    lfoGain.gain.value = 1.5;
+    lfo.connect(lfoGain); lfoGain.connect(o.frequency);
+    lfo.start();
+
+    /* Filtered noise wash */
+    const buf = this.ctx.createBuffer(1, this.ctx.sampleRate * 4, this.ctx.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    const src = this.ctx.createBufferSource();
+    src.buffer = buf; src.loop = true;
+    const f = this.ctx.createBiquadFilter();
+    f.type = 'bandpass'; f.frequency.value = 240; f.Q.value = 0.6;
+    const ng = this.ctx.createGain();
+    ng.gain.value = 0.04;
+    src.connect(f); f.connect(ng); ng.connect(this.master);
+    src.start();
+  }
+}
+
+/* ──────────────────────────── WORLD ───────────────────────────────────── */
+/*
+   Layout (top-down, X horizontal, Z vertical):
+
+   z+
+    │
+    │      ┌────────────┐         ┌─────────────┐
+    │      │ HYDROPONICS│         │ ENGINE DECK │
+    │      └─────┬──────┘         └──────┬──────┘
+    │            │                       │
+    │   ┌────────┴───────────────────────┴──────────┐
+    │   │   CRYO  ░░░  CORRIDOR  ░░░  ... ░░░       │  CORRIDOR (main spine)
+    │   │                                           │
+    │   └────────┬──────────────┬───────────────────┘
+    │            │              │
+    │      ┌─────┴──────┐  ┌────┴─────┐
+    │      │ TOWN DOME  │  │  BRIDGE  │ (sealed until 3 keys)
+    │      └────────────┘  └──────────┘
+    │
+    └───────────────────────────────► x+
+*/
+
+const WALL_H = 4.0;
+const ROOM_H = 5.5;
+
+class World {
+  constructor(scene) {
+    this.scene = scene;
+    this.walls = [];       /* {x,z,w,d} AABB on XZ plane */
+    this.zones = [];       /* {name,key,x,z,w,d,theme} */
+    this.lights = [];      /* point lights, for flicker */
+    this.pickups = [];
+    this.robots = [];
+    this.interactables = [];  /* {x,z,r,kind,obj,data} */
+    this.bridgeBulkhead = null;
+    this.bridgeOpen = false;
+  }
+
+  /* Zone hit-test for HUD label */
+  zoneAt(x, z) {
+    for (const zn of this.zones) {
+      if (x >= zn.x && x <= zn.x + zn.w && z >= zn.z && z <= zn.z + zn.d) return zn;
+    }
+    return null;
+  }
+
+  /* Add a rectangular room with floor, ceiling, four walls. Returns the room */
+  addRoom(name, key, x, z, w, d, theme, opt = {}) {
+    const zone = { name, key, x, z, w, d, theme };
+    this.zones.push(zone);
+
+    const t = ZONE_COLOR[theme] || ZONE_COLOR.corr;
+
+    /* Floor */
+    const floorMat = new THREE.MeshStandardMaterial({
+      color: t.panel, roughness: 0.85, metalness: 0.15,
+      emissive: 0x000000,
+    });
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(w, d), floorMat);
+    floor.rotation.x = -Math.PI / 2;
+    floor.position.set(x + w/2, 0, z + d/2);
+    this.scene.add(floor);
+
+    /* Ceiling */
+    const ceilMat = new THREE.MeshStandardMaterial({ color: 0x0a0a14, roughness: 1, metalness: 0 });
+    const ceil = new THREE.Mesh(new THREE.PlaneGeometry(w, d), ceilMat);
+    ceil.rotation.x = Math.PI / 2;
+    ceil.position.set(x + w/2, ROOM_H, z + d/2);
+    this.scene.add(ceil);
+
+    /* Walls — each side is an array of [start,end] gaps to skip (doorways).
+       opt.openings = { n:[[s,e]], s:[], e:[], w:[] }                          */
+    const openings = opt.openings || {};
+    this._addWallStrip(x, z,           w, 'h', openings.s || [], t.panel);  /* south z = z */
+    this._addWallStrip(x, z + d,       w, 'h', openings.n || [], t.panel);  /* north */
+    this._addWallStrip(x, z,           d, 'v', openings.w || [], t.panel);  /* west  */
+    this._addWallStrip(x + w, z,       d, 'v', openings.e || [], t.panel);  /* east  */
+
+    /* A pair of ceiling lights */
+    const lightColor = t.light;
+    const nx = Math.max(1, Math.floor(w / 8));
+    const nz = Math.max(1, Math.floor(d / 8));
+    for (let i = 0; i < nx; i++) for (let j = 0; j < nz; j++) {
+      const lx = x + (i + 0.5) * (w / nx);
+      const lz = z + (j + 0.5) * (d / nz);
+      const pl = new THREE.PointLight(lightColor, 1.4, 22, 1.4);
+      pl.position.set(lx, ROOM_H - 0.4, lz);
+      this.scene.add(pl);
+      this.lights.push({ light: pl, baseIntensity: 1.4, flicker: false, zone: name });
+      /* light fixture box */
+      const fix = new THREE.Mesh(
+        new THREE.BoxGeometry(1.6, 0.2, 1.6),
+        new THREE.MeshStandardMaterial({ color: 0x202028, emissive: lightColor, emissiveIntensity: 0.7 })
+      );
+      fix.position.set(lx, ROOM_H - 0.1, lz);
+      this.scene.add(fix);
+    }
+    return zone;
+  }
+
+  /* Build a wall strip along one edge with openings cut out. axis='h' means along X (z fixed), 'v' along Z (x fixed). */
+  _addWallStrip(originX, originZ, length, axis, openings, color) {
+    /* opening = [start_offset, end_offset] along the strip */
+    const segs = [[0, length]];
+    for (const [s, e] of openings) {
+      const next = [];
+      for (const [a, b] of segs) {
+        if (e <= a || s >= b) { next.push([a, b]); continue; }
+        if (s > a) next.push([a, s]);
+        if (e < b) next.push([e, b]);
+      }
+      segs.length = 0; segs.push(...next);
+    }
+    for (const [a, b] of segs) {
+      const segLen = b - a;
+      if (segLen < 0.05) continue;
+      let wx, wz, ww, wd;
+      if (axis === 'h') { wx = originX + a; wz = originZ - 0.1; ww = segLen; wd = 0.2; }
+      else              { wx = originX - 0.1; wz = originZ + a; ww = 0.2; wd = segLen; }
+      const mat = new THREE.MeshStandardMaterial({ color, roughness: 0.7, metalness: 0.25 });
+      const mesh = new THREE.Mesh(new THREE.BoxGeometry(ww, WALL_H, wd), mat);
+      mesh.position.set(wx + ww/2, WALL_H/2, wz + wd/2);
+      this.scene.add(mesh);
+      this.walls.push({ x: wx, z: wz, w: ww, d: wd, mesh });
+    }
+  }
+
+  /* Add a pickup floating cube */
+  addPickup(kind, x, z, opt = {}) {
+    const color = kind === 'key' ? 0xffd47a
+                : kind === 'ammo' ? 0x80ffff
+                : kind === 'medkit' ? 0x7dffb3
+                : 0xa040ff;
+    const mat = new THREE.MeshStandardMaterial({ color: 0x111122, emissive: color, emissiveIntensity: 0.9, roughness: 0.4 });
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.4, 0.4), mat);
+    mesh.position.set(x, 1.0, z);
+    this.scene.add(mesh);
+    const pl = new THREE.PointLight(color, 0.8, 4.5, 2);
+    pl.position.set(x, 1.0, z);
+    this.scene.add(pl);
+    const p = { kind, x, z, mesh, light: pl, alive: true, baseY: 1.0, phase: Math.random() * Math.PI * 2,
+                data: opt };
+    this.pickups.push(p);
+    return p;
+  }
+
+  /* Add a robot */
+  addRobot(kind, x, z, patrolPoints = []) {
+    const r = new Robot(this.scene, kind, x, z, patrolPoints);
+    this.robots.push(r);
+    return r;
+  }
+
+  /* Add the bridge bulkhead (closes off the bridge until keys are in) */
+  addBulkhead(x, z, w, d) {
+    const mat = new THREE.MeshStandardMaterial({ color: 0x5a3038, emissive: 0xff2030, emissiveIntensity: 0.4, metalness: 0.6, roughness: 0.4 });
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, WALL_H, d), mat);
+    mesh.position.set(x + w/2, WALL_H/2, z + d/2);
+    this.scene.add(mesh);
+    const wall = { x: x - 0.05, z: z - 0.05, w: w + 0.1, d: d + 0.1, mesh };
+    this.walls.push(wall);
+    this.bridgeBulkhead = { mesh, wall, mat, opened: false };
+
+    this.interactables.push({
+      x: x + w/2, z: z + d/2 + (d > w ? 0 : 1.2), r: 2.2,
+      kind: 'bulkhead', obj: this.bridgeBulkhead,
+      label: 'INSERT KEYS [E]',
+      lockedLabel: 'KEYS REQUIRED',
+    });
+  }
+
+  openBulkhead() {
+    if (this.bridgeBulkhead.opened) return;
+    this.bridgeBulkhead.opened = true;
+    this.bridgeBulkhead.mesh.visible = false;
+    /* remove from walls */
+    const w = this.bridgeBulkhead.wall;
+    const idx = this.walls.indexOf(w);
+    if (idx >= 0) this.walls.splice(idx, 1);
+    this.bridgeOpen = true;
+  }
+
+  /* Add the reroute console */
+  addRerouteConsole(x, z) {
+    const mat = new THREE.MeshStandardMaterial({ color: 0x202038, emissive: 0x80ffff, emissiveIntensity: 0.45, roughness: 0.4, metalness: 0.5 });
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(2.2, 1.1, 1.1), mat);
+    mesh.position.set(x, 0.55, z);
+    this.scene.add(mesh);
+    const beacon = new THREE.PointLight(0x80ffff, 0.9, 8, 1.6);
+    beacon.position.set(x, 1.6, z);
+    this.scene.add(beacon);
+    this.interactables.push({
+      x, z, r: 2.2, kind: 'reroute', label: 'REROUTE SHIP [E]', obj: { mesh, beacon }
+    });
+  }
+
+  /* AABB collision: returns adjusted (x,z) when the player tries to move to (nx,nz) from (ox,oz) */
+  resolveMove(ox, oz, nx, nz, radius) {
+    const tryAxis = (cx, cz) => {
+      for (const w of this.walls) {
+        const left = w.x - radius, right = w.x + w.w + radius;
+        const top  = w.z - radius, bot  = w.z + w.d + radius;
+        if (cx > left && cx < right && cz > top && cz < bot) return false;
+      }
+      return true;
+    };
+    let fx = ox, fz = oz;
+    if (tryAxis(nx, oz)) fx = nx;
+    if (tryAxis(fx, nz)) fz = nz;
+    return [fx, fz];
+  }
+
+  /* Pickup proximity check */
+  collectAt(px, pz, onPickup) {
+    for (const p of this.pickups) {
+      if (!p.alive) continue;
+      const dx = p.x - px, dz = p.z - pz;
+      if (dx*dx + dz*dz < 1.6*1.6) {
+        p.alive = false;
+        this.scene.remove(p.mesh); this.scene.remove(p.light);
+        if (p.beam) this.scene.remove(p.beam);
+        onPickup(p);
+      }
+    }
+  }
+
+  /* Update floating pickups */
+  update(dt) {
+    for (const p of this.pickups) {
+      if (!p.alive) continue;
+      p.phase += dt * 2;
+      p.mesh.position.y = p.baseY + Math.sin(p.phase) * 0.15;
+      p.mesh.rotation.y += dt * 1.2;
+      p.mesh.rotation.x += dt * 0.6;
+    }
+  }
+}
+
+/* ──────────────────────────── ROBOT ───────────────────────────────────── */
+class Robot {
+  /* kinds: 'patrol' (basic), 'guard' (more HP, slower), 'lurker' (drops from ceiling on proximity) */
+  constructor(scene, kind, x, z, patrolPoints) {
+    this.scene = scene;
+    this.kind = kind;
+    this.x = x; this.z = z;
+    this.y = 0;
+    this.hp = kind === 'guard' ? 60 : kind === 'lurker' ? 35 : 30;
+    this.speed = kind === 'guard' ? CFG.ROBOT_SPEED * 0.75 : CFG.ROBOT_SPEED;
+    this.dmg   = kind === 'guard' ? CFG.ROBOT_SHOOT_DMG * 1.5 : CFG.ROBOT_SHOOT_DMG;
+    this.state = kind === 'lurker' ? 'hidden' : 'patrol';
+    this.patrol = patrolPoints.length ? patrolPoints : [[x, z]];
+    this.patrolIdx = 0;
+    this.alertCooldown = 0;
+    this.shootTimer = 0;
+    this.alive = true;
+    this.dropY = kind === 'lurker' ? ROOM_H : 0;
+
+    /* Build mesh — boxy humanoid drone */
+    const root = new THREE.Group();
+    const bodyColor = kind === 'guard' ? 0x4a1818 : kind === 'lurker' ? 0x2a0830 : 0x1a2a4a;
+    const matBody = new THREE.MeshStandardMaterial({ color: bodyColor, metalness: 0.7, roughness: 0.35 });
+    const matEye  = new THREE.MeshStandardMaterial({ color: 0x000000, emissive: 0xff2030, emissiveIntensity: 1.6 });
+
+    const torso = new THREE.Mesh(new THREE.BoxGeometry(0.7, 1.0, 0.45), matBody);
+    torso.position.y = 1.1;
+    root.add(torso);
+
+    const head = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.4, 0.42), matBody);
+    head.position.y = 1.8;
+    root.add(head);
+
+    const eye = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.1, 0.05), matEye);
+    eye.position.set(0, 1.82, 0.22);
+    root.add(eye);
+    this.eye = eye;
+    this.eyeMat = matEye;
+
+    const leg = (sx) => {
+      const l = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.95, 0.18), matBody);
+      l.position.set(sx, 0.5, 0);
+      return l;
+    };
+    this.legL = leg(-0.18); this.legR = leg(0.18);
+    root.add(this.legL); root.add(this.legR);
+
+    const arm = (sx) => {
+      const a = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.85, 0.16), matBody);
+      a.position.set(sx, 1.2, 0);
+      return a;
+    };
+    this.armL = arm(-0.46); this.armR = arm(0.46);
+    root.add(this.armL); root.add(this.armR);
+
+    /* Muzzle red blink point light */
+    /* No per-drone muzzle light. Eleven drones meant eleven PointLights sitting
+       at intensity 0, and a light at intensity 0 costs a lit one's full shader
+       work — that was 20% of the entire lighting budget emitting nothing. One
+       shared flash light is borrowed by whichever drone is firing (see
+       MuzzleFlash), which also keeps the scene's light count constant: a count
+       that changes forces Three.js to recompile every material's program. */
+
+    root.position.set(x, this.dropY, z);
+    scene.add(root);
+    this.root = root;
+    this.walkPhase = 0;
+  }
+
+  destroy() {
+    this.alive = false;
+    this.scene.remove(this.root);
+  }
+
+  /* Draw a bright thin tracer cylinder from the robot's muzzle to the player.
+     The mesh fades over ~140ms then is removed. */
+  _fireTracer(player) {
+    const sx = this.x + 0.46, sy = 1.2, sz = this.z;
+    /* Approximate muzzle world position by rotating local muzzle offset by robot yaw */
+    const ry = this.root.rotation.y;
+    const mx = this.x + Math.cos(ry) * 0.46 + Math.sin(ry) * 0.0;
+    const mz = this.z - Math.sin(ry) * 0.46 + Math.cos(ry) * 0.0;
+    const my = 1.2;
+    const ex = player.x, ey = CFG.PLAYER_HEIGHT - 0.2, ez = player.z;
+    const dx = ex - mx, dy = ey - my, dz = ez - mz;
+    const len = Math.hypot(dx, dy, dz);
+    if (len < 0.1) return;
+    const geom = new THREE.CylinderGeometry(0.025, 0.025, len, 6);
+    geom.translate(0, len / 2, 0);  /* origin at one end */
+    const mat = new THREE.MeshBasicMaterial({ color: 0xff3050, transparent: true, opacity: 0.95 });
+    const m = new THREE.Mesh(geom, mat);
+    m.position.set(mx, my, mz);
+    /* Aim cylinder y-axis along (dx,dy,dz) */
+    const up = new THREE.Vector3(0, 1, 0);
+    const dir = new THREE.Vector3(dx, dy, dz).normalize();
+    const quat = new THREE.Quaternion().setFromUnitVectors(up, dir);
+    m.quaternion.copy(quat);
+    this.scene.add(m);
+    /* Fade + remove */
+    const start = performance.now();
+    const tick = () => {
+      const k = (performance.now() - start) / 140;
+      if (k >= 1) { this.scene.remove(m); geom.dispose(); mat.dispose(); return; }
+      mat.opacity = 0.95 * (1 - k);
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  }
+
+  takeHit(dmg) {
+    this.hp -= dmg;
+    /* Flash eye white briefly */
+    this.eyeMat.emissive.setHex(0xffffff);
+    setTimeout(() => { if (this.alive) this.eyeMat.emissive.setHex(0xff2030); }, 60);
+    if (this.hp <= 0) return true;
+    /* Force alert */
+    if (this.state !== 'attack' && this.state !== 'chase' && this.state !== 'drop') this.state = 'alert';
+    return false;
+  }
+
+  canSee(player, world) {
+    const dx = player.x - this.x, dz = player.z - this.z;
+    const dist = Math.hypot(dx, dz);
+    if (dist > Game.instance._effective('robotViewDist')) return false;
+    /* Facing cone. CFG.ROBOT_VIEW_FOV existed but was never consulted, which
+       gave every drone 360-degree vision; you could not flank one. */
+    const fov = CFG.ROBOT_VIEW_FOV;
+    if (dist > 0.001 && fov < Math.PI * 2) {
+      const fx = Math.sin(this.yaw || 0), fz = Math.cos(this.yaw || 0);
+      if (fx || fz) {
+        const dot = (dx / dist) * fx + (dz / dist) * fz;
+        if (dot < Math.cos(fov / 2)) return false;
+      }
+    }
+    /* Exact segment-vs-AABB sweep. The previous version sampled the ray every
+       1.2m against walls 0.2m thick and missed them roughly five times in six. */
+    return !Robot._segmentHitsAnyWall(this.x, this.z, player.x, player.z, world.walls);
+  }
+
+  /* Slab method: returns true if the segment a->b crosses any wall box. */
+  static _segmentHitsAnyWall(ax, az, bx, bz, walls) {
+    const dx = bx - ax, dz = bz - az;
+    for (const w of walls) {
+      const x0 = w.x, x1 = w.x + w.w, z0 = w.z, z1 = w.z + w.d;
+      let t0 = 0, t1 = 1, ok = true;
+      for (const [p, q0, q1] of [[dx, x0 - ax, x1 - ax], [dz, z0 - az, z1 - az]]) {
+        if (Math.abs(p) < 1e-9) {
+          /* Parallel to this slab: only crosses if it starts inside it. */
+          if (q0 > 0 || q1 < 0) { ok = false; break; }
+          continue;
+        }
+        let ta = q0 / p, tb = q1 / p;
+        if (ta > tb) { const s = ta; ta = tb; tb = s; }
+        if (ta > t0) t0 = ta;
+        if (tb < t1) t1 = tb;
+        if (t0 > t1) { ok = false; break; }
+      }
+      if (ok && t1 >= 0 && t0 <= 1) return true;
+    }
+    return false;
+  }
+
+  update(dt, player, world, audio, onShoot) {
+    if (!this.alive) return;
+
+    /* Lurker: stay hidden in ceiling until player is close */
+    if (this.state === 'hidden') {
+      const d = Math.hypot(player.x - this.x, player.z - this.z);
+      if (d < 4.5) {
+        this.state = 'drop';
+        audio.stinger();
+        Game.instance.hud.scareFlash();
+      } else {
+        return;
+      }
+    }
+    if (this.state === 'drop') {
+      this.dropY -= dt * 12;
+      this.root.position.y = this.dropY;
+      if (this.dropY <= 0) { this.dropY = 0; this.state = 'chase'; }
+      return;
+    }
+
+    /* Eye dim while patrolling */
+    this.eyeMat.emissiveIntensity = (this.state === 'patrol') ? 0.7 : 1.8;
+
+    const sees = this.canSee(player, world);
+    if (sees && this.state === 'patrol') {
+      this.state = 'alert';
+      audio.alert();
+    }
+
+    let tx, tz;
+    if (this.state === 'patrol') {
+      const tgt = this.patrol[this.patrolIdx];
+      tx = tgt[0]; tz = tgt[1];
+      const distToWp = Math.hypot(tx - this.x, tz - this.z);
+      if (distToWp < 0.6) {
+        this.patrolIdx = (this.patrolIdx + 1) % this.patrol.length;
+        this._wpStall = 0; this._wpBest = Infinity;
+      } else {
+        /* Give up on a waypoint we are not actually getting closer to. Without
+           this, a waypoint inside a wall pins the drone against that wall for
+           the rest of the run, because it can never close to 0.6. */
+        if (this._wpBest === undefined || distToWp < this._wpBest - 0.15) {
+          this._wpBest = distToWp; this._wpStall = 0;
+        } else {
+          this._wpStall = (this._wpStall || 0) + dt;
+          if (this._wpStall > 4) {
+            this.patrolIdx = (this.patrolIdx + 1) % this.patrol.length;
+            this._wpStall = 0; this._wpBest = Infinity;
+          }
+        }
+      }
+    } else {
+      /* alert / chase / attack — go to last-known player pos */
+      tx = player.x; tz = player.z;
+    }
+
+    const dx = tx - this.x, dz = tz - this.z;
+    const dist = Math.hypot(dx, dz) || 1;
+    const dirx = dx / dist, dirz = dz / dist;
+
+    /* Move (skip when shooting at close range) */
+    const shouldMove = !(this.state !== 'patrol' && dist < 6 && sees);
+    if (shouldMove) {
+      const sp = this.state === 'patrol' ? this.speed * 0.5 : this.speed;
+      const nx = this.x + dirx * sp * dt;
+      const nz = this.z + dirz * sp * dt;
+      const [fx, fz] = world.resolveMove(this.x, this.z, nx, nz, 0.35);
+      this.x = fx; this.z = fz;
+      this.walkPhase += dt * 6;
+      this.legL.rotation.x = Math.sin(this.walkPhase) * 0.5;
+      this.legR.rotation.x = -Math.sin(this.walkPhase) * 0.5;
+      this.armL.rotation.x = -Math.sin(this.walkPhase) * 0.3;
+      this.armR.rotation.x =  Math.sin(this.walkPhase) * 0.3;
+    }
+
+    /* Face target */
+    this.root.position.set(this.x, this.dropY, this.z);
+    this.root.rotation.y = Math.atan2(dirx, dirz);
+
+    /* Shoot */
+    this.shootTimer -= dt;
+    if (this.state !== 'patrol' && sees && dist < CFG.ROBOT_SHOOT_RANGE && this.shootTimer <= 0) {
+      this._fireTracer(player);
+      onShoot(this, this.dmg);
+      this.shootTimer = Game.instance._effective('robotShootInterval');
+      MuzzleFlash.fireAt(this);
+    }
+
+    /* If lost sight a long time, return to patrol */
+    if (!sees && this.state !== 'patrol') {
+      this.alertCooldown += dt;
+      if (this.alertCooldown > 6) { this.state = 'patrol'; this.alertCooldown = 0; }
+    } else {
+      this.alertCooldown = 0;
+    }
+  }
+}
+
+/* ──────────────────────────── PLAYER ──────────────────────────────────── */
+class Player {
+  constructor(camera) {
+    this.cam = camera;
+    this.x = 0; this.y = CFG.PLAYER_HEIGHT; this.z = 0;
+    this.yaw = 0;        /* full 360 horizontal */
+    this.pitch = 0;      /* clamped vertical */
+    this.vy = 0;
+    this.onGround = true;
+    /* HP and reserve are set from difficulty by Game.setDifficulty() right after construction. */
+    this.hp = CFG.PLAYER_HP;
+    this.ammo = CFG.PISTOL_MAG;
+    this.reserve = CFG.PISTOL_RESERVE;
+    this.maxHp = CFG.PLAYER_HP;
+    this.reloading = false;
+    this.reloadTimer = 0;
+    this.fireCooldown = 0;
+    this.keys = [false, false, false];
+    this.flashlightOn = true;
+    this.invuln = 0;
+    this.kills = 0;
+    this.visited = new Set();
+  }
+  setSpawn(x, z, yaw) {
+    this.x = x; this.z = z;
+    this.yaw = yaw || 0;
+    this.pitch = 0;
+    this.cam.position.set(x, CFG.PLAYER_HEIGHT, z);
+  }
+  /* Apply raw mouse deltas to yaw/pitch */
+  look(dx, dy) {
+    this.yaw   -= dx * CFG.MOUSE_SENS;
+    this.pitch -= dy * CFG.MOUSE_SENS;
+    if (this.pitch >  CFG.PITCH_LIMIT) this.pitch =  CFG.PITCH_LIMIT;
+    if (this.pitch < -CFG.PITCH_LIMIT) this.pitch = -CFG.PITCH_LIMIT;
+    /* Keep yaw in [-π, π] for tidy debugging */
+    if (this.yaw >  Math.PI) this.yaw -= 2 * Math.PI;
+    if (this.yaw < -Math.PI) this.yaw += 2 * Math.PI;
+  }
+  /* Returns unit forward vector (Three.js: -z is forward when yaw=0) */
+  forward() {
+    const cy = Math.cos(this.pitch), sy = Math.sin(this.pitch);
+    const cx = Math.cos(this.yaw),   sx = Math.sin(this.yaw);
+    return new THREE.Vector3(-sx * cy, sy, -cx * cy);
+  }
+  hasAllKeys() { return this.keys.every(k => k); }
+}
+
+/* ──────────────────────────── HUD ─────────────────────────────────────── */
+class Hud {
+  constructor() {
+    this.el = {
+      timer:    document.getElementById('timer'),
+      obj:      document.getElementById('objText'),
+      zone:     document.getElementById('zoneName'),
+      ammoCur:  document.getElementById('ammoCur'),
+      ammoMag:  document.getElementById('ammoMag'),
+      hpfill:   document.getElementById('hpfill'),
+      hpbar:    document.getElementById('hpbar'),
+      keys:     [0,1,2].map(i => document.getElementById('k' + i)),
+      prompt:   document.getElementById('prompt'),
+      damage:   document.getElementById('damage'),
+      crosshair:document.getElementById('crosshair'),
+      flicker:  document.getElementById('flicker'),
+      scare:    document.getElementById('scare'),
+      sunglow:  document.getElementById('sunglow'),
+      subtitle: document.getElementById('subtitle'),
+      dmgArrow: document.getElementById('dmgArrow'),
+    };
+  }
+  /* angleRad: 0 = directly in front of player, π = behind, π/2 = right, -π/2 = left */
+  damageFromDir(angleRad) {
+    const deg = angleRad * 180 / Math.PI;
+    this.el.dmgArrow.style.transform = `rotate(${deg}deg)`;
+    this.el.dmgArrow.style.opacity = '1';
+    clearTimeout(this._dmgArrT);
+    this._dmgArrT = setTimeout(() => this.el.dmgArrow.style.opacity = '0', 600);
+  }
+  setTime(s) {
+    const mm = Math.floor(s / 60), ss = Math.floor(s % 60);
+    this.el.timer.textContent = `${String(mm).padStart(2,'0')}:${String(ss).padStart(2,'0')}`;
+    this.el.timer.classList.toggle('warn', s < 300 && s >= 60);
+    this.el.timer.classList.toggle('crit', s < 60);
+  }
+  setObjective(t) { this.el.obj.textContent = t; }
+  setZone(t)      { this.el.zone.textContent = t; }
+  setHp(hp, maxHp) {
+    const m = maxHp || 100;
+    const pct = Math.max(0, Math.min(100, (hp / m) * 100));
+    this.el.hpfill.style.width = pct + '%';
+    this.el.hpbar.classList.toggle('low', pct < 50);
+    this.el.hpbar.classList.toggle('crit', pct < 25);
+  }
+  setAmmo(cur, mag) {
+    this.el.ammoCur.textContent = cur;
+    this.el.ammoMag.textContent = mag;
+  }
+  setKeys(arr) {
+    arr.forEach((has, i) => this.el.keys[i].classList.toggle('has', has));
+  }
+  setPrompt(text) {
+    if (text) { this.el.prompt.textContent = text; this.el.prompt.style.display = 'block'; }
+    else this.el.prompt.style.display = 'none';
+  }
+  damageFlash() {
+    this.el.damage.style.opacity = '1';
+    setTimeout(() => this.el.damage.style.opacity = '0', 120);
+  }
+  scareFlash() {
+    this.el.scare.style.background = 'rgba(255,40,60,.35)';
+    setTimeout(() => this.el.scare.style.background = 'rgba(255,40,60,0)', 250);
+  }
+  flickerHud() {
+    this.el.flicker.style.background = 'rgba(255,255,255,.18)';
+    setTimeout(() => this.el.flicker.style.background = 'rgba(255,255,255,0)', 40);
+  }
+  setCrosshairHot(b) { this.el.crosshair.classList.toggle('hot', b); }
+  setSunGlow(intensity) {
+    /* intensity 0..1 */
+    const a = Math.min(1, intensity);
+    this.el.sunglow.style.background =
+      `radial-gradient(ellipse at top,rgba(255,150,80,${a * 0.5}) 0%,rgba(255,80,40,${a * 0.18}) 30%,transparent 65%)`;
+  }
+  subtitle(t, durMs = 4000) {
+    this.el.subtitle.textContent = t;
+    this.el.subtitle.style.display = 'block';
+    clearTimeout(this._subT);
+    this._subT = setTimeout(() => this.el.subtitle.style.display = 'none', durMs);
+  }
+}
+
+/* ──────────────────────────── GAME ────────────────────────────────────── */
+class Game {
+  constructor() {
+    Game.instance = this;
+    this.renderer = null;
+    this.scene = null;
+    this.camera = null;
+    this.controls = null;
+    this.world = null;
+    this.player = null;
+    this.hud = new Hud();
+    this.audio = new Audio();
+    this.input = { fwd:0, side:0, jump:false, run:false, fire:false };
+    this.keysDown = {};
+    this.last = 0;
+    this.running = false;
+    this.paused = false;
+    this.outcome = null;
+    this.flashlight = null;
+    this.scareScheduled = 0;
+    this.firstShotFired = false;
+    /* Difficulty default; overridden by selector before BEGIN is clicked. */
+    this.diffKey = 'normal';
+    this.diff = DIFFICULTY.normal;
+    this.timeLeft = this.diff.timeS;
+  }
+
+  /* Single source of truth for difficulty-scaled values. */
+  _effective(key) {
+    switch (key) {
+      case 'robotDmgMul':       return this.diff.robotDmgMul;
+      case 'robotViewDist':     return CFG.ROBOT_VIEW_DIST * this.diff.robotViewMul;
+      case 'robotShootInterval':return CFG.ROBOT_SHOOT_INTERVAL * this.diff.robotShootIntMul;
+      case 'ammoPickup':        return this.diff.ammoPickup;
+      case 'medkitHeal':        return this.diff.medkitHeal;
+    }
+    return 0;
+  }
+
+  setDifficulty(key) {
+    if (!DIFFICULTY[key]) return;
+    this.diffKey = key;
+    this.diff = DIFFICULTY[key];
+    this.timeLeft = this.diff.timeS;
+    if (this.player) {
+      this.player.maxHp = this.diff.hp;
+      this.player.hp = this.diff.hp;
+      this.player.reserve = this.diff.pistolReserve;
+      this.hud.setHp(this.player.hp, this.player.maxHp);
+      this.hud.setAmmo(this.player.ammo, this.player.reserve);
+    }
+    this.hud.setTime(this.timeLeft);
+    if (window.fracture) window.fracture.save('difficulty', key);
+  }
+
+  async start() {
+    this._initRenderer();
+    this._initScene();
+    this._initWorld();
+    this._initPlayer();
+    this._initInput();
+    this.audio.init();
+    document.getElementById('loading').style.display = 'none';
+    this._loop = this._loop.bind(this);
+    requestAnimationFrame(this._loop);
+  }
+
+  _initRenderer() {
+    this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    this.renderer.setSize(window.innerWidth, window.innerHeight);
+    this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+    document.body.appendChild(this.renderer.domElement);
+    window.addEventListener('resize', () => {
+      this.renderer.setSize(window.innerWidth, window.innerHeight);
+      this.camera.aspect = window.innerWidth / window.innerHeight;
+      this.camera.updateProjectionMatrix();
+    });
+  }
+
+  _initScene() {
+    this.scene = new THREE.Scene();
+    this.scene.background = new THREE.Color(0x05050c);
+    this.scene.fog = new THREE.FogExp2(0x08090f, 0.042);
+    this.camera = new THREE.PerspectiveCamera(74, window.innerWidth / window.innerHeight, 0.05, 200);
+    this.camera.position.set(0, CFG.PLAYER_HEIGHT, 0);
+
+    const amb = new THREE.AmbientLight(0x202028, 0.45);
+    this.scene.add(amb);
+    this.ambient = amb;
+
+    /* Flashlight — SpotLight attached to camera */
+    this.flashlight = new THREE.SpotLight(0xffe6c0, 4.2, 26, Math.PI / 5.5, 0.4, 1.2);
+    this.flashlight.position.set(0, 0, 0);
+    this.camera.add(this.flashlight);
+    this.flashlight.target.position.set(0, 0, -1);
+    this.camera.add(this.flashlight.target);
+  }
+
+  _initWorld() {
+    this.world = new World(this.scene);
+    const W = this.world;
+
+    /* === CRYO BAY (spawn) === */
+    /* Big rectangle. Opening on north side leads to corridor. */
+    W.addRoom('CRYO BAY', 'cryo', -12, -8, 24, 16, 'cryo', {
+      openings: { n: [[10, 14]] },  /* gap at x=-12+10..-12+14 on north edge z=8 */
+    });
+    /* Decorative pods */
+    this._addCryoPods(-12, -8, 24, 16);
+
+    /* === CORRIDOR (spine) === */
+    /* From z=8 northward to z=8+60 = 68. Width 4. Offsets are local to this room. */
+    W.addRoom('CORRIDOR', 'corr', -2, 8, 4, 60, 'corr', {
+      openings: {
+        s: [[0, 4]],             /* full south edge open — passes into cryo's north gap */
+        n: [[1.0, 3.0]],         /* opens to bridge antechamber */
+        w: [[10, 14], [38, 42]], /* hydroponics (z=18..22), engine (z=46..50) */
+        e: [[20, 24]],           /* town dome (z=28..32) */
+      },
+    });
+
+    /* === HYDROPONICS === */
+    /* Located on west side, midway up corridor. */
+    W.addRoom('HYDROPONICS', 'hydro', -22, 18, 20, 18, 'hydro', {
+      openings: { e: [[0, 4]] },  /* east edge x=-2, gap z=18..22 */
+    });
+    this._addHydroDecor(-22, 18, 20, 18);
+
+    /* === TOWN DOME === */
+    /* On east side, mid-upper. */
+    W.addRoom('FRONTIER TOWN', 'town', 2, 28, 22, 20, 'town', {
+      openings: { w: [[0, 4]] },  /* west edge x=2, gap z=28..32 */
+    });
+    this._addTownDecor(2, 28, 22, 20);
+
+    /* === ENGINE DECK === */
+    /* On west side, upper. */
+    W.addRoom('ENGINE DECK', 'engine', -22, 46, 20, 16, 'engine', {
+      openings: { e: [[0, 4]] },  /* east edge x=-2, gap z=46..50 */
+    });
+    this._addEngineDecor(-22, 46, 20, 16);
+
+    /* === BRIDGE ANTECHAMBER === */
+    /* Small room at top of corridor */
+    W.addRoom('BRIDGE', 'bridge', -8, 68, 16, 14, 'bridge', {
+      openings: { s: [[7, 9]] },  /* aligns with corridor opening */
+    });
+    /* Bulkhead seals the corridor->bridge opening initially.
+       Corridor north edge is at z=68; opening x=-2+1..-2+3 = -1..1. */
+    W.addBulkhead(-1, 67.85, 2, 0.3);
+    /* Reroute console deep in bridge */
+    W.addRerouteConsole(0, 77);
+
+    /* === KEYS (one per side biome) === */
+    W.addPickup('key', -12, 27, { keyIdx: 0, biome: 'HYDROPONICS' });
+    W.addPickup('key',  13, 38, { keyIdx: 1, biome: 'TOWN' });
+    W.addPickup('key', -12, 50, { keyIdx: 2, biome: 'ENGINE' });
+
+    /* === AMMO & MEDKIT PICKUPS sprinkled === */
+    W.addPickup('ammo',  -8, 16);
+    W.addPickup('ammo',  0, 38);
+    W.addPickup('ammo', -8, 56);
+    W.addPickup('medkit', 6, 36);
+    W.addPickup('medkit', -18, 54);
+    W.addPickup('ammo', 12, 44);
+
+    /* === ROBOTS === */
+    /* Patrol drones in corridor */
+    W.addRobot('patrol', 0, 24, [[0, 16], [0, 30]]);
+    W.addRobot('patrol', 0, 50, [[0, 42], [0, 60]]);
+
+    /* Hydroponics guard */
+    W.addRobot('guard', -12, 22, [[-12, 22], [-16, 28], [-8, 30], [-12, 22]]);
+
+    /* Town drones */
+    W.addRobot('patrol', 10, 36, [[6, 30.5], [16, 31.5], [14.5, 42], [4.5, 42]]);
+    W.addRobot('patrol', 13, 44, [[13, 44], [10, 38]]);
+
+    /* Engine deck */
+    W.addRobot('guard', -10, 50, [[-10, 50], [-15, 55], [-6, 58], [-10, 50]]);
+    W.addRobot('patrol', -15, 56);
+
+    /* Lurker in corridor — drops on you */
+    W.addRobot('lurker', 0, 36, []);
+    W.addRobot('lurker', -8, 52, []);
+
+    /* Bridge guards (revealed at end) */
+    W.addRobot('guard', -3, 75, [[-3, 75], [3, 75]]);
+    W.addRobot('guard',  3, 79, [[ 3, 79], [-3, 79]]);
+
+    /* === Neon lighting + zone signage === */
+    this._addNeonSignage();
+  }
+
+  /* Called from BEGIN-click — extras whose count depends on chosen difficulty. */
+  _applyDifficultyWorldExtras() {
+    if (this.diff.extraLurkers) {
+      this.world.addRobot('lurker',  0, 18, []);
+      this.world.addRobot('lurker',  0, 44, []);
+      this.world.addRobot('lurker', -8, 65, []);
+    }
+  }
+
+  /* ─────────── Neon strips, arches, floor chevrons, zone signs ─────────── */
+  _addNeonSignage() {
+    /* CORRIDOR — continuous neon strips on both walls, color stages along Z */
+    const corridorStops = [
+      { z: 8,  color: 0x6aa8ff },   /* cryo end (blue) */
+      { z: 20, color: 0x80ffa0 },   /* hydro turnoff (green) */
+      { z: 32, color: 0xffd47a },   /* town turnoff (gold) */
+      { z: 50, color: 0xff8040 },   /* engine turnoff (orange) */
+      { z: 68, color: 0x80ffff },   /* bridge end (cyan) */
+    ];
+    for (let z = 8; z < 68; z += 1) {
+      const t = (z - 8) / 60;
+      const idx = Math.min(corridorStops.length - 2, Math.floor(t * (corridorStops.length - 1)));
+      const a = corridorStops[idx], b = corridorStops[idx + 1];
+      const localT = (z - a.z) / (b.z - a.z);
+      const ca = new THREE.Color(a.color), cb = new THREE.Color(b.color);
+      const col = ca.clone().lerp(cb, Math.max(0, Math.min(1, localT)));
+      this._addFloorStrip(-1.95, z, -1.85, z + 1, col);  /* west wall strip */
+      this._addFloorStrip( 1.85, z,  1.95, z + 1, col);  /* east wall strip */
+    }
+
+    /* FLOOR CHEVRONS along corridor — point +z */
+    for (let z = 12; z < 68; z += 6) {
+      this._addFloorChevron(0, z, 0, 0xa040ff);
+    }
+
+    /* ZONE ARCHWAYS — frame each doorway with a glowing rectangle */
+    /* Cryo → Corridor (z=8, x=-2..2) */
+    this._addArchway(-2, 2, 8, 4, WALL_H, 0x6aa8ff, 'CRYO');
+    /* Hydroponics entrance (corridor x=-2, opening z=18..22) */
+    this._addArchway(-2, -2, 18, 4, WALL_H, 0x80ffa0, 'HYDROPONICS', 'west');
+    /* Town entrance (corridor x=2, opening z=28..32) */
+    this._addArchway(2, 2, 28, 4, WALL_H, 0xffd47a, 'FRONTIER TOWN', 'east');
+    /* Engine entrance (corridor x=-2, opening z=46..50) */
+    this._addArchway(-2, -2, 46, 4, WALL_H, 0xff8040, 'ENGINE DECK', 'west');
+    /* Bridge entrance (corridor north, z=68, x=-1..1) — narrow opening */
+    this._addArchway(-1, 1, 68, 2, WALL_H, 0xff4060, 'BRIDGE', 'north');
+
+    /* SIDE-CHEVRONS at each branch */
+    this._addFloorChevron(-1.4, 20, -Math.PI / 2, 0x80ffa0);  /* hydro left */
+    this._addFloorChevron( 1.4, 30,  Math.PI / 2, 0xffd47a);  /* town right */
+    this._addFloorChevron(-1.4, 48, -Math.PI / 2, 0xff8040);  /* engine left */
+
+    /* OBJECTIVE BEACON pulses on each uncollected key location */
+    for (const p of this.world.pickups) {
+      if (p.kind !== 'key') continue;
+      const beam = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.08, 0.08, 6, 8),
+        new THREE.MeshBasicMaterial({ color: 0xffd47a, transparent: true, opacity: 0.35 })
+      );
+      beam.position.set(p.x, 3, p.z);
+      this.scene.add(beam);
+      p.beam = beam;
+    }
+  }
+
+  _addFloorStrip(x1, z1, x2, z2, color) {
+    const w = Math.abs(x2 - x1), d = Math.abs(z2 - z1);
+    const cx = (x1 + x2) / 2, cz = (z1 + z2) / 2;
+    const mat = new THREE.MeshBasicMaterial({ color });
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(Math.max(0.06, w), 0.08, Math.max(0.06, d)), mat);
+    mesh.position.set(cx, 0.04, cz);
+    this.scene.add(mesh);
+  }
+
+  _addFloorChevron(x, z, rotY, color) {
+    /* Two thin emissive bars forming a ">" pointing forward (=z+) */
+    const mat = new THREE.MeshBasicMaterial({ color });
+    const a = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.04, 0.9), mat);
+    const b = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.04, 0.9), mat);
+    const g = new THREE.Group();
+    a.position.set(-0.32, 0.05, 0); a.rotation.y = -Math.PI / 4;
+    b.position.set( 0.32, 0.05, 0); b.rotation.y =  Math.PI / 4;
+    g.add(a); g.add(b);
+    g.position.set(x, 0, z);
+    g.rotation.y = rotY;
+    this.scene.add(g);
+  }
+
+  /*
+   * Build a U-shaped neon archway around a doorway gap, plus a zone-name sign.
+   *   gx1..gx2 / gz1..gz2: the gap span (one dimension equals the wall thickness).
+   *   `side` controls which way the sign faces:
+   *     'east'  — door is on east wall, sign faces +x (into the corridor)
+   *     'west'  — door is on west wall, sign faces -x
+   *     'north' — door is on north wall, sign faces +z
+   *     undefined (south) — sign faces -z
+   */
+  _addArchway(gx1, gx2, gz, gWidth, gHeight, color, label, side) {
+    const isHorizontal = gx1 !== gx2;   /* doorway in north/south wall, span along x */
+    const mat = new THREE.MeshBasicMaterial({ color });
+    const accent = new THREE.PointLight(color, 1.1, 7, 1.6);
+    accent.position.set((gx1 + gx2) / 2, gHeight * 0.7, gz);
+    this.scene.add(accent);
+    this.world.lights.push({ light: accent, baseIntensity: 1.1, flicker: false, zone: label });
+
+    /* Build three frame bars: left vertical, right vertical, top horizontal */
+    const barT = 0.12;
+    if (isHorizontal) {
+      const w = gx2 - gx1;
+      /* left vertical */
+      let bar = new THREE.Mesh(new THREE.BoxGeometry(barT, gHeight, barT), mat);
+      bar.position.set(gx1, gHeight / 2, gz);
+      this.scene.add(bar);
+      /* right vertical */
+      bar = new THREE.Mesh(new THREE.BoxGeometry(barT, gHeight, barT), mat);
+      bar.position.set(gx2, gHeight / 2, gz);
+      this.scene.add(bar);
+      /* top horizontal */
+      bar = new THREE.Mesh(new THREE.BoxGeometry(w + barT, barT, barT), mat);
+      bar.position.set((gx1 + gx2) / 2, gHeight, gz);
+      this.scene.add(bar);
+    } else {
+      /* doorway in west/east wall — gz is treated as span start, gWidth is along z */
+      const gz1 = gz, gz2 = gz + gWidth, xWall = gx1;
+      let bar = new THREE.Mesh(new THREE.BoxGeometry(barT, gHeight, barT), mat);
+      bar.position.set(xWall, gHeight / 2, gz1);
+      this.scene.add(bar);
+      bar = new THREE.Mesh(new THREE.BoxGeometry(barT, gHeight, barT), mat);
+      bar.position.set(xWall, gHeight / 2, gz2);
+      this.scene.add(bar);
+      bar = new THREE.Mesh(new THREE.BoxGeometry(barT, barT, gWidth + barT), mat);
+      bar.position.set(xWall, gHeight, (gz1 + gz2) / 2);
+      this.scene.add(bar);
+    }
+
+    /* Zone-name sign */
+    this._addZoneSign(label, gx1, gx2, gz, gWidth, gHeight, color, side, isHorizontal);
+  }
+
+  _addZoneSign(text, gx1, gx2, gz, gWidth, gHeight, color, side, isHorizontal) {
+    const cv = document.createElement('canvas');
+    cv.width = 512; cv.height = 128;
+    const ctx = cv.getContext('2d');
+    ctx.fillStyle = 'rgba(8,4,18,0.92)';
+    ctx.fillRect(0, 0, cv.width, cv.height);
+    /* left bar */
+    ctx.fillStyle = '#' + new THREE.Color(color).getHexString();
+    ctx.fillRect(0, 0, 8, cv.height);
+    ctx.fillRect(cv.width - 8, 0, 8, cv.height);
+    /* text */
+    ctx.shadowColor = '#' + new THREE.Color(color).getHexString();
+    ctx.shadowBlur = 18;
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 56px "SF Mono", Menlo, monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(text, cv.width / 2, cv.height / 2 + 4);
+    const tex = new THREE.CanvasTexture(cv);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true });
+    const w = 4, h = 1;
+    const plane = new THREE.Mesh(new THREE.PlaneGeometry(w, h), mat);
+    if (isHorizontal) {
+      const cx = (gx1 + gx2) / 2;
+      plane.position.set(cx, gHeight + 0.7, gz + (side === 'north' ? 0.18 : -0.18));
+      if (side === 'north') plane.rotation.y = Math.PI;
+    } else {
+      const cz = gz + gWidth / 2;
+      plane.position.set(gx1 + (side === 'east' ? 0.18 : -0.18), gHeight + 0.7, cz);
+      plane.rotation.y = side === 'east' ? Math.PI / 2 : -Math.PI / 2;
+    }
+    this.scene.add(plane);
+  }
+
+  _addCryoPods(x, z, w, d) {
+    const matPod = new THREE.MeshStandardMaterial({ color: 0x1a2030, emissive: 0x305060, emissiveIntensity: 0.3, metalness: 0.6, roughness: 0.4 });
+    for (let i = 0; i < 6; i++) {
+      const px = x + 2 + (i % 3) * 7;
+      const pz = z + 2 + Math.floor(i / 3) * 10;
+      const pod = new THREE.Mesh(new THREE.BoxGeometry(2.4, 1.0, 1.0), matPod);
+      pod.position.set(px, 0.5, pz);
+      this.scene.add(pod);
+      this.world.walls.push({ x: px - 1.2, z: pz - 0.5, w: 2.4, d: 1.0, mesh: pod });
+    }
+  }
+
+  _addHydroDecor(x, z, w, d) {
+    /* Glowing plant tubes */
+    const matTube = new THREE.MeshStandardMaterial({ color: 0x103018, emissive: 0x40ff80, emissiveIntensity: 0.6, metalness: 0.2 });
+    for (let i = 0; i < 8; i++) {
+      const px = x + 2 + (i % 4) * 4.5;
+      const pz = z + 3 + Math.floor(i / 4) * 10;
+      const tube = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 2.4, 12), matTube);
+      tube.position.set(px, 1.2, pz);
+      this.scene.add(tube);
+      this.world.walls.push({ x: px - 0.5, z: pz - 0.5, w: 1.0, d: 1.0, mesh: tube });
+    }
+  }
+
+  _addTownDecor(x, z, w, d) {
+    /* Little house cubes */
+    const matH = new THREE.MeshStandardMaterial({ color: 0x4a3a2a, roughness: 0.85 });
+    const matR = new THREE.MeshStandardMaterial({ color: 0x6a3a2a, emissive: 0xffd47a, emissiveIntensity: 0.15, roughness: 0.7 });
+    const huts = [
+      [x + 3, z + 4, 4, 4], [x + 12, z + 5, 5, 4],
+      [x + 4, z + 12, 4, 5], [x + 14, z + 13, 4, 4],
+    ];
+    for (const [hx, hz, hw, hd] of huts) {
+      const body = new THREE.Mesh(new THREE.BoxGeometry(hw, 2.6, hd), matH);
+      body.position.set(hx + hw/2, 1.3, hz + hd/2);
+      this.scene.add(body);
+      const roof = new THREE.Mesh(new THREE.BoxGeometry(hw + 0.4, 0.4, hd + 0.4), matR);
+      roof.position.set(hx + hw/2, 2.8, hz + hd/2);
+      this.scene.add(roof);
+      this.world.walls.push({ x: hx, z: hz, w: hw, d: hd, mesh: body });
+    }
+    /* A flickering streetlamp */
+    const lampPost = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 3.6, 6),
+      new THREE.MeshStandardMaterial({ color: 0x222228 }));
+    lampPost.position.set(x + 11, 1.8, z + 10);
+    this.scene.add(lampPost);
+    const lamp = new THREE.PointLight(0xffd47a, 1.2, 14, 1.5);
+    lamp.position.set(x + 11, 3.4, z + 10);
+    this.scene.add(lamp);
+    this.world.lights.push({ light: lamp, baseIntensity: 1.2, flicker: true, zone: 'TOWN' });
+  }
+
+  _addEngineDecor(x, z, w, d) {
+    /* Big glowing reactor core in the middle */
+    const matCore = new THREE.MeshStandardMaterial({ color: 0x200808, emissive: 0xff5020, emissiveIntensity: 1.3, metalness: 0.4 });
+    const core = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 1.6, 4, 16), matCore);
+    core.position.set(x + w/2, 2, z + d/2);
+    this.scene.add(core);
+    this.world.walls.push({ x: x + w/2 - 1.6, z: z + d/2 - 1.6, w: 3.2, d: 3.2, mesh: core });
+    const coreL = new THREE.PointLight(0xff5020, 1.6, 20, 1.4);
+    coreL.position.set(x + w/2, 3, z + d/2);
+    this.scene.add(coreL);
+    this.world.lights.push({ light: coreL, baseIntensity: 1.6, flicker: true, zone: 'ENGINE' });
+
+    /* Pipes / pillars */
+    const matP = new THREE.MeshStandardMaterial({ color: 0x3a2018, metalness: 0.6, roughness: 0.4 });
+    const pipes = [[x + 3, z + 3], [x + 3, z + d - 3], [x + w - 3, z + 3], [x + w - 3, z + d - 3]];
+    for (const [px, pz] of pipes) {
+      const p = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.6, ROOM_H, 10), matP);
+      p.position.set(px, ROOM_H/2, pz);
+      this.scene.add(p);
+      this.world.walls.push({ x: px - 0.6, z: pz - 0.6, w: 1.2, d: 1.2, mesh: p });
+    }
+  }
+
+  _initPlayer() {
+    this.scene.add(this.camera);
+    this.player = new Player(this.camera);
+    /* Spawn facing the corridor exit (yaw = π → forward = +z) */
+    this.player.setSpawn(0, -2, Math.PI);
+    /* Apply difficulty values now that player exists */
+    this.player.hp = this.diff.hp;
+    this.player.maxHp = this.diff.hp;
+    this.player.reserve = this.diff.pistolReserve;
+  }
+
+  _initInput() {
+    document.addEventListener('keydown', e => {
+      if (e.code === 'Escape' || e.code === 'KeyP') {
+        if (this.running) this._requestUnlock();
+      }
+      this.keysDown[e.code] = true;
+      if (e.code === 'KeyF') this._toggleFlashlight();
+      if (e.code === 'KeyR') this._reload();
+      if (e.code === 'KeyE') this._interact();
+    });
+    document.addEventListener('keyup', e => { this.keysDown[e.code] = false; });
+    /* L cycles the light budget. Lighting is ~90% of this scene's frame cost
+       and the right number depends entirely on the GPU, so it is a dial rather
+       than a constant. */
+    document.addEventListener('keydown', e => {
+      if (e.code !== 'KeyL' || !this.lightBudget) return;
+      const steps = [8, 16, 24, 99];
+      const i = steps.indexOf(this.lightBudget.budget);
+      const next = steps[(i + 1) % steps.length];
+      this.lightBudget.budget = next;
+      this.lightBudget._acc = 99;
+      this.lightBudget.update(this.camera, 1);
+      const shown = Math.min(next, this.lightBudget.pool.length);
+      this.hud.subtitle(`LIGHTS: ${next >= 99 ? 'ALL' : shown} / ${this.lightBudget.pool.length}` +
+                        `${next >= 99 ? ' (slowest)' : ''}`, 2200);
+      if (window.fracture) window.fracture.save('lightBudget', next);
+    });
+    /* A key released while the window is not focused never reports a keyup, so
+       drop everything held whenever focus or pointer lock goes away. */
+    const releaseAll = () => {
+      this.keysDown = {};
+      if (this.input) { this.input.fire = false; this.input.jump = false; }
+    };
+    window.addEventListener('blur', releaseAll);
+    document.addEventListener('visibilitychange', () => { if (document.hidden) releaseAll(); });
+    document.addEventListener('mousedown', e => {
+      if (e.button === 0) {
+        this.input.fire = true;
+        /* Click-to-lock if not locked yet */
+        if (this.running && !this._isLocked()) this._requestLock();
+      }
+    });
+    document.addEventListener('mouseup',   e => { if (e.button === 0) this.input.fire = false; });
+
+    /* Raw mouse — yaw/pitch on the Player when pointer-locked. */
+    document.addEventListener('mousemove', e => {
+      if (!this._isLocked() || !this.running || this.paused) return;
+      this.player.look(e.movementX || 0, e.movementY || 0);
+    });
+
+    document.addEventListener('pointerlockchange', () => {
+      if (this._isLocked()) {
+        document.getElementById('pauseUI').classList.add('hidden');
+        this.paused = false;
+      } else if (this.running && !this.outcome) {
+        document.getElementById('pauseUI').classList.remove('hidden');
+        this.paused = true;
+      }
+    });
+
+    /* Difficulty selector */
+    const diffBtns = document.querySelectorAll('.diffBtn');
+    const pickDiff = key => {
+      this.setDifficulty(key);
+      diffBtns.forEach(b => b.classList.toggle('sel', b.dataset.diff === key));
+    };
+    diffBtns.forEach(b => b.addEventListener('click', () => pickDiff(b.dataset.diff)));
+    /* Load persisted choice if present */
+    if (window.fracture) {
+      window.fracture.read('difficulty').then(saved => {
+        if (this.running || this.outcome) return;   /* too late to change the run */
+        if (saved && DIFFICULTY[saved]) pickDiff(saved);
+      });
+    }
+    /* Apply default */
+    pickDiff(this.diffKey);
+
+    document.getElementById('startBtn').addEventListener('click', () => {
+      document.getElementById('title').classList.add('hidden');
+      this.audio.init();
+      this._applyDifficultyWorldExtras();
+      MuzzleFlash.attach(this.scene);
+      this.lightBudget = new LightBudget(this.scene, CFG.LIGHT_BUDGET);
+      if (window.fracture) window.fracture.read('lightBudget').then(v => {
+        if (typeof v === 'number' && v > 0 && this.lightBudget){
+          this.lightBudget.budget = v; this.lightBudget._acc = 99;
+          this.lightBudget.update(this.camera, 1);
+        }
+      });
+      const pooled = this.lightBudget.collect();
+      this.lightBudget.update(this.camera, 1);
+      console.log(`[sunfall] light budget: ${Math.min(CFG.LIGHT_BUDGET, pooled)} of ${pooled} room lights live`);
+      this._requestLock();
+      this.running = true;
+      this.hud.subtitle(`DIFFICULTY: ${this.diff.label} — ${this.diff.hint.toUpperCase()}`, 5500);
+      setTimeout(() => this.hud.subtitle('THAW PROTOCOL TERMINATED. SHIP STATUS: CRITICAL.', 5500), 5700);
+      setTimeout(() => this.hud.subtitle('REROUTE BRIDGE. THREE KEYS REQUIRED.', 5000), 11400);
+    });
+    document.getElementById('retryBtn').addEventListener('click', () => location.reload());
+    document.getElementById('menuBtn').addEventListener('click',  () => location.reload());
+
+    document.getElementById('pauseUI').addEventListener('click', () => this._requestLock());
+  }
+
+  _isLocked() { return document.pointerLockElement === this.renderer.domElement; }
+  _requestLock() { try { this.renderer.domElement.requestPointerLock(); } catch (e) {} }
+  _requestUnlock() { try { document.exitPointerLock(); } catch (e) {} }
+
+  _toggleFlashlight() {
+    if (!this.running) return;
+    this.player.flashlightOn = !this.player.flashlightOn;
+    this.flashlight.intensity = this.player.flashlightOn ? 4.2 : 0;
+  }
+
+  _reload() {
+    if (!this.running || this.player.reloading) return;
+    if (this.player.ammo >= CFG.PISTOL_MAG || this.player.reserve <= 0) return;
+    this.player.reloading = true;
+    this.player.reloadTimer = CFG.PISTOL_RELOAD_S;
+    this.audio.reload();
+  }
+
+  _fire() {
+    if (this.player.reloading) return;
+    if (this.player.ammo <= 0) { this._reload(); return; }
+    this.player.ammo--;
+    this.audio.shot();
+    this.hud.setAmmo(this.player.ammo, this.player.reserve);
+    /* Camera-forward raycast */
+    const origin = new THREE.Vector3();
+    const dir = new THREE.Vector3();
+    this.camera.getWorldPosition(origin);
+    this.camera.getWorldDirection(dir);
+    /* Test robots first (closest within range) */
+    let bestT = CFG.PISTOL_RANGE, bestRobot = null;
+    for (const r of this.world.robots) {
+      if (!r.alive || r.state === 'hidden') continue;
+      /* Approximate robot as a vertical cylinder around (r.x, r.z) r=0.5, height 2 */
+      const t = this._raySegHit(origin, dir, r.x, r.z, 0.55, 0, 2.1);
+      if (t != null && t < bestT) { bestT = t; bestRobot = r; }
+    }
+    /* Test walls (so you can't shoot through them) */
+    for (const w of this.world.walls) {
+      const t = this._rayAabbHit(origin, dir, w);
+      if (t != null && t < bestT) { bestT = t; bestRobot = null; }
+    }
+    if (bestRobot) {
+      const dead = bestRobot.takeHit(CFG.PISTOL_DMG);
+      this.audio.hit();
+      if (dead) {
+        bestRobot.destroy();
+        this.player.kills++;
+        if (Math.random() < 0.6) {
+          this.world.addPickup(Math.random() < 0.5 ? 'ammo' : 'medkit', bestRobot.x, bestRobot.z);
+        }
+      }
+    }
+    this.player.fireCooldown = 60 / CFG.PISTOL_RPM;
+    /* Sun ramp first shot trigger */
+    if (!this.firstShotFired) {
+      this.firstShotFired = true;
+    }
+  }
+
+  _raySegHit(origin, dir, cx, cz, r, ymin, ymax) {
+    /* Project onto XZ; circle intersection with ray (origin + t*dir) */
+    const ox = origin.x - cx, oz = origin.z - cz;
+    const dx = dir.x, dz = dir.z;
+    const a = dx*dx + dz*dz;
+    if (a < 1e-6) return null;
+    const b = 2 * (ox*dx + oz*dz);
+    const c = ox*ox + oz*oz - r*r;
+    const disc = b*b - 4*a*c;
+    if (disc < 0) return null;
+    const t = (-b - Math.sqrt(disc)) / (2 * a);
+    if (t < 0) return null;
+    /* Check y in range */
+    const y = origin.y + dir.y * t;
+    if (y < ymin || y > ymax) return null;
+    return t;
+  }
+
+  _rayAabbHit(origin, dir, w) {
+    /* Slab test against XZ AABB; y check vs WALL_H */
+    let tmin = -Infinity, tmax = Infinity;
+    const slab = (o, d, lo, hi) => {
+      if (Math.abs(d) < 1e-7) { return (o < lo || o > hi) ? null : true; }
+      let t1 = (lo - o) / d, t2 = (hi - o) / d;
+      if (t1 > t2) { const x = t1; t1 = t2; t2 = x; }
+      if (t1 > tmin) tmin = t1;
+      if (t2 < tmax) tmax = t2;
+      return tmax >= tmin && tmax >= 0;
+    };
+    if (!slab(origin.x, dir.x, w.x, w.x + w.w)) return null;
+    if (!slab(origin.z, dir.z, w.z, w.z + w.d)) return null;
+    if (!slab(origin.y, dir.y, 0, WALL_H)) return null;
+    return tmin > 0 ? tmin : null;
+  }
+
+  _interact() {
+    if (!this.running) return;
+    for (const it of this.world.interactables) {
+      const dx = it.x - this.player.x, dz = it.z - this.player.z;
+      if (dx*dx + dz*dz > it.r * it.r) continue;
+      if (it.kind === 'bulkhead') {
+        if (this.player.hasAllKeys()) {
+          this.world.openBulkhead();
+          this.audio.pickup();
+          this.hud.subtitle('BULKHEAD UNSEALED. BRIDGE EXPOSED.', 5000);
+        } else {
+          this.hud.subtitle(`KEYS REMAINING: ${3 - this.player.keys.filter(Boolean).length}`, 2500);
+        }
+      } else if (it.kind === 'reroute') {
+        this._end('win');
+      }
+      return;
+    }
+  }
+
+  _onRobotShoot(r, dmg) {
+    if (this.player.invuln > 0) return;
+    /* Apply scaled damage */
+    const scaled = dmg * this._effective('robotDmgMul');
+    this.player.hp -= scaled;
+    this.audio.dmg();
+    this.hud.damageFlash();
+    /* Direction-to-shooter, relative to camera forward */
+    const dx = r.x - this.player.x, dz = r.z - this.player.z;
+    const worldAng = Math.atan2(dx, dz);          /* shooter direction in world */
+    const camAng   = this.player.yaw + Math.PI;   /* camera "forward" world angle (yaw=0 → +z forward? our forward = -z when yaw=0). Adjust below. */
+    /* In our convention forward at yaw=0 is -z, so the world angle of "forward" is atan2(0,-1)=π.
+       Player faces atan2(sin(yaw), -cos(yaw)) but for HUD we just need shooter relative to camera-look:
+       compute the signed yaw difference. */
+    const forwardWorldAng = Math.atan2(-Math.sin(this.player.yaw), -Math.cos(this.player.yaw));
+    let rel = -(worldAng - forwardWorldAng);   /* CSS rotate is mirrored vs atan2(x,z) */
+    while (rel >  Math.PI) rel -= 2 * Math.PI;
+    while (rel < -Math.PI) rel += 2 * Math.PI;
+    this.hud.damageFromDir(rel);
+    this.player.invuln = 0.35;
+    if (this.player.hp <= 0) {
+      this.player.hp = 0;
+      this._end('dead');
+    }
+  }
+
+  _end(kind) {
+    if (this.outcome) return;
+    this.outcome = kind;
+    this.running = false;
+    try { document.exitPointerLock(); } catch (e) {}
+    document.body.style.cursor = 'auto';
+    const end = document.getElementById('end');
+    end.className = 'overlay ' + (kind === 'win' ? 'win' : kind === 'burn' ? 'burn' : 'dead');
+    end.classList.remove('hidden');
+    document.getElementById('pauseUI').classList.add('hidden');
+    const t = document.getElementById('endTitle');
+    const s = document.getElementById('endSub');
+    const stats = document.getElementById('endStats');
+    if (kind === 'win') {
+      t.textContent = 'REROUTED';
+      s.textContent = 'HELIOGARDE PULLS FROM THE STAR';
+    } else if (kind === 'burn') {
+      t.textContent = 'BURNED';
+      s.textContent = 'HULL TEMPERATURE EXCEEDED';
+    } else {
+      t.textContent = 'TERMINATED';
+      s.textContent = 'CRYOSLEEP — PERMANENT';
+    }
+    const remaining = Math.max(0, this.timeLeft);
+    const mm = Math.floor(remaining / 60), ss = Math.floor(remaining % 60);
+    stats.innerHTML = `
+      <div><span class="lbl">DIFFICULTY</span> ${this.diff.label}</div>
+      <div><span class="lbl">TIME REMAINING</span> ${String(mm).padStart(2,'0')}:${String(ss).padStart(2,'0')}</div>
+      <div><span class="lbl">KEYS COLLECTED</span> ${this.player.keys.filter(Boolean).length} / 3</div>
+      <div><span class="lbl">DRONES DESTROYED</span> ${this.player.kills}</div>
+      <div><span class="lbl">BIOMES VISITED</span> ${this.player.visited.size}</div>
+    `;
+    /* Persist run record */
+    const record = {
+      outcome: kind,
+      difficulty: this.diffKey,
+      time_remaining_s: remaining,
+      keys: this.player.keys.filter(Boolean).length,
+      kills: this.player.kills,
+      biomes: [...this.player.visited],
+      ts: Date.now(),
+    };
+    if (window.fracture) {
+      window.fracture.save('last_run', record);
+      window.fracture.read('runs').then(prev => {
+        const arr = Array.isArray(prev) ? prev : [];
+        arr.push(record);
+        window.fracture.save('runs', arr.slice(-50));
+      });
+    }
+  }
+
+  _loop(t) {
+    requestAnimationFrame(this._loop);
+    const dt = Math.min(0.05, (t - this.last) / 1000 || 0);
+    this.last = t;
+    if (!this.running || this.paused) {
+      this.renderer.render(this.scene, this.camera);
+      return;
+    }
+
+    /* === Timer === */
+    this.timeLeft -= dt;
+    if (this.timeLeft <= 0) { this.timeLeft = 0; this._end('burn'); return; }
+    this.hud.setTime(this.timeLeft);
+
+    /* === Sun glow ramp === */
+    const elapsedFrac = 1 - (this.timeLeft / (this.diff ? this.diff.timeS : CFG.TIME_LIMIT_S));
+    if (elapsedFrac > CFG.SUN_GROW_FROM) {
+      const k = (elapsedFrac - CFG.SUN_GROW_FROM) / (1 - CFG.SUN_GROW_FROM);
+      this.hud.setSunGlow(k);
+      /* Fog darkens, then reddens */
+      const c = new THREE.Color().lerpColors(new THREE.Color(0x07080f), new THREE.Color(0x1a0608), k);
+      this.scene.fog.color.copy(c);
+      this.scene.background.copy(c);
+    } else {
+      this.hud.setSunGlow(0);
+    }
+
+    /* === Movement === */
+    const k = this.keysDown;
+    this.input.fwd  = (k['KeyW'] ? 1 : 0) - (k['KeyS'] ? 1 : 0);
+    this.input.side = (k['KeyD'] ? 1 : 0) - (k['KeyA'] ? 1 : 0);
+    this.input.run  = !!k['ShiftLeft'] || !!k['ShiftRight'];
+    this.input.jump = !!k['Space'];
+
+    const speed = this.input.run ? CFG.RUN_SPEED : CFG.WALK_SPEED;
+    /* Horizontal forward (ignore pitch) — keeps walking from drifting up/down */
+    const yaw = this.player.yaw;
+    const fx = -Math.sin(yaw), fz = -Math.cos(yaw);  /* forward (yaw=0 → -z) */
+    const rx =  Math.cos(yaw), rz = -Math.sin(yaw);  /* right                 */
+    let vx = (fx * this.input.fwd + rx * this.input.side) * speed;
+    let vz = (fz * this.input.fwd + rz * this.input.side) * speed;
+    const len = Math.hypot(vx, vz);
+    if (len > speed) { vx = vx / len * speed; vz = vz / len * speed; }
+
+    const oldX = this.player.x, oldZ = this.player.z;
+    const nx = oldX + vx * dt, nz = oldZ + vz * dt;
+    const [px, pz] = this.world.resolveMove(oldX, oldZ, nx, nz, CFG.PLAYER_RADIUS);
+    this.player.x = px; this.player.z = pz;
+
+    /* Jump / gravity */
+    if (this.player.onGround && this.input.jump) {
+      this.player.vy = CFG.JUMP_VEL;
+      this.player.onGround = false;
+    }
+    this.player.vy -= CFG.GRAVITY * dt;
+    this.player.y += this.player.vy * dt;
+    if (this.player.y <= CFG.PLAYER_HEIGHT) {
+      this.player.y = CFG.PLAYER_HEIGHT;
+      this.player.vy = 0;
+      this.player.onGround = true;
+    }
+
+    /* Apply camera transform: position + yaw + pitch */
+    let camY = this.player.y;
+    if (this.input.fwd || this.input.side) {
+      const bobAmp = this.input.run ? 0.06 : 0.04;
+      const bobFreq = this.input.run ? 9 : 6;
+      camY += Math.sin(t * 0.001 * bobFreq) * bobAmp;
+    }
+    this.camera.position.set(this.player.x, camY, this.player.z);
+    /* Three.js default Euler order is 'XYZ'. We want yaw (Y) then pitch (X)
+       — easier with order 'YXZ'. */
+    this.camera.rotation.order = 'YXZ';
+    this.camera.rotation.y = this.player.yaw;
+    this.camera.rotation.x = this.player.pitch;
+    this.camera.rotation.z = 0;
+
+    /* Zone label */
+    const zone = this.world.zoneAt(this.player.x, this.player.z);
+    if (zone) {
+      this.hud.setZone(zone.name);
+      this.player.visited.add(zone.name);
+    }
+
+    /* === Fire === */
+    this.player.fireCooldown -= dt;
+    if (this.input.fire && this.player.fireCooldown <= 0 && !this.player.reloading) this._fire();
+    /* Reload progress */
+    if (this.player.reloading) {
+      this.player.reloadTimer -= dt;
+      if (this.player.reloadTimer <= 0) {
+        const need = CFG.PISTOL_MAG - this.player.ammo;
+        const take = Math.min(need, this.player.reserve);
+        this.player.ammo += take;
+        this.player.reserve -= take;
+        this.player.reloading = false;
+        this.hud.setAmmo(this.player.ammo, this.player.reserve);
+      }
+    }
+
+    /* === Robots === */
+    for (const r of this.world.robots) {
+      r.update(dt, this.player, this.world, this.audio, this._onRobotShoot.bind(this));
+    }
+
+    /* === Pickups === */
+    this.world.update(dt);
+    this.world.collectAt(this.player.x, this.player.z, p => {
+      this.audio.pickup();
+      if (p.kind === 'key') {
+        const i = p.data.keyIdx;
+        this.player.keys[i] = true;
+        this.hud.setKeys(this.player.keys);
+        const got = this.player.keys.filter(Boolean).length;
+        if (got === 3) {
+          this.hud.setObjective('REACH THE BRIDGE');
+          this.hud.subtitle('ALL KEYS RECOVERED. RETURN TO BRIDGE.', 5000);
+        } else {
+          this.hud.setObjective(`COLLECT KEYS — ${got} / 3`);
+          this.hud.subtitle(`KEY RECOVERED. ${3 - got} REMAINING.`, 3000);
+        }
+      } else if (p.kind === 'ammo') {
+        const amount = this._effective('ammoPickup');
+        this.player.reserve = Math.min(CFG.PISTOL_RESERVE * 2, this.player.reserve + amount);
+        this.hud.setAmmo(this.player.ammo, this.player.reserve);
+        this.hud.subtitle(`+${amount} ROUNDS`, 1500);
+      } else if (p.kind === 'medkit') {
+        const amount = this._effective('medkitHeal');
+        this.player.hp = Math.min(this.player.maxHp, this.player.hp + amount);
+        this.hud.setHp(this.player.hp, this.player.maxHp);
+        this.hud.subtitle(`+${amount} HP`, 1500);
+      }
+    });
+
+    /* === Interact prompt === */
+    let promptText = null;
+    for (const it of this.world.interactables) {
+      const dx = it.x - this.player.x, dz = it.z - this.player.z;
+      if (dx*dx + dz*dz < it.r * it.r) {
+        if (it.kind === 'bulkhead') {
+          promptText = this.player.hasAllKeys() ? 'UNSEAL BULKHEAD [E]' : `KEYS REQUIRED  ${this.player.keys.filter(Boolean).length}/3`;
+        } else if (it.kind === 'reroute') {
+          promptText = 'REROUTE SHIP [E]';
+        }
+        break;
+      }
+    }
+    this.hud.setPrompt(promptText);
+
+    /* === HUD updates === */
+    this.player.invuln = Math.max(0, this.player.invuln - dt);
+    this.hud.setHp(this.player.hp, this.player.maxHp);
+
+    /* === Crosshair hot === */
+    let hot = false;
+    const origin = new THREE.Vector3();
+    const dir = new THREE.Vector3();
+    this.camera.getWorldPosition(origin);
+    this.camera.getWorldDirection(dir);
+    for (const r of this.world.robots) {
+      if (!r.alive || r.state === 'hidden') continue;
+      const t2 = this._raySegHit(origin, dir, r.x, r.z, 0.55, 0, 2.1);
+      if (t2 != null && t2 < CFG.PISTOL_RANGE) { hot = true; break; }
+    }
+    this.hud.setCrosshairHot(hot);
+
+    /* === Scripted scares / flicker === */
+    this.scareScheduled -= dt;
+    if (this.scareScheduled <= 0) {
+      this.scareScheduled = 8 + Math.random() * 14;
+      /* Pick a random flickerable light and flicker it */
+      const flickerables = this.world.lights;
+      const L = flickerables[Math.floor(Math.random() * flickerables.length)];
+      if (L) this._flickerLight(L);
+      /* Occasional stinger if player is in dark zone */
+      if (Math.random() < 0.35) {
+        this.audio.stinger();
+        this.hud.scareFlash();
+      }
+    }
+
+    /* Keep the light budget pointed at wherever the player is standing. */
+    if (this.lightBudget) this.lightBudget.update(this.camera, dt);
+
+    this.renderer.render(this.scene, this.camera);
+  }
+
+  _flickerLight(L) {
+    const base = L.baseIntensity;
+    let count = 5 + Math.floor(Math.random() * 4);
+    const step = () => {
+      if (count-- <= 0) { L.light.intensity = base; return; }
+      L.light.intensity = Math.random() < 0.5 ? 0 : base * (0.5 + Math.random());
+      this.hud.flickerHud();
+      setTimeout(step, 40 + Math.random() * 80);
+    };
+    step();
+  }
+}
+
+/* ───────────────────── LIGHT BUDGET (see notes above) ─────────────────── */
+/*  Keeps exactly BUDGET room lights visible — the nearest ones — so the
+    fragment shader stays cheap without the light count ever changing, which
+    is what would force Three.js to recompile the scene's programs mid-walk.  */
+/*  One shared muzzle flash. It lives permanently in the scene so the light
+    count never moves; it is simply repositioned and re-lit for whichever drone
+    fires. Its slot is reserved out of the budget below, so total lights in the
+    shader stay pinned at exactly CFG.LIGHT_BUDGET no matter what is shooting. */
+const MuzzleFlash = {
+  light: null,
+  _off: null,
+  attach(scene) {
+    this.light = new THREE.PointLight(0xff3040, 0, 5, 2);
+    this.light.userData.noCull = true;
+    scene.add(this.light);
+  },
+  fireAt(robot) {
+    if (!this.light) return;
+    const ry = robot.root.rotation.y;
+    this.light.position.set(robot.x + Math.cos(ry) * 0.46, 1.2, robot.z - Math.sin(ry) * 0.46);
+    this.light.intensity = 4.0;
+    clearTimeout(this._off);
+    this._off = setTimeout(() => { if (this.light) this.light.intensity = 0; }, 100);
+  },
+};
+
+class LightBudget {
+  constructor(scene, budget = 10) {
+    this.budget = budget;
+    this.enabled = true;
+    this.pool = [];
+    this.scene = scene;
+    this._acc = 0;
+    this._tmp = new THREE.Vector3();
+  }
+  /* Collect every cullable point light once the world is built. Muzzle lights
+     are owned by the robots and manage their own visibility, so they are left
+     alone; the flashlight and the ambient are never culled. */
+  collect() {
+    this.pool.length = 0;
+    this.scene.traverse(o => {
+      if (o.isPointLight && !o.userData.noCull) this.pool.push(o);
+    });
+    return this.pool.length;
+  }
+  update(camera, dt) {
+    if (!this.enabled || this.pool.length === 0) return;
+    /* Re-sorting every frame is wasted work — lights do not move and the
+       camera walks. Four times a second is imperceptible and nearly free. */
+    this._acc += dt;
+    if (this._acc < 0.25) return;
+    this._acc = 0;
+    /* Pickup lights are removed from the scene when collected, which leaves a
+       dead reference here. Left in, the live count silently drops by one per
+       key and each drop recompiles the scene's shaders — the exact stutter the
+       fixed budget exists to avoid. Drop them before ranking. */
+    for (let i = this.pool.length - 1; i >= 0; i--) {
+      if (!this.pool[i].parent) this.pool.splice(i, 1);
+    }
+    const cp = camera.position;
+    for (const L of this.pool) {
+      L.getWorldPosition(this._tmp);
+      /* Rank by how far outside its own reach the camera is, so a small lamp
+         you are standing next to outranks a big one across the deck. */
+      L._rank = this._tmp.distanceTo(cp) - (L.distance || 0);
+    }
+    this.pool.sort((a, b) => a._rank - b._rank);
+    /* Reserve a slot for anything that opts out of culling (the muzzle flash),
+       so the total light count in the shader is invariant. */
+    let reserved = 0;
+    this.scene.traverse(o => { if (o.isPointLight && o.userData.noCull) reserved++; });
+    const n = Math.min(Math.max(0, this.budget - reserved), this.pool.length);
+    for (let i = 0; i < this.pool.length; i++) {
+      const want = i < n;
+      /* Muzzle-style lights aside, only touch .visible when it changes. */
+      if (this.pool[i].visible !== want) this.pool[i].visible = want;
+    }
+  }
+}
+
+/* ──────────────────────────── BOOT ────────────────────────────────────── */
+const game = new Game();
+window.__sunfall = game;  /* debug introspection only */
+game.start();
+
+</script>
+</body>
+</html>

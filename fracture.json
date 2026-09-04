@@ -1,0 +1,18 @@
+{
+  "name": "Present Palm",
+  "world": "Fracture City",
+  "version": "0.1.0",
+  "description": "Present Palm — the hub. An Avner Media app ecosystem around the Triaxial Orientation / Coherence framework and the Fracture City world.",
+  "created": "2026-06-02",
+  "renamed": "2026-06-08",
+  "schema_version": 1,
+  "shell": {
+    "slug": "present-palm",
+    "name": "Present Palm",
+    "version": "0.1.0"
+  },
+  "data_dir": "data",
+  "apps_dir": "apps",
+  "ideas_dir": "ideas",
+  "shared_dir": "shared"
+}

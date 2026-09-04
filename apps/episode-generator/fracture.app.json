@@ -1,0 +1,53 @@
+{
+  "slug": "episode-generator",
+  "name": "Episode Generator",
+  "version": "2.0.0",
+  "icon": "icon.png",
+  "entry": "index.html",
+  "runtime": "html5",
+  "description": "Causal story engine + motion-comic video output. Builds a season from one of 30 narrative archetype presets (Hero's Journey, Tragedy, Heist, Whodunit, Siege, Revenge, Betrayal, Locked Room, Coming of Age, and more), each a contract binding want, obstacle, climax and resolution so the parts cohere. Every episode runs a 9-beat dramatic spine (ordinary world -> inciting incident -> commitment -> first obstacle -> midpoint reversal -> escalation -> crisis -> climax -> resolution) against a StoryLedger that tracks what the protagonist knows, holds, owes and has lost, so scenes reference each other causally and threads carry between episodes. Location, time and weather are continuous. Includes a from-scratch Scene Builder with live art generation, and renders any episode as a 1280x720 WebM with animated portraits, camera motion and a procedural ambient score.",
+  "inputs": [
+    {
+      "type": "character.identity.v1",
+      "description": "Cast for the arc — characters appear in scenes across multiple episodes."
+    },
+    {
+      "type": "episode.outline.v1",
+      "description": "Optional. Use a pre-composed episode as render input instead of generating a new one."
+    }
+  ],
+  "outputs": [
+    {
+      "type": "episode.outline.v1",
+      "description": "Each generated episode is emitted as a standard episode.outline.v1 record."
+    },
+    {
+      "type": "video.episode.v1",
+      "description": "Metadata referencing the rendered video file (filename, duration, codec, dimensions, source episode)."
+    },
+    {
+      "type": "scene.custom.v1",
+      "description": "A scene built from scratch in the Scene Builder — setting, cast, shot, art overrides and script."
+    }
+  ],
+  "tags": [
+    "arc",
+    "archetypes",
+    "beat-sheet",
+    "continuity",
+    "episode",
+    "fracture-city",
+    "generator",
+    "production",
+    "render",
+    "scene-builder",
+    "show",
+    "story-engine",
+    "tv",
+    "video"
+  ],
+  "author": "Avner Media",
+  "license": "personal-use",
+  "window_width": 1400,
+  "window_height": 920
+}

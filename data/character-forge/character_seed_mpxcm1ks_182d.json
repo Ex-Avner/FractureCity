@@ -1,0 +1,73 @@
+{
+  "name": {
+    "first": "Orion",
+    "last": "Fenwick",
+    "full": "Orion Fenwick of the Hive Choir",
+    "origin_descriptor": "of the Hive Choir"
+  },
+  "epithet": "who remembered what no one had asked to be remembered",
+  "zone": "V",
+  "subtype": "The Burden-Bearer",
+  "class": "Weaver of Bond",
+  "stamp": "Abandonment",
+  "capture": "None",
+  "origin": "The Undercroft",
+  "age": "Ancient",
+  "physical": {
+    "build": "Tall",
+    "skin": "umber",
+    "hair": "grey at the temples",
+    "eyes": "grey",
+    "garment": "scholar wraps"
+  },
+  "mannerisms": [
+    "measures the height of doorframes by habit",
+    "declines invitations with elaborate politeness",
+    "has a notebook nobody is allowed to read",
+    "collects the names of streets they will not return to"
+  ],
+  "voice": "precise as cut glass and just as hard to argue with",
+  "aspiration": "to set the record straight before they go",
+  "fear": "the last person walking out without saying anything",
+  "gift": "they keep their word in conditions that release others from theirs",
+  "wound": "a parent who left and called it work",
+  "secret": "that they have been carrying a body, metaphorically, for decades",
+  "threads": [
+    {
+      "kind": "A friend",
+      "desc": "who left without an argument, and whose silence {name} still rehearses answers to"
+    },
+    {
+      "kind": "A parent",
+      "desc": "who left a letter that {name} has not finished reading"
+    },
+    {
+      "kind": "A rival",
+      "desc": "who has been chasing the same prize for so long that the chase is the friendship"
+    }
+  ],
+  "seed": "seed_mpxcm1ks_182d",
+  "timestamp": "2026-06-03T00:49:02.770Z",
+  "backstory": {
+    "origin": "Orion was born in The Undercroft, of the Hive Choir, the last child of a baker and a clerk.",
+    "weight": "The family is built on a series of leavings. Two generations back, a father vanished into work and never quite returned. Orion's parent learned to expect this kind of departure, and so did Orion.",
+    "fracture": "It was their grandmother's last week. Orion was twenty-eight, and they understood, suddenly and with no warning, that nobody else was going to carry what she had carried. They have been carrying it since.",
+    "between": "They drifted through a stretch of years that produced fewer stories than the decade before. Orion grew quieter, then briefly louder, then quieter again. There was a project — a letter to the council that took years — that almost worked.",
+    "present": "These days, Orion can be found at the same café most mornings. They have a stack of unanswered letters that they will not throw away, and a habit of lighting one candle before breakfast that even their oldest friends find slightly strange.",
+    "threadsIntro": "Three relationships, alive or otherwise, hold the architecture in place:",
+    "threads": [
+      {
+        "kind": "A friend",
+        "desc": "who left without an argument, and whose silence {name} still rehearses answers to"
+      },
+      {
+        "kind": "A parent",
+        "desc": "who left a letter that {name} has not finished reading"
+      },
+      {
+        "kind": "A rival",
+        "desc": "who has been chasing the same prize for so long that the chase is the friendship"
+      }
+    ]
+  }
+}

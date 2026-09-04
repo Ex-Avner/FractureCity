@@ -1,0 +1,53 @@
+{
+  "name": "present-palm",
+  "version": "0.1.0",
+  "description": "Present Palm — launcher and integration layer for the Avner Media app ecosystem (Coherence, Fracture City, the show pipeline)",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --mac"
+  },
+  "author": "Avner Media",
+  "license": "UNLICENSED",
+  "private": true,
+  "devDependencies": {
+    "electron": "^43.4.0",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.avnermedia.present-palm",
+    "productName": "Present Palm",
+    "directories": {
+      "output": "../dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "renderer/**/*",
+      "services/**/*",
+      "assets/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "../apps",
+        "to": "apps"
+      },
+      {
+        "from": "../shared",
+        "to": "shared"
+      },
+      {
+        "from": "../fracture.json",
+        "to": "fracture.json"
+      }
+    ],
+    "mac": {
+      "category": "public.app-category.productivity",
+      "icon": "assets/AppIcon.icns",
+      "target": [
+        "dmg",
+        "zip"
+      ]
+    }
+  }
+}

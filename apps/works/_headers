@@ -1,0 +1,30 @@
+# Cloudflare Pages _headers — security + caching for the static works site.
+# Docs: https://developers.cloudflare.com/pages/configuration/headers/
+
+/*
+  X-Frame-Options: SAMEORIGIN
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=()
+  # HSTS — once you're confident on HTTPS-only, this is the standard hardening
+  Strict-Transport-Security: max-age=31536000; includeSubDomains
+
+# Long-cache the immutable assets. Data JSON gets short cache so updates show up.
+/data/*
+  Cache-Control: public, max-age=300
+
+/shared/*
+  Cache-Control: public, max-age=86400
+
+# Don't cache the HTML shell — we want fresh deploys to roll out immediately.
+/index.html
+  Cache-Control: no-cache
+/
+  Cache-Control: no-cache
+
+# Vendored three.js (0.158.0). Version-pinned by content, not by filename, so
+# a day is the right cache — long enough to be free, short enough that swapping
+# the engine version actually reaches people.
+/shared/vendor/*
+  Cache-Control: public, max-age=86400
+  Content-Type: text/javascript; charset=utf-8

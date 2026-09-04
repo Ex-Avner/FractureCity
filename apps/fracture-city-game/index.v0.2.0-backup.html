@@ -1,0 +1,4211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Fracture City</title>
+<script>
+(function(){
+  if (window.fracture && window.fracture.shell) return;
+  const prefix = 'fracture::fracture-city-game::';
+  window.fracture = {
+    shell:false, appSlug:'fracture-city-game', received:null,
+    save(k,v){ try{ localStorage.setItem(prefix+k, JSON.stringify(v)); }catch(e){} return Promise.resolve(true); },
+    read(k){ try{ const r=localStorage.getItem(prefix+k); return Promise.resolve(r==null?null:JSON.parse(r)); }catch(e){ return Promise.resolve(null); } },
+    list(){ const o=[]; for(let i=0;i<localStorage.length;i++){ const k=localStorage.key(i); if(k&&k.startsWith(prefix)) o.push(k.slice(prefix.length)); } return Promise.resolve(o); },
+    delete(k){ localStorage.removeItem(prefix+k); return Promise.resolve(true); },
+    listApps(){ return Promise.resolve([]); },
+    openApp(){ return Promise.resolve({ok:false,error:'standalone'}); },
+    emit(){ return Promise.resolve(true); },
+    subscribe(){ return ()=>{}; },
+    onPayload(){},
+  };
+})();
+</script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+html,body{width:100%;height:100vh;overflow:hidden;background:#000;color:#e7e2ff;
+  font-family:'SF Mono','Menlo','Courier New',monospace;-webkit-font-smoothing:antialiased;user-select:none;cursor:none;}
+canvas{display:block;}
+
+#crosshair{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);
+  width:32px;height:32px;pointer-events:none;z-index:10;}
+/* center dot */
+#crosshair::before{content:'';position:absolute;left:50%;top:50%;
+  width:3px;height:3px;background:rgba(128,255,255,.95);
+  transform:translate(-50%,-50%);border-radius:50%;
+  box-shadow:0 0 4px rgba(128,255,255,.9),0 0 10px rgba(128,255,255,.4);}
+/* four tick marks via the outer box */
+#crosshair::after{content:'';position:absolute;inset:0;
+  background:
+    linear-gradient(to right,rgba(128,255,255,.85) 0 6px,transparent 6px 26px,rgba(128,255,255,.85) 26px 32px) center 0/100% 1.5px no-repeat,
+    linear-gradient(to right,rgba(128,255,255,.85) 0 6px,transparent 6px 26px,rgba(128,255,255,.85) 26px 32px) center 100%/100% 1.5px no-repeat,
+    linear-gradient(to bottom,rgba(128,255,255,.85) 0 6px,transparent 6px 26px,rgba(128,255,255,.85) 26px 32px) 0 center/1.5px 100% no-repeat,
+    linear-gradient(to bottom,rgba(128,255,255,.85) 0 6px,transparent 6px 26px,rgba(128,255,255,.85) 26px 32px) 100% center/1.5px 100% no-repeat;
+  filter:drop-shadow(0 0 4px rgba(128,255,255,.6));}
+#crosshair.hostile::before{background:#ff3050;box-shadow:0 0 6px rgba(255,80,100,1),0 0 14px rgba(255,80,100,.6);}
+#crosshair.hostile::after{
+  background:
+    linear-gradient(to right,#ff3050 0 6px,transparent 6px 26px,#ff3050 26px 32px) center 0/100% 1.5px no-repeat,
+    linear-gradient(to right,#ff3050 0 6px,transparent 6px 26px,#ff3050 26px 32px) center 100%/100% 1.5px no-repeat,
+    linear-gradient(to bottom,#ff3050 0 6px,transparent 6px 26px,#ff3050 26px 32px) 0 center/1.5px 100% no-repeat,
+    linear-gradient(to bottom,#ff3050 0 6px,transparent 6px 26px,#ff3050 26px 32px) 100% center/1.5px 100% no-repeat;
+  filter:drop-shadow(0 0 4px rgba(255,80,100,.8));}
+
+/* ════════════════════════════════════════════════════════════════
+   FRACTURE CITY — v0.4 cinematic upgrade
+   Angular panels (clip-path), scan lines, animated glows, hex framing,
+   chromatic aberration, film grain, distant skyline silhouette.
+   ════════════════════════════════════════════════════════════════ */
+#hud{position:fixed;inset:0;pointer-events:none;z-index:5;font-family:'SF Mono','Menlo',monospace;}
+/* — Angular hex-cut HUD panel — */
+.hud-panel{position:absolute;
+  background:linear-gradient(135deg,rgba(8,4,20,.82) 0%,rgba(14,8,32,.72) 100%);
+  padding:11px 18px;font-size:11px;letter-spacing:1.5px;line-height:1.6;
+  clip-path:polygon(10px 0,100% 0,100% calc(100% - 10px),calc(100% - 10px) 100%,0 100%,0 10px);
+  position:relative;}
+.hud-panel::before{content:'';position:absolute;inset:0;pointer-events:none;
+  clip-path:polygon(10px 0,100% 0,100% calc(100% - 10px),calc(100% - 10px) 100%,0 100%,0 10px,10px 0,10px 1px,1px 10px,1px calc(100% - 1px),calc(100% - 11px) calc(100% - 1px),calc(100% - 1px) calc(100% - 11px),calc(100% - 1px) 1px,11px 1px);
+  background:linear-gradient(135deg,rgba(180,140,255,.7) 0%,rgba(80,255,255,.55) 100%);}
+.hud-panel::after{content:'';position:absolute;inset:0;pointer-events:none;opacity:.18;
+  background:repeating-linear-gradient(0deg,transparent 0 2px,rgba(120,200,255,.18) 2px 3px);}
+.hud-panel .label{color:#a098d0;font-size:9px;letter-spacing:4px;text-transform:uppercase;
+  text-shadow:0 0 6px rgba(180,140,255,.35);font-weight:600;}
+.hud-panel .value{color:#80ffff;font-size:15px;letter-spacing:2.5px;
+  text-shadow:0 0 8px rgba(128,255,255,.55),0 0 2px rgba(128,255,255,.85);
+  font-weight:600;}
+#hud-credits{top:22px;right:22px;text-align:right;}
+#hud-credits .value{color:#ffd47a;text-shadow:0 0 10px rgba(255,212,122,.65),0 0 2px rgba(255,212,122,.9);}
+#hud-credits::after{background:repeating-linear-gradient(0deg,transparent 0 2px,rgba(255,212,122,.16) 2px 3px) !important;}
+#hud-task{top:18px;left:18px;max-width:340px;}
+#hud-task .value{color:#e7e2ff;font-size:12px;letter-spacing:1px;line-height:1.5;
+  font-family:'Inter',sans-serif;text-transform:none;}
+#hud-task .compass{display:inline-block;margin-right:8px;color:#ff60d0;font-size:13px;}
+#hud-mode{bottom:18px;left:18px;}
+#hud-district{bottom:96px;left:22px;color:#80ffff;font-size:10px;letter-spacing:4px;
+  background:linear-gradient(135deg,rgba(8,16,30,.78) 0%,rgba(8,20,40,.7) 100%);
+  padding:6px 14px;border-left:2px solid #80ffff;
+  text-transform:uppercase;font-weight:600;
+  text-shadow:0 0 8px rgba(128,255,255,.6);
+  box-shadow:0 0 14px rgba(128,255,255,.15);
+  animation:district-pulse 2.4s ease-in-out infinite;}
+@keyframes district-pulse{
+  0%,100%{box-shadow:0 0 14px rgba(128,255,255,.15);}
+  50%{box-shadow:0 0 22px rgba(128,255,255,.32);}
+}
+/* Construct-mode hotbar */
+/* Sits above the weapon bar so the two never overlap, and wraps on narrow windows */
+#build-hud{position:absolute;left:50%;bottom:132px;transform:translateX(-50%);
+  display:none;flex-direction:column;align-items:center;gap:5px;z-index:9;pointer-events:none;
+  max-width:min(94vw,880px);}
+#build-hud.show{display:flex;}
+#build-slots{display:flex;gap:3px;flex-wrap:wrap;justify-content:center;}
+.bslot{display:flex;align-items:center;gap:4px;padding:4px 7px;font-size:8px;letter-spacing:.5px;
+  background:rgba(8,4,20,.82);border:1px solid rgba(120,200,255,.22);color:#9c93c6;white-space:nowrap;}
+.bslot.sel{border-color:rgba(128,255,255,.9);color:#e7e2ff;box-shadow:0 0 14px rgba(128,255,255,.28);}
+.bsw{width:11px;height:11px;border:1px solid rgba(255,255,255,.25);display:inline-block;}
+#build-stats{font-size:9px;letter-spacing:2px;color:#7a6f9c;}
+#hud-controls{bottom:18px;right:18px;text-align:right;font-size:10px;letter-spacing:1px;color:#9c93c6;line-height:1.7;}
+#hud-controls kbd{display:inline-block;padding:1px 5px;background:rgba(40,20,80,.6);
+  border:1px solid rgba(120,200,255,.3);border-radius:2px;font-size:9px;color:#e7e2ff;margin:0 1px;font-family:inherit;}
+#hud-prompt{position:absolute;left:50%;top:60%;transform:translateX(-50%) translateY(0);
+  background:linear-gradient(135deg,rgba(8,4,20,.92) 0%,rgba(32,8,32,.88) 100%);
+  padding:12px 28px;
+  clip-path:polygon(12px 0,100% 0,calc(100% - 12px) 100%,0 100%);
+  font-size:13px;letter-spacing:3px;text-transform:uppercase;color:#fff;text-align:center;
+  box-shadow:0 0 30px rgba(255,96,208,.45),inset 0 0 18px rgba(255,96,208,.12);
+  text-shadow:0 0 12px rgba(255,140,220,.7);font-weight:600;
+  display:none;opacity:0;}
+#hud-prompt.show{display:block;animation:prompt-in .25s ease-out forwards;}
+@keyframes prompt-in{from{opacity:0;transform:translateX(-50%) translateY(8px);}to{opacity:1;transform:translateX(-50%) translateY(0);}}
+#hud-prompt::before{content:'';position:absolute;inset:0;pointer-events:none;
+  clip-path:polygon(12px 0,100% 0,calc(100% - 12px) 100%,0 100%,12px 0,12px 1px,1px calc(100% - 1px),calc(100% - 13px) calc(100% - 1px),calc(100% - 1px) 1px,13px 1px);
+  background:linear-gradient(135deg,#ff60d0 0%,#80ffff 100%);}
+#hud-prompt kbd{display:inline-block;padding:3px 10px;
+  background:linear-gradient(135deg,rgba(255,96,208,.5) 0%,rgba(255,140,220,.45) 100%);
+  border:1px solid rgba(255,180,230,.8);border-radius:3px;font-size:11px;color:#fff;
+  margin-right:10px;font-family:inherit;font-weight:bold;letter-spacing:1px;
+  text-shadow:0 0 6px rgba(255,255,255,.7);
+  box-shadow:0 0 12px rgba(255,96,208,.5),inset 0 0 8px rgba(255,255,255,.18);}
+#hud-speed{position:absolute;left:50%;bottom:74px;transform:translateX(-50%);
+  font-size:18px;letter-spacing:4px;color:#80ffff;font-weight:700;
+  text-shadow:0 0 12px rgba(128,255,255,.7),0 0 3px rgba(128,255,255,.9);
+  display:none;
+  background:linear-gradient(135deg,rgba(8,4,20,.85) 0%,rgba(8,32,40,.78) 100%);
+  padding:8px 22px;
+  clip-path:polygon(10px 0,100% 0,calc(100% - 10px) 100%,0 100%);}
+#hud-speed.show{display:block;}
+#hud-speed::before{content:'';position:absolute;inset:0;pointer-events:none;
+  clip-path:polygon(10px 0,100% 0,calc(100% - 10px) 100%,0 100%,10px 0,10px 1px,1px calc(100% - 1px),calc(100% - 11px) calc(100% - 1px),calc(100% - 1px) 1px,11px 1px);
+  background:linear-gradient(135deg,#80ffff 0%,#a040ff 100%);}
+#hud-time{position:absolute;top:22px;left:50%;transform:translateX(-50%);
+  font-size:11px;letter-spacing:4px;color:#a098d0;
+  background:linear-gradient(180deg,rgba(8,4,20,.78) 0%,rgba(14,8,32,.7) 100%);
+  padding:6px 18px;
+  clip-path:polygon(0 0,calc(100% - 8px) 0,100% 100%,8px 100%);
+  text-transform:uppercase;font-weight:600;
+  text-shadow:0 0 6px rgba(180,140,255,.5);}
+#hud-time::before{content:'';position:absolute;inset:0;pointer-events:none;
+  clip-path:polygon(0 0,calc(100% - 8px) 0,100% 100%,8px 100%,0 0,1px 1px,9px calc(100% - 1px),calc(100% - 1px) calc(100% - 1px),calc(100% - 9px) 1px,1px 1px);
+  background:linear-gradient(90deg,#a040ff 0%,#80ffff 50%,#ff60d0 100%);}
+
+/* ─── HP bar — segmented, angular, glowing ─── */
+#hud-hp{position:absolute;bottom:22px;left:50%;transform:translateX(-50%);
+  width:340px;display:flex;flex-direction:column;gap:5px;align-items:center;}
+.hp-bar{position:relative;width:100%;height:16px;
+  background:linear-gradient(180deg,rgba(20,4,8,.92) 0%,rgba(8,4,16,.95) 100%);
+  clip-path:polygon(10px 0,100% 0,calc(100% - 10px) 100%,0 100%);
+  overflow:hidden;
+  box-shadow:0 0 18px rgba(255,80,100,.32),inset 0 0 8px rgba(0,0,0,.7);}
+.hp-bar::before{content:'';position:absolute;inset:0;pointer-events:none;
+  clip-path:polygon(10px 0,100% 0,calc(100% - 10px) 100%,0 100%,10px 0,10px 1px,1px calc(100% - 1px),calc(100% - 11px) calc(100% - 1px),calc(100% - 1px) 1px,11px 1px);
+  background:linear-gradient(90deg,#ff3050 0%,#ff60d0 100%);z-index:2;}
+.hp-fill{position:relative;height:100%;
+  background:
+    linear-gradient(180deg,rgba(255,180,200,.45) 0%,transparent 30%,transparent 70%,rgba(0,0,0,.4) 100%),
+    linear-gradient(90deg,#ff3050,#ff60d0,#ff80a0);
+  transition:width .15s;
+  box-shadow:0 0 16px rgba(255,80,140,.6);}
+.hp-fill::after{content:'';position:absolute;inset:0;pointer-events:none;
+  background:repeating-linear-gradient(90deg,transparent 0 14px,rgba(0,0,0,.25) 14px 15px);}
+.hp-label{font-family:'SF Mono',monospace;font-size:10px;letter-spacing:4px;
+  color:#ff7088;text-transform:uppercase;font-weight:600;
+  text-shadow:0 0 8px rgba(255,80,120,.6);}
+.hp-label #hp-num{color:#ffb0c0;font-weight:700;}
+
+/* ─── Weapons panel — angular hex slots ─── */
+#hud-weapons{position:absolute;bottom:54px;left:50%;transform:translateX(-50%);
+  display:flex;gap:8px;}
+.weapon-slot{position:relative;
+  background:linear-gradient(135deg,rgba(8,4,20,.85) 0%,rgba(14,8,32,.78) 100%);
+  padding:8px 18px;min-width:118px;text-align:center;cursor:pointer;
+  transition:all .18s;font-family:'SF Mono',monospace;
+  clip-path:polygon(8px 0,100% 0,calc(100% - 8px) 100%,0 100%);}
+.weapon-slot::before{content:'';position:absolute;inset:0;pointer-events:none;
+  clip-path:polygon(8px 0,100% 0,calc(100% - 8px) 100%,0 100%,8px 0,8px 1px,1px calc(100% - 1px),calc(100% - 9px) calc(100% - 1px),calc(100% - 1px) 1px,9px 1px);
+  background:rgba(180,140,255,.35);transition:background .15s;}
+.weapon-slot.active{transform:translateY(-2px);
+  background:linear-gradient(135deg,rgba(16,40,52,.92) 0%,rgba(24,60,80,.85) 100%);
+  box-shadow:0 0 22px rgba(128,255,255,.55),inset 0 0 14px rgba(128,255,255,.18);}
+.weapon-slot.active::before{background:linear-gradient(135deg,#80ffff 0%,#a040ff 100%);}
+.weapon-slot .ws-key{font-size:9px;letter-spacing:3px;color:#a098d0;display:block;margin-bottom:4px;font-weight:600;}
+.weapon-slot .ws-name{font-size:11px;letter-spacing:3px;color:#e7e2ff;display:block;margin-bottom:4px;font-weight:600;}
+.weapon-slot .ws-ammo{font-size:14px;letter-spacing:2px;color:#ffd47a;font-weight:700;
+  text-shadow:0 0 8px rgba(255,212,122,.5);}
+.weapon-slot.active .ws-name{color:#80ffff;text-shadow:0 0 8px rgba(128,255,255,.6);}
+.weapon-slot.active .ws-key{color:#80ffff;}
+
+/* ════ SCREEN-SPACE CINEMATIC OVERLAYS ════ */
+/* Scan lines — entire screen, very subtle */
+#fx-scanlines{position:fixed;inset:0;pointer-events:none;z-index:9;
+  background:repeating-linear-gradient(0deg,transparent 0 2px,rgba(0,0,0,.18) 2px 3px);
+  mix-blend-mode:multiply;opacity:.45;}
+/* Vignette — darker corners */
+#fx-vignette{position:fixed;inset:0;pointer-events:none;z-index:9;
+  background:radial-gradient(ellipse at center,transparent 45%,rgba(0,0,0,.55) 100%);}
+/* Chromatic aberration at the edges */
+#fx-chroma{position:fixed;inset:0;pointer-events:none;z-index:9;
+  background:radial-gradient(ellipse at center,transparent 50%,rgba(255,60,120,.06) 88%,rgba(60,180,255,.08) 100%);
+  mix-blend-mode:screen;}
+/* Film grain — animated noise via SVG turbulence */
+#fx-grain{position:fixed;inset:0;pointer-events:none;z-index:9;opacity:.05;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 1 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+  animation:grain 1.5s steps(8) infinite;}
+@keyframes grain{
+  0%{transform:translate(0,0);}
+  12%{transform:translate(-3%,-2%);}
+  25%{transform:translate(2%,-3%);}
+  37%{transform:translate(-2%,3%);}
+  50%{transform:translate(3%,2%);}
+  62%{transform:translate(-3%,1%);}
+  75%{transform:translate(1%,-3%);}
+  87%{transform:translate(-2%,-2%);}
+  100%{transform:translate(0,0);}
+}
+/* Top + bottom letterbox bars — toggleable, subtle */
+#fx-letterbox{position:fixed;left:0;right:0;pointer-events:none;z-index:9;
+  background:linear-gradient(180deg,rgba(0,0,0,.65) 0%,transparent 100%);height:80px;top:0;}
+#fx-letterbox::after{content:'';position:fixed;left:0;right:0;bottom:0;height:60px;
+  background:linear-gradient(0deg,rgba(0,0,0,.55) 0%,transparent 100%);}
+/* HUD edge corner accents */
+#fx-corners{position:fixed;inset:0;pointer-events:none;z-index:9;}
+#fx-corners::before,#fx-corners::after{content:'';position:fixed;width:80px;height:80px;
+  border-color:rgba(128,255,255,.45);}
+#fx-corners::before{top:14px;left:14px;border-top:1.5px solid;border-left:1.5px solid;
+  box-shadow:-2px -2px 14px rgba(128,255,255,.18);}
+#fx-corners::after{bottom:14px;right:14px;border-bottom:1.5px solid;border-right:1.5px solid;
+  box-shadow:2px 2px 14px rgba(128,255,255,.18);}
+
+/* Damage vignette */
+#dmg-vignette{position:fixed;inset:0;pointer-events:none;z-index:8;
+  background:radial-gradient(ellipse at center,transparent 40%,rgba(255,40,60,0.55) 100%);
+  opacity:0;transition:opacity .12s;}
+#dmg-vignette.show{opacity:1;}
+
+/* Damage numbers (3D-projected) */
+.dmg-num{position:fixed;pointer-events:none;z-index:6;
+  font-family:'SF Mono',monospace;font-size:18px;letter-spacing:1px;font-weight:bold;
+  color:#ff60d0;text-shadow:0 0 8px rgba(255,80,180,.7),0 0 2px #000;
+  transition:transform 0.7s ease-out, opacity 0.7s ease-out;}
+.dmg-num.crit{color:#ffd47a;text-shadow:0 0 12px rgba(255,212,122,.9),0 0 3px #000;font-size:24px;}
+
+/* Crosshair turns red on enemy */
+#crosshair.hostile::before, #crosshair.hostile::after{background:#ff3050;}
+
+/* ─── Class select ─── */
+#class-overlay{position:fixed;inset:0;background:rgba(4,2,10,.96);backdrop-filter:blur(10px);
+  z-index:110;display:none;align-items:center;justify-content:center;flex-direction:column;cursor:default;}
+#class-overlay.show{display:flex;}
+#class-overlay .cs-title{font-family:'Courier New',monospace;font-size:32px;letter-spacing:14px;
+  color:#80ffff;margin-bottom:8px;}
+#class-overlay .cs-sub{font-size:11px;letter-spacing:5px;color:#9c93c6;
+  text-transform:uppercase;margin-bottom:34px;}
+.class-grid{display:flex;gap:18px;max-width:1000px;}
+.class-card{background:rgba(20,12,38,.85);border:1px solid rgba(180,140,255,.4);
+  border-radius:5px;padding:22px 24px;width:280px;cursor:pointer;transition:all .2s;}
+.class-card:hover{border-color:rgba(255,140,220,.6);transform:translateY(-4px);
+  box-shadow:0 8px 28px rgba(160,64,255,.3);}
+.class-card .cc-name{font-family:'Courier New',monospace;font-size:18px;letter-spacing:6px;
+  margin-bottom:6px;}
+.class-card .cc-tag{font-family:'Inter',sans-serif;font-style:italic;font-size:12px;
+  color:#9c93c6;margin-bottom:14px;line-height:1.5;}
+.class-card .cc-desc{font-family:'Inter',sans-serif;font-size:12px;color:#c8c4d8;
+  line-height:1.6;margin-bottom:16px;}
+.class-card .cc-stats{display:grid;grid-template-columns:auto 1fr;gap:5px 14px;
+  font-family:'SF Mono',monospace;font-size:11px;}
+.class-card .cc-stats .label{color:#9c93c6;letter-spacing:1px;}
+.class-card .cc-stats .val{color:#ffd47a;}
+.class-card .cc-pick{margin-top:18px;text-align:center;font-family:'Courier New',monospace;
+  font-size:11px;letter-spacing:4px;color:#80ffff;text-transform:uppercase;padding-top:12px;
+  border-top:1px solid rgba(180,140,255,.25);}
+
+/* ─── Death overlay ─── */
+#death-overlay{position:fixed;inset:0;background:rgba(40,4,8,.85);backdrop-filter:blur(8px);
+  z-index:120;display:none;align-items:center;justify-content:center;flex-direction:column;cursor:default;}
+#death-overlay.show{display:flex;}
+#death-overlay .death-title{font-family:'Courier New',monospace;font-size:46px;letter-spacing:16px;
+  color:#ff3050;text-shadow:0 0 30px rgba(255,80,100,.6);margin-bottom:14px;}
+#death-overlay .death-sub{font-size:12px;letter-spacing:5px;color:#ff7088;margin-bottom:30px;}
+#death-overlay .respawn-btn{font-family:'Courier New',monospace;font-size:13px;letter-spacing:5px;
+  background:rgba(80,20,30,.7);color:#ff7088;border:1px solid #ff3050;padding:14px 30px;
+  border-radius:3px;cursor:pointer;text-transform:uppercase;}
+#death-overlay .respawn-btn:hover{background:rgba(160,40,60,.8);color:#fff;
+  box-shadow:0 0 18px rgba(255,80,120,.6);}
+
+#menu-overlay{position:fixed;inset:0;background:rgba(4,2,10,.92);backdrop-filter:blur(8px);z-index:100;
+  display:flex;align-items:center;justify-content:center;flex-direction:column;cursor:default;}
+#menu-overlay.hide{display:none;}
+#menu-overlay .title{font-family:'Courier New',monospace;font-size:68px;letter-spacing:22px;
+  background:linear-gradient(180deg,#80ffff 0%,#ff60d0 50%,#a040ff 100%);
+  -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
+  filter:drop-shadow(0 0 28px rgba(160,64,255,.55)) drop-shadow(0 0 8px rgba(255,96,208,.4));
+  margin-bottom:10px;
+  animation:title-flicker 6s ease-in-out infinite;}
+@keyframes title-flicker{
+  0%,100%{opacity:1;filter:drop-shadow(0 0 28px rgba(160,64,255,.55)) drop-shadow(0 0 8px rgba(255,96,208,.4));}
+  47%{opacity:1;}
+  48%{opacity:.4;filter:drop-shadow(0 0 4px rgba(160,64,255,.2));}
+  49%{opacity:1;filter:drop-shadow(0 0 28px rgba(160,64,255,.55)) drop-shadow(0 0 8px rgba(255,96,208,.4));}
+  62%{opacity:1;}
+  63%{opacity:.7;}
+  64%{opacity:1;}
+}
+#menu-overlay .subtitle{font-family:'Courier New',monospace;font-size:12px;letter-spacing:6px;
+  color:#9c93c6;text-transform:uppercase;margin-bottom:46px;}
+#menu-overlay .menu-btn{background:rgba(40,20,80,.6);color:#80ffff;border:1px solid rgba(180,140,255,.5);
+  padding:14px 32px;font-family:inherit;font-size:13px;letter-spacing:5px;cursor:pointer;
+  text-transform:uppercase;margin:6px;border-radius:3px;transition:all .15s;min-width:280px;}
+#menu-overlay .menu-btn:hover{background:rgba(80,40,160,.7);color:#fff;box-shadow:0 0 18px rgba(255,80,220,.5);}
+#menu-overlay .menu-btn.primary{background:linear-gradient(180deg,rgba(120,80,200,.6),rgba(60,20,120,.7));
+  color:#fff;border-color:rgba(255,140,220,.7);}
+#menu-overlay .footer{position:absolute;bottom:24px;font-size:10px;letter-spacing:3px;
+  color:#6a608a;text-transform:uppercase;text-align:center;line-height:1.7;}
+#menu-overlay .stats{margin-top:24px;font-size:11px;color:#9c93c6;letter-spacing:2px;line-height:1.6;text-align:center;}
+#menu-overlay .stats .stat-row{margin:3px 0;}
+#menu-overlay .stats .stat-val{color:#ffd47a;margin-left:6px;}
+
+#minigame-overlay{position:fixed;inset:0;background:rgba(4,2,10,.92);backdrop-filter:blur(8px);z-index:80;
+  display:none;align-items:center;justify-content:center;cursor:default;}
+#minigame-overlay.show{display:flex;}
+.mg-card{background:linear-gradient(180deg,#11091d,#04020a);border:1px solid rgba(180,140,255,.5);border-radius:6px;
+  padding:28px 32px;max-width:640px;width:90%;box-shadow:0 0 60px rgba(160,64,255,.35);}
+.mg-card .mg-head{display:flex;justify-content:space-between;align-items:center;
+  border-bottom:1px solid rgba(120,200,255,.18);padding-bottom:14px;margin-bottom:18px;}
+.mg-card .mg-title{font-family:'Courier New',monospace;font-size:15px;letter-spacing:6px;color:#ff60d0;text-transform:uppercase;}
+.mg-card .mg-close{background:none;border:1px solid rgba(180,140,255,.4);color:#9c93c6;
+  width:28px;height:28px;border-radius:2px;cursor:pointer;font-size:14px;font-family:inherit;}
+.mg-card .mg-close:hover{color:#ff7088;border-color:#ff7088;}
+
+.hack-prompt{font-family:'Inter',sans-serif;font-size:13px;color:#9c93c6;margin-bottom:14px;line-height:1.55;}
+.hack-target{font-family:'SF Mono',monospace;font-size:22px;letter-spacing:3px;color:#80ffff;
+  text-align:center;padding:14px;background:rgba(8,4,16,.6);border:1px solid rgba(128,255,255,.3);
+  border-radius:3px;margin-bottom:14px;min-height:38px;}
+.hack-target .typed{color:#7dffb3;}
+.hack-target .untyped{color:#5b527a;}
+.hack-input{width:100%;background:rgba(8,4,16,.7);border:1px solid rgba(180,140,255,.4);color:#e7e2ff;
+  padding:10px 14px;border-radius:3px;font-family:'SF Mono',monospace;font-size:16px;letter-spacing:2px;outline:none;}
+.hack-input:focus{border-color:#ff60d0;}
+.hack-meta{display:flex;justify-content:space-between;margin-top:12px;font-size:11px;letter-spacing:2px;color:#9c93c6;}
+.hack-meta .timer{color:#ffd47a;}
+.hack-meta .progress{color:#80ffff;}
+
+.route-canvas{width:100%;height:280px;background:rgba(8,4,16,.6);border:1px solid rgba(180,140,255,.3);
+  border-radius:3px;margin-bottom:14px;position:relative;cursor:crosshair;}
+.route-canvas svg{width:100%;height:100%;}
+.route-node{cursor:pointer;}
+.route-info{font-size:11px;color:#9c93c6;letter-spacing:1.5px;line-height:1.7;display:flex;justify-content:space-between;}
+.route-info .status{color:#ffd47a;text-transform:uppercase;letter-spacing:3px;}
+
+#toast-stack{position:fixed;top:80px;right:18px;z-index:90;display:flex;flex-direction:column;gap:6px;align-items:flex-end;}
+.toast{background:rgba(8,4,16,.88);border:1px solid rgba(255,212,122,.5);padding:8px 14px;border-radius:3px;
+  font-size:11.5px;letter-spacing:1px;color:#ffd47a;animation:toast-in .25s ease-out;max-width:340px;}
+.toast.success{border-color:rgba(125,255,179,.5);color:#7dffb3;}
+.toast.fail{border-color:rgba(255,112,136,.5);color:#ff7088;}
+.toast.info{border-color:rgba(128,255,255,.4);color:#80ffff;}
+@keyframes toast-in{from{opacity:0;transform:translateX(20px);}to{opacity:1;transform:translateX(0);}}
+
+#lock-instruction{position:fixed;inset:0;display:none;align-items:center;justify-content:center;
+  background:rgba(4,2,10,.85);z-index:70;cursor:default;}
+#lock-instruction.show{display:flex;}
+.lock-card{text-align:center;padding:32px;}
+.lock-card .ico{font-size:38px;margin-bottom:14px;color:#80ffff;}
+.lock-card .msg{font-size:13px;letter-spacing:3px;color:#e7e2ff;text-transform:uppercase;margin-bottom:12px;}
+.lock-card .sub{font-size:11px;letter-spacing:2px;color:#9c93c6;}
+</style>
+</head>
+<body>
+
+<!-- ════ Cinematic screen-space FX layers (CSS only, no JS cost) ════ -->
+<div id="fx-scanlines"></div>
+<div id="fx-vignette"></div>
+<div id="fx-chroma"></div>
+<div id="fx-grain"></div>
+<div id="fx-corners"></div>
+<div id="fx-letterbox"></div>
+
+<div id="crosshair"></div>
+
+<div id="hud">
+  <div class="hud-panel" id="hud-credits">
+    <div class="label">CREDITS</div>
+    <div class="value" id="hud-credits-val">0</div>
+  </div>
+  <div class="hud-panel" id="hud-task">
+    <div class="label">CURRENT JOB</div>
+    <div class="value" id="hud-task-val"><span class="compass">▲</span>—</div>
+  </div>
+  <div id="hud-time">DAY 1 · <span id="hud-clock">06:00</span></div>
+  <div class="hud-panel" id="hud-mode">
+    <div class="label">MODE</div>
+    <div class="value" id="hud-mode-val">FOOT</div>
+  </div>
+  <div id="hud-district">DISTRICT — DOWNTOWN</div>
+  <div class="hud-panel" id="hud-controls">
+    <kbd>WASD</kbd> move · <kbd>MOUSE</kbd> look · <kbd>SPACE</kbd> jump<br>
+    <kbd>E</kbd> interact · <kbd>SHIFT</kbd> sprint · <kbd>ESC</kbd> menu<br>
+    <kbd>B</kbd> construct mode
+  </div>
+  <div id="build-hud">
+    <div id="build-slots"></div>
+    <div id="build-stats">mined 0 · placed 0</div>
+  </div>
+  <div id="hud-prompt"><kbd>E</kbd><span id="hud-prompt-text">interact</span></div>
+  <div id="hud-speed">— km/h</div>
+
+  <div id="hud-hp">
+    <div class="hp-label">HP <span id="hp-num">100 / 100</span></div>
+    <div class="hp-bar"><div class="hp-fill" id="hp-fill" style="width:100%;"></div></div>
+  </div>
+
+  <div id="hud-weapons">
+    <div class="weapon-slot" data-weapon="baton">
+      <span class="ws-key">[1]</span>
+      <span class="ws-name">BATON</span>
+      <span class="ws-ammo" id="ammo-baton">∞</span>
+    </div>
+    <div class="weapon-slot" data-weapon="pistol">
+      <span class="ws-key">[2]</span>
+      <span class="ws-name">PISTOL</span>
+      <span class="ws-ammo" id="ammo-pistol">0</span>
+    </div>
+    <div class="weapon-slot" data-weapon="shotgun">
+      <span class="ws-key">[3]</span>
+      <span class="ws-name">SCATTER</span>
+      <span class="ws-ammo" id="ammo-shotgun">0</span>
+    </div>
+  </div>
+</div>
+
+<div id="dmg-vignette"></div>
+
+<div id="class-overlay">
+  <div class="cs-title">CHOOSE CLASS</div>
+  <div class="cs-sub">v0.3 · combat update</div>
+  <div class="class-grid">
+    <div class="class-card" id="class-netrunner" data-class="netrunner">
+      <div class="cc-name" style="color:#80ffff;">NETRUNNER</div>
+      <div class="cc-tag">Glass cannon. Speed + hack mastery.</div>
+      <div class="cc-desc">Fast, fragile, hacking ace. Mini-game rewards are 1.5× and you move 15% faster. Don't get hit.</div>
+      <div class="cc-stats">
+        <span class="label">HP</span><span class="val">60</span>
+        <span class="label">SPEED</span><span class="val">7.5 / 13.0</span>
+        <span class="label">JUMP</span><span class="val">9.5</span>
+        <span class="label">HACK BONUS</span><span class="val">×1.5</span>
+        <span class="label">START AMMO</span><span class="val">PISTOL 8 / NO SHOT</span>
+      </div>
+      <div class="cc-pick">▶ SELECT</div>
+    </div>
+    <div class="class-card" id="class-operative" data-class="operative">
+      <div class="cc-name" style="color:#ffd47a;">OPERATIVE</div>
+      <div class="cc-tag">Balanced. Works at everything.</div>
+      <div class="cc-desc">A jack of all trades. Standard HP, decent damage, decent speed. Recommended starting class.</div>
+      <div class="cc-stats">
+        <span class="label">HP</span><span class="val">100</span>
+        <span class="label">SPEED</span><span class="val">6.5 / 11.0</span>
+        <span class="label">JUMP</span><span class="val">8.5</span>
+        <span class="label">HACK BONUS</span><span class="val">×1.0</span>
+        <span class="label">START AMMO</span><span class="val">PISTOL 14 / SHOT 4</span>
+      </div>
+      <div class="cc-pick">▶ SELECT</div>
+    </div>
+    <div class="class-card" id="class-bruiser" data-class="bruiser">
+      <div class="cc-name" style="color:#ff60d0;">BRUISER</div>
+      <div class="cc-tag">Tank. Hits hard, soaks damage.</div>
+      <div class="cc-desc">Slow, tough, hits hard. 60% more HP, 25% more damage. Hacking rewards reduced.</div>
+      <div class="cc-stats">
+        <span class="label">HP</span><span class="val">160</span>
+        <span class="label">SPEED</span><span class="val">5.5 / 9.0</span>
+        <span class="label">JUMP</span><span class="val">7.5</span>
+        <span class="label">DAMAGE</span><span class="val">×1.25</span>
+        <span class="label">START AMMO</span><span class="val">PISTOL 8 / SHOT 12</span>
+      </div>
+      <div class="cc-pick">▶ SELECT</div>
+    </div>
+  </div>
+</div>
+
+<div id="death-overlay">
+  <div class="death-title">FLATLINED</div>
+  <div class="death-sub">CONNECTION TERMINATED</div>
+  <button class="respawn-btn" id="respawn-btn">↻ RESPAWN AT ORIGIN</button>
+</div>
+
+<div id="toast-stack"></div>
+
+<div id="menu-overlay">
+  <div class="title">FRACTURE CITY</div>
+  <div class="subtitle">A near-future urban exploration · v0.2 (infinite)</div>
+  <button class="menu-btn primary" id="btn-start">▶ ENTER CITY</button>
+  <button class="menu-btn" id="btn-continue">↻ CONTINUE</button>
+  <button class="menu-btn" id="btn-newseed">⟲ NEW CITY (RESEED)</button>
+  <div class="stats" id="menu-stats"></div>
+  <div class="footer">Click ENTER CITY, then click the canvas to lock the mouse.<br>
+    WASD + Mouse to move. E to interact. ESC to release.</div>
+</div>
+
+<div id="lock-instruction">
+  <div class="lock-card">
+    <div class="ico">⌖</div>
+    <div class="msg">CLICK TO RE-LOCK CURSOR</div>
+    <div class="sub">Press ESC to release</div>
+  </div>
+</div>
+
+<div id="minigame-overlay">
+  <div class="mg-card" id="minigame-card"></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.158.0/build/three.min.js"></script>
+<script>
+// =============================================================================
+//  FRACTURE CITY v0.2 — chunk-based infinite generation
+// =============================================================================
+
+const TAU = Math.PI * 2;
+
+// ─── Deterministic RNG ─────────────────────────────────────────────────────
+function hashStr(s){let h=1779033703^s.length;for(let i=0;i<s.length;i++){h=Math.imul(h^s.charCodeAt(i),3432918353);h=h<<13|h>>>19;}return (h^=h>>>16)>>>0;}
+function mulberry32(seed){let s=seed;return function(){let t=s+=0x6D2B79F5;t=Math.imul(t^t>>>15,t|1);t^=t+Math.imul(t^t>>>7,t|61);return ((t^t>>>14)>>>0)/4294967296;};}
+class RNG{
+  constructor(seed){this.next=mulberry32(typeof seed==='string'?hashStr(seed):seed>>>0);}
+  range(lo,hi){return lo+this.next()*(hi-lo);}
+  int(lo,hi){return Math.floor(this.range(lo,hi+1));}
+  pick(arr){return arr[Math.floor(this.next()*arr.length)];}
+  bool(p=0.5){return this.next()<p;}
+}
+
+// ─── World layout constants ────────────────────────────────────────────────
+const CITY_BLOCK_SIZE = 16;
+const STREET_WIDTH = 8;
+const CHUNK_SIZE = CITY_BLOCK_SIZE + STREET_WIDTH; // 24 units
+const RENDER_RADIUS = 3;   // 7x7 = 49 chunks visible (perf)
+const UNLOAD_RADIUS = 4;   // chunks beyond this distance from player get destroyed
+const MAX_NPCS_GLOBAL = 40;
+const MAX_MOBILE_CARS_GLOBAL = 8;
+const MAX_VISIBLE_POINT_LIGHTS = 14;
+
+// ─── Districts ─────────────────────────────────────────────────────────────
+const DISTRICTS = {
+  DOWNTOWN: {
+    name: 'DOWNTOWN', bgColor: 0x4a4252, accentColor: 0x80ffff,
+    minHeight: 22, maxHeight: 55,
+    windowColors: [0xffe480, 0x80ffff, 0xb0c0e8, 0xfff0d0],
+    windowLitProb: 0.65, neonProb: 0.45, billboardProb: 0.35,
+    treeProb: 0.10, trashProb: 0.30, graffitiProb: 0.40, ventProb: 0.25,
+    cameraProb: 0.30, ventingSteamProb: 0.20, cableProb: 0.50,
+  },
+  RESIDENTIAL: {
+    name: 'RESIDENTIAL', bgColor: 0x4a3848, accentColor: 0xffd47a,
+    minHeight: 5, maxHeight: 14,
+    windowColors: [0xffd47a, 0xffba60, 0xf0e5c8, 0xffac50],
+    windowLitProb: 0.55, neonProb: 0.10, billboardProb: 0.05,
+    treeProb: 0.45, trashProb: 0.20, graffitiProb: 0.30, ventProb: 0.10,
+    cameraProb: 0.10, ventingSteamProb: 0.10, cableProb: 0.30,
+  },
+  FORGE: {
+    name: 'FORGE', bgColor: 0x3a3340, accentColor: 0xff8030,
+    minHeight: 3, maxHeight: 11,
+    windowColors: [0xff8030, 0xffac50, 0xffd078, 0xc04020],
+    windowLitProb: 0.45, neonProb: 0.25, billboardProb: 0.10,
+    treeProb: 0.05, trashProb: 0.50, graffitiProb: 0.55, ventProb: 0.45,
+    cameraProb: 0.45, ventingSteamProb: 0.55, cableProb: 0.50,
+  },
+  FLOOD: {
+    name: 'FLOOD GATE', bgColor: 0x3a4858, accentColor: 0x80c0ff,
+    minHeight: 6, maxHeight: 20,
+    windowColors: [0x80ffff, 0xa0c0ff, 0xffd47a, 0xffac50],
+    windowLitProb: 0.50, neonProb: 0.20, billboardProb: 0.15,
+    treeProb: 0.20, trashProb: 0.30, graffitiProb: 0.35, ventProb: 0.30,
+    cameraProb: 0.20, ventingSteamProb: 0.30, cableProb: 0.40,
+  },
+  CHINATOWN: {
+    name: 'NIGHT MARKET', bgColor: 0x4a3040, accentColor: 0xff60d0,
+    minHeight: 4, maxHeight: 14,
+    windowColors: [0xff60d0, 0xffd47a, 0x80ffff, 0xa040ff],
+    windowLitProb: 0.70, neonProb: 0.70, billboardProb: 0.30,
+    treeProb: 0.15, trashProb: 0.40, graffitiProb: 0.50, ventProb: 0.30,
+    cameraProb: 0.25, ventingSteamProb: 0.45, cableProb: 0.65,
+  },
+};
+const DISTRICT_LIST = Object.values(DISTRICTS);
+
+// Pick district from chunk coords — clusters in 3-chunk superblocks
+function districtForChunk(cx, cz){
+  const sx = Math.floor((cx + 1000) / 3);
+  const sz = Math.floor((cz + 1000) / 3);
+  const seed = hashStr(`d:${sx}:${sz}`);
+  return DISTRICT_LIST[seed % DISTRICT_LIST.length];
+}
+
+const NEON_COLORS = [0xff60d0, 0x80ffff, 0xffd47a, 0xa040ff, 0x7dffb3, 0xff8050];
+const CAR_COLORS = [0xb03050, 0x405888, 0x707880, 0x6b3535, 0x507060, 0x484048, 0x8a6824, 0x3a4860, 0xc04020];
+
+// ─── Classes ───────────────────────────────────────────────────────────────
+const CLASSES = {
+  netrunner: {
+    name: 'NETRUNNER',
+    tagline: 'Glass cannon. Speed + hack mastery.',
+    desc: 'Fast, fragile, hacking ace. Mini-game rewards are 1.5× and you move 15% faster.',
+    color: 0x80ffff,
+    hp: 60, walkSpeed: 7.5, sprintSpeed: 13.0, jumpPower: 9.5,
+    startLoadout: { baton: -1, pistol: 8, shotgun: 0 },
+    hackBonus: 1.5,
+  },
+  operative: {
+    name: 'OPERATIVE',
+    tagline: 'Balanced. Works at everything.',
+    desc: 'A jack of all trades. Standard HP, decent damage, decent speed. Recommended for new players.',
+    color: 0xffd47a,
+    hp: 100, walkSpeed: 6.5, sprintSpeed: 11.0, jumpPower: 8.5,
+    startLoadout: { baton: -1, pistol: 14, shotgun: 4 },
+    hackBonus: 1.0,
+  },
+  bruiser: {
+    name: 'BRUISER',
+    tagline: 'Tank. Hits hard, soaks damage.',
+    desc: 'Slow, tough, hits hard. 60% more HP, 25% more damage. Hacking rewards reduced.',
+    color: 0xff60d0,
+    hp: 160, walkSpeed: 5.5, sprintSpeed: 9.0, jumpPower: 7.5,
+    startLoadout: { baton: -1, pistol: 8, shotgun: 12 },
+    hackBonus: 0.7, damageMult: 1.25,
+  },
+};
+
+// ─── Weapons ───────────────────────────────────────────────────────────────
+const WEAPONS = {
+  baton: {
+    name: 'NEON BATON',
+    type: 'melee',
+    dmg: 28, range: 2.4, cooldown: 0.32,
+    color: 0x80ffff,
+    slotKey: '1',
+  },
+  pistol: {
+    name: 'PULSE PISTOL',
+    type: 'ranged',
+    dmg: 32, range: 36, cooldown: 0.40,
+    spread: 0.025, pellets: 1, ammoMax: 14,
+    color: 0xffd47a,
+    slotKey: '2',
+  },
+  shotgun: {
+    name: 'SCATTER SHOT',
+    type: 'ranged',
+    dmg: 14, range: 14, cooldown: 0.85,
+    spread: 0.16, pellets: 6, ammoMax: 6,
+    color: 0xff60d0,
+    slotKey: '3',
+  },
+};
+
+// ─── Enemies ───────────────────────────────────────────────────────────────
+const ENEMY_TYPES = {
+  thug: {
+    name: 'STREET THUG',
+    hp: 50, dmg: 14, speed: 3.4,
+    detectRange: 14, attackRange: 2.4, attackCooldown: 1.1,
+    rewardCredits: [20, 35],
+    flying: false,
+    colors: { jacket: 0x3a1a26, pants: 0x1a1626, weapon: 0x6a3a2a },
+  },
+  drone: {
+    name: 'SEC DRONE',
+    hp: 30, dmg: 8, speed: 5.2,
+    detectRange: 24, attackRange: 18, attackCooldown: 0.6,
+    rewardCredits: [25, 40],
+    flying: true,
+    colors: { body: 0x40484a, accent: 0xff3040 },
+  },
+  heavy: {
+    name: 'CORP HEAVY',
+    hp: 130, dmg: 22, speed: 2.2,
+    detectRange: 11, attackRange: 3.0, attackCooldown: 1.4,
+    rewardCredits: [55, 85],
+    flying: false,
+    colors: { armor: 0x2a3050, accent: 0xa0c0ff, weapon: 0x303040 },
+  },
+};
+const MAX_ENEMIES_GLOBAL = 8;
+
+// ─── Game state ─────────────────────────────────────────────────────────────
+const State = {
+  scene: null, camera: null, renderer: null, clock: null,
+  sky: null, stars: null, moon: null, sunLight: null, ambient: null,
+  chunkMap: new Map(),       // key "cx,cz" → Chunk
+  globalCars: [],            // mobile cars across all chunks
+  globalNPCs: [],            // pedestrians
+  steamSources: [],          // steam-vent positions
+  hud: { credits: 0, tasksDone: 0, distanceWalked: 0, distanceDriven: 0, playTime: 0,
+         blocksMined: 0, blocksPlaced: 0 },
+  ui: { locked: false, paused: true, inMiniGame: false, inCar: null, construct: false },
+  blockBits: [],             // debris cubes from mining
+  editsDirty: false,         // set when a block changes; drives the autosave
+  keys: new Set(),
+  task: null, taskQueue: [],
+  citySeed: 'fc-1',
+  dayTime: 18 * 60,
+  dayLengthMs: 600000,
+  rng: null,
+};
+
+const Player = {
+  position: new THREE.Vector3(0, 1.7, 0),
+  velocity: new THREE.Vector3(0,0,0),
+  yaw: 0, pitch: 0,
+  height: 1.7, radius: 0.4,
+  onGround: false,
+  mode: 'walk',
+  // Combat
+  classKey: 'operative',
+  hp: 100, hpMax: 100,
+  currentWeapon: 'baton',
+  ammo: { baton: -1, pistol: 14, shotgun: 4 },
+  attackCooldown: 0,
+  damageMult: 1.0,
+  hackBonus: 1.0,
+  invulnTime: 0,
+  damageFlash: 0,
+  kills: 0,
+};
+State.enemies = [];
+State.holoAds = [];        // animated billboards
+State.civDrones = [];      // friendly delivery drones
+State.dmgNumbers = [];     // floating damage text
+State.muzzleFlash = null;  // weapon flash sprite
+
+function $(id){ return document.getElementById(id); }
+
+// =============================================================================
+//  SKY + STARS + MOON
+// =============================================================================
+function createSky(scene){
+  // Big sphere with vertex-color gradient
+  const geo = new THREE.SphereGeometry(380, 32, 18);
+  // Default colors — will be updated by updateDayNight
+  const mat = new THREE.MeshBasicMaterial({ side: THREE.BackSide, vertexColors: true });
+  const colors = new Float32Array(geo.attributes.position.count * 3);
+  geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  const sky = new THREE.Mesh(geo, mat);
+  sky.renderOrder = -1000;
+  scene.add(sky);
+  return sky;
+}
+
+function setSkyGradient(sky, stops){
+  // stops: array of [yNormalized 0-1, hexColor], ordered by yNormalized
+  const positions = sky.geometry.attributes.position;
+  const colors = sky.geometry.attributes.color;
+  for (let i = 0; i < positions.count; i++){
+    const y = positions.getY(i);
+    const yNorm = (y / 380 + 1) / 2; // -380..380 → 0..1
+    // Find surrounding stops
+    let c = new THREE.Color(stops[0][1]);
+    for (let j = 0; j < stops.length - 1; j++){
+      if (yNorm >= stops[j][0] && yNorm <= stops[j+1][0]){
+        const t = (yNorm - stops[j][0]) / (stops[j+1][0] - stops[j][0]);
+        c = new THREE.Color(stops[j][1]).lerp(new THREE.Color(stops[j+1][1]), t);
+        break;
+      }
+      if (yNorm > stops[stops.length-1][0]){ c = new THREE.Color(stops[stops.length-1][1]); }
+    }
+    colors.setXYZ(i, c.r, c.g, c.b);
+  }
+  colors.needsUpdate = true;
+}
+
+function createStars(scene){
+  const starCount = 800;
+  const positions = new Float32Array(starCount * 3);
+  const colors = new Float32Array(starCount * 3);
+  for (let i = 0; i < starCount; i++){
+    // Random points on a hemisphere
+    const theta = Math.random() * TAU;
+    const phi = Math.acos(Math.random() * 0.7 + 0.3); // upper hemisphere bias
+    const r = 350;
+    positions[i*3] = r * Math.sin(phi) * Math.cos(theta);
+    positions[i*3+1] = r * Math.cos(phi);
+    positions[i*3+2] = r * Math.sin(phi) * Math.sin(theta);
+    // Slight color variation
+    const t = Math.random();
+    colors[i*3] = 0.95 + t*0.05;
+    colors[i*3+1] = 0.95 + t*0.05;
+    colors[i*3+2] = 0.85 + t*0.15;
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  const mat = new THREE.PointsMaterial({ size: 1.5, vertexColors: true, transparent: true, opacity: 0 });
+  const stars = new THREE.Points(geo, mat);
+  scene.add(stars);
+  return stars;
+}
+
+function createMoon(scene){
+  const geo = new THREE.SphereGeometry(12, 16, 12);
+  const mat = new THREE.MeshBasicMaterial({ color: 0xffe8c0, transparent: true, opacity: 0 });
+  const moon = new THREE.Mesh(geo, mat);
+  moon.position.set(120, 90, -150);
+  scene.add(moon);
+  return moon;
+}
+
+// =============================================================================
+//  DISTANT SKYLINE — silhouette towers + neon holo billboards
+//  Rendered as a ring of building boxes far out, gives the city a sense of
+//  scale + depth that the voxel grid alone can't. Cheap (instanced-ish).
+// =============================================================================
+function createDistantSkyline(scene){
+  const group = new THREE.Group();
+  const RING_R = 320;        // distance from origin
+  const TOWERS = 120;
+  // Tower silhouette material — dark plum with vertical neon stripes via tex
+  const matBody = new THREE.MeshBasicMaterial({
+    color: 0x0a0418, transparent: true, opacity: 0.92, fog: false,
+  });
+  for (let i = 0; i < TOWERS; i++){
+    const ang = (i / TOWERS) * Math.PI * 2 + (Math.random() - .5) * 0.05;
+    const r = RING_R + (Math.random() - .5) * 60;
+    const w = 6 + Math.random() * 12;
+    const h = 28 + Math.random() * 78;
+    const d = 6 + Math.random() * 8;
+    const g = new THREE.BoxGeometry(w, h, d);
+    const m = new THREE.Mesh(g, matBody);
+    m.position.set(Math.cos(ang) * r, h / 2 - 2, Math.sin(ang) * r);
+    m.lookAt(0, m.position.y, 0);
+    group.add(m);
+    // Neon window strips — a few horizontal glow segments per tower
+    const stripCount = 2 + Math.floor(Math.random() * 4);
+    for (let k = 0; k < stripCount; k++){
+      const sy = (Math.random() * 0.7 + 0.15) * h;
+      const sw = w * 0.85;
+      const sg = new THREE.PlaneGeometry(sw, 0.4 + Math.random() * 0.6);
+      // pick neon color
+      const col = [0xff60d0, 0x80ffff, 0xffd47a, 0xa040ff, 0x60ffa0][Math.floor(Math.random()*5)];
+      const sm = new THREE.MeshBasicMaterial({
+        color: col, transparent: true, opacity: 0.55 + Math.random() * 0.35,
+        fog: false, blending: THREE.AdditiveBlending, depthWrite: false,
+      });
+      const strip = new THREE.Mesh(sg, sm);
+      strip.position.set(0, sy - h / 2, d / 2 + 0.05);
+      m.add(strip);
+      strip.userData.flicker = { base: sm.opacity, phase: Math.random() * 100, rate: 0.5 + Math.random() * 2 };
+    }
+    // Antenna on tallest towers
+    if (h > 80 && Math.random() < 0.5){
+      const ag = new THREE.CylinderGeometry(0.15, 0.15, 6 + Math.random() * 4, 5);
+      const am = new THREE.Mesh(ag, matBody);
+      am.position.set(0, h / 2 + 3, 0);
+      m.add(am);
+      // blinking red beacon
+      const beg = new THREE.SphereGeometry(0.5, 6, 5);
+      const bem = new THREE.MeshBasicMaterial({
+        color: 0xff3050, transparent: true, opacity: 0.9, fog: false,
+        blending: THREE.AdditiveBlending, depthWrite: false,
+      });
+      const beacon = new THREE.Mesh(beg, bem);
+      beacon.position.set(0, h / 2 + 6.2, 0);
+      m.add(beacon);
+      beacon.userData.beacon = { phase: Math.random() * 100 };
+    }
+  }
+  scene.add(group);
+  return group;
+}
+
+// =============================================================================
+//  HOLO BILLBOARDS — drifting text-board sprites in the middle distance
+// =============================================================================
+function makeHoloBillboardTexture(text, accentRgb){
+  const c = document.createElement('canvas'); c.width = 512; c.height = 256;
+  const cx = c.getContext('2d');
+  // Background — translucent dark with neon border
+  cx.fillStyle = 'rgba(8,4,20,.85)'; cx.fillRect(0, 0, 512, 256);
+  cx.strokeStyle = `rgb(${accentRgb})`; cx.lineWidth = 4;
+  cx.strokeRect(6, 6, 500, 244);
+  // Big text
+  cx.fillStyle = `rgb(${accentRgb})`;
+  cx.font = 'bold 64px "Courier New", monospace';
+  cx.textAlign = 'center'; cx.textBaseline = 'middle';
+  cx.shadowColor = `rgb(${accentRgb})`; cx.shadowBlur = 24;
+  cx.fillText(text, 256, 128);
+  cx.shadowBlur = 0;
+  // Subtitle
+  cx.fillStyle = 'rgba(220,200,255,.6)';
+  cx.font = '14px "Courier New", monospace';
+  cx.fillText('· FRACTURE CITY ·', 256, 224);
+  // Scan lines
+  for (let y = 0; y < 256; y += 3){
+    cx.fillStyle = 'rgba(0,0,0,.18)';
+    cx.fillRect(0, y, 512, 1);
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.minFilter = THREE.LinearFilter;
+  return tex;
+}
+function createHoloBillboards(scene){
+  const ads = [
+    { text: 'NEON',     col: '255,96,208' },
+    { text: 'PALM',     col: '128,255,255' },
+    { text: 'WIRED',    col: '255,212,122' },
+    { text: 'COHERE',   col: '160,80,255' },
+    { text: 'TRANSIT',  col: '120,255,160' },
+    { text: 'OFFLINE',  col: '255,80,100' },
+  ];
+  const group = new THREE.Group();
+  for (let i = 0; i < ads.length; i++){
+    const a = ads[i];
+    const tex = makeHoloBillboardTexture(a.text, a.col);
+    const mat = new THREE.SpriteMaterial({
+      map: tex, transparent: true, opacity: 0.85, fog: false,
+      blending: THREE.AdditiveBlending, depthWrite: false,
+    });
+    const sp = new THREE.Sprite(mat);
+    const ang = (i / ads.length) * Math.PI * 2 + 0.4;
+    const r = 220 + Math.random() * 40;
+    sp.position.set(Math.cos(ang) * r, 45 + Math.random() * 25, Math.sin(ang) * r);
+    sp.scale.set(40, 20, 1);
+    sp.userData = { angle: ang, radius: r, baseY: sp.position.y, phase: Math.random() * 100, flickerRate: 0.5 + Math.random() * 1.5 };
+    group.add(sp);
+  }
+  scene.add(group);
+  return group;
+}
+
+// =============================================================================
+//  REUSABLE GEOMETRIES + MATERIALS (cache to save memory)
+// =============================================================================
+const G = {}; // geometry cache
+const M = {}; // material cache
+
+// Facade texture cache — windows baked into a tileable canvas texture
+// One mesh per building instead of one mesh per window. This is the load-bearing perf fix.
+const FACADE_TEX = {}; // district.name → [Texture, Texture, Texture, Texture]
+
+function makeFacadeTexture(district){
+  // 256×256 canvas with 4×4 windows = 16 windows per tile
+  // Building applies texture with repeat set to (buildingWidth/2, buildingHeight/2)
+  // so windows tile naturally across the surface
+  const SIZE = 256;
+  const COLS = 4, ROWS = 4;
+  const canvas = document.createElement('canvas');
+  canvas.width = SIZE; canvas.height = SIZE;
+  const ctx = canvas.getContext('2d');
+
+  // Wall background with slight gradient for depth
+  const bgHex = '#' + district.bgColor.toString(16).padStart(6, '0');
+  const darker = '#' + Math.max(0, district.bgColor - 0x080808).toString(16).padStart(6, '0');
+  const grad = ctx.createLinearGradient(0, 0, 0, SIZE);
+  grad.addColorStop(0, bgHex);
+  grad.addColorStop(1, darker);
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, SIZE, SIZE);
+
+  // Subtle concrete texture — random darker dots
+  ctx.fillStyle = 'rgba(0,0,0,0.10)';
+  for (let i = 0; i < 80; i++){
+    const x = Math.random() * SIZE, y = Math.random() * SIZE;
+    const s = 1 + Math.random() * 2;
+    ctx.fillRect(x, y, s, s);
+  }
+
+  // Windows in a grid
+  const cellW = SIZE / COLS;
+  const cellH = SIZE / ROWS;
+  const winW = cellW * 0.50;
+  const winH = cellH * 0.55;
+
+  for (let r = 0; r < ROWS; r++){
+    for (let c = 0; c < COLS; c++){
+      const x = c * cellW + (cellW - winW) / 2;
+      const y = r * cellH + (cellH - winH) / 2;
+      // Window frame (dark)
+      ctx.fillStyle = '#0a0810';
+      ctx.fillRect(x - 2, y - 2, winW + 4, winH + 4);
+      // Lit / unlit
+      if (Math.random() < district.windowLitProb){
+        const c2 = district.windowColors[Math.floor(Math.random() * district.windowColors.length)];
+        // Window glow — light center, darker edges
+        const wgrad = ctx.createRadialGradient(
+          x + winW/2, y + winH/2, 0,
+          x + winW/2, y + winH/2, Math.max(winW, winH) * 0.7
+        );
+        wgrad.addColorStop(0, '#' + c2.toString(16).padStart(6, '0'));
+        const darker2 = Math.floor(c2 * 0.45);
+        wgrad.addColorStop(1, '#' + darker2.toString(16).padStart(6, '0'));
+        ctx.fillStyle = wgrad;
+        ctx.fillRect(x, y, winW, winH);
+        // Sometimes draw a curtain (horizontal bar)
+        if (Math.random() < 0.20){
+          ctx.fillStyle = 'rgba(20,15,30,0.5)';
+          ctx.fillRect(x, y + winH * 0.4, winW, winH * 0.3);
+        }
+        // Mullion bar
+        ctx.fillStyle = 'rgba(0,0,0,0.45)';
+        ctx.fillRect(x + winW/2 - 0.5, y, 1, winH);
+        ctx.fillRect(x, y + winH/2 - 0.5, winW, 1);
+      } else {
+        // Dark window
+        ctx.fillStyle = '#0c0814';
+        ctx.fillRect(x, y, winW, winH);
+        // Faint outline
+        ctx.fillStyle = 'rgba(50,40,70,0.4)';
+        ctx.fillRect(x, y, winW, 1);
+      }
+    }
+  }
+
+  // Subtle horizontal floor line every row
+  ctx.fillStyle = 'rgba(0,0,0,0.18)';
+  for (let r = 0; r < ROWS; r++){
+    ctx.fillRect(0, r * cellH, SIZE, 1);
+  }
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
+  tex.magFilter = THREE.NearestFilter;
+  tex.minFilter = THREE.LinearMipMapLinearFilter;
+  return tex;
+}
+
+function initFacadeTextures(){
+  for (const district of DISTRICT_LIST){
+    FACADE_TEX[district.name] = [];
+    for (let v = 0; v < 4; v++){
+      FACADE_TEX[district.name].push(makeFacadeTexture(district));
+    }
+  }
+}
+
+function buildingMaterialForFace(district, faceWidth, faceHeight, rng){
+  // Pick one of the 4 cached district textures
+  const sourceTex = FACADE_TEX[district.name][rng.int(0, 3)];
+  // Clone so we can set independent repeat
+  const tex = sourceTex.clone();
+  tex.needsUpdate = true;
+  // 1 texture tile = 4 windows = ~5.6 world units (matches old 1.4-unit window spacing)
+  tex.repeat.set(Math.max(1, faceWidth / 5.6), Math.max(1, faceHeight / 5.6));
+  return new THREE.MeshBasicMaterial({ map: tex });
+}
+
+function initCache(){
+  // Geometries
+  G.unitBox = new THREE.BoxGeometry(1, 1, 1);
+  G.unitPlane = new THREE.PlaneGeometry(1, 1);
+  G.unitCyl = new THREE.CylinderGeometry(0.5, 0.5, 1, 8);
+  G.unitSphere = new THREE.SphereGeometry(0.5, 8, 6);
+  // ── Voxel materials. Colour rides on the vertex attribute, so the whole
+  // blocky world needs only these two — roughly 2 draw calls per section.
+  M.voxOpaque = new THREE.MeshLambertMaterial({ vertexColors: true });
+  M.voxEmit   = new THREE.MeshBasicMaterial({ vertexColors: true });
+  // Materials
+  M.asphalt   = new THREE.MeshLambertMaterial({ color: 0x14121e });
+  M.sidewalk  = new THREE.MeshLambertMaterial({ color: 0x2a242e });
+  M.crossLine = new THREE.MeshBasicMaterial({ color: 0xb0a060 });
+  M.roof      = new THREE.MeshLambertMaterial({ color: 0x1c1824 });
+  M.metal     = new THREE.MeshLambertMaterial({ color: 0x4a4a52 });
+  M.darkMetal = new THREE.MeshLambertMaterial({ color: 0x1c1822 });
+  M.trashBag  = new THREE.MeshLambertMaterial({ color: 0x1a1a18 });
+  M.trashBag2 = new THREE.MeshLambertMaterial({ color: 0x281c1c });
+  M.foliage   = new THREE.MeshLambertMaterial({ color: 0x3a5a40 });
+  M.foliageDk = new THREE.MeshLambertMaterial({ color: 0x2a4632 });
+  M.bark      = new THREE.MeshLambertMaterial({ color: 0x3a2818 });
+  M.glassBlue = new THREE.MeshBasicMaterial({ color: 0x202840 });
+  M.headlight = new THREE.MeshBasicMaterial({ color: 0xfff0d0 });
+  M.taillight = new THREE.MeshBasicMaterial({ color: 0xff5060 });
+  M.camRed    = new THREE.MeshBasicMaterial({ color: 0xff3040 });
+  M.npcSkin   = [
+    new THREE.MeshLambertMaterial({ color: 0xc59070 }),
+    new THREE.MeshLambertMaterial({ color: 0x9c6845 }),
+    new THREE.MeshLambertMaterial({ color: 0xeac0a0 }),
+    new THREE.MeshLambertMaterial({ color: 0x6a4a35 }),
+  ];
+  M.npcHair = [
+    new THREE.MeshLambertMaterial({ color: 0x1a0e08 }),
+    new THREE.MeshLambertMaterial({ color: 0x4a3018 }),
+    new THREE.MeshLambertMaterial({ color: 0xb0a890 }),
+    new THREE.MeshLambertMaterial({ color: 0xff60d0 }),
+    new THREE.MeshLambertMaterial({ color: 0x80ffff }),
+    new THREE.MeshLambertMaterial({ color: 0xffd47a }),
+  ];
+  M.npcClothes = [
+    new THREE.MeshLambertMaterial({ color: 0x1a1820 }),
+    new THREE.MeshLambertMaterial({ color: 0x3a1820 }),
+    new THREE.MeshLambertMaterial({ color: 0x182830 }),
+    new THREE.MeshLambertMaterial({ color: 0x402040 }),
+    new THREE.MeshLambertMaterial({ color: 0x2a2018 }),
+    new THREE.MeshLambertMaterial({ color: 0x383040 }),
+    new THREE.MeshLambertMaterial({ color: 0x281a3a }),
+  ];
+}
+
+function makeBoxMesh(w, h, d, mat){
+  const m = new THREE.Mesh(G.unitBox, mat);
+  m.scale.set(w, h, d);
+  return m;
+}
+
+function makeNeonMat(color){
+  return new THREE.MeshBasicMaterial({ color });
+}
+
+// =============================================================================
+//  VOXEL CORE — the city is made of blocks, and every block is removable
+// =============================================================================
+//  Chunk (cx,cz) owns the voxel column [cx*24, cx*24+24) x [cz*24, cz*24+24),
+//  which is exactly the region its procedural generator already fills. Height is
+//  VOX_H, split into SEC_H-tall sections so breaking one block only remeshes a
+//  24x16x24 slab instead of the whole column (~9x less work).
+//
+//  The mesher below is deliberately a PURE function of (dims, sampler): no
+//  THREE.js, no scene, no chunk references. That is what lets it move to a Web
+//  Worker later without being rewritten.
+// =============================================================================
+const VOX_H  = 64;                 // world height in blocks
+const SEC_H  = 16;                 // section height
+const N_SEC  = VOX_H / SEC_H;      // 4 sections per chunk
+const VOX_W  = CHUNK_SIZE;         // 24 — matches the city block + street span
+
+// Block registry. `solid` drives collision + face culling, `emit` routes the
+// face into the unlit material so neon/windows glow at night.
+const B_AIR=0, B_ASPHALT=1, B_SIDEWALK=2, B_CONCRETE=3, B_WIN_LIT=4,
+      B_WIN_DARK=5, B_ROOF=6, B_METAL=7, B_NEON=8, B_GLASS=9, B_PAINT=10,
+      B_BRICK=11, B_RUST=12;
+const BLOCKS = [
+  { name:'air',      solid:false, emit:false, color:0x000000 },
+  { name:'asphalt',  solid:true,  emit:false, color:0x14121e },
+  { name:'sidewalk', solid:true,  emit:false, color:0x2a242e },
+  { name:'concrete', solid:true,  emit:false, color:0x3a3444 },
+  { name:'lit pane', solid:true,  emit:true,  color:0xffd9a0 },
+  { name:'dark pane',solid:true,  emit:false, color:0x161426 },
+  { name:'roof',     solid:true,  emit:false, color:0x1c1824 },
+  { name:'metal',    solid:true,  emit:false, color:0x4a4a56 },
+  { name:'neon',     solid:true,  emit:true,  color:0xff60d0 },
+  { name:'glass',    solid:true,  emit:false, color:0x5a7a8a },
+  { name:'paint',    solid:true,  emit:false, color:0xb0a060 },
+  { name:'brick',    solid:true,  emit:false, color:0x5a3a34 },
+  { name:'rust',     solid:true,  emit:false, color:0x6a4028 },
+];
+const isSolid = id => id !== B_AIR && BLOCKS[id] && BLOCKS[id].solid;
+
+// Per-face shading — a cheap stand-in for AO that gives the blocky world depth.
+const FACE_SHADE = [0.82, 0.82, 1.00, 0.55, 0.70, 0.70]; // +X -X +Y -Y +Z -Z
+
+const vIndex = (x, y, z) => x + VOX_W * z + VOX_W * VOX_W * y;
+const chunkCoordOf = w => Math.floor(w / VOX_W);
+
+// ─── Player edits — sparse diffs layered over procedural generation ─────────
+// An infinite city can't be stored; only what the player changed is. Keyed by
+// world seed so different cities keep separate edit sets.
+const EDITS = new Map();           // "x,y,z" -> blockId
+function editKey(x, y, z){ return x + ',' + y + ',' + z; }
+
+// ─── Global block access ───────────────────────────────────────────────────
+function getBlock(wx, wy, wz){
+  if (wy < 0 || wy >= VOX_H) return B_AIR;
+  const cx = chunkCoordOf(wx), cz = chunkCoordOf(wz);
+  const c = State.chunkMap.get(`${cx},${cz}`);
+  if (!c || !c.vox) return B_AIR;   // unloaded reads as air; neighbours remesh on load
+  return c.vox[vIndex(wx - cx*VOX_W, wy, wz - cz*VOX_W)];
+}
+function setBlock(wx, wy, wz, id, record = true){
+  if (wy < 0 || wy >= VOX_H) return false;
+  const cx = chunkCoordOf(wx), cz = chunkCoordOf(wz);
+  const c = State.chunkMap.get(`${cx},${cz}`);
+  if (!c || !c.vox) return false;
+  const lx = wx - cx*VOX_W, lz = wz - cz*VOX_W;
+  c.vox[vIndex(lx, wy, lz)] = id;
+  if (record){ EDITS.set(editKey(wx, wy, wz), id); State.editsDirty = true; }
+  // Remesh the touched section, plus any neighbour whose faces are now exposed.
+  c.markSectionDirty(Math.floor(wy / SEC_H));
+  if (lx === 0)         markNeighbourDirty(cx-1, cz, wy);
+  if (lx === VOX_W - 1) markNeighbourDirty(cx+1, cz, wy);
+  if (lz === 0)         markNeighbourDirty(cx, cz-1, wy);
+  if (lz === VOX_W - 1) markNeighbourDirty(cx, cz+1, wy);
+  const sy = Math.floor(wy / SEC_H);
+  if (wy % SEC_H === 0 && sy > 0)         c.markSectionDirty(sy-1);
+  if (wy % SEC_H === SEC_H-1 && sy < N_SEC-1) c.markSectionDirty(sy+1);
+  return true;
+}
+function markNeighbourDirty(cx, cz, wy){
+  const n = State.chunkMap.get(`${cx},${cz}`);
+  if (n && n.vox) n.markSectionDirty(Math.floor(wy / SEC_H));
+}
+
+// ─── GREEDY MESHER (pure) ──────────────────────────────────────────────────
+// Merges coplanar runs of identical blocks into single quads. A flat 16x40
+// tower wall collapses from 640 quads to ~1. Returns plain quad records so the
+// caller owns all THREE.js concerns.
+function greedyQuads(dx, dy, dz, getAt){
+  const dims = [dx, dy, dz];
+  const quads = [];
+  for (let d = 0; d < 3; d++){
+    const u = (d+1)%3, v = (d+2)%3;
+    const x = [0,0,0], q = [0,0,0];
+    q[d] = 1;
+    const mask = new Int32Array(dims[u] * dims[v]);
+    for (x[d] = -1; x[d] < dims[d];){
+      // Build the mask for this slice: +id = face pointing +d, -id = pointing -d
+      let n = 0;
+      for (x[v] = 0; x[v] < dims[v]; x[v]++){
+        for (x[u] = 0; x[u] < dims[u]; x[u]++, n++){
+          const a = x[d] >= 0        ? getAt(x[0], x[1], x[2]) : B_AIR;
+          const b = x[d] < dims[d]-1 ? getAt(x[0]+q[0], x[1]+q[1], x[2]+q[2]) : B_AIR;
+          const sa = isSolid(a), sb = isSolid(b);
+          mask[n] = sa === sb ? 0 : (sa ? a : -b);
+        }
+      }
+      x[d]++;
+      // Greedy-merge rectangles out of the mask
+      n = 0;
+      for (let j = 0; j < dims[v]; j++){
+        for (let i = 0; i < dims[u];){
+          const c = mask[n];
+          if (c === 0){ i++; n++; continue; }
+          let w = 1;
+          while (i + w < dims[u] && mask[n + w] === c) w++;
+          let h = 1, stop = false;
+          while (j + h < dims[v]){
+            for (let k = 0; k < w; k++){
+              if (mask[n + k + h*dims[u]] !== c){ stop = true; break; }
+            }
+            if (stop) break;
+            h++;
+          }
+          x[u] = i; x[v] = j;
+          const du = [0,0,0], dv = [0,0,0];
+          du[u] = w; dv[v] = h;
+          quads.push({ p:[x[0],x[1],x[2]], du, dv, d, back: c < 0, id: Math.abs(c) });
+          for (let l = 0; l < h; l++)
+            for (let k = 0; k < w; k++) mask[n + k + l*dims[u]] = 0;
+          i += w; n += w;
+        }
+      }
+    }
+  }
+  return quads;
+}
+
+// Turn quads into a BufferGeometry. `wantEmit` selects which material bucket.
+function quadsToGeometry(quads, ox, oy, oz, wantEmit){
+  const pos = [], nrm = [], col = [], idx = [];
+  const c3 = new THREE.Color();
+  let vi = 0;
+  for (const Q of quads){
+    const blk = BLOCKS[Q.id];
+    if (!blk || !!blk.emit !== wantEmit) continue;
+    const [px, py, pz] = Q.p;
+    const s = Q.back ? -1 : 1;
+    const nx = Q.d === 0 ? s : 0, ny = Q.d === 1 ? s : 0, nz = Q.d === 2 ? s : 0;
+    // Corner order flips with facing so winding stays counter-clockwise.
+    const a = [px, py, pz];
+    const b = [px + Q.du[0], py + Q.du[1], pz + Q.du[2]];
+    const c = [px + Q.du[0] + Q.dv[0], py + Q.du[1] + Q.dv[1], pz + Q.du[2] + Q.dv[2]];
+    const e = [px + Q.dv[0], py + Q.dv[1], pz + Q.dv[2]];
+    const quad = Q.back ? [a, e, c, b] : [a, b, c, e];
+    const face = Q.d*2 + (Q.back ? 1 : 0);
+    const shade = FACE_SHADE[face] ?? 0.8;
+    c3.setHex(blk.color);
+    for (const p of quad){
+      pos.push(p[0] + ox, p[1] + oy, p[2] + oz);
+      nrm.push(nx, ny, nz);
+      col.push(c3.r * shade, c3.g * shade, c3.b * shade);
+    }
+    idx.push(vi, vi+1, vi+2, vi, vi+2, vi+3);
+    vi += 4;
+  }
+  if (!idx.length) return null;
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('normal',   new THREE.Float32BufferAttribute(nrm, 3));
+  g.setAttribute('color',    new THREE.Float32BufferAttribute(col, 3));
+  g.setIndex(idx);
+  return g;
+}
+
+// ─── DDA voxel raycast (Amanatides & Woo) ──────────────────────────────────
+// Faster than THREE.Raycaster against a voxel field, and it hands back the hit
+// face for free — which is exactly what block placement needs.
+function raycastVoxel(origin, dir, maxDist){
+  let x = Math.floor(origin.x), y = Math.floor(origin.y), z = Math.floor(origin.z);
+  const sx = dir.x > 0 ? 1 : -1, sy = dir.y > 0 ? 1 : -1, sz = dir.z > 0 ? 1 : -1;
+  const tDX = Math.abs(1 / (dir.x || 1e-9));
+  const tDY = Math.abs(1 / (dir.y || 1e-9));
+  const tDZ = Math.abs(1 / (dir.z || 1e-9));
+  let tMX = ((dir.x > 0 ? x + 1 - origin.x : origin.x - x) || 1e-9) * tDX;
+  let tMY = ((dir.y > 0 ? y + 1 - origin.y : origin.y - y) || 1e-9) * tDY;
+  let tMZ = ((dir.z > 0 ? z + 1 - origin.z : origin.z - z) || 1e-9) * tDZ;
+  let nx = 0, ny = 0, nz = 0, t = 0;
+  while (t <= maxDist){
+    if (y >= 0 && y < VOX_H){
+      const id = getBlock(x, y, z);
+      if (isSolid(id)) return { x, y, z, id, nx, ny, nz };
+    }
+    if (tMX < tMY && tMX < tMZ){ x += sx; t = tMX; tMX += tDX; nx = -sx; ny = 0; nz = 0; }
+    else if (tMY < tMZ)        { y += sy; t = tMY; tMY += tDY; nx = 0; ny = -sy; nz = 0; }
+    else                       { z += sz; t = tMZ; tMZ += tDZ; nx = 0; ny = 0; nz = -sz; }
+  }
+  return null;
+}
+
+// ─── Voxel collision ───────────────────────────────────────────────────────
+// Replaces the old per-chunk AABB lists. Besides being simpler, this finally
+// lets the player stand on roofs — the AABB version only ever blocked XZ and
+// resolved Y against the ground plane, so rooftops were unreachable.
+function boxHitsVoxels(cx, cy, cz, r, h){
+  const x0 = Math.floor(cx - r), x1 = Math.floor(cx + r);
+  const z0 = Math.floor(cz - r), z1 = Math.floor(cz + r);
+  const y0 = Math.floor(cy),     y1 = Math.floor(cy + h - 0.001);
+  for (let y = y0; y <= y1; y++)
+    for (let z = z0; z <= z1; z++)
+      for (let x = x0; x <= x1; x++)
+        if (isSolid(getBlock(x, y, z))) return true;
+  return false;
+}
+
+// =============================================================================
+//  CHUNK CLASS — generates and owns all objects in a 24x24 city block area
+// =============================================================================
+class Chunk {
+  constructor(cx, cz, globalSeed){
+    this.cx = cx; this.cz = cz;
+    this.key = `${cx},${cz}`;
+    this.seed = hashStr(`${globalSeed}:${cx}:${cz}`);
+    this.rng = new RNG(this.seed);
+    this.district = districtForChunk(cx, cz);
+    this.group = new THREE.Group();
+    this.collisionAABBs = [];
+    this.terminals = [];
+    this.parkedCars = [];
+    this.lights = []; // point lights, only enabled when near player
+    this.steamVents = []; // steam emitter positions
+    // World center of this chunk's block
+    this.worldX = cx * CHUNK_SIZE + CHUNK_SIZE/2;
+    this.worldZ = cz * CHUNK_SIZE + CHUNK_SIZE/2;
+    // ── Voxel field: this chunk owns [cx*24, cx*24+24) x [cz*24, cz*24+24) ──
+    this.originX = cx * VOX_W;
+    this.originZ = cz * VOX_W;
+    this.vox = new Uint8Array(VOX_W * VOX_W * VOX_H);
+    this.secMesh = new Array(N_SEC).fill(null);   // opaque mesh per section
+    this.secEmit = new Array(N_SEC).fill(null);   // emissive mesh per section
+    this.secDirty = new Array(N_SEC).fill(true);
+    this.generate();
+    this.applyEdits();      // player changes overlay the procedural city
+    this.buildAllSections();
+    // Our own faces changed, so neighbours may now be exposing seams.
+    for (const [dx, dz] of [[-1,0],[1,0],[0,-1],[0,1]]){
+      const n = State.chunkMap.get(`${cx+dx},${cz+dz}`);
+      if (n && n.vox) n.secDirty.fill(true);
+    }
+  }
+
+  // ── Voxel helpers (local coords) ──────────────────────────────────────────
+  vGet(x, y, z){
+    if (x < 0 || z < 0 || x >= VOX_W || z >= VOX_W || y < 0 || y >= VOX_H) return B_AIR;
+    return this.vox[vIndex(x, y, z)];
+  }
+  vSet(x, y, z, id){
+    if (x < 0 || z < 0 || x >= VOX_W || z >= VOX_W || y < 0 || y >= VOX_H) return;
+    this.vox[vIndex(x, y, z)] = id;
+  }
+  // Stamp a world-space box into the voxel field. Generation works in floats,
+  // so bounds are rounded to whole blocks here — the one lossy step.
+  stampBox(wx0, wy0, wz0, wx1, wy1, wz1, id){
+    const x0 = Math.max(0,        Math.round(wx0 - this.originX));
+    const x1 = Math.min(VOX_W-1,  Math.round(wx1 - this.originX) - 1);
+    const z0 = Math.max(0,        Math.round(wz0 - this.originZ));
+    const z1 = Math.min(VOX_W-1,  Math.round(wz1 - this.originZ) - 1);
+    const y0 = Math.max(0,        Math.round(wy0));
+    const y1 = Math.min(VOX_H-1,  Math.round(wy1) - 1);
+    for (let y = y0; y <= y1; y++)
+      for (let z = z0; z <= z1; z++)
+        for (let x = x0; x <= x1; x++)
+          this.vox[vIndex(x, y, z)] = id;
+  }
+
+  applyEdits(){
+    if (!EDITS.size) return;
+    const ox = this.originX, oz = this.originZ;
+    for (const [k, id] of EDITS){
+      const [x, y, z] = k.split(',').map(Number);
+      if (x >= ox && x < ox + VOX_W && z >= oz && z < oz + VOX_W){
+        this.vox[vIndex(x - ox, y, z - oz)] = id;
+      }
+    }
+  }
+
+  markSectionDirty(sy){
+    if (sy >= 0 && sy < N_SEC) this.secDirty[sy] = true;
+  }
+
+  // Build one 24x16x24 section. Sampling goes through the GLOBAL getBlock at
+  // the borders so faces between chunks are culled correctly.
+  buildSection(sy){
+    const baseY = sy * SEC_H;
+    const ox = this.originX, oz = this.originZ;
+    const sample = (x, y, z) => {
+      const wy = y + baseY;
+      if (x >= 0 && z >= 0 && x < VOX_W && z < VOX_W){
+        return (wy < 0 || wy >= VOX_H) ? B_AIR : this.vox[vIndex(x, wy, z)];
+      }
+      return getBlock(ox + x, wy, oz + z);   // crosses into a neighbour chunk
+    };
+    const quads = greedyQuads(VOX_W, SEC_H, VOX_W, sample);
+    for (const [arr, wantEmit, mat] of [
+      [this.secMesh, false, M.voxOpaque],
+      [this.secEmit, true,  M.voxEmit],
+    ]){
+      if (arr[sy]){ this.group.remove(arr[sy]); arr[sy].geometry.dispose(); arr[sy] = null; }
+      const geo = quadsToGeometry(quads, ox, baseY, oz, wantEmit);
+      if (geo){
+        const mesh = new THREE.Mesh(geo, mat);
+        mesh.frustumCulled = true;
+        this.group.add(mesh);
+        arr[sy] = mesh;
+      }
+    }
+    this.secDirty[sy] = false;
+  }
+  buildAllSections(){ for (let s = 0; s < N_SEC; s++) this.buildSection(s); }
+  rebuildDirtySections(){
+    for (let s = 0; s < N_SEC; s++) if (this.secDirty[s]) this.buildSection(s);
+  }
+
+  generate(){
+    const rng = this.rng;
+    const district = this.district;
+    const wx = this.worldX, wz = this.worldZ;
+
+    // ── Ground, as blocks ───────────────────────────────────────────────────
+    // Everything structural is stamped into the voxel field now rather than
+    // added as scaled boxes, so all of it can be mined out.
+    const ox = this.originX, oz = this.originZ;
+    // Street bed: one layer of asphalt across the whole chunk (y 0..1)
+    this.stampBox(ox, 0, oz, ox + VOX_W, 1, oz + VOX_W, B_ASPHALT);
+    // Lane paint down the middle of the two streets this chunk owns
+    this.stampBox(ox, 0, oz + 1, ox + VOX_W, 1, oz + 2, B_PAINT);
+    this.stampBox(ox + 1, 0, oz, ox + 2, 1, oz + VOX_W, B_PAINT);
+    // Sidewalk pad, one block proud of the road, over the city-block footprint
+    const bx0 = wx - CITY_BLOCK_SIZE/2, bx1 = wx + CITY_BLOCK_SIZE/2;
+    const bz0 = wz - CITY_BLOCK_SIZE/2, bz1 = wz + CITY_BLOCK_SIZE/2;
+    this.stampBox(bx0, 1, bz0, bx1, 2, bz1, B_SIDEWALK);
+
+    // ── Buildings ────────────────────────────────────────────────────────────
+    const splitMode = rng.next();
+    const blockBuildings = [];
+    if (splitMode < 0.55){
+      blockBuildings.push({
+        cx: wx, cz: wz, w: CITY_BLOCK_SIZE - 2, d: CITY_BLOCK_SIZE - 2,
+        h: rng.range(district.minHeight, district.maxHeight),
+      });
+    } else if (splitMode < 0.85){
+      const half = (CITY_BLOCK_SIZE - 2) / 2;
+      for (let i = 0; i < 2; i++){
+        const offset = (i - 0.5) * half;
+        const horiz = rng.bool();
+        blockBuildings.push({
+          cx: wx + (horiz ? offset : 0),
+          cz: wz + (horiz ? 0 : offset),
+          w: horiz ? half - 0.4 : (CITY_BLOCK_SIZE - 2),
+          d: horiz ? (CITY_BLOCK_SIZE - 2) : half - 0.4,
+          h: rng.range(district.minHeight, district.maxHeight),
+        });
+      }
+    } else {
+      const half = (CITY_BLOCK_SIZE - 2) / 2;
+      for (let i = 0; i < 2; i++){
+        for (let j = 0; j < 2; j++){
+          blockBuildings.push({
+            cx: wx + (i - 0.5) * half,
+            cz: wz + (j - 0.5) * half,
+            w: half - 0.6, d: half - 0.6,
+            h: rng.range(district.minHeight*0.6, district.maxHeight*0.8),
+          });
+        }
+      }
+    }
+    for (const b of blockBuildings){ this.makeBuilding(b, district); }
+
+    // ── Sidewalk dystopian details ──────────────────────────────────────────
+    this.placeSidewalkDetails(blockBuildings, district);
+
+    // ── Plants ──────────────────────────────────────────────────────────────
+    this.placePlants(district, blockBuildings);
+
+    // ── Parked cars on adjacent street ──────────────────────────────────────
+    const carRoll = rng.next();
+    if (carRoll < 0.50){
+      const edge = rng.int(0, 3);
+      const off = CITY_BLOCK_SIZE/2 + STREET_WIDTH * 0.25;
+      const positions = [
+        { x: wx + rng.range(-CITY_BLOCK_SIZE/4, CITY_BLOCK_SIZE/4), z: wz - off, rot: 0 },
+        { x: wx + off, z: wz + rng.range(-CITY_BLOCK_SIZE/4, CITY_BLOCK_SIZE/4), rot: Math.PI/2 },
+        { x: wx + rng.range(-CITY_BLOCK_SIZE/4, CITY_BLOCK_SIZE/4), z: wz + off, rot: 0 },
+        { x: wx - off, z: wz + rng.range(-CITY_BLOCK_SIZE/4, CITY_BLOCK_SIZE/4), rot: Math.PI/2 },
+      ];
+      const p = positions[edge];
+      const car = this.makeParkedCar(p.x, p.z, p.rot);
+      this.parkedCars.push(car);
+    }
+
+    // ── Terminal kiosk ──────────────────────────────────────────────────────
+    if (rng.next() < 0.16){
+      const edge = rng.int(0, 3);
+      const sidewalkEdge = CITY_BLOCK_SIZE/2 - 1.2;
+      const positions = [
+        { x: wx + rng.range(-CITY_BLOCK_SIZE/4, CITY_BLOCK_SIZE/4), z: wz - sidewalkEdge },
+        { x: wx + sidewalkEdge, z: wz + rng.range(-CITY_BLOCK_SIZE/4, CITY_BLOCK_SIZE/4) },
+        { x: wx + rng.range(-CITY_BLOCK_SIZE/4, CITY_BLOCK_SIZE/4), z: wz + sidewalkEdge },
+        { x: wx - sidewalkEdge, z: wz + rng.range(-CITY_BLOCK_SIZE/4, CITY_BLOCK_SIZE/4) },
+      ];
+      const p = positions[edge];
+      const t = this.makeTerminal(p.x, p.z);
+      this.terminals.push(t);
+    }
+
+    // ── Steam vents (manhole steam emitters) ────────────────────────────────
+    if (rng.next() < district.ventingSteamProb){
+      // Place a manhole-ish circle on the street
+      const angle = rng.range(0, TAU);
+      const dist = CITY_BLOCK_SIZE/2 + STREET_WIDTH/3;
+      const sx = wx + Math.cos(angle) * dist;
+      const sz = wz + Math.sin(angle) * dist;
+      // Visible manhole — dark cylinder slightly raised
+      const manhole = new THREE.Mesh(G.unitCyl, M.darkMetal);
+      manhole.scale.set(1.2, 0.05, 1.2);
+      manhole.position.set(sx, 0.07, sz);
+      this.group.add(manhole);
+      this.steamVents.push({ x: sx, y: 0.1, z: sz });
+    }
+
+    // ── NPCs (capped globally) ──────────────────────────────────────────────
+    if (rng.bool(0.55) && State.globalNPCs.length < MAX_NPCS_GLOBAL){
+      const ang = rng.range(0, TAU);
+      const r = rng.range(CITY_BLOCK_SIZE/2 + 1, CITY_BLOCK_SIZE/2 + 2.5);
+      const nx = wx + Math.cos(ang) * r;
+      const nz = wz + Math.sin(ang) * r;
+      const npc = new NPC(nx, nz, this.rng);
+      this.group.add(npc.group);
+      State.globalNPCs.push(npc);
+      npc.chunkKey = this.key;
+    }
+
+    // ── Enemies (capped globally) ───────────────────────────────────────────
+    // Don't spawn enemies in chunks too close to player
+    const playerDistSq = (this.worldX - Player.position.x)**2 + (this.worldZ - Player.position.z)**2;
+    if (playerDistSq > 25 * 25 &&
+        rng.bool(0.30) && State.enemies.length < MAX_ENEMIES_GLOBAL){
+      const typeRoll = rng.next();
+      const enemyType = typeRoll < 0.55 ? 'thug' : typeRoll < 0.85 ? 'drone' : 'heavy';
+      const ang = rng.range(0, TAU);
+      const r = rng.range(CITY_BLOCK_SIZE/2 + 1, CITY_BLOCK_SIZE/2 + 3);
+      const ex = wx + Math.cos(ang) * r;
+      const ez = wz + Math.sin(ang) * r;
+      const enemy = new Enemy(enemyType, ex, ez, this.rng);
+      this.group.add(enemy.group);
+      State.enemies.push(enemy);
+      enemy.chunkKey = this.key;
+    }
+
+    // ── Mobile cars (capped globally) ───────────────────────────────────────
+    if (rng.next() < 0.18 && State.globalCars.length < MAX_MOBILE_CARS_GLOBAL){
+      const dir = rng.int(0, 3);
+      const off = CITY_BLOCK_SIZE/2 + STREET_WIDTH * 0.30;
+      const sxz = (() => {
+        switch(dir){
+          case 0: return { x: wx + rng.range(-3, 3), z: wz - off, rot: 0 };
+          case 1: return { x: wx + off, z: wz + rng.range(-3, 3), rot: -Math.PI/2 };
+          case 2: return { x: wx + rng.range(-3, 3), z: wz + off, rot: Math.PI };
+          case 3: return { x: wx - off, z: wz + rng.range(-3, 3), rot: Math.PI/2 };
+        }
+      })();
+      const mc = new MobileCar(sxz.x, sxz.z, sxz.rot, this.rng);
+      this.group.add(mc.group);
+      State.globalCars.push(mc);
+      mc.chunkKey = this.key;
+    }
+  }
+
+  makeBuilding(b, district){
+    const rng = this.rng;
+    // ── Voxelised tower ─────────────────────────────────────────────────────
+    // Was a single stretched box wearing a baked facade texture. Now it is
+    // solid blocks: concrete shell, a punched window grid, roof slab. The
+    // facade look survives as block *types* rather than as a texture.
+    const GROUND = 2;                                   // sidewalk top
+    const top = Math.min(VOX_H - 2, GROUND + Math.round(b.h));
+    const x0 = Math.round(b.cx - b.w/2), x1 = Math.round(b.cx + b.w/2);
+    const z0 = Math.round(b.cz - b.d/2), z1 = Math.round(b.cz + b.d/2);
+    this.stampBox(x0, GROUND, z0, x1, top, z1, B_CONCRETE);
+    // Roof slab, one block proud, reads as the old parapet
+    this.stampBox(x0 - 1, top, z0 - 1, x1 + 1, top + 1, z1 + 1, B_ROOF);
+    const roofTop = top + 1;   // world Y that rooftop props stand on
+
+    // ── Windows: punch a grid into the outer shell only ─────────────────────
+    const litProb = district.litWindowProb !== undefined ? district.litWindowProb : 0.45;
+    const lx0 = Math.max(0, x0 - this.originX), lx1 = Math.min(VOX_W - 1, x1 - this.originX - 1);
+    const lz0 = Math.max(0, z0 - this.originZ), lz1 = Math.min(VOX_W - 1, z1 - this.originZ - 1);
+    for (let y = GROUND + 2; y < top - 1; y += 3){          // skip the ground floor
+      for (let lx = lx0; lx <= lx1; lx++){
+        for (let lz = lz0; lz <= lz1; lz++){
+          const edge = (lx === lx0 || lx === lx1 || lz === lz0 || lz === lz1);
+          if (!edge) continue;
+          // 2-on / 1-off rhythm horizontally so panes read as windows, not stripes
+          const along = (lx === lx0 || lx === lx1) ? lz : lx;
+          if (along % 3 === 0) continue;
+          if (this.vGet(lx, y, lz) !== B_CONCRETE) continue;
+          this.vSet(lx, y, lz, rng.next() < litProb ? B_WIN_LIT : B_WIN_DARK);
+        }
+      }
+    }
+
+    // Rooftop equipment — AC units (capped for perf)
+    const equipCount = rng.int(0, 2);
+    for (let i = 0; i < equipCount; i++){
+      const ex = b.cx + rng.range(-b.w/2 + 0.5, b.w/2 - 0.5);
+      const ez = b.cz + rng.range(-b.d/2 + 0.5, b.d/2 - 0.5);
+      const eh = rng.range(0.4, 1.2);
+      const equip = makeBoxMesh(rng.range(0.6, 1.4), eh, rng.range(0.6, 1.4), M.metal);
+      // roofTop: props sit on the voxel roof slab, which starts GROUND blocks up
+      equip.position.set(ex, roofTop + eh/2, ez);
+      this.group.add(equip);
+    }
+    // Antennas (with blinker red light)
+    if (rng.bool(0.30)){
+      const antH = rng.range(0.8, 2.5);
+      const antenna = makeBoxMesh(0.06, antH, 0.06, M.metal);
+      const ax = b.cx + rng.range(-b.w/2, b.w/2);
+      const az = b.cz + rng.range(-b.d/2, b.d/2);
+      antenna.position.set(ax, roofTop + antH/2, az);
+      this.group.add(antenna);
+      const blinker = makeBoxMesh(0.12, 0.12, 0.12, M.taillight);
+      blinker.position.set(ax, roofTop + antH, az);
+      this.group.add(blinker);
+    }
+
+    // Side neon sign
+    if (rng.next() < district.neonProb){
+      const color = rng.pick(NEON_COLORS);
+      const orient = rng.int(0, 3);
+      const signH = Math.min(b.h * 0.5, rng.range(3, 8));
+      const isVertical = orient % 2 === 0;
+      const sign = makeBoxMesh(
+        isVertical ? 0.7 : 0.15,
+        signH,
+        isVertical ? 0.15 : 0.7,
+        makeNeonMat(color)
+      );
+      let sx = b.cx, sz = b.cz, sy = GROUND + b.h * rng.range(0.3, 0.7);
+      switch (orient){
+        case 0: sx = b.cx + b.w/2 + 0.1; break;
+        case 1: sz = b.cz + b.d/2 + 0.1; break;
+        case 2: sx = b.cx - b.w/2 - 0.1; break;
+        case 3: sz = b.cz - b.d/2 - 0.1; break;
+      }
+      sign.position.set(sx, sy, sz);
+      this.group.add(sign);
+      // Add light (will be enabled only when chunk is near player)
+      const sLight = new THREE.PointLight(color, 1.5, 8);
+      sLight.position.set(sx, sy, sz);
+      sLight.visible = false; // toggled by light manager
+      this.group.add(sLight);
+      this.lights.push(sLight);
+    }
+
+    // Rooftop billboard
+    if (b.h > 16 && rng.next() < district.billboardProb){
+      const bbColor = rng.pick(NEON_COLORS);
+      const bbW = b.w * 0.75;
+      const bbH = rng.range(2.5, 4.0);
+      const bb = makeBoxMesh(bbW, bbH, 0.25, makeNeonMat(bbColor));
+      bb.position.set(b.cx, b.h + bbH/2 + 1.2, b.cz);
+      // Random rotation around Y
+      bb.rotation.y = rng.range(0, TAU * 0.1) - TAU * 0.05;
+      this.group.add(bb);
+      // Supports
+      [-bbW/2 + 0.3, bbW/2 - 0.3].forEach(off => {
+        const sup = makeBoxMesh(0.3, 1.2, 0.3, M.metal);
+        sup.position.set(b.cx + off, b.h + 0.6, b.cz);
+        this.group.add(sup);
+      });
+      const bbLight = new THREE.PointLight(bbColor, 1.2, 16);
+      bbLight.position.set(b.cx, b.h + bbH + 1, b.cz);
+      bbLight.visible = false;
+      this.group.add(bbLight);
+      this.lights.push(bbLight);
+      // ── Register as holo ad for color cycling ──
+      if (rng.bool(0.4)){
+        State.holoAds.push({
+          mesh: bb, light: bbLight,
+          phase: rng.range(0, 1),
+        });
+      }
+    }
+
+    // Graffiti — colorful rectangles on walls (low to ground)
+    if (rng.next() < district.graffitiProb * 0.6){
+      const tagCount = rng.int(1, 2);
+      for (let i = 0; i < tagCount; i++){
+        const color = rng.pick([0xff60d0, 0x80ffff, 0xffd47a, 0x7dffb3, 0xa040ff, 0xff5050]);
+        const tagW = rng.range(0.8, 2.2);
+        const tagH = rng.range(0.3, 1.0);
+        const wallFace = rng.int(0, 3);
+        const tag = makeBoxMesh(
+          wallFace % 2 === 0 ? 0.05 : tagW,
+          tagH,
+          wallFace % 2 === 1 ? 0.05 : tagW,
+          makeNeonMat(color)
+        );
+        const tagY = rng.range(0.5, 2.5);
+        switch (wallFace){
+          case 0: tag.position.set(b.cx + b.w/2 + 0.06, tagY, b.cz + rng.range(-b.d/3, b.d/3)); break;
+          case 1: tag.position.set(b.cx + rng.range(-b.w/3, b.w/3), tagY, b.cz + b.d/2 + 0.06); break;
+          case 2: tag.position.set(b.cx - b.w/2 - 0.06, tagY, b.cz + rng.range(-b.d/3, b.d/3)); break;
+          case 3: tag.position.set(b.cx + rng.range(-b.w/3, b.w/3), tagY, b.cz - b.d/2 - 0.06); break;
+        }
+        this.group.add(tag);
+      }
+    }
+
+    // Surveillance camera
+    if (rng.next() < district.cameraProb * 0.5){
+      const corner = rng.int(0, 3);
+      const cornerX = b.cx + (corner % 2 === 0 ? -1 : 1) * (b.w/2 - 0.2);
+      const cornerZ = b.cz + (corner < 2 ? -1 : 1) * (b.d/2 - 0.2);
+      const camY = rng.range(2.5, Math.min(b.h * 0.8, 6));
+      // Body
+      const camBody = makeBoxMesh(0.3, 0.2, 0.5, M.darkMetal);
+      camBody.position.set(cornerX, camY, cornerZ);
+      camBody.rotation.y = corner * Math.PI/2 + Math.PI/4;
+      this.group.add(camBody);
+      // Red dot
+      const camLed = makeBoxMesh(0.08, 0.08, 0.08, M.camRed);
+      camLed.position.set(cornerX + 0.1, camY, cornerZ);
+      this.group.add(camLed);
+    }
+
+    // Wall vents (small grilles)
+    if (rng.next() < district.ventProb * 0.5){
+      const ventCount = 1;
+      for (let i = 0; i < ventCount; i++){
+        const vent = makeBoxMesh(0.6, 0.6, 0.08, M.metal);
+        const face = rng.int(0, 3);
+        const vy = rng.range(0.8, b.h * 0.6);
+        switch (face){
+          case 0: vent.position.set(b.cx + b.w/2 + 0.05, vy, b.cz + rng.range(-b.d/3, b.d/3)); vent.rotation.y = Math.PI/2; break;
+          case 1: vent.position.set(b.cx + rng.range(-b.w/3, b.w/3), vy, b.cz + b.d/2 + 0.05); break;
+          case 2: vent.position.set(b.cx - b.w/2 - 0.05, vy, b.cz + rng.range(-b.d/3, b.d/3)); vent.rotation.y = Math.PI/2; break;
+          case 3: vent.position.set(b.cx + rng.range(-b.w/3, b.w/3), vy, b.cz - b.d/2 - 0.05); break;
+        }
+        this.group.add(vent);
+      }
+    }
+
+    // Pipes running down the building exterior
+    if (rng.bool(0.20)){
+      const pipeFace = rng.int(0, 3);
+      const pipeR = 0.12;
+      const pipe = makeBoxMesh(pipeR, b.h * 0.8, pipeR, M.metal);
+      let px = b.cx, pz = b.cz;
+      switch (pipeFace){
+        case 0: px = b.cx + b.w/2 - 0.3; pz = b.cz + rng.range(-b.d/4, b.d/4); break;
+        case 1: px = b.cx + rng.range(-b.w/4, b.w/4); pz = b.cz + b.d/2 - 0.3; break;
+        case 2: px = b.cx - b.w/2 + 0.3; pz = b.cz + rng.range(-b.d/4, b.d/4); break;
+        case 3: px = b.cx + rng.range(-b.w/4, b.w/4); pz = b.cz - b.d/2 + 0.3; break;
+      }
+      pipe.position.set(px, b.h * 0.4, pz);
+      this.group.add(pipe);
+    }
+  }
+
+  placeSidewalkDetails(buildings, district){
+    const rng = this.rng;
+    const wx = this.worldX, wz = this.worldZ;
+    const blockHalf = CITY_BLOCK_SIZE/2 - 0.6;
+
+    // Helper — get a position near the block edge on the sidewalk
+    const sidewalkSpot = () => {
+      const edge = rng.int(0, 3);
+      const along = rng.range(-blockHalf + 1, blockHalf - 1);
+      switch (edge){
+        case 0: return { x: wx + along, z: wz - blockHalf, edgeRot: 0 };
+        case 1: return { x: wx + blockHalf, z: wz + along, edgeRot: -Math.PI/2 };
+        case 2: return { x: wx + along, z: wz + blockHalf, edgeRot: Math.PI };
+        case 3: return { x: wx - blockHalf, z: wz + along, edgeRot: Math.PI/2 };
+      }
+    };
+
+    // Streetlights on 2 opposite corners (cut from 4 for perf)
+    const cornerStart = rng.int(0, 1); // alternate corner pair
+    for (let cidx = 0; cidx < 2; cidx++){
+      const corner = cornerStart + cidx * 2; // 0,2 or 1,3
+      const cs = [-1, 1];
+      const xSign = cs[corner % 2];
+      const zSign = cs[Math.floor(corner / 2)];
+      const sx = wx + xSign * (CITY_BLOCK_SIZE/2 + STREET_WIDTH * 0.05);
+      const sz = wz + zSign * (CITY_BLOCK_SIZE/2 + STREET_WIDTH * 0.05);
+      // Pole
+      const pole = makeBoxMesh(0.18, 5.5, 0.18, M.metal);
+      pole.position.set(sx, 2.75, sz);
+      this.group.add(pole);
+      // Lamp arm
+      const arm = makeBoxMesh(1.0, 0.12, 0.12, M.metal);
+      arm.position.set(sx - xSign * 0.5, 5.4, sz);
+      this.group.add(arm);
+      // Lamp head
+      const lampColor = rng.pick([0xfff0c8, 0xffe8a0, 0xfffacd, 0xffd47a]);
+      const lampMat = makeNeonMat(lampColor);
+      const lamp = makeBoxMesh(0.4, 0.18, 0.4, lampMat);
+      lamp.position.set(sx - xSign * 1.0, 5.3, sz);
+      this.group.add(lamp);
+      // Light
+      const ll = new THREE.PointLight(lampColor, 0.8, 11);
+      ll.position.set(sx - xSign * 1.0, 5.0, sz);
+      ll.visible = false; // toggled
+      this.group.add(ll);
+      this.lights.push(ll);
+    }
+
+    // Vending machines
+    if (rng.next() < 0.20){
+      const count = 1;
+      for (let i = 0; i < count; i++){
+        const p = sidewalkSpot();
+        const vmColor = rng.pick([0xff3050, 0x3050ff, 0x30c050, 0xffae50, 0xff60d0]);
+        const vm = new THREE.Group();
+        // Body
+        const body = makeBoxMesh(0.9, 1.8, 0.6, new THREE.MeshStandardMaterial({ color: vmColor, roughness: 0.5 }));
+        body.position.y = 0.9;
+        vm.add(body);
+        // Screen / panel (lit)
+        const panel = makeBoxMesh(0.7, 0.6, 0.05, makeNeonMat(0xffffd0));
+        panel.position.set(0, 1.4, 0.31);
+        vm.add(panel);
+        // Logo strip
+        const logo = makeBoxMesh(0.7, 0.15, 0.05, makeNeonMat(0xffffff));
+        logo.position.set(0, 0.4, 0.31);
+        vm.add(logo);
+        vm.position.set(p.x, 0.2, p.z);
+        vm.rotation.y = p.edgeRot + Math.PI; // face into the block
+        this.group.add(vm);
+      }
+    }
+
+    // Trash piles / dumpsters
+    if (rng.next() < district.trashProb * 0.5){
+      const t = rng.next();
+      if (t < 0.5){
+        // Dumpster
+        const p = sidewalkSpot();
+        const dumpColor = rng.pick([0x2a4a2a, 0x4a2a2a, 0x2a3a4a, 0x4a4a2a]);
+        const dump = makeBoxMesh(2.0, 1.1, 1.2,
+          new THREE.MeshStandardMaterial({ color: dumpColor, roughness: 0.85 }));
+        dump.position.set(p.x, 0.55, p.z);
+        dump.rotation.y = p.edgeRot;
+        this.group.add(dump);
+        // Lid (slightly tilted up)
+        const lid = makeBoxMesh(2.0, 0.08, 1.2, M.metal);
+        lid.position.set(p.x, 1.15, p.z);
+        lid.rotation.y = p.edgeRot;
+        lid.rotation.x = -0.1;
+        this.group.add(lid);
+      } else {
+        // Trash bag pile
+        const p = sidewalkSpot();
+        const bagCount = rng.int(2, 5);
+        for (let i = 0; i < bagCount; i++){
+          const bag = new THREE.Mesh(G.unitSphere, rng.bool() ? M.trashBag : M.trashBag2);
+          const bagS = rng.range(0.4, 0.7);
+          bag.scale.set(bagS, bagS * 0.7, bagS);
+          bag.position.set(
+            p.x + rng.range(-0.4, 0.4),
+            bagS * 0.35,
+            p.z + rng.range(-0.4, 0.4)
+          );
+          this.group.add(bag);
+        }
+      }
+    }
+
+    // Newspaper boxes / mailbox-like
+    if (rng.next() < 0.15){
+      const p = sidewalkSpot();
+      const nb = makeBoxMesh(0.5, 1.1, 0.35,
+        new THREE.MeshStandardMaterial({ color: rng.pick([0x4a3030, 0x303a4a, 0x3a3030]), roughness: 0.6 }));
+      nb.position.set(p.x, 0.55, p.z);
+      this.group.add(nb);
+    }
+
+    // Bench
+    if (rng.next() < 0.12){
+      const p = sidewalkSpot();
+      const bench = new THREE.Group();
+      const seat = makeBoxMesh(1.8, 0.1, 0.4, M.darkMetal);
+      seat.position.y = 0.5;
+      bench.add(seat);
+      const back = makeBoxMesh(1.8, 0.6, 0.08, M.darkMetal);
+      back.position.set(0, 0.8, -0.16);
+      bench.add(back);
+      // Legs
+      [-0.7, 0.7].forEach(lx => {
+        const leg = makeBoxMesh(0.08, 0.5, 0.4, M.metal);
+        leg.position.set(lx, 0.25, 0);
+        bench.add(leg);
+      });
+      bench.position.set(p.x, 0.2, p.z);
+      bench.rotation.y = p.edgeRot;
+      this.group.add(bench);
+    }
+
+    // Construction barrier (orange & white striped barrier)
+    if (rng.next() < 0.10){
+      const p = sidewalkSpot();
+      const barrier = new THREE.Group();
+      const baseB = makeBoxMesh(1.4, 0.25, 0.5,
+        new THREE.MeshStandardMaterial({ color: 0xc04020, roughness: 0.8 }));
+      baseB.position.y = 0.125;
+      barrier.add(baseB);
+      const stripe = makeBoxMesh(1.4, 0.06, 0.51, makeNeonMat(0xffffff));
+      stripe.position.y = 0.20;
+      barrier.add(stripe);
+      barrier.position.set(p.x, 0.2, p.z);
+      barrier.rotation.y = p.edgeRot;
+      this.group.add(barrier);
+    }
+  }
+
+  placePlants(district, buildings){
+    const rng = this.rng;
+    const wx = this.worldX, wz = this.worldZ;
+    const blockHalf = CITY_BLOCK_SIZE/2 - 0.6;
+
+    // Trees scattered around the sidewalk edge (capped at 2)
+    const treeCount = Math.min(2, Math.floor(rng.range(0, district.treeProb * 4)));
+    for (let i = 0; i < treeCount; i++){
+      const edge = rng.int(0, 3);
+      const along = rng.range(-blockHalf + 1.2, blockHalf - 1.2);
+      let tx, tz;
+      switch (edge){
+        case 0: tx = wx + along; tz = wz - blockHalf + 0.5; break;
+        case 1: tx = wx + blockHalf - 0.5; tz = wz + along; break;
+        case 2: tx = wx + along; tz = wz + blockHalf - 0.5; break;
+        case 3: tx = wx - blockHalf + 0.5; tz = wz + along; break;
+      }
+      // Trunk
+      const trunkH = rng.range(2.5, 4.2);
+      const trunk = makeBoxMesh(0.25, trunkH, 0.25, M.bark);
+      trunk.position.set(tx, trunkH/2 + 0.2, tz);
+      this.group.add(trunk);
+      // Foliage — 3-5 cubes stacked
+      const isExotic = rng.bool(0.2); // 20% neon plants
+      const foliageMat = isExotic
+        ? makeNeonMat(rng.pick([0x7dffb3, 0x80ffff, 0xff60d0]))
+        : (rng.bool() ? M.foliage : M.foliageDk);
+      const fSize = rng.range(1.3, 2.2);
+      const foliage = makeBoxMesh(fSize, fSize * 0.8, fSize, foliageMat);
+      foliage.position.set(tx, 0.2 + trunkH + fSize * 0.3, tz);
+      this.group.add(foliage);
+      // Add a smaller foliage cube on top
+      const top = makeBoxMesh(fSize * 0.7, fSize * 0.5, fSize * 0.7, foliageMat);
+      top.position.set(tx, 0.2 + trunkH + fSize * 0.95, tz);
+      this.group.add(top);
+      // Exotic plants get a soft glow light
+      if (isExotic){
+        const exoticC = foliageMat.color.getHex();
+        const exoticL = new THREE.PointLight(exoticC, 0.6, 4);
+        exoticL.position.set(tx, 0.2 + trunkH + fSize * 0.5, tz);
+        exoticL.visible = false;
+        this.group.add(exoticL);
+        this.lights.push(exoticL);
+      }
+    }
+
+    // Planters (low rectangles with green tops)
+    if (rng.next() < district.treeProb * 1.5){
+      const count = rng.int(1, 3);
+      for (let i = 0; i < count; i++){
+        const edge = rng.int(0, 3);
+        const along = rng.range(-blockHalf + 1, blockHalf - 1);
+        let px, pz;
+        switch (edge){
+          case 0: px = wx + along; pz = wz - blockHalf + 0.3; break;
+          case 1: px = wx + blockHalf - 0.3; pz = wz + along; break;
+          case 2: px = wx + along; pz = wz + blockHalf - 0.3; break;
+          case 3: px = wx - blockHalf + 0.3; pz = wz + along; break;
+        }
+        // Planter box
+        const planter = makeBoxMesh(1.2, 0.5, 0.5,
+          new THREE.MeshStandardMaterial({ color: 0x3a2618, roughness: 0.9 }));
+        planter.position.set(px, 0.45, pz);
+        this.group.add(planter);
+        // Green fill
+        const fill = makeBoxMesh(1.0, 0.4, 0.35, M.foliage);
+        fill.position.set(px, 0.85, pz);
+        this.group.add(fill);
+        // Sprouts
+        const sproutCount = rng.int(2, 5);
+        for (let j = 0; j < sproutCount; j++){
+          const sprout = makeBoxMesh(0.08, rng.range(0.3, 0.8), 0.08, M.foliageDk);
+          sprout.position.set(
+            px + rng.range(-0.4, 0.4),
+            0.85 + sprout.scale.y/2 + 0.1,
+            pz + rng.range(-0.15, 0.15)
+          );
+          this.group.add(sprout);
+        }
+      }
+    }
+  }
+
+  makeTerminal(x, z){
+    const group = new THREE.Group();
+    // Body
+    const body = makeBoxMesh(1.0, 2.2, 0.6, new THREE.MeshStandardMaterial({ color: 0x14101c, roughness: 0.7 }));
+    body.position.y = 1.1;
+    group.add(body);
+    // Screen — cyan glow
+    const screenMat = makeNeonMat(0x80ffff);
+    const screen = makeBoxMesh(0.85, 1.0, 0.05, screenMat);
+    screen.position.set(0, 1.5, 0.31);
+    group.add(screen);
+    // Decorative top bar
+    const bar = makeBoxMesh(1.0, 0.08, 0.05, makeNeonMat(0xff60d0));
+    bar.position.set(0, 2.05, 0.31);
+    group.add(bar);
+    // Glow light
+    const tLight = new THREE.PointLight(0x80ffff, 0.7, 4.5);
+    tLight.position.set(0, 1.5, 0.5);
+    tLight.visible = false;
+    group.add(tLight);
+    group.position.set(x, 0.2, z);
+    this.group.add(group);
+    this.lights.push(tLight);
+    // Collision
+    this.collisionAABBs.push({
+      minX: x - 0.6, maxX: x + 0.6,
+      minZ: z - 0.4, maxZ: z + 0.4, maxY: 2.4,
+    });
+    return {
+      type: 'terminal',
+      position: new THREE.Vector3(x, 1.5, z),
+      screen, light: tLight,
+      used: false,
+    };
+  }
+
+  makeParkedCar(x, z, rot){
+    const rng = this.rng;
+    const color = rng.pick(CAR_COLORS);
+    const group = new THREE.Group();
+    // Body
+    const body = makeBoxMesh(2.0, 0.6, 4.0,
+      new THREE.MeshStandardMaterial({ color, roughness: 0.5, metalness: 0.4 }));
+    body.position.y = 0.6;
+    group.add(body);
+    // Cabin
+    const cabinColor = Math.floor(color * 0.5);
+    const cabin = makeBoxMesh(1.8, 0.7, 2.4,
+      new THREE.MeshStandardMaterial({ color: cabinColor, roughness: 0.4 }));
+    cabin.position.set(0, 1.25, -0.2);
+    group.add(cabin);
+    // Windows
+    [[0, 1.25, 1.0, 1.7], [0, 1.25, -1.4, 1.7]].forEach(([x,y,z,w]) => {
+      const win = makeBoxMesh(w, 0.6, 0.05, M.glassBlue);
+      win.position.set(x, y, z);
+      group.add(win);
+    });
+    // Headlights
+    [[-0.6, 0.8, 2.0], [0.6, 0.8, 2.0]].forEach(p => {
+      const hl = makeBoxMesh(0.3, 0.2, 0.08, M.headlight);
+      hl.position.set(p[0], p[1], p[2]);
+      group.add(hl);
+    });
+    // Taillights
+    [[-0.6, 0.8, -2.0], [0.6, 0.8, -2.0]].forEach(p => {
+      const tl = makeBoxMesh(0.3, 0.2, 0.08, M.taillight);
+      tl.position.set(p[0], p[1], p[2]);
+      group.add(tl);
+    });
+    // Underbody neon
+    const underColor = rng.pick([0xff60d0, 0x80ffff, 0xa040ff, 0xffd47a]);
+    const under = makeBoxMesh(1.9, 0.05, 3.8, makeNeonMat(underColor));
+    under.position.y = 0.25;
+    group.add(under);
+    group.position.set(x, 0, z);
+    group.rotation.y = rot;
+    this.group.add(group);
+    return {
+      type: 'car',
+      position: group.position,
+      rotation: rot,
+      mesh: group,
+      velocity: 0,
+      occupied: false,
+    };
+  }
+
+  destroy(scene){
+    // Remove all meshes / lights
+    scene.remove(this.group);
+    // Dispose geometries & materials that were created uniquely
+    this.group.traverse(obj => {
+      if (obj.geometry && obj.geometry !== G.unitBox && obj.geometry !== G.unitPlane &&
+          obj.geometry !== G.unitCyl && obj.geometry !== G.unitSphere){
+        obj.geometry.dispose && obj.geometry.dispose();
+      }
+      if (obj.material && !Object.values(M).includes(obj.material) &&
+          !(Array.isArray(M.npcSkin) && M.npcSkin.includes(obj.material)) &&
+          !(Array.isArray(M.npcHair) && M.npcHair.includes(obj.material)) &&
+          !(Array.isArray(M.npcClothes) && M.npcClothes.includes(obj.material))){
+        if (Array.isArray(obj.material)){
+          obj.material.forEach(m => m.dispose && m.dispose());
+        } else {
+          obj.material.dispose && obj.material.dispose();
+        }
+      }
+    });
+    // Remove NPCs and cars belonging to this chunk
+    for (let i = State.globalNPCs.length - 1; i >= 0; i--){
+      if (State.globalNPCs[i].chunkKey === this.key){
+        State.globalNPCs.splice(i, 1);
+      }
+    }
+    for (let i = State.globalCars.length - 1; i >= 0; i--){
+      const c = State.globalCars[i];
+      if (c.chunkKey === this.key){
+        if (State.ui.inCar === c){
+          // Don't despawn the car the player is in!
+          continue;
+        }
+        State.globalCars.splice(i, 1);
+      }
+    }
+  }
+}
+
+// =============================================================================
+//  NPC — voxel pedestrian
+// =============================================================================
+class NPC {
+  constructor(x, z, rng){
+    this.position = new THREE.Vector3(x, 0, z);
+    this.direction = rng.range(0, TAU);
+    this.speed = rng.range(0.8, 1.8);
+    this.walkPhase = rng.range(0, TAU);
+    this.changeTimer = rng.range(1.5, 5);
+    // Build voxel figure
+    this.group = new THREE.Group();
+    const skin = rng.pick(M.npcSkin);
+    const hair = rng.pick(M.npcHair);
+    const clothes = rng.pick(M.npcClothes);
+    const pants = rng.pick(M.npcClothes);
+    // Head
+    const head = makeBoxMesh(0.45, 0.45, 0.45, skin);
+    head.position.y = 1.55;
+    this.group.add(head);
+    // Hair
+    const h = makeBoxMesh(0.5, 0.2, 0.5, hair);
+    h.position.y = 1.85;
+    this.group.add(h);
+    // Body
+    const body = makeBoxMesh(0.55, 0.65, 0.35, clothes);
+    body.position.y = 1.0;
+    this.group.add(body);
+    // Arms
+    this.leftArm = makeBoxMesh(0.18, 0.6, 0.18, clothes);
+    this.leftArm.position.set(-0.40, 1.0, 0);
+    this.group.add(this.leftArm);
+    this.rightArm = makeBoxMesh(0.18, 0.6, 0.18, clothes);
+    this.rightArm.position.set(0.40, 1.0, 0);
+    this.group.add(this.rightArm);
+    // Legs
+    this.leftLeg = makeBoxMesh(0.22, 0.65, 0.22, pants);
+    this.leftLeg.position.set(-0.13, 0.35, 0);
+    this.group.add(this.leftLeg);
+    this.rightLeg = makeBoxMesh(0.22, 0.65, 0.22, pants);
+    this.rightLeg.position.set(0.13, 0.35, 0);
+    this.group.add(this.rightLeg);
+    // 10% chance: glowing aura (cyberpunk modded human)
+    if (rng.bool(0.10)){
+      const auraC = rng.pick([0xff60d0, 0x80ffff, 0x7dffb3]);
+      const auraLight = new THREE.PointLight(auraC, 0.5, 2.5);
+      auraLight.position.y = 1.3;
+      this.group.add(auraLight);
+      this.aura = auraLight;
+    }
+    this.group.position.set(x, 0, z);
+  }
+  update(dt){
+    // Decide new direction occasionally
+    this.changeTimer -= dt;
+    if (this.changeTimer <= 0){
+      this.direction = Math.random() * TAU;
+      this.changeTimer = 1.5 + Math.random() * 5;
+    }
+    // Move forward
+    const dx = Math.cos(this.direction) * this.speed * dt;
+    const dz = Math.sin(this.direction) * this.speed * dt;
+    // Soft collision — if would walk into a building, turn around
+    const next = this.position.clone();
+    next.x += dx; next.z += dz;
+    const chunkKey = chunkKeyForWorldXZ(next.x, next.z);
+    const chunk = State.chunkMap.get(chunkKey);
+    let blocked = false;
+    if (chunk){
+      for (const a of chunk.collisionAABBs){
+        if (next.x > a.minX && next.x < a.maxX &&
+            next.z > a.minZ && next.z < a.maxZ){
+          blocked = true;
+          break;
+        }
+      }
+    }
+    if (blocked){
+      this.direction += Math.PI + (Math.random() - 0.5) * 0.6;
+      this.changeTimer = 1.0;
+    } else {
+      this.position.copy(next);
+    }
+    // Walk bob (leg/arm sway)
+    this.walkPhase += dt * 6;
+    const swing = Math.sin(this.walkPhase) * 0.3;
+    this.leftLeg.rotation.x = swing;
+    this.rightLeg.rotation.x = -swing;
+    this.leftArm.rotation.x = -swing * 0.7;
+    this.rightArm.rotation.x = swing * 0.7;
+    // Apply
+    this.group.position.x = this.position.x;
+    this.group.position.z = this.position.z;
+    this.group.rotation.y = -this.direction + Math.PI/2;
+  }
+}
+
+// =============================================================================
+//  MOBILE CAR — car driving along streets
+// =============================================================================
+class MobileCar {
+  constructor(x, z, rot, rng){
+    this.position = new THREE.Vector3(x, 0, z);
+    this.rotation = rot;
+    this.speed = rng.range(5, 9);
+    this.turnTimer = rng.range(2, 6);
+    // Build voxel car (same as parked car)
+    const color = rng.pick(CAR_COLORS);
+    this.group = new THREE.Group();
+    const body = makeBoxMesh(2.0, 0.6, 4.0,
+      new THREE.MeshStandardMaterial({ color, roughness: 0.5, metalness: 0.4 }));
+    body.position.y = 0.6;
+    this.group.add(body);
+    const cabinColor = Math.floor(color * 0.5);
+    const cabin = makeBoxMesh(1.8, 0.7, 2.4,
+      new THREE.MeshStandardMaterial({ color: cabinColor, roughness: 0.4 }));
+    cabin.position.set(0, 1.25, -0.2);
+    this.group.add(cabin);
+    [[0, 1.25, 1.0], [0, 1.25, -1.4]].forEach(([x,y,z]) => {
+      const win = makeBoxMesh(1.7, 0.6, 0.05, M.glassBlue);
+      win.position.set(x, y, z);
+      this.group.add(win);
+    });
+    // Headlights (bright when driving)
+    this.headlightMat = makeNeonMat(0xfff0d0);
+    [[-0.6, 0.8, 2.0], [0.6, 0.8, 2.0]].forEach(p => {
+      const hl = makeBoxMesh(0.3, 0.2, 0.08, this.headlightMat);
+      hl.position.set(p[0], p[1], p[2]);
+      this.group.add(hl);
+    });
+    [[-0.6, 0.8, -2.0], [0.6, 0.8, -2.0]].forEach(p => {
+      const tl = makeBoxMesh(0.3, 0.2, 0.08, M.taillight);
+      tl.position.set(p[0], p[1], p[2]);
+      this.group.add(tl);
+    });
+    const underColor = rng.pick([0xff60d0, 0x80ffff, 0xa040ff]);
+    const under = makeBoxMesh(1.9, 0.05, 3.8, makeNeonMat(underColor));
+    under.position.y = 0.25;
+    this.group.add(under);
+    this.group.position.set(x, 0, z);
+    this.group.rotation.y = rot;
+    // Headlight forward beam (soft)
+    this.headBeam = new THREE.PointLight(0xfff0d0, 0.8, 8);
+    this.headBeam.position.set(0, 0.8, 3.0);
+    this.headBeam.visible = false;
+    this.group.add(this.headBeam);
+  }
+  update(dt){
+    // Drive forward
+    const dx = Math.sin(this.rotation) * this.speed * dt;
+    const dz = Math.cos(this.rotation) * this.speed * dt;
+    this.position.x += dx;
+    this.position.z += dz;
+    // Occasionally turn at "intersections"
+    this.turnTimer -= dt;
+    if (this.turnTimer <= 0){
+      // Snap rotation to nearest 90° + maybe turn
+      if (Math.random() < 0.4){
+        this.rotation += (Math.random() < 0.5 ? Math.PI/2 : -Math.PI/2);
+      }
+      this.turnTimer = 3 + Math.random() * 5;
+    }
+    this.group.position.copy(this.position);
+    this.group.rotation.y = this.rotation;
+  }
+}
+
+// =============================================================================
+//  ENEMY — voxel hostile with simple state-machine AI
+// =============================================================================
+class Enemy {
+  constructor(type, x, z, rng){
+    this.type = type;
+    const def = ENEMY_TYPES[type];
+    this.def = def;
+    this.position = new THREE.Vector3(x, def.flying ? 4 : 0, z);
+    this.direction = rng.range(0, TAU);
+    this.hp = def.hp; this.maxHp = def.hp;
+    this.state = 'patrol';  // patrol, alert, attack, dead
+    this.attackTimer = 0;
+    this.patrolTimer = rng.range(2, 5);
+    this.flying = def.flying;
+    this.group = this.makeMesh(rng);
+    this.group.position.copy(this.position);
+    this.lastSeenPlayerPos = null;
+    this.hitFlash = 0;
+  }
+  makeMesh(rng){
+    const g = new THREE.Group();
+    const def = this.def;
+    if (this.type === 'drone'){
+      // Hovering surveillance drone — 4 small rotors + body + red eye
+      const body = makeBoxMesh(0.9, 0.3, 0.9, new THREE.MeshLambertMaterial({ color: def.colors.body }));
+      body.position.y = 0;
+      g.add(body);
+      // Rotors
+      const rotorMat = new THREE.MeshLambertMaterial({ color: 0x16121c });
+      [[-0.55, 0.55], [0.55, 0.55], [-0.55, -0.55], [0.55, -0.55]].forEach(([x,z]) => {
+        const rotor = makeBoxMesh(0.55, 0.04, 0.55, rotorMat);
+        rotor.position.set(x, 0.2, z);
+        g.add(rotor);
+        // Arm
+        const arm = makeBoxMesh(0.10, 0.05, 0.10, rotorMat);
+        arm.position.set(x * 0.6, 0.05, z * 0.6);
+        g.add(arm);
+      });
+      // Red sensor eye
+      const eye = makeBoxMesh(0.32, 0.18, 0.10, makeNeonMat(def.colors.accent));
+      eye.position.set(0, 0, 0.46);
+      g.add(eye);
+      this.eye = eye;
+      // Belly light
+      const belly = makeBoxMesh(0.5, 0.05, 0.5, makeNeonMat(0xff3050));
+      belly.position.set(0, -0.18, 0);
+      g.add(belly);
+    } else if (this.type === 'heavy'){
+      // Armored heavy with rifle
+      const skin = M.npcSkin[rng.int(0, M.npcSkin.length - 1)];
+      const armor = new THREE.MeshLambertMaterial({ color: def.colors.armor });
+      const accent = makeNeonMat(def.colors.accent);
+      // Head
+      const head = makeBoxMesh(0.5, 0.5, 0.5, skin);
+      head.position.y = 1.65;
+      g.add(head);
+      // Helmet
+      const helm = makeBoxMesh(0.6, 0.3, 0.6, armor);
+      helm.position.y = 1.95;
+      g.add(helm);
+      // Helmet visor
+      const visor = makeBoxMesh(0.5, 0.12, 0.55, accent);
+      visor.position.set(0, 1.55, 0);
+      g.add(visor);
+      // Body — bulky
+      const body = makeBoxMesh(0.85, 0.85, 0.55, armor);
+      body.position.y = 1.0;
+      g.add(body);
+      // Shoulder pads
+      [-0.55, 0.55].forEach(x => {
+        const pad = makeBoxMesh(0.30, 0.30, 0.55, armor);
+        pad.position.set(x, 1.4, 0);
+        g.add(pad);
+      });
+      // Arms
+      this.leftArm = makeBoxMesh(0.28, 0.7, 0.28, armor);
+      this.leftArm.position.set(-0.60, 1.0, 0);
+      g.add(this.leftArm);
+      this.rightArm = makeBoxMesh(0.28, 0.7, 0.28, armor);
+      this.rightArm.position.set(0.60, 1.0, 0);
+      g.add(this.rightArm);
+      // Legs
+      this.leftLeg = makeBoxMesh(0.3, 0.7, 0.3, new THREE.MeshLambertMaterial({ color: 0x18141c }));
+      this.leftLeg.position.set(-0.20, 0.35, 0);
+      g.add(this.leftLeg);
+      this.rightLeg = makeBoxMesh(0.3, 0.7, 0.3, new THREE.MeshLambertMaterial({ color: 0x18141c }));
+      this.rightLeg.position.set(0.20, 0.35, 0);
+      g.add(this.rightLeg);
+      // Rifle in front
+      const rifleMat = new THREE.MeshLambertMaterial({ color: def.colors.weapon });
+      const rifle = makeBoxMesh(0.18, 0.18, 1.4, rifleMat);
+      rifle.position.set(0.45, 1.05, 0.55);
+      g.add(rifle);
+      // Belt light
+      const belt = makeBoxMesh(0.85, 0.10, 0.55, accent);
+      belt.position.set(0, 0.62, 0);
+      g.add(belt);
+    } else {
+      // Street thug — leaner, hooded
+      const skin = M.npcSkin[rng.int(0, M.npcSkin.length - 1)];
+      const jacket = new THREE.MeshLambertMaterial({ color: def.colors.jacket });
+      const pants = new THREE.MeshLambertMaterial({ color: def.colors.pants });
+      // Head + hood
+      const head = makeBoxMesh(0.42, 0.42, 0.42, skin);
+      head.position.y = 1.6;
+      g.add(head);
+      const hood = makeBoxMesh(0.55, 0.30, 0.55, jacket);
+      hood.position.y = 1.84;
+      g.add(hood);
+      // Body
+      const body = makeBoxMesh(0.55, 0.7, 0.35, jacket);
+      body.position.y = 1.05;
+      g.add(body);
+      // Arms
+      this.leftArm = makeBoxMesh(0.18, 0.65, 0.18, jacket);
+      this.leftArm.position.set(-0.40, 1.05, 0);
+      g.add(this.leftArm);
+      this.rightArm = makeBoxMesh(0.18, 0.65, 0.18, jacket);
+      this.rightArm.position.set(0.40, 1.05, 0);
+      g.add(this.rightArm);
+      // Legs
+      this.leftLeg = makeBoxMesh(0.22, 0.7, 0.22, pants);
+      this.leftLeg.position.set(-0.13, 0.35, 0);
+      g.add(this.leftLeg);
+      this.rightLeg = makeBoxMesh(0.22, 0.7, 0.22, pants);
+      this.rightLeg.position.set(0.13, 0.35, 0);
+      g.add(this.rightLeg);
+      // Pipe wrench
+      const wrenchMat = new THREE.MeshLambertMaterial({ color: def.colors.weapon });
+      const wrench = makeBoxMesh(0.12, 0.6, 0.12, wrenchMat);
+      wrench.position.set(0.40, 0.95, 0.30);
+      g.add(wrench);
+      // Glowing eye-line (neon biomod)
+      const eyes = makeBoxMesh(0.32, 0.06, 0.05, makeNeonMat(0xff3050));
+      eyes.position.set(0, 1.62, 0.22);
+      g.add(eyes);
+    }
+    return g;
+  }
+  update(dt){
+    if (this.state === 'dead') return;
+    const px = Player.position.x, pz = Player.position.z, py = Player.position.y;
+    const dx = px - this.position.x, dz = pz - this.position.z;
+    const distSq = dx*dx + dz*dz;
+    const dist = Math.sqrt(distSq);
+
+    // Hit flash decay
+    if (this.hitFlash > 0){
+      this.hitFlash -= dt;
+      const intensity = this.hitFlash / 0.2;
+      this.group.traverse(o => {
+        if (o.material && o.material.emissive){
+          o.material.emissive.setRGB(intensity * 0.6, 0, 0);
+        }
+      });
+    }
+
+    // Detection
+    if (this.state === 'patrol' && dist < this.def.detectRange){
+      this.state = 'alert';
+      this.lastSeenPlayerPos = new THREE.Vector3(px, py, pz);
+    }
+    if ((this.state === 'alert' || this.state === 'attack') && dist > this.def.detectRange * 1.4){
+      this.state = 'patrol';
+      this.lastSeenPlayerPos = null;
+    }
+
+    if (this.state === 'patrol'){
+      this.patrolTimer -= dt;
+      if (this.patrolTimer <= 0){
+        this.direction = Math.random() * TAU;
+        this.patrolTimer = 2 + Math.random() * 4;
+      }
+      const speed = this.def.speed * 0.4;
+      this.tryMove(Math.cos(this.direction) * speed * dt, Math.sin(this.direction) * speed * dt);
+    } else if (this.state === 'alert'){
+      // Move toward player
+      const dirAngle = Math.atan2(dz, dx);
+      this.direction = dirAngle;
+      const speed = this.def.speed;
+      if (dist > this.def.attackRange * 0.9){
+        this.tryMove(Math.cos(dirAngle) * speed * dt, Math.sin(dirAngle) * speed * dt);
+      } else {
+        this.state = 'attack';
+      }
+    }
+    if (this.state === 'attack'){
+      const dirAngle = Math.atan2(dz, dx);
+      this.direction = dirAngle;
+      if (dist > this.def.attackRange){
+        this.state = 'alert'; return;
+      }
+      this.attackTimer -= dt;
+      if (this.attackTimer <= 0){
+        this.attackTimer = this.def.attackCooldown;
+        this.doAttack();
+      }
+    }
+
+    // Flying drones bob
+    if (this.flying){
+      this.group.position.y = 4 + Math.sin(performance.now() * 0.003 + this.position.x) * 0.3;
+    }
+
+    // Limb sway for humanoids
+    if (this.leftLeg && this.state !== 'patrol'){
+      const phase = performance.now() * 0.012;
+      this.leftLeg.rotation.x = Math.sin(phase) * 0.4;
+      this.rightLeg.rotation.x = -Math.sin(phase) * 0.4;
+      this.leftArm.rotation.x = -Math.sin(phase) * 0.3;
+      this.rightArm.rotation.x = Math.sin(phase) * 0.3;
+    }
+
+    this.group.position.x = this.position.x;
+    this.group.position.z = this.position.z;
+    this.group.rotation.y = -this.direction + Math.PI/2;
+  }
+  tryMove(dx, dz){
+    const next = this.position.clone();
+    next.x += dx; next.z += dz;
+    if (this.flying || !enemyCollides(next)){
+      this.position.x = next.x; this.position.z = next.z;
+    }
+  }
+  doAttack(){
+    // Hit player if facing
+    if (this.type === 'drone'){
+      // Ranged: instant raycast
+      spawnDamageNumber(Player.position.x, Player.position.y + 0.5, Player.position.z, this.def.dmg, false);
+    } else {
+      // Melee swing
+      spawnDamageNumber(Player.position.x, Player.position.y + 0.5, Player.position.z, this.def.dmg, false);
+    }
+    damagePlayer(this.def.dmg);
+  }
+  takeDamage(amount, headshot=false){
+    if (this.state === 'dead') return;
+    this.hp -= amount;
+    this.hitFlash = 0.2;
+    spawnDamageNumber(
+      this.position.x, this.position.y + (this.flying ? 1.0 : 2.0), this.position.z,
+      Math.round(amount), headshot
+    );
+    if (this.state === 'patrol') this.state = 'alert';
+    if (this.hp <= 0){
+      this.die();
+    }
+  }
+  die(){
+    this.state = 'dead';
+    // Reward player
+    const r = ENEMY_TYPES[this.type].rewardCredits;
+    const reward = Math.floor(r[0] + Math.random() * (r[1] - r[0]));
+    grantCredits(reward);
+    Player.kills++;
+    toast(`${ENEMY_TYPES[this.type].name} eliminated · +${reward}c`, 'success');
+    // Death animation: tip over
+    this.group.rotation.z = Math.PI / 2;
+    this.group.position.y = this.flying ? 0.3 : 0.3;
+    // Schedule removal
+    this.deadTimer = 5;
+  }
+}
+
+function enemyCollides(pos){
+  const r = 0.6;
+  const keys = nearbyChunkKeys(pos.x, pos.z);
+  for (const k of keys){
+    const c = State.chunkMap.get(k);
+    if (!c) continue;
+    for (const a of c.collisionAABBs){
+      if (pos.x + r > a.minX && pos.x - r < a.maxX &&
+          pos.z + r > a.minZ && pos.z - r < a.maxZ){
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+// =============================================================================
+//  COMBAT — player attacking
+// =============================================================================
+function tryAttack(){
+  if (State.ui.inMiniGame || State.ui.paused || Player.mode === 'drive') return;
+  if (Player.attackCooldown > 0) return;
+  if (Player.hp <= 0) return;
+  const w = WEAPONS[Player.currentWeapon];
+  if (w.type === 'ranged'){
+    if (Player.ammo[Player.currentWeapon] <= 0){
+      toast('Empty mag.', 'fail');
+      return;
+    }
+    Player.ammo[Player.currentWeapon]--;
+    refreshAmmoHUD();
+  }
+  Player.attackCooldown = w.cooldown;
+
+  // Forward direction from camera
+  const forward = new THREE.Vector3(0, 0, -1).applyEuler(State.camera.rotation).normalize();
+  const origin = Player.position.clone();
+  // Muzzle flash sprite
+  flashWeapon(w);
+
+  const pellets = w.pellets || 1;
+  for (let i = 0; i < pellets; i++){
+    const dir = forward.clone();
+    if (w.spread){
+      dir.x += (Math.random() - 0.5) * w.spread * 2;
+      dir.y += (Math.random() - 0.5) * w.spread * 2;
+      dir.z += (Math.random() - 0.5) * w.spread * 2;
+      dir.normalize();
+    }
+    // Check all enemies
+    let closest = null, closestDist = Infinity;
+    for (const e of State.enemies){
+      if (e.state === 'dead') continue;
+      const ex = e.position.x, ey = e.position.y + (e.flying ? 0 : 1.2), ez = e.position.z;
+      const d = ex - origin.x, dy = ey - origin.y, dz = ez - origin.z;
+      const t = d * dir.x + dy * dir.y + dz * dir.z;
+      if (t < 0 || t > w.range) continue;
+      const projX = origin.x + dir.x * t;
+      const projY = origin.y + dir.y * t;
+      const projZ = origin.z + dir.z * t;
+      const distSq = (projX-ex)**2 + (projY-ey)**2 + (projZ-ez)**2;
+      const hitR = e.flying ? 0.8 : 0.9;
+      if (distSq < hitR * hitR && t < closestDist){
+        closest = e;
+        closestDist = t;
+      }
+    }
+    if (closest){
+      const dmg = w.dmg * Player.damageMult;
+      // Headshot if hit-y is near head height for non-drones
+      const isHead = !closest.flying && Math.abs(closest.position.y + 1.6 - (origin.y + dir.y * closestDist)) < 0.5;
+      const finalDmg = isHead ? dmg * 1.5 : dmg;
+      closest.takeDamage(finalDmg, isHead);
+    }
+  }
+}
+
+function flashWeapon(w){
+  // Brief muzzle flash at lower-right of screen — CSS element
+  if (!State.muzzleFlashEl){
+    const el = document.createElement('div');
+    el.style.position = 'fixed';
+    el.style.right = '15%';
+    el.style.bottom = '20%';
+    el.style.width = '120px';
+    el.style.height = '120px';
+    el.style.pointerEvents = 'none';
+    el.style.zIndex = '7';
+    el.style.background = 'radial-gradient(circle, rgba(255,200,140,0.85) 0%, rgba(255,140,80,0) 70%)';
+    el.style.borderRadius = '50%';
+    el.style.opacity = '0';
+    el.style.transition = 'opacity 0.08s';
+    document.body.appendChild(el);
+    State.muzzleFlashEl = el;
+  }
+  const el = State.muzzleFlashEl;
+  if (w.type === 'melee'){
+    el.style.background = `radial-gradient(circle, rgba(128,255,255,0.7) 0%, rgba(128,255,255,0) 70%)`;
+  } else {
+    const c = w.color;
+    const r = (c >> 16) & 0xff, g = (c >> 8) & 0xff, b = c & 0xff;
+    el.style.background = `radial-gradient(circle, rgba(${r},${g},${b},0.85) 0%, rgba(${r},${g},${b},0) 70%)`;
+  }
+  el.style.opacity = '1';
+  setTimeout(() => { el.style.opacity = '0'; }, 80);
+}
+
+function damagePlayer(amount){
+  if (Player.invulnTime > 0) return;
+  Player.hp -= amount;
+  Player.invulnTime = 0.4;
+  Player.damageFlash = 0.5;
+  $('dmg-vignette').classList.add('show');
+  refreshHpHUD();
+  if (Player.hp <= 0){
+    Player.hp = 0;
+    onPlayerDeath();
+  }
+}
+
+function onPlayerDeath(){
+  $('death-overlay').classList.add('show');
+  document.exitPointerLock();
+  document.body.style.cursor = 'auto';
+  State.ui.paused = true;
+}
+
+function respawnPlayer(){
+  Player.position.set(0, Player.height, 5);
+  Player.velocity.set(0,0,0);
+  Player.hp = Player.hpMax;
+  Player.invulnTime = 2.0;
+  refreshHpHUD();
+  $('death-overlay').classList.remove('show');
+  document.body.style.cursor = 'none';
+  State.ui.paused = false;
+  toast('Respawned.', 'info');
+}
+
+// ─── Damage numbers ────────────────────────────────────────────────────────
+function spawnDamageNumber(x, y, z, amount, crit){
+  const el = document.createElement('div');
+  el.className = 'dmg-num' + (crit ? ' crit' : '');
+  el.textContent = (crit ? 'CRIT ' : '') + Math.round(amount);
+  document.body.appendChild(el);
+  State.dmgNumbers.push({
+    el, worldPos: new THREE.Vector3(x, y, z), life: 0.7, age: 0,
+    offsetY: 0,
+  });
+}
+
+function updateDamageNumbers(dt){
+  for (let i = State.dmgNumbers.length - 1; i >= 0; i--){
+    const dn = State.dmgNumbers[i];
+    dn.age += dt;
+    if (dn.age >= dn.life){
+      if (dn.el.parentNode) dn.el.parentNode.removeChild(dn.el);
+      State.dmgNumbers.splice(i, 1);
+      continue;
+    }
+    // Project world → screen
+    const pos = dn.worldPos.clone();
+    pos.y += dn.age * 1.5; // float up
+    pos.project(State.camera);
+    if (pos.z > 1){
+      dn.el.style.display = 'none';
+      continue;
+    }
+    const sx = (pos.x + 1) * 0.5 * window.innerWidth;
+    const sy = (-pos.y + 1) * 0.5 * window.innerHeight;
+    dn.el.style.left = sx + 'px';
+    dn.el.style.top = sy + 'px';
+    dn.el.style.transform = `translate(-50%, -50%)`;
+    dn.el.style.opacity = String(1 - dn.age / dn.life);
+  }
+}
+
+// ─── HUD refresh ───────────────────────────────────────────────────────────
+function refreshHpHUD(){
+  const pct = Math.max(0, Player.hp) / Player.hpMax * 100;
+  $('hp-fill').style.width = pct + '%';
+  $('hp-num').textContent = `${Math.round(Math.max(0, Player.hp))} / ${Player.hpMax}`;
+}
+function refreshAmmoHUD(){
+  $('ammo-baton').textContent = Player.ammo.baton < 0 ? '∞' : Player.ammo.baton.toString();
+  $('ammo-pistol').textContent = Player.ammo.pistol.toString();
+  $('ammo-shotgun').textContent = Player.ammo.shotgun.toString();
+  for (const slot of document.querySelectorAll('.weapon-slot')){
+    slot.classList.toggle('active', slot.dataset.weapon === Player.currentWeapon);
+  }
+}
+function switchWeapon(key){
+  if (!WEAPONS[key]) return;
+  Player.currentWeapon = key;
+  refreshAmmoHUD();
+  toast(`Weapon: ${WEAPONS[key].name}`, 'info');
+}
+
+// =============================================================================
+//  CLASS APPLICATION
+// =============================================================================
+function applyClass(classKey){
+  const cls = CLASSES[classKey];
+  if (!cls) return;
+  Player.classKey = classKey;
+  Player.hpMax = cls.hp;
+  Player.hp = cls.hp;
+  Player.damageMult = cls.damageMult || 1.0;
+  Player.hackBonus = cls.hackBonus;
+  Player.ammo = { ...cls.startLoadout };
+  Player.currentWeapon = cls.startLoadout.shotgun > 0 ? 'shotgun'
+                       : cls.startLoadout.pistol > 0 ? 'pistol' : 'baton';
+  refreshHpHUD();
+  refreshAmmoHUD();
+}
+
+function getWalkSpeed(){
+  const cls = CLASSES[Player.classKey];
+  return State.keys.has('shift') ? cls.sprintSpeed : cls.walkSpeed;
+}
+function getJumpPower(){ return CLASSES[Player.classKey].jumpPower; }
+
+// =============================================================================
+//  HOLO ADS — animated billboard color cycling
+// =============================================================================
+function updateHoloAds(dt){
+  const t = performance.now() * 0.001;
+  for (const ad of State.holoAds){
+    // Cycle color
+    const hue = (t * 0.3 + ad.phase) % 1;
+    const c = new THREE.Color().setHSL(hue, 0.85, 0.55);
+    ad.mesh.material.color.copy(c);
+    if (ad.light) ad.light.color.copy(c);
+  }
+}
+
+// =============================================================================
+//  CIVILIAN DRONES — flying delivery drones overhead
+// =============================================================================
+function spawnCivDrone(){
+  if (State.civDrones.length >= 4) return;
+  const ang = Math.random() * TAU;
+  const r = 80 + Math.random() * 60;
+  const startX = Player.position.x + Math.cos(ang) * r;
+  const startZ = Player.position.z + Math.sin(ang) * r;
+  const targetX = Player.position.x + Math.cos(ang + Math.PI) * (60 + Math.random() * 40);
+  const targetZ = Player.position.z + Math.sin(ang + Math.PI) * (60 + Math.random() * 40);
+  const group = new THREE.Group();
+  // Drone body
+  const bodyColor = NEON_COLORS[Math.floor(Math.random() * NEON_COLORS.length)];
+  const body = makeBoxMesh(1.4, 0.4, 1.4, new THREE.MeshLambertMaterial({ color: 0x2a2a32 }));
+  body.position.y = 0;
+  group.add(body);
+  // Package box hanging below
+  const pkg = makeBoxMesh(0.7, 0.7, 0.7, new THREE.MeshLambertMaterial({ color: 0x8a5a30 }));
+  pkg.position.y = -0.6;
+  group.add(pkg);
+  // 4 rotors
+  const rotMat = new THREE.MeshLambertMaterial({ color: 0x14101c });
+  [[-0.85, 0.85], [0.85, 0.85], [-0.85, -0.85], [0.85, -0.85]].forEach(([x,z]) => {
+    const rotor = makeBoxMesh(0.7, 0.04, 0.7, rotMat);
+    rotor.position.set(x, 0.25, z);
+    group.add(rotor);
+  });
+  // Neon side strips
+  [-1, 1].forEach(s => {
+    const strip = makeBoxMesh(0.05, 0.10, 1.2, makeNeonMat(bodyColor));
+    strip.position.set(s * 0.72, 0, 0);
+    group.add(strip);
+  });
+  // Light beam down
+  const beam = makeBoxMesh(0.5, 1.5, 0.5, makeNeonMat(0xffffe0));
+  beam.position.y = -1.6;
+  beam.material.transparent = true;
+  beam.material.opacity = 0.25;
+  group.add(beam);
+  const height = 12 + Math.random() * 8;
+  group.position.set(startX, height, startZ);
+  State.scene.add(group);
+  State.civDrones.push({
+    group, start: new THREE.Vector3(startX, height, startZ),
+    target: new THREE.Vector3(targetX, height, targetZ),
+    speed: 5 + Math.random() * 4,
+    progress: 0,
+  });
+}
+
+function updateCivDrones(dt){
+  for (let i = State.civDrones.length - 1; i >= 0; i--){
+    const d = State.civDrones[i];
+    const dist = d.start.distanceTo(d.target);
+    d.progress += d.speed * dt / dist;
+    if (d.progress >= 1){
+      State.scene.remove(d.group);
+      State.civDrones.splice(i, 1);
+      continue;
+    }
+    d.group.position.lerpVectors(d.start, d.target, d.progress);
+    // Slight bob
+    d.group.position.y += Math.sin(performance.now() * 0.003 + i) * 0.05;
+    // Face direction
+    const dir = new THREE.Vector3().subVectors(d.target, d.start).normalize();
+    d.group.rotation.y = Math.atan2(dir.x, dir.z);
+  }
+  // Spawn occasionally
+  if (Math.random() < 0.002 * dt * 60) spawnCivDrone();
+}
+
+// =============================================================================
+//  CHUNK MANAGER — load/unload chunks around player
+// =============================================================================
+function chunkKeyForWorldXZ(x, z){
+  const cx = Math.floor((x + CHUNK_SIZE/2) / CHUNK_SIZE);
+  const cz = Math.floor((z + CHUNK_SIZE/2) / CHUNK_SIZE);
+  return `${cx},${cz}`;
+}
+
+function updateChunks(){
+  const px = Player.position.x, pz = Player.position.z;
+  const pcx = Math.floor((px + CHUNK_SIZE/2) / CHUNK_SIZE);
+  const pcz = Math.floor((pz + CHUNK_SIZE/2) / CHUNK_SIZE);
+
+  const wanted = new Set();
+  for (let dx = -RENDER_RADIUS; dx <= RENDER_RADIUS; dx++){
+    for (let dz = -RENDER_RADIUS; dz <= RENDER_RADIUS; dz++){
+      wanted.add(`${pcx+dx},${pcz+dz}`);
+    }
+  }
+
+  // Load missing
+  for (const key of wanted){
+    if (!State.chunkMap.has(key)){
+      const [cx, cz] = key.split(',').map(Number);
+      const chunk = new Chunk(cx, cz, State.citySeed);
+      State.scene.add(chunk.group);
+      State.chunkMap.set(key, chunk);
+    }
+  }
+
+  // Unload distant
+  const unloadKeys = [];
+  for (const [key, chunk] of State.chunkMap){
+    const dx = chunk.cx - pcx, dz = chunk.cz - pcz;
+    if (Math.abs(dx) > UNLOAD_RADIUS || Math.abs(dz) > UNLOAD_RADIUS){
+      unloadKeys.push(key);
+    }
+  }
+  for (const key of unloadKeys){
+    const chunk = State.chunkMap.get(key);
+    chunk.destroy(State.scene);
+    State.chunkMap.delete(key);
+  }
+
+  // Light manager: hard cap at MAX_VISIBLE_POINT_LIGHTS globally.
+  // Disable everything first, then enable the N closest lights to player.
+  const lightCandidates = [];
+  for (const [, chunk] of State.chunkMap){
+    const dx = Math.abs(chunk.cx - pcx), dz = Math.abs(chunk.cz - pcz);
+    const inRange = dx <= 1 && dz <= 1; // only 3x3 chunks around player
+    for (const l of chunk.lights){
+      if (!inRange){ if (l.visible) l.visible = false; continue; }
+      const d = Math.hypot(l.position.x - px, l.position.z - pz);
+      lightCandidates.push({ l, d });
+    }
+  }
+  lightCandidates.sort((a, b) => a.d - b.d);
+  for (let i = 0; i < lightCandidates.length; i++){
+    const want = i < MAX_VISIBLE_POINT_LIGHTS;
+    if (lightCandidates[i].l.visible !== want){
+      lightCandidates[i].l.visible = want;
+    }
+  }
+
+  // Despawn mobile cars and NPCs that wandered too far
+  for (let i = State.globalCars.length - 1; i >= 0; i--){
+    const c = State.globalCars[i];
+    if (State.ui.inCar === c) continue;
+    const d = Math.hypot(c.position.x - px, c.position.z - pz);
+    if (d > CHUNK_SIZE * (RENDER_RADIUS + 1)){
+      State.scene.remove(c.group);
+      State.globalCars.splice(i, 1);
+    }
+  }
+  for (let i = State.globalNPCs.length - 1; i >= 0; i--){
+    const n = State.globalNPCs[i];
+    const d = Math.hypot(n.position.x - px, n.position.z - pz);
+    if (d > CHUNK_SIZE * (RENDER_RADIUS + 1)){
+      State.scene.remove(n.group);
+      State.globalNPCs.splice(i, 1);
+    }
+  }
+  // Despawn enemies too far
+  for (let i = State.enemies.length - 1; i >= 0; i--){
+    const e = State.enemies[i];
+    const d = Math.hypot(e.position.x - px, e.position.z - pz);
+    if (d > CHUNK_SIZE * (RENDER_RADIUS + 2)){
+      State.scene.remove(e.group);
+      State.enemies.splice(i, 1);
+    }
+  }
+}
+
+// =============================================================================
+//  STEAM PARTICLES
+// =============================================================================
+class SteamSystem {
+  constructor(scene){
+    this.scene = scene;
+    this.particles = [];
+    this.maxParticles = 80;
+    this.spawnTimer = 0;
+    // Particle pool — billboarded sprites via points
+    const positions = new Float32Array(this.maxParticles * 3);
+    const colors = new Float32Array(this.maxParticles * 3);
+    const sizes = new Float32Array(this.maxParticles);
+    for (let i = 0; i < this.maxParticles; i++){
+      positions[i*3+1] = -1000; // hidden
+      colors[i*3] = 1; colors[i*3+1] = 1; colors[i*3+2] = 1;
+      sizes[i] = 0;
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    const mat = new THREE.PointsMaterial({
+      size: 2.0, vertexColors: true,
+      transparent: true, opacity: 0.4,
+      sizeAttenuation: true, depthWrite: false,
+    });
+    this.points = new THREE.Points(geo, mat);
+    scene.add(this.points);
+  }
+  emit(x, y, z){
+    for (let i = 0; i < this.maxParticles; i++){
+      if (!this.particles[i] || this.particles[i].life <= 0){
+        this.particles[i] = {
+          x, y, z,
+          vx: (Math.random() - 0.5) * 0.4,
+          vy: 0.8 + Math.random() * 0.4,
+          vz: (Math.random() - 0.5) * 0.4,
+          life: 2.5,
+        };
+        return;
+      }
+    }
+  }
+  update(dt, vents){
+    this.spawnTimer += dt;
+    if (this.spawnTimer > 0.12){
+      this.spawnTimer = 0;
+      // Find nearby vents (within render radius)
+      for (const v of vents){
+        const d = Math.hypot(v.x - Player.position.x, v.z - Player.position.z);
+        if (d < 60){
+          this.emit(v.x + (Math.random()-0.5)*0.3, v.y, v.z + (Math.random()-0.5)*0.3);
+        }
+      }
+    }
+    // Update
+    const positions = this.points.geometry.attributes.position;
+    for (let i = 0; i < this.maxParticles; i++){
+      const p = this.particles[i];
+      if (!p || p.life <= 0){
+        positions.setY(i, -1000);
+        continue;
+      }
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      p.z += p.vz * dt;
+      p.vy *= 0.97;
+      p.life -= dt;
+      positions.setXYZ(i, p.x, p.y, p.z);
+    }
+    positions.needsUpdate = true;
+  }
+}
+
+// =============================================================================
+//  PLAYER + INPUT
+// =============================================================================
+function updateCrosshairTarget(){
+  // Cast a ray from camera forward; if it hits an enemy within weapon range, redden
+  if (Player.mode === 'drive' || State.enemies.length === 0){
+    $('crosshair').classList.remove('hostile');
+    return;
+  }
+  const forward = new THREE.Vector3(0, 0, -1).applyEuler(State.camera.rotation).normalize();
+  const origin = Player.position;
+  const w = WEAPONS[Player.currentWeapon];
+  let hit = false;
+  for (const e of State.enemies){
+    if (e.state === 'dead') continue;
+    const ex = e.position.x, ey = e.position.y + (e.flying ? 0 : 1.2), ez = e.position.z;
+    const d = ex - origin.x, dy = ey - origin.y, dz = ez - origin.z;
+    const t = d * forward.x + dy * forward.y + dz * forward.z;
+    if (t < 0 || t > w.range) continue;
+    const projX = origin.x + forward.x * t;
+    const projY = origin.y + forward.y * t;
+    const projZ = origin.z + forward.z * t;
+    const distSq = (projX-ex)**2 + (projY-ey)**2 + (projZ-ez)**2;
+    if (distSq < 1.2){ hit = true; break; }
+  }
+  $('crosshair').classList.toggle('hostile', hit);
+}
+
+function updateWalkInput(dt){
+  const moveSpeed = getWalkSpeed();
+  const dir = new THREE.Vector3();
+  if (State.keys.has('w')) dir.z -= 1;
+  if (State.keys.has('s')) dir.z += 1;
+  if (State.keys.has('a')) dir.x -= 1;
+  if (State.keys.has('d')) dir.x += 1;
+  if (dir.lengthSq() > 0){
+    dir.normalize();
+    const cy = Math.cos(Player.yaw), sy = Math.sin(Player.yaw);
+    const dx = dir.x * cy + dir.z * sy;
+    const dz = -dir.x * sy + dir.z * cy;
+    Player.velocity.x = dx * moveSpeed;
+    Player.velocity.z = dz * moveSpeed;
+  } else {
+    Player.velocity.x *= 0.6;
+    Player.velocity.z *= 0.6;
+  }
+  if (State.keys.has(' ') && Player.onGround){
+    Player.velocity.y = getJumpPower();
+    Player.onGround = false;
+  }
+  Player.velocity.y -= 22 * dt;
+}
+
+// Axis-separated movement against the voxel field. Unlike the old AABB pass
+// this resolves Y as well, so roofs, ledges and anything you build are all
+// walkable surfaces.
+function updateWalkPhysics(dt){
+  const r = Player.radius, h = Player.height;
+  const p = Player.position;
+  const x0 = p.x, z0 = p.z;
+  let feet = p.y - h;
+
+  const nx = p.x + Player.velocity.x * dt;
+  if (!blockedAt(nx, feet, p.z, r, h)) p.x = nx;
+  const nz = p.z + Player.velocity.z * dt;
+  if (!blockedAt(p.x, feet, nz, r, h)) p.z = nz;
+
+  let nf = feet + Player.velocity.y * dt;
+  if (Player.velocity.y <= 0){
+    if (blockedAt(p.x, nf, p.z, r, h)){
+      nf = Math.floor(nf) + 1;              // land on the block top
+      Player.velocity.y = 0;
+      Player.onGround = true;
+    } else {
+      Player.onGround = false;
+    }
+  } else {
+    if (blockedAt(p.x, nf, p.z, r, h)){     // clipped a ceiling
+      nf = feet;
+      Player.velocity.y = 0;
+    }
+    Player.onGround = false;
+  }
+  if (nf < 0){ nf = 0; Player.velocity.y = 0; Player.onGround = true; }
+  p.y = nf + h;
+
+  State.hud.distanceWalked += Math.hypot(p.x - x0, p.z - z0);
+}
+
+// Voxels first, then the small prop AABBs (hydrants, bins, planters) so street
+// clutter stays solid even though it isn't part of the block field.
+function blockedAt(cx, feet, cz, r, h){
+  if (boxHitsVoxels(cx, feet, cz, r, h)) return true;
+  for (const k of nearbyChunkKeys(cx, cz)){
+    const c = State.chunkMap.get(k);
+    if (!c) continue;
+    for (const a of c.collisionAABBs){
+      if (cx + r > a.minX && cx - r < a.maxX &&
+          cz + r > a.minZ && cz - r < a.maxZ &&
+          feet < a.maxY && feet + h > (a.minY || 0)){
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+function playerCollides(pos){
+  return blockedAt(pos.x, pos.y - Player.height, pos.z, Player.radius, Player.height);
+}
+
+function nearbyChunkKeys(x, z){
+  const pcx = Math.floor((x + CHUNK_SIZE/2) / CHUNK_SIZE);
+  const pcz = Math.floor((z + CHUNK_SIZE/2) / CHUNK_SIZE);
+  return [
+    `${pcx},${pcz}`, `${pcx+1},${pcz}`, `${pcx-1},${pcz}`,
+    `${pcx},${pcz+1}`, `${pcx},${pcz-1}`,
+    `${pcx+1},${pcz+1}`, `${pcx-1},${pcz-1}`,
+    `${pcx+1},${pcz-1}`, `${pcx-1},${pcz+1}`,
+  ];
+}
+
+function updateDriveInput(dt){
+  const car = State.ui.inCar;
+  if (!car) return;
+  const accel = 16;
+  const brake = 26;
+  const maxFwd = 22;
+  const maxRev = -8;
+  const friction = 4;
+  const steerRate = State.keys.has('shift') ? 1.6 : 2.2;
+  if (State.keys.has('w')) car.velocity = Math.min(maxFwd, car.velocity + accel * dt);
+  else if (State.keys.has('s')) car.velocity = Math.max(maxRev, car.velocity - accel * dt);
+  else {
+    if (Math.abs(car.velocity) < friction * dt) car.velocity = 0;
+    else car.velocity -= Math.sign(car.velocity) * friction * dt;
+  }
+  if (State.keys.has(' ')){
+    if (Math.abs(car.velocity) < brake * dt) car.velocity = 0;
+    else car.velocity -= Math.sign(car.velocity) * brake * dt;
+  }
+  let steer = 0;
+  if (State.keys.has('a')) steer += 1;
+  if (State.keys.has('d')) steer -= 1;
+  const speedFactor = Math.min(1, Math.abs(car.velocity) / 6);
+  car.rotation += steer * steerRate * dt * speedFactor;
+  const dx = Math.sin(car.rotation) * car.velocity * dt;
+  const dz = Math.cos(car.rotation) * car.velocity * dt;
+  const tryPos = car.position.clone();
+  tryPos.x += dx; tryPos.z += dz;
+  if (!carCollides(tryPos)){
+    car.position.x = tryPos.x;
+    car.position.z = tryPos.z;
+    State.hud.distanceDriven += Math.hypot(dx, dz);
+  } else {
+    car.velocity *= -0.4;
+  }
+  car.mesh.position.copy(car.position);
+  car.mesh.rotation.y = car.rotation;
+  const camOff = new THREE.Vector3(
+    -Math.sin(car.rotation) * 7, 4.5, -Math.cos(car.rotation) * 7
+  );
+  const target = car.position.clone().add(camOff);
+  State.camera.position.lerp(target, Math.min(1, 8*dt));
+  State.camera.lookAt(car.position.x, car.position.y + 1.5, car.position.z);
+  Player.position.set(car.position.x, Player.height, car.position.z);
+  $('hud-speed').classList.add('show');
+  $('hud-speed').textContent = `${Math.abs(car.velocity * 3.6 * 0.7).toFixed(0)} km/h`;
+}
+
+function carCollides(pos){
+  const r = 1.5;
+  const keys = nearbyChunkKeys(pos.x, pos.z);
+  for (const k of keys){
+    const c = State.chunkMap.get(k);
+    if (!c) continue;
+    for (const a of c.collisionAABBs){
+      if (pos.x + r > a.minX && pos.x - r < a.maxX &&
+          pos.z + r > a.minZ && pos.z - r < a.maxZ){
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+// =============================================================================
+//  INTERACTIONS
+// =============================================================================
+function findNearbyInteractable(){
+  const px = Player.position.x, pz = Player.position.z;
+  let best = null, bestDist = 3.5;
+  // Check terminals in nearby chunks
+  for (const k of nearbyChunkKeys(px, pz)){
+    const c = State.chunkMap.get(k);
+    if (!c) continue;
+    for (const t of c.terminals){
+      const d = Math.hypot(t.position.x - px, t.position.z - pz);
+      if (d < bestDist){ bestDist = d; best = { type: 'terminal', ref: t }; }
+    }
+    for (const car of c.parkedCars){
+      if (car.occupied) continue;
+      const d = Math.hypot(car.position.x - px, car.position.z - pz);
+      if (d < 3.5 && d < bestDist){ bestDist = d; best = { type: 'car', ref: car }; }
+    }
+  }
+  return best;
+}
+
+function handleInteract(){
+  if (Player.mode === 'drive'){ exitCar(); return; }
+  const it = findNearbyInteractable();
+  if (!it) return;
+  if (it.type === 'terminal') openMiniGame(it.ref);
+  else if (it.type === 'car') enterCar(it.ref);
+}
+
+function enterCar(car){
+  Player.mode = 'drive';
+  State.ui.inCar = car;
+  car.occupied = true;
+  $('hud-mode-val').textContent = 'DRIVING';
+  $('hud-speed').classList.add('show');
+  toast('Entered vehicle. WASD to drive, E to exit.', 'info');
+}
+
+function exitCar(){
+  const car = State.ui.inCar;
+  if (!car) return;
+  car.occupied = false;
+  Player.position.set(
+    car.position.x + Math.cos(car.rotation) * 2,
+    Player.height,
+    car.position.z - Math.sin(car.rotation) * 2,
+  );
+  Player.mode = 'walk';
+  State.ui.inCar = null;
+  $('hud-mode-val').textContent = 'FOOT';
+  $('hud-speed').classList.remove('show');
+  toast('Exited vehicle.', 'info');
+}
+
+// =============================================================================
+//  MINI-GAMES (unchanged from v0.1)
+// =============================================================================
+const HACK_WORDPOOL = ['cipher','memex','protocol','daemon','kernel','runtime','beacon','snapshot','register','manifest','sandbox','overlay','fallback','syncwave','payload','dataflow','endpoint','keyring','session','timestamp','signature','quantum','midnight','offshore','blackbox','dropbox','signal','tunnel','breakpoint','thread','token','request','response','channel','listener','handshake'];
+
+function openMiniGame(terminal){
+  if (terminal.used){ toast('Terminal already used.', 'info'); return; }
+  State.ui.inMiniGame = true;
+  document.exitPointerLock();
+  document.body.style.cursor = 'auto';
+  const card = $('minigame-card');
+  const kind = Math.random() < 0.5 ? 'hack' : 'route';
+  if (kind === 'hack') openHackGame(terminal, card);
+  else openRouteGame(terminal, card);
+  $('minigame-overlay').classList.add('show');
+}
+
+function closeMiniGame(success, terminal, reward){
+  $('minigame-overlay').classList.remove('show');
+  State.ui.inMiniGame = false;
+  document.body.style.cursor = 'none';
+  if (success){
+    terminal.used = true;
+    terminal.screen.material = makeNeonMat(0x7dffb3);
+    terminal.light.color.setHex(0x7dffb3);
+    grantCredits(reward);
+    toast(`+${reward} credits.`, 'success');
+    if (State.task && State.task.targetType === 'terminal' && State.task.target === terminal){
+      taskComplete();
+    }
+  } else {
+    toast('Job failed.', 'fail');
+  }
+}
+
+function openHackGame(terminal, card){
+  const rng = new RNG(Date.now() + (terminal.position.x * 1000)|0);
+  const words = [];
+  for (let i = 0; i < 3; i++) words.push(rng.pick(HACK_WORDPOOL));
+  let wordIdx = 0, typed = '', timeLeft = 14000, active = true;
+  const startTs = performance.now();
+  function render(){
+    const current = words[wordIdx] || '';
+    card.innerHTML = `
+      <div class="mg-head">
+        <div class="mg-title">▷ TERMINAL — INTRUSION</div>
+        <button class="mg-close" id="mg-close-btn">×</button>
+      </div>
+      <div class="hack-prompt">Type the access tokens shown below. Three in a row. Don't make typos. The cursor will return when you finish or fail.</div>
+      <div class="hack-target">
+        <span class="typed">${current.slice(0, typed.length)}</span><span class="untyped">${current.slice(typed.length)}</span>
+      </div>
+      <input class="hack-input" id="hack-input" autofocus placeholder="type here">
+      <div class="hack-meta">
+        <span class="progress">${wordIdx + 1} / ${words.length}</span>
+        <span class="timer">${(timeLeft/1000).toFixed(1)}s</span>
+      </div>`;
+    $('mg-close-btn').onclick = () => { active = false; closeMiniGame(false, terminal, 0); };
+    const input = $('hack-input'); input.focus(); input.value = typed;
+    input.oninput = (e) => {
+      typed = e.target.value;
+      const cur = words[wordIdx] || '';
+      if (typed === cur){
+        wordIdx++; typed = ''; input.value = '';
+        if (wordIdx >= words.length){
+          active = false;
+          const elapsed = performance.now() - startTs;
+          const speedBonus = Math.max(0, 14000 - elapsed) / 14000;
+          closeMiniGame(true, terminal, Math.round(40 + speedBonus * 40));
+          return;
+        }
+        render(); $('hack-input').focus();
+      } else if (!cur.startsWith(typed)){
+        input.style.borderColor = '#ff7088';
+        setTimeout(() => { input.style.borderColor = ''; typed = ''; input.value = ''; render(); $('hack-input').focus(); }, 200);
+      }
+    };
+  }
+  render();
+  function tick(){
+    if (!active) return;
+    timeLeft = 14000 - (performance.now() - startTs);
+    if (timeLeft <= 0){ active = false; closeMiniGame(false, terminal, 0); return; }
+    const meta = card.querySelector('.timer');
+    if (meta) meta.textContent = (timeLeft/1000).toFixed(1) + 's';
+    requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+}
+
+function openRouteGame(terminal, card){
+  const rng = new RNG(Date.now() + (terminal.position.z * 1000)|0);
+  const W = 600, H = 280, NODE_COUNT = 8;
+  const nodes = [];
+  for (let i = 0; i < NODE_COUNT; i++){
+    nodes.push({ id: i, x: 50 + (i % 4) * 160 + rng.range(-15, 15), y: 50 + Math.floor(i / 4) * 160 + rng.range(-15, 15) });
+  }
+  const SRC = 0, DST = NODE_COUNT - 1;
+  const adj = nodes.map(() => new Set());
+  for (let i = 0; i < NODE_COUNT; i++){
+    const dists = nodes.map((n, j) => ({ j, d: Math.hypot(n.x - nodes[i].x, n.y - nodes[i].y) }))
+      .filter(o => o.j !== i).sort((a, b) => a.d - b.d).slice(0, 3);
+    for (const o of dists){ adj[i].add(o.j); adj[o.j].add(i); }
+  }
+  let path = [SRC], finished = false;
+  function render(){
+    const lines = [];
+    for (let i = 0; i < NODE_COUNT; i++){
+      for (const j of adj[i]){
+        if (j > i){
+          lines.push(`<line x1="${nodes[i].x}" y1="${nodes[i].y}" x2="${nodes[j].x}" y2="${nodes[j].y}" stroke="rgba(120,80,200,0.35)" stroke-width="1.5"/>`);
+        }
+      }
+    }
+    const pathLines = [];
+    for (let i = 1; i < path.length; i++){
+      const a = nodes[path[i-1]], b = nodes[path[i]];
+      pathLines.push(`<line x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}" stroke="#ff60d0" stroke-width="3" stroke-linecap="round"/>`);
+    }
+    const nodeMarks = nodes.map((n, i) => {
+      let fill = '#3a2856';
+      if (i === SRC) fill = '#7dffb3';
+      else if (i === DST) fill = '#ff60d0';
+      else if (path.includes(i)) fill = '#80ffff';
+      const stroke = path[path.length-1] === i ? '#ffd47a' : 'rgba(180,140,255,0.5)';
+      const label = i === SRC ? 'SRC' : i === DST ? 'DST' : (i+'');
+      return `<g class="route-node" data-id="${i}">
+        <circle cx="${n.x}" cy="${n.y}" r="18" fill="${fill}" stroke="${stroke}" stroke-width="2"/>
+        <text x="${n.x}" y="${n.y+4}" text-anchor="middle" font-family="SF Mono, monospace" font-size="11" fill="#fff">${label}</text>
+      </g>`;
+    });
+    card.innerHTML = `
+      <div class="mg-head"><div class="mg-title">▷ TERMINAL — PACKET ROUTE</div><button class="mg-close" id="mg-close-btn">×</button></div>
+      <div class="hack-prompt">Route a packet from <strong style="color:#7dffb3;">SRC</strong> to <strong style="color:#ff60d0;">DST</strong>. Click nodes — only adjacent hops are valid.</div>
+      <div class="route-canvas"><svg viewBox="0 0 ${W} ${H}">${lines.join('')}${pathLines.join('')}${nodeMarks.join('')}</svg></div>
+      <div class="route-info">
+        <span>HOPS: <strong style="color:#80ffff">${path.length-1}</strong></span>
+        <span class="status">${finished ? 'PACKET DELIVERED' : 'ROUTING…'}</span>
+        <span>RESET <button class="mg-close" id="mg-reset-btn" style="width:22px;height:18px;display:inline-flex;line-height:1;margin-left:4px;">↻</button></span>
+      </div>`;
+    $('mg-close-btn').onclick = () => closeMiniGame(false, terminal, 0);
+    $('mg-reset-btn').onclick = () => { path = [SRC]; finished = false; render(); };
+    card.querySelectorAll('.route-node').forEach(g => {
+      g.addEventListener('click', () => {
+        if (finished) return;
+        const id = parseInt(g.dataset.id, 10);
+        const last = path[path.length - 1];
+        if (path.includes(id) && id !== last){
+          path = path.slice(0, path.indexOf(id) + 1); render();
+        } else if (adj[last].has(id) && id !== last){
+          path.push(id);
+          if (id === DST){
+            finished = true; render();
+            setTimeout(() => closeMiniGame(true, terminal, Math.max(30, 90 - (path.length-1) * 8)), 700);
+          } else render();
+        }
+      });
+    });
+  }
+  render();
+}
+
+// =============================================================================
+//  TASK SYSTEM
+// =============================================================================
+function buildTaskQueue(){
+  State.taskQueue = [];
+  // Mix of generic tasks; targets resolve at runtime
+  for (let i = 0; i < 2; i++) State.taskQueue.push({
+    kind: 'hack-any-terminal', targetType: 'any-terminal',
+    description: 'Find a terminal and run the intrusion.', reward: 60,
+  });
+  for (let i = 0; i < 2; i++) State.taskQueue.push({
+    kind: 'visit-district', targetType: 'district',
+    target: State.rng.pick(DISTRICT_LIST.map(d => d.name)),
+    description: '', reward: 50,
+  });
+  for (let i = 0; i < 2; i++){
+    // Random destination 60-120m away
+    const angle = State.rng.range(0, TAU);
+    const dist = State.rng.range(50, 140);
+    State.taskQueue.push({
+      kind: 'travel-to', targetType: 'position',
+      target: { x: Math.cos(angle) * dist, z: Math.sin(angle) * dist },
+      description: 'Reach the marked location.', reward: 70,
+    });
+  }
+  // Shuffle
+  for (let i = State.taskQueue.length - 1; i > 0; i--){
+    const j = Math.floor(State.rng.next() * (i+1));
+    [State.taskQueue[i], State.taskQueue[j]] = [State.taskQueue[j], State.taskQueue[i]];
+  }
+  // Set descriptions for district tasks
+  for (const t of State.taskQueue){
+    if (t.kind === 'visit-district') t.description = `Reach the ${t.target} district.`;
+  }
+  startNextTask();
+}
+
+function startNextTask(){
+  State.task = State.taskQueue.shift();
+  if (!State.task){
+    $('hud-task-val').innerHTML = '<span class="compass">★</span>All jobs done — explore freely.';
+    return;
+  }
+  $('hud-task-val').innerHTML = `<span class="compass">▲</span>${State.task.description}`;
+}
+
+function checkTaskProgress(){
+  if (!State.task) return;
+  const t = State.task;
+  if (t.kind === 'travel-to'){
+    const d = Math.hypot(Player.position.x - t.target.x, Player.position.z - t.target.z);
+    if (d < 5) taskComplete();
+  } else if (t.kind === 'visit-district'){
+    const d = districtAtPosition(Player.position.x, Player.position.z);
+    if (d && d.name === t.target) taskComplete();
+  } else if (t.kind === 'hack-any-terminal'){
+    // Resolved by miniGame closing
+    if (t.target && t.target.used) taskComplete();
+  }
+}
+
+function districtAtPosition(x, z){
+  const cx = Math.floor((x + CHUNK_SIZE/2) / CHUNK_SIZE);
+  const cz = Math.floor((z + CHUNK_SIZE/2) / CHUNK_SIZE);
+  return districtForChunk(cx, cz);
+}
+
+function taskComplete(){
+  if (!State.task) return;
+  grantCredits(State.task.reward);
+  State.hud.tasksDone++;
+  toast(`Job complete: +${State.task.reward} credits`, 'success');
+  setTimeout(() => startNextTask(), 1000);
+}
+
+function grantCredits(n){
+  State.hud.credits += n;
+  $('hud-credits-val').textContent = State.hud.credits.toString();
+}
+
+// =============================================================================
+//  DAY/NIGHT
+// =============================================================================
+function updateDayNight(dt){
+  const dayLengthSec = State.dayLengthMs / 1000;
+  State.dayTime += dt * (24 * 60 / dayLengthSec);
+  if (State.dayTime >= 24*60) State.dayTime -= 24*60;
+  const hour = State.dayTime / 60;
+
+  // Sky gradient — bottom (horizon) to top (zenith)
+  let stops;
+  if (hour < 5){
+    // Deep night
+    stops = [[0, '#080012'], [0.4, '#100428'], [0.7, '#060218'], [1, '#020108']];
+  } else if (hour < 6){
+    // Pre-dawn
+    const t = (hour - 5);
+    stops = [
+      [0, lerpHex('#080012', '#3a1840', t)],
+      [0.3, lerpHex('#100428', '#502850', t)],
+      [0.7, lerpHex('#060218', '#1a1030', t)],
+      [1, '#020108'],
+    ];
+  } else if (hour < 7.5){
+    // Sunrise — strong magenta/orange horizon
+    const t = (hour - 6) / 1.5;
+    stops = [
+      [0, lerpHex('#3a1840', '#ff8050', t)],
+      [0.2, lerpHex('#502850', '#ff60a0', t)],
+      [0.5, lerpHex('#1a1030', '#a050b0', t)],
+      [1, lerpHex('#020108', '#205080', t)],
+    ];
+  } else if (hour < 11){
+    // Morning
+    const t = (hour - 7.5) / 3.5;
+    stops = [
+      [0, lerpHex('#ff8050', '#ffd078', t)],
+      [0.3, lerpHex('#ff60a0', '#80a8d8', t)],
+      [0.7, lerpHex('#a050b0', '#6098d0', t)],
+      [1, lerpHex('#205080', '#3070b0', t)],
+    ];
+  } else if (hour < 16){
+    // Midday — clear blue
+    stops = [[0, '#80c0d8'], [0.4, '#6098d0'], [0.8, '#3870b0'], [1, '#205090']];
+  } else if (hour < 18){
+    // Afternoon golden
+    const t = (hour - 16) / 2;
+    stops = [
+      [0, lerpHex('#80c0d8', '#ffac60', t)],
+      [0.4, lerpHex('#6098d0', '#ff8060', t)],
+      [0.8, lerpHex('#3870b0', '#9050a0', t)],
+      [1, lerpHex('#205090', '#502070', t)],
+    ];
+  } else if (hour < 19.5){
+    // Sunset — intense
+    const t = (hour - 18) / 1.5;
+    stops = [
+      [0, lerpHex('#ffac60', '#ff4080', t)],
+      [0.2, lerpHex('#ff8060', '#a040a0', t)],
+      [0.5, lerpHex('#9050a0', '#401860', t)],
+      [1, lerpHex('#502070', '#100628', t)],
+    ];
+  } else if (hour < 21){
+    // Dusk
+    const t = (hour - 19.5) / 1.5;
+    stops = [
+      [0, lerpHex('#ff4080', '#a02060', t)],
+      [0.3, lerpHex('#a040a0', '#502070', t)],
+      [0.7, lerpHex('#401860', '#180838', t)],
+      [1, lerpHex('#100628', '#060218', t)],
+    ];
+  } else if (hour < 22.5){
+    // Early night — neon city glow on horizon
+    const t = (hour - 21) / 1.5;
+    stops = [
+      [0, lerpHex('#a02060', '#601850', t)],   // neon city glow stays a bit
+      [0.3, lerpHex('#502070', '#200a40', t)],
+      [0.7, lerpHex('#180838', '#080218', t)],
+      [1, lerpHex('#060218', '#020108', t)],
+    ];
+  } else {
+    // Deep night
+    stops = [[0, '#601850'], [0.2, '#200a40'], [0.6, '#080218'], [1, '#020108']];
+  }
+  setSkyGradient(State.sky, stops);
+  State.scene.fog = new THREE.FogExp2(new THREE.Color(stops[0][1]).getHex(), 0.008);
+
+  // Sun position + intensity
+  const dayBright = (hour > 6 && hour < 19) ? 1.0 : 0.05;
+  State.sunLight.intensity = dayBright;
+  const sunAngle = (hour - 6) / 12 * Math.PI;
+  State.sunLight.position.set(
+    Math.cos(sunAngle) * 80,
+    Math.sin(sunAngle) * 80 + 5,
+    Math.sin(sunAngle * 0.3) * 30,
+  );
+  // Sun color shifts with time
+  if (hour < 7) State.sunLight.color.setHex(0xff8060);
+  else if (hour < 9) State.sunLight.color.setHex(0xffd078);
+  else if (hour < 17) State.sunLight.color.setHex(0xffe8c0);
+  else if (hour < 19) State.sunLight.color.setHex(0xff8050);
+  else State.sunLight.color.setHex(0x4060a0);
+
+  // Stars visible at night, fade in dusk
+  const starOpacity = hour > 20 || hour < 5 ? 0.85
+    : hour > 19 ? (20 - hour) * -1 + 0.85  // approaching night
+    : 0;
+  State.stars.material.opacity = Math.max(0, Math.min(0.85, starOpacity));
+  // Stars follow camera
+  State.stars.position.copy(Player.position);
+
+  // Moon position (opposite of sun)
+  State.moon.position.set(
+    -Math.cos(sunAngle) * 100,
+    -Math.sin(sunAngle) * 100 + 25,
+    50
+  );
+  State.moon.material.opacity = hour > 19 || hour < 6 ? 0.85 : 0;
+  // Moon follows camera laterally
+  const moonRelOffset = new THREE.Vector3(
+    -Math.cos(sunAngle) * 100,
+    -Math.sin(sunAngle) * 100 + 25,
+    50,
+  );
+  State.moon.position.copy(Player.position).add(moonRelOffset);
+
+  // HUD clock
+  const hh = Math.floor(hour).toString().padStart(2, '0');
+  const mm = Math.floor(State.dayTime % 60).toString().padStart(2, '0');
+  $('hud-clock').textContent = `${hh}:${mm}`;
+}
+
+function lerpHex(a, b, t){
+  const ca = new THREE.Color(a), cb = new THREE.Color(b);
+  ca.lerp(cb, Math.max(0, Math.min(1, t)));
+  return '#' + ca.getHexString();
+}
+
+// =============================================================================
+//  CONSTRUCT MODE — break and place blocks
+// =============================================================================
+//  Toggled with B so the existing combat keeps left-click. In construct mode
+//  LMB mines the targeted block and RMB places the held one against the hit
+//  face (the face comes free out of the DDA raycast).
+const REACH = 6;
+const HOTBAR = [B_CONCRETE, B_BRICK, B_METAL, B_GLASS, B_WIN_LIT, B_NEON, B_ROOF, B_SIDEWALK, B_RUST];
+let heldSlot = 0;
+let highlightMesh = null;
+let targetBlock = null;
+
+function initBlockHighlight(){
+  const geo = new THREE.BoxGeometry(1.002, 1.002, 1.002);
+  const edges = new THREE.EdgesGeometry(geo);
+  highlightMesh = new THREE.LineSegments(
+    edges, new THREE.LineBasicMaterial({ color: 0x80ffff, transparent: true, opacity: 0.85 })
+  );
+  highlightMesh.visible = false;
+  State.scene.add(highlightMesh);
+  geo.dispose();
+}
+
+function updateBlockTarget(){
+  if (!State.ui.construct || !State.ui.locked || Player.mode !== 'walk'){
+    targetBlock = null;
+    if (highlightMesh) highlightMesh.visible = false;
+    return;
+  }
+  const dir = new THREE.Vector3(
+    -Math.sin(Player.yaw) * Math.cos(Player.pitch),
+     Math.sin(Player.pitch),
+    -Math.cos(Player.yaw) * Math.cos(Player.pitch)
+  ).normalize();
+  targetBlock = raycastVoxel(Player.position, dir, REACH);
+  if (targetBlock && highlightMesh){
+    highlightMesh.position.set(targetBlock.x + 0.5, targetBlock.y + 0.5, targetBlock.z + 0.5);
+    highlightMesh.visible = true;
+  } else if (highlightMesh){
+    highlightMesh.visible = false;
+  }
+}
+
+function breakBlock(){
+  if (!targetBlock) return;
+  const { x, y, z, id } = targetBlock;
+  // Everything is removable, road bed included — updateWalkPhysics already
+  // clamps the player at y=0, so digging the street out can't drop you
+  // through the world.
+  if (y < 0) return;
+  setBlock(x, y, z, B_AIR);
+  spawnBlockBits(x, y, z, id);
+  State.hud.blocksMined = (State.hud.blocksMined || 0) + 1;
+  refreshBuildHUD();
+}
+
+function placeBlock(){
+  if (!targetBlock) return;
+  const px = targetBlock.x + targetBlock.nx;
+  const py = targetBlock.y + targetBlock.ny;
+  const pz = targetBlock.z + targetBlock.nz;
+  if (py < 0 || py >= VOX_H) return;
+  if (isSolid(getBlock(px, py, pz))) return;
+  // Never seal the player inside the block they are standing in
+  const feet = Player.position.y - Player.height;
+  if (px === Math.floor(Player.position.x) && pz === Math.floor(Player.position.z) &&
+      py >= Math.floor(feet) && py <= Math.floor(feet + Player.height)) return;
+  setBlock(px, py, pz, HOTBAR[heldSlot]);
+  State.hud.blocksPlaced = (State.hud.blocksPlaced || 0) + 1;
+  refreshBuildHUD();
+}
+
+// A short burst of debris so mining reads as an impact, not a disappearance.
+function spawnBlockBits(x, y, z, id){
+  const col = (BLOCKS[id] && BLOCKS[id].color) || 0x888888;
+  for (let i = 0; i < 6; i++){
+    const m = new THREE.Mesh(G.unitBox, new THREE.MeshBasicMaterial({ color: col }));
+    const s = 0.10 + Math.random() * 0.12;
+    m.scale.set(s, s, s);
+    m.position.set(x + 0.5 + (Math.random()-0.5), y + 0.5 + (Math.random()-0.5), z + 0.5 + (Math.random()-0.5));
+    m.userData.vel = new THREE.Vector3((Math.random()-0.5)*3, 2 + Math.random()*2, (Math.random()-0.5)*3);
+    m.userData.life = 0.7;
+    State.scene.add(m);
+    State.blockBits.push(m);
+  }
+}
+function updateBlockBits(dt){
+  for (let i = State.blockBits.length - 1; i >= 0; i--){
+    const b = State.blockBits[i];
+    b.userData.life -= dt;
+    if (b.userData.life <= 0){
+      State.scene.remove(b);
+      b.material.dispose();
+      State.blockBits.splice(i, 1);
+      continue;
+    }
+    b.userData.vel.y -= 14 * dt;
+    b.position.addScaledVector(b.userData.vel, dt);
+    b.rotation.x += dt * 6; b.rotation.y += dt * 4;
+  }
+}
+
+function toggleConstructMode(){
+  State.ui.construct = !State.ui.construct;
+  $('build-hud').classList.toggle('show', State.ui.construct);
+  if (!State.ui.construct && highlightMesh) highlightMesh.visible = false;
+  toast(State.ui.construct ? 'CONSTRUCT MODE — LMB mine · RMB place · 1-9 block' : 'CONSTRUCT MODE OFF', 'info');
+  refreshBuildHUD();
+}
+
+function refreshBuildHUD(){
+  const el = $('build-slots');
+  if (!el) return;
+  el.innerHTML = '';
+  HOTBAR.forEach((id, i) => {
+    const d = document.createElement('div');
+    d.className = 'bslot' + (i === heldSlot ? ' sel' : '');
+    const sw = document.createElement('span');
+    sw.className = 'bsw';
+    sw.style.background = '#' + BLOCKS[id].color.toString(16).padStart(6, '0');
+    d.appendChild(sw);
+    d.appendChild(document.createTextNode((i+1) + ' ' + BLOCKS[id].name));
+    el.appendChild(d);
+  });
+  const st = $('build-stats');
+  if (st) st.textContent = `mined ${State.hud.blocksMined||0} · placed ${State.hud.blocksPlaced||0}`;
+}
+
+// ─── Edit persistence — sparse diffs, keyed by city seed ────────────────────
+function saveEdits(){
+  if (!window.fracture) return;
+  const out = [];
+  for (const [k, v] of EDITS) out.push(k + ':' + v);
+  window.fracture.save('edits-' + State.citySeed, out);
+  State.editsDirty = false;
+}
+async function loadEdits(){
+  if (!window.fracture) return;
+  try {
+    const raw = await window.fracture.read('edits-' + State.citySeed);
+    if (!Array.isArray(raw)) return;
+    EDITS.clear();
+    for (const s of raw){
+      const i = s.lastIndexOf(':');
+      if (i > 0) EDITS.set(s.slice(0, i), Number(s.slice(i+1)));
+    }
+  } catch(e){ /* fresh city */ }
+}
+
+// =============================================================================
+//  INPUT
+// =============================================================================
+function setupInput(){
+  document.addEventListener('keydown', e => {
+    if (State.ui.inMiniGame) return;
+    State.keys.add(e.key.toLowerCase());
+    if (e.key.toLowerCase() === 'e' && !e.repeat) handleInteract();
+    if (e.key === 'Escape') openMenu();
+    if (e.key.toLowerCase() === 'b' && !e.repeat && Player.mode === 'walk') toggleConstructMode();
+    if (!e.repeat && Player.mode === 'walk'){
+      if (State.ui.construct){
+        // 1-9 pick a block while building; weapons stay bound outside the mode
+        const n = parseInt(e.key, 10);
+        if (n >= 1 && n <= HOTBAR.length){ heldSlot = n - 1; refreshBuildHUD(); }
+      } else {
+        if (e.key === '1') switchWeapon('baton');
+        if (e.key === '2') switchWeapon('pistol');
+        if (e.key === '3') switchWeapon('shotgun');
+      }
+    }
+  });
+  document.addEventListener('keyup', e => State.keys.delete(e.key.toLowerCase()));
+  const canvas = State.renderer.domElement;
+  // Click to lock OR to attack (depending on state)
+  canvas.addEventListener('mousedown', (e) => {
+    if (!State.ui.locked && !State.ui.inMiniGame && !State.ui.paused){
+      canvas.requestPointerLock();
+      return;
+    }
+    if (State.ui.locked && Player.mode === 'walk'){
+      if (State.ui.construct){
+        if (e.button === 0) breakBlock();
+        else if (e.button === 2) placeBlock();
+      } else if (e.button === 0){
+        tryAttack();
+      }
+    }
+  });
+  // Right-click places blocks, so suppress the browser context menu on canvas
+  canvas.addEventListener('contextmenu', e => e.preventDefault());
+  canvas.addEventListener('click', () => {
+    if (!State.ui.locked && !State.ui.inMiniGame && !State.ui.paused){
+      canvas.requestPointerLock();
+    }
+  });
+  document.addEventListener('pointerlockchange', () => {
+    State.ui.locked = (document.pointerLockElement === canvas);
+    if (!State.ui.locked && !State.ui.paused && !State.ui.inMiniGame){
+      $('lock-instruction').classList.add('show');
+    } else {
+      $('lock-instruction').classList.remove('show');
+    }
+  });
+  $('lock-instruction').addEventListener('click', () => canvas.requestPointerLock());
+  document.addEventListener('mousemove', e => {
+    if (!State.ui.locked) return;
+    Player.yaw -= e.movementX * 0.0025;
+    Player.pitch -= e.movementY * 0.0025;
+    Player.pitch = Math.max(-Math.PI/2 + 0.01, Math.min(Math.PI/2 - 0.01, Player.pitch));
+  });
+}
+
+// =============================================================================
+//  UI
+// =============================================================================
+function toast(msg, kind='info'){
+  const t = document.createElement('div');
+  t.className = 'toast ' + kind;
+  t.textContent = msg;
+  $('toast-stack').appendChild(t);
+  setTimeout(() => { t.style.opacity = '0'; setTimeout(() => t.remove(), 400); }, 2800);
+}
+
+function openMenu(){
+  State.ui.paused = true;
+  document.exitPointerLock();
+  $('menu-overlay').classList.remove('hide');
+  document.body.style.cursor = 'auto';
+  $('menu-stats').innerHTML = `
+    <div class="stat-row">CREDITS<span class="stat-val">${State.hud.credits}</span></div>
+    <div class="stat-row">JOBS COMPLETED<span class="stat-val">${State.hud.tasksDone}</span></div>
+    <div class="stat-row">METRES WALKED<span class="stat-val">${Math.round(State.hud.distanceWalked)}</span></div>
+    <div class="stat-row">METRES DRIVEN<span class="stat-val">${Math.round(State.hud.distanceDriven)}</span></div>
+    <div class="stat-row">CHUNKS LOADED<span class="stat-val">${State.chunkMap.size}</span></div>
+  `;
+  if (State.chunkMap.size > 0) $('btn-start').textContent = '▶ RESUME';
+}
+
+function closeMenu(){
+  $('menu-overlay').classList.add('hide');
+  State.ui.paused = false;
+  document.body.style.cursor = 'none';
+}
+
+// =============================================================================
+//  CINEMATIC AMBIENT — drift billboards, flicker neon strips, blink beacons
+// =============================================================================
+function updateSkylineAndBillboards(dt){
+  const t = performance.now() * 0.001;
+  // Skyline tower window strips — flicker each strip's opacity
+  if (State.skyline){
+    State.skyline.traverse(obj => {
+      if (obj.userData && obj.userData.flicker){
+        const f = obj.userData.flicker;
+        const v = Math.sin(t * f.rate + f.phase) * 0.18 + Math.sin(t * f.rate * 6.3 + f.phase) * 0.06;
+        obj.material.opacity = Math.max(0.15, Math.min(0.95, f.base + v));
+      }
+      if (obj.userData && obj.userData.beacon){
+        const b = obj.userData.beacon;
+        const phase = (t * 0.7 + b.phase) % 2;
+        obj.material.opacity = phase < 0.2 ? 1.0 : phase < 0.4 ? 0.2 : 0.55;
+      }
+    });
+  }
+  // Billboards — gentle Y drift + flicker + always face player
+  if (State.holoBillboards && State.camera){
+    State.holoBillboards.children.forEach(sp => {
+      const u = sp.userData;
+      sp.position.y = u.baseY + Math.sin(t * 0.3 + u.phase) * 1.5;
+      // Slight orbital rotation around scene
+      u.angle += dt * 0.005;
+      sp.position.x = Math.cos(u.angle) * u.radius;
+      sp.position.z = Math.sin(u.angle) * u.radius;
+      // Flicker opacity
+      const f = Math.sin(t * u.flickerRate + u.phase) * 0.2 + Math.sin(t * u.flickerRate * 8 + u.phase) * 0.05;
+      sp.material.opacity = Math.max(0.3, Math.min(0.95, 0.75 + f));
+    });
+  }
+}
+
+// =============================================================================
+//  RENDER LOOP
+// =============================================================================
+function tick(){
+  requestAnimationFrame(tick);
+  const dt = Math.min(0.05, State.clock.getDelta());
+
+  if (!State.ui.paused && !State.ui.inMiniGame){
+    State.hud.playTime += dt;
+    updateDayNight(dt);
+    updateChunks();
+    updateSkylineAndBillboards(dt);
+
+    if (Player.mode === 'walk'){
+      updateWalkInput(dt);
+      updateWalkPhysics(dt);
+      State.camera.position.copy(Player.position);
+      State.camera.rotation.y = Player.yaw;
+      State.camera.rotation.x = Player.pitch;
+    } else {
+      updateDriveInput(dt);
+    }
+
+    // Update NPCs
+    for (const npc of State.globalNPCs){ npc.update(dt); }
+    // Update mobile cars
+    for (const car of State.globalCars){ car.update(dt); }
+    // Update enemies
+    for (let i = State.enemies.length - 1; i >= 0; i--){
+      const e = State.enemies[i];
+      e.update(dt);
+      if (e.state === 'dead'){
+        e.deadTimer -= dt;
+        if (e.deadTimer <= 0){
+          State.scene.remove(e.group);
+          State.enemies.splice(i, 1);
+        }
+      }
+    }
+    // Update player attack cooldown + invuln
+    if (Player.attackCooldown > 0) Player.attackCooldown -= dt;
+    if (Player.invulnTime > 0) Player.invulnTime -= dt;
+    if (Player.damageFlash > 0){
+      Player.damageFlash -= dt;
+      if (Player.damageFlash <= 0) $('dmg-vignette').classList.remove('show');
+    }
+    // Construct mode — target the block under the crosshair, age debris, and
+    // rebuild only the sections an edit actually touched.
+    updateBlockTarget();
+    updateBlockBits(dt);
+    for (const [, c] of State.chunkMap) c.rebuildDirtySections();
+    if (State.editsDirty){
+      State._saveT = (State._saveT || 0) + dt;
+      if (State._saveT > 2){ saveEdits(); State._saveT = 0; }
+    }
+
+    // Update aliveness systems
+    updateHoloAds(dt);
+    updateCivDrones(dt);
+    updateDamageNumbers(dt);
+    // Update crosshair color
+    updateCrosshairTarget();
+    // Update steam — combine vents from all loaded chunks
+    const allVents = [];
+    for (const c of State.chunkMap.values()){
+      for (const v of c.steamVents) allVents.push(v);
+    }
+    if (State.steam) State.steam.update(dt, allVents);
+
+    // Headlight beams for nearby mobile cars (and we toggle at night)
+    const isNight = (State.dayTime/60 < 6 || State.dayTime/60 > 19);
+    for (const car of State.globalCars){
+      const d = Math.hypot(car.position.x - Player.position.x, car.position.z - Player.position.z);
+      if (car.headBeam){ car.headBeam.visible = isNight && d < 30; }
+    }
+
+    // Check interactables
+    const it = findNearbyInteractable();
+    const promptEl = $('hud-prompt');
+    if (it && Player.mode === 'walk'){
+      promptEl.classList.add('show');
+      $('hud-prompt-text').textContent = it.type === 'terminal'
+        ? (it.ref.used ? 'TERMINAL — USED' : 'USE TERMINAL')
+        : 'ENTER VEHICLE';
+    } else if (Player.mode === 'drive'){
+      promptEl.classList.add('show');
+      $('hud-prompt-text').textContent = 'EXIT VEHICLE';
+    } else {
+      promptEl.classList.remove('show');
+    }
+
+    // Update district HUD
+    const d = districtAtPosition(Player.position.x, Player.position.z);
+    if (d) $('hud-district').textContent = `DISTRICT — ${d.name}`;
+
+    checkTaskProgress();
+
+    // Resolve "any terminal" tasks
+    if (State.task && State.task.targetType === 'any-terminal' && !State.task.target){
+      // First terminal player hacks counts
+      for (const c of State.chunkMap.values()){
+        for (const t of c.terminals){
+          if (t.used){ State.task.target = t; taskComplete(); break; }
+        }
+        if (State.task && State.task.target) break;
+      }
+    }
+  }
+
+  State.renderer.render(State.scene, State.camera);
+}
+
+// =============================================================================
+//  BOOT
+// =============================================================================
+function newGame(seed){
+  // Wipe scene
+  while (State.scene.children.length) State.scene.remove(State.scene.children[0]);
+  State.chunkMap.clear();
+  State.globalNPCs.length = 0;
+  State.globalCars.length = 0;
+  State.enemies.length = 0;
+  State.holoAds.length = 0;
+  State.civDrones.length = 0;
+  for (const dn of State.dmgNumbers){ if (dn.el.parentNode) dn.el.parentNode.removeChild(dn.el); }
+  State.dmgNumbers.length = 0;
+  applyClass(Player.classKey || 'operative');
+
+  State.citySeed = seed || ('fc-' + Math.random().toString(36).slice(2, 8));
+  State.rng = new RNG(State.citySeed);
+  State.hud = { credits: 0, tasksDone: 0, distanceWalked: 0, distanceDriven: 0, playTime: 0,
+                blocksMined: 0, blocksPlaced: 0 };
+  $('hud-credits-val').textContent = '0';
+  State.dayTime = 18 * 60; // start at dusk for the dramatic sky
+  // Ground is now a block at y=0, so the sidewalk surface sits at y=2. Spawn
+  // above it and let gravity settle the player onto the pavement.
+  Player.position.set(0, Player.height + 3, 5);
+  Player.velocity.set(0,0,0);
+  Player.yaw = 0; Player.pitch = 0;
+  Player.mode = 'walk';
+  State.ui.inCar = null;
+  $('hud-mode-val').textContent = 'FOOT';
+
+  // Sky + stars + moon
+  State.sky = createSky(State.scene);
+  State.stars = createStars(State.scene);
+  State.moon = createMoon(State.scene);
+  // Distant city silhouette + holographic billboards (v0.4 cinematic upgrade)
+  State.skyline = createDistantSkyline(State.scene);
+  State.holoBillboards = createHoloBillboards(State.scene);
+
+  // Ground (large plane, just for under city)
+  // Actually each chunk has its own asphalt; we just need a backdrop in case.
+  // Skip the global ground — chunks cover it.
+
+  // Sun/ambient
+  State.ambient = new THREE.AmbientLight(0x4050a0, 0.35);
+  State.scene.add(State.ambient);
+  State.sunLight = new THREE.DirectionalLight(0xffe8c0, 1.0);
+  State.sunLight.position.set(50, 80, 30);
+  State.scene.add(State.sunLight);
+
+  // Steam
+  State.steam = new SteamSystem(State.scene);
+
+  // Distant skyline ring of voxel silhouettes (reduced from 80 to 40)
+  for (let i = 0; i < 40; i++){
+    const angle = (i / 40) * TAU;
+    const r = 220 + State.rng.range(0, 40);
+    const x = Math.cos(angle) * r;
+    const z = Math.sin(angle) * r;
+    const h = State.rng.range(20, 90);
+    const w = State.rng.range(8, 22);
+    const dColor = State.rng.pick([0x18141f, 0x100c18, 0x201824, 0x14101c]);
+    const distant = makeBoxMesh(w, h, w, new THREE.MeshBasicMaterial({ color: dColor }));
+    distant.position.set(x, h/2, z);
+    State.scene.add(distant);
+    // Random lit window
+    if (State.rng.bool(0.5)){
+      const winC = State.rng.pick([0xffd47a, 0x80ffff, 0xffac50, 0xff60d0]);
+      const inwardAngle = angle + Math.PI;
+      const winY = h * (0.3 + State.rng.range(0, 0.4));
+      const winSize = State.rng.range(0.6, 1.4);
+      const wmat = makeNeonMat(winC);
+      const win = makeBoxMesh(winSize, winSize, 0.1, wmat);
+      win.position.set(
+        x + Math.cos(inwardAngle) * w/2 - 0.05 * Math.cos(angle),
+        winY,
+        z + Math.sin(inwardAngle) * w/2 - 0.05 * Math.sin(angle)
+      );
+      win.lookAt(0, winY, 0);
+      State.scene.add(win);
+    }
+  }
+
+  // Load initial chunks
+  updateChunks();
+  buildTaskQueue();
+  closeMenu();
+}
+
+function continueGame(){
+  if (State.chunkMap.size === 0) newGame();
+  else closeMenu();
+}
+
+function init(){
+  initCache();
+  initFacadeTextures();
+  State.scene = new THREE.Scene();
+  State.camera = new THREE.PerspectiveCamera(78, window.innerWidth/window.innerHeight, 0.1, 600);
+  State.camera.rotation.order = 'YXZ';
+  State.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+  State.renderer.setPixelRatio(Math.min(2, window.devicePixelRatio));
+  State.renderer.setSize(window.innerWidth, window.innerHeight);
+  document.body.appendChild(State.renderer.domElement);
+  State.clock = new THREE.Clock();
+  initBlockHighlight();
+  refreshBuildHUD();
+  setupInput();
+  window.addEventListener('resize', () => {
+    State.camera.aspect = window.innerWidth / window.innerHeight;
+    State.camera.updateProjectionMatrix();
+    State.renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+  $('btn-start').onclick = () => {
+    if (State.chunkMap.size === 0){
+      openClassSelect(() => newGame());
+    } else {
+      closeMenu();
+    }
+  };
+  $('btn-continue').onclick = continueGame;
+  $('btn-newseed').onclick = () => openClassSelect(() => newGame());
+  // Class card clicks
+  for (const card of document.querySelectorAll('.class-card')){
+    card.addEventListener('click', () => {
+      const k = card.dataset.class;
+      applyClass(k);
+      $('class-overlay').classList.remove('show');
+      if (State.classSelectCallback) State.classSelectCallback();
+    });
+  }
+  $('respawn-btn').onclick = respawnPlayer;
+  tick();
+}
+
+function openClassSelect(cb){
+  State.classSelectCallback = cb;
+  $('class-overlay').classList.add('show');
+  $('menu-overlay').classList.add('hide');
+}
+
+document.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>

@@ -1,0 +1,90 @@
+PALM DRIVE — build notes
+════════════════════════
+
+RENDERER
+  Pseudo-3D, not real 3D. The road is z-ordered segments projected with a
+  perspective divide and drawn back-to-front as trapezoids (Pole Position /
+  OutRun technique). Locked 60fps, and it gives the "road bends into the
+  horizon" feel real 3D tends to flatten.
+
+ADDING A TRACK
+  Add a row to TRACKS: {id, name, sky, laps, sprites, desc, build()}.
+  build() is a sequence of addStraight / addCurve / addHill / addSCurves.
+  Skies are data in SKIES — stops, sun, ridges, city, ground, fog, grass.
+  buildTrack() appends addDownhillToEnd so the loop rejoins at y=0.
+
+CALIBRATION NOTES (learned the hard way — do not "simplify" these)
+  • RIVAL SKILL MUST STRADDLE THE PLAYER'S RANGE, NOT SIT ABOVE OR BELOW IT.
+    A competent human sustains roughly 0.62 (scruffy) to 0.90 (near-ideal) of
+    top speed over a race. Two failures have now been made here:
+      - 0.85-1.00: whole field above the player. Beaten by half a lap, always.
+      - 0.575-0.70: whole field below the player. Unlosable.
+    Both cliff-edge, because a NARROW band sits entirely on one side of the
+    player. The six are now spread 0.66-0.86 so each finishing position means
+    something, and the overall level is set by the difficulty tier instead.
+  • THE 0.575-0.70 CUT WAS A WORKAROUND FOR THE GRID BUG, NOT A BALANCE FIX.
+    Rivals used to spawn at trackLength-N, which read as a lap ahead (see
+    below). Skill was cut to compensate. The grid bug was then fixed and the
+    skill cut was never reverted, which is how the game became unlosable.
+    If you find a "balance" constant, check what bug it was hiding first.
+  • GRID POSITIONS MUST BE POSITIVE OFFSETS FROM THE START LINE.
+    Rivals were spawned at trackLength-N. Since progress = (lap-1)*trackLength
+    + z, that read as almost a full lap AHEAD, so the player was classified
+    last no matter how fast they drove. This looked exactly like a balance
+    problem and was not one.
+  • CATCH-UP ONLY EVER HELPS A RIVAL ADRIFT OF THE FIELD, AND ONLY ONE THAT IS
+    BEHIND YOU. A band that pulls back cars you have already beaten reads as
+    cheating and removes the point of driving well.
+  • FRACTURE TIER IS 1.045, NOT HIGHER. That puts the quickest rival at ~0.90
+    — level with a near-ideal human lap. At 1.09 the tier was unwinnable even
+    for a perfect drive, which is not difficulty, it is a wall.
+  • STEERING IS SPEED-SENSITIVE (steerAuth = 1 - speedPct*0.38).
+    Lateral movement already scales with speed via dx, so without this the car
+    is knife-edge at the top end — measured 24s spent off-road on the FASTEST
+    circuit purely from oversteer. Dropped to 1s with the fix.
+  • Car sprite world width must stay well under a lane (road spans 2*ROAD_W
+    across 3 lanes, so a lane is ~1466). At 1500 traffic read as a moving wall.
+  • Track hills must roughly cancel. An early layout climbed 48,000 units and
+    dropped it all at the end, which projected as a cliff.
+
+RIVAL EXPANSION (rivals.js)
+  Loads after the inline script and overrides spawnRivals / updateRivals.
+  Three tiers (ROOKIE 0.88 / PRO 1.00 / FRACTURE 1.045) multiply a base skill
+  band, and each of the six has a TEMPERAMENT that changes behaviour when the
+  player is near: blocker (covers the line), drafter (gains in a tow), closer
+  (faster on the final lap), opportunist (lifts when you go off), metronome
+  (no pace drift), wildcard (fast, occasionally throws it away). Per-circuit
+  bias means the running order differs by track.
+  Balance is asserted by _sim.js — run it after touching any constant.
+
+NEWSMAN NED (ned.js)
+  Announcer + campaign. Ned is canon: see apps/works/data/book.json ch.21,
+  "THE MONK WHO DID NOT BROADCAST". He addresses "citizens", reports only what
+  can be confirmed, and says so on air when the facts run out. He does NOT
+  hype — the comedy is in the epistemics. Keep new lines in that register.
+  The campaign derives a NEMESIS from who actually finishes ahead of you, so
+  the season narration responds to real results rather than a fixed script.
+
+HOST BINDING GOTCHA
+  The inline script declares its state with const/let (CAREER, RIVALS, G,
+  rivals, segments...). Those are global LEXICAL bindings and are NOT
+  properties of globalThis, so an add-on script cannot reach them as
+  globalThis.CAREER. rivals.js captures them into globalThis.PDHost — use
+  that. Function declarations (startRace, updateRivals...) ARE on globalThis
+  and can be overridden directly.
+
+PERSISTENCE
+  localStorage 'palmdrive_career_v1' — per-track lap records, race/win/podium
+  counts, trophies, and the in-progress championship (round, points, results)
+  so a season survives a reload and can be resumed from the menu.
+
+VERIFIED
+  All four circuits complete with an autopilot; lap times 40-61s; championship
+  awards points and produces standings; career survives reload.
+  _sim.js     — balance grid across 3 tiers x 4 driving standards. Asserts
+                losing is possible at PRO/FRACTURE, winning is possible at
+                every tier, and better driving always improves position.
+                Current: PRO gives P6.8 (bad) / P5.0 (average) / P3.0 (good)
+                / P1.0 (expert). FRACTURE: P7.0 / P6.0 / P4.3 / P1.5.
+  _sim_dom.js — loads the game in jsdom, drives the tier UI, runs 600 frames
+                of rival AI, and exercises the campaign + nemesis logic.

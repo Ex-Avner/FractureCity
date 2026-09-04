@@ -1,0 +1,38 @@
+{
+  "slug": "still-human",
+  "name": "Still Human",
+  "version": "0.2.0",
+  "entry": "index.html",
+  "runtime": "html5",
+  "description": "A first-person round survival game. You hold a walled yard against the turned, the lupine and the revenants; between waves a hatch opens for fifty-five seconds onto the lab underneath, where Dr Varga is somewhere in a generated maze with a serum that reverses what was done to people. He keeps making more between waves, so the way down stays worth taking. Hold the injector on a turned or a lupine for a beat and a bit and they stand up as themselves and walk away. A revenant cannot be cured, because a revenant was never someone who was changed \u2014 it is someone who died here, and all that is left of one is a name nobody says. Lead does nothing to them; the lantern wears them thin until they stop, and then a name tag found in the lab will settle one for good. Bring twelve people back, either way, and you can go home.",
+  "inputs": [
+    {
+      "type": "person.v1",
+      "description": "The player \u2014 read from the shell so a run is recorded under the same name you use everywhere else in the hub."
+    }
+  ],
+  "outputs": [
+    {
+      "type": "survival.run.v1",
+      "description": "A finished run \u2014 rounds held, creatures put down, people reverted with the serum, revenants laid to rest with their names, whether the scientist was found, and the seed that made that compound and that maze."
+    }
+  ],
+  "tags": [
+    "game",
+    "survival",
+    "first-person",
+    "rounds",
+    "zombies",
+    "werewolves",
+    "ghosts",
+    "maze",
+    "procedural",
+    "three.js",
+    "arcade",
+    "present-palm"
+  ],
+  "author": "Avner Media",
+  "license": "personal-use",
+  "window_width": 1360,
+  "window_height": 860
+}

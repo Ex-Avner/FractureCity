@@ -1,0 +1,73 @@
+{
+  "name": {
+    "first": "Liraz",
+    "last": "Tann",
+    "full": "Liraz Tann of the Lower Veins",
+    "origin_descriptor": "of the Lower Veins"
+  },
+  "epithet": "who built a door without first finding a room",
+  "zone": "VII",
+  "subtype": "The Visionary",
+  "class": "Weaver of Bond",
+  "stamp": "Abandonment",
+  "capture": "Face",
+  "origin": "Fracture City",
+  "age": "Young Adult",
+  "physical": {
+    "build": "Lean",
+    "skin": "bronze",
+    "hair": "long and braided",
+    "eyes": "violet",
+    "garment": "traveler hood"
+  },
+  "mannerisms": [
+    "lights candles in daylight without seeming to notice",
+    "walks past mirrors without looking",
+    "looks past your shoulder when they answer",
+    "collects the names of streets they will not return to"
+  ],
+  "voice": "lilting, with an accent no one can quite place",
+  "aspiration": "to build the thing they have seen",
+  "fear": "the last person walking out without saying anything",
+  "gift": "they finish what they begin",
+  "wound": "a doorway they watched until dark",
+  "secret": "that the person they need to convince is themselves",
+  "threads": [
+    {
+      "kind": "A parent",
+      "desc": "who never said it and is unlikely to"
+    },
+    {
+      "kind": "A rival",
+      "desc": "whom {name} cannot quite forgive, and cannot quite stop calling"
+    },
+    {
+      "kind": "A stranger",
+      "desc": "who said the right sentence at the right moment, and is unaware of any of it"
+    }
+  ],
+  "seed": "seed_mq2onf81_ne3",
+  "timestamp": "2026-06-06T18:24:49.134Z",
+  "backstory": {
+    "origin": "Liraz came up in Fracture City, of the Lower Veins. Their watch-keeper was rarely home, their smith was generous to strangers.",
+    "weight": "Doors closed in this family without being slammed. The pattern of being almost-loved-and-then-left runs back further than anyone has the heart to trace.",
+    "fracture": "Around their twenty-fives, the vision came. Or the obligation came. Whichever it was, Liraz could not put it down, and they have been carrying it largely alone since.",
+    "between": "Between then and now, they did most of the ordinary things. They lived in a town that was theirs only in winters for a time, learned to mend their own clothes, and grew briefly close to a person whose name they will not say in mixed company.",
+    "present": "These days, Liraz can be found at the watch wall most mornings. They have a book they have re-read four times that they will not throw away, and a habit of walking three blocks past where they need to go that even their oldest friends find slightly strange.",
+    "threadsIntro": "Three relationships, alive or otherwise, hold the architecture in place:",
+    "threads": [
+      {
+        "kind": "A parent",
+        "desc": "who never said it and is unlikely to"
+      },
+      {
+        "kind": "A rival",
+        "desc": "whom {name} cannot quite forgive, and cannot quite stop calling"
+      },
+      {
+        "kind": "A stranger",
+        "desc": "who said the right sentence at the right moment, and is unaware of any of it"
+      }
+    ]
+  }
+}

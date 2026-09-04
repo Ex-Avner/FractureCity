@@ -1,0 +1,73 @@
+{
+  "name": {
+    "first": "Mahir",
+    "last": "Vey",
+    "full": "Mahir Vey of the Glass Mouth",
+    "origin_descriptor": "of the Glass Mouth"
+  },
+  "epithet": "who knelt in places no one else could find",
+  "zone": "III",
+  "subtype": "The Hermit",
+  "class": "Blade of Form",
+  "stamp": "Abandonment",
+  "capture": "Face",
+  "origin": "The Forge",
+  "age": "Young Adult",
+  "physical": {
+    "build": "Heavy",
+    "skin": "bronze",
+    "hair": "wild and curling",
+    "eyes": "magenta",
+    "garment": "tight harness"
+  },
+  "mannerisms": [
+    "declines invitations with elaborate politeness",
+    "looks past your shoulder when they answer",
+    "never sits with their back to a door",
+    "unclasps and reclasps belts when thinking"
+  ],
+  "voice": "precise as cut glass and just as hard to argue with",
+  "aspiration": "to be left alone long enough to finish what they started",
+  "fear": "being left a second time",
+  "gift": "they finish what they begin",
+  "wound": "a parent who left and called it work",
+  "secret": "that the experience they claim to have had keeps slipping away",
+  "threads": [
+    {
+      "kind": "A rival",
+      "desc": "who has been chasing the same prize for so long that the chase is the friendship"
+    },
+    {
+      "kind": "A child",
+      "desc": "(not theirs) who calls when nobody else does"
+    },
+    {
+      "kind": "A friend",
+      "desc": "who left without an argument, and whose silence {name} still rehearses answers to"
+    }
+  ],
+  "seed": "seed_mpxfplx3_iqz",
+  "timestamp": "2026-06-03T02:15:44.783Z",
+  "backstory": {
+    "origin": "Born in The Forge, of the Glass Mouth, Mahir grew up in a household where one book was on every shelf and another had been forbidden.",
+    "weight": "The family is built on a series of leavings. Two generations back, a father vanished into work and never quite returned. Mahir's parent learned to expect this kind of departure, and so did Mahir.",
+    "fracture": "Somewhere in their fifteens, the floor gave way. What they touched on the other side has not left them, and they have, since then, been more interested in what is under things than what is on them.",
+    "between": "Between then and now, they did most of the ordinary things. They lived in a house borrowed and not returned for a time, learned the names of the local birds, and grew briefly close to a person whose name they will not say in mixed company.",
+    "present": "These days, Mahir can be found at the watch wall most mornings. They have a small icon they did not buy that they will not throw away, and a habit of speaking briefly aloud to the dead that even their oldest friends find slightly strange.",
+    "threadsIntro": "Three people belong, in different ways, to the shape of Mahir's life:",
+    "threads": [
+      {
+        "kind": "A rival",
+        "desc": "who has been chasing the same prize for so long that the chase is the friendship"
+      },
+      {
+        "kind": "A child",
+        "desc": "(not theirs) who calls when nobody else does"
+      },
+      {
+        "kind": "A friend",
+        "desc": "who left without an argument, and whose silence {name} still rehearses answers to"
+      }
+    ]
+  }
+}

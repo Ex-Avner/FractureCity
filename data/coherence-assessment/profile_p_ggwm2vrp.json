@@ -1,0 +1,181 @@
+{
+  "participant_id": "p_ggwm2vrp",
+  "timestamp": "2026-06-09T03:17:32.888Z",
+  "responses": {
+    "V02": 3,
+    "V04": 4,
+    "V06": 4,
+    "V07": 7,
+    "V09": 3,
+    "V11": 4,
+    "V12": 4,
+    "V14": 6,
+    "V15": 2,
+    "V17": 2,
+    "H02": 3,
+    "H03": 1,
+    "H05": 7,
+    "H07": 3,
+    "H09": 7,
+    "H10": 1,
+    "H11": 1,
+    "H12": 5,
+    "H14": 2,
+    "H17": 6,
+    "T01": 4,
+    "T02": 7,
+    "T04": 1,
+    "T05": 6,
+    "T07": 7,
+    "T11": 7,
+    "T13": 5,
+    "T14": 4,
+    "T15": 2,
+    "T18": 4,
+    "I01": 7,
+    "I03": 1,
+    "I05": 1,
+    "I07": 4,
+    "I09": 7,
+    "I11": 3
+  },
+  "poles": {
+    "Ohn": 0.5333333333333333,
+    "Hoc": 0.4333333333333333,
+    "Him": 0.5333333333333333,
+    "Allmen": 0.3333333333333333,
+    "Wasonce": 0.6666666666666667,
+    "Willbe": 0.5666666666666667
+  },
+  "axes": {
+    "vertical": -0.10000000000000003,
+    "horizontal": -0.2,
+    "temporal_extension": 0.6166666666666667,
+    "temporal_balance": -0.10000000000000009
+  },
+  "zone": "VII",
+  "zone_def": {
+    "n": "VII",
+    "name": "The Prophet",
+    "char": "Deep, singular, temporally active. Prophetic isolation — depth and obligation but no community.",
+    "v": "deep",
+    "h": "singular",
+    "t": "active"
+  },
+  "zone_confidence": 0.10000000000000003,
+  "subtype": {
+    "primary": {
+      "name": "The Visionary",
+      "desc": "Genuine sight. Genuine isolation. The framework without the room.",
+      "distance": 0.8602325267042626
+    },
+    "all": [
+      {
+        "name": "The Visionary",
+        "desc": "Genuine sight. Genuine isolation. The framework without the room.",
+        "distance": 0.8602325267042626
+      },
+      {
+        "name": "The Builder",
+        "desc": "Creates the architecture nobody has been invited into.",
+        "distance": 0.9219544457292888
+      },
+      {
+        "name": "The Martyr",
+        "desc": "Depth and obligation without community. Sacrificial by structure.",
+        "distance": 1.0049875621120892
+      }
+    ]
+  },
+  "shape_parameter": 1.6096667545570922,
+  "shape_name": "Rounded Octahedron (Functional)",
+  "interior_volume": 3.2515666139976984,
+  "geometry": {
+    "v_health": 0.48166666666666663,
+    "h_health": 0.4566666666666666,
+    "t_health": 0.6083333333333333,
+    "v_scale": 0.6371666666666667,
+    "h_scale": 0.6196666666666666,
+    "t_scale": 0.7258333333333333,
+    "p_vh": 1.232994991253864,
+    "p_vt": 1.3437670969020818,
+    "p_ht": 1.3224516989781452,
+    "p_global": 1.6096667545570922,
+    "p_empirical": 1.9420371835210797,
+    "p_self_report": 1.1111111111111112,
+    "weakest_axis": "Horizontal (Breath)",
+    "strongest_axis": "Temporal (Obligation)",
+    "axis_imbalance": 0.15166666666666667,
+    "mean_health": 0.5155555555555554,
+    "deformations": []
+  },
+  "captures": {
+    "type": "None",
+    "primary": "None",
+    "intensity": 0,
+    "vertex": {
+      "Ground (Consumed Mystic)": 0.026666666666666727,
+      "Surface (Flat Performer)": 0,
+      "Singular (Sealed Self)": 0.026666666666666727,
+      "Collective (Dissolved)": 0,
+      "Ancestral (Haunted)": 0.18666666666666676,
+      "Futural (Ungrounded Visionary)": 0.06666666666666665
+    },
+    "edge": {
+      "Ohn-Him": 0.033333333333333326,
+      "The Ecstatic Gathering": 0,
+      "The High-Performing Loner": 0,
+      "The Scroll": 0,
+      "The Archival Mystic": 0.13333333333333347,
+      "The Visionary Prophet": 0.058333333333333404,
+      "The Nostalgist": 0.058333333333333404,
+      "The Techno-Optimist": 0,
+      "The Duty-Bound Loner": 0.13333333333333347,
+      "The Absent Builder": 0.058333333333333404,
+      "The Empty Ceremony": 0,
+      "The Hollow Movement": 0
+    },
+    "face": {
+      "Zone I: The Performer": 0.4777777777777777,
+      "Zone II: The Crowd": 0.41111111111111115,
+      "Zone III: The Mystic": 0.5111111111111111,
+      "Zone IV: The Congregation": 0.4444444444444445,
+      "Zone V: The Archivist": 0.5555555555555555,
+      "Zone VI: The Tradition": 0.48888888888888893,
+      "Zone VII: The Prophet": 0.5888888888888889,
+      "Zone VIII: The Somey": 0.5222222222222223
+    }
+  },
+  "stamps": {
+    "scores": {
+      "Scarcity": 0.45625,
+      "Displacement": 0.5719298245614035,
+      "Violence": 0.44222222222222224,
+      "Silencing": 0.4208333333333333,
+      "Abandonment": 0.5157407407407407
+    },
+    "detected": [
+      {
+        "name": "Displacement",
+        "score": 0.5719298245614035
+      },
+      {
+        "name": "Abandonment",
+        "score": 0.5157407407407407
+      },
+      {
+        "name": "Scarcity",
+        "score": 0.45625
+      },
+      {
+        "name": "Violence",
+        "score": 0.44222222222222224
+      },
+      {
+        "name": "Silencing",
+        "score": 0.4208333333333333
+      }
+    ],
+    "primary": "Displacement"
+  }
+}

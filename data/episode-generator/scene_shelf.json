@@ -1,0 +1,141 @@
+[
+  {
+    "title": "Untitled Scene",
+    "role": "ordinary-world",
+    "beat": "ordinary-world",
+    "beat_label": "ORDINARY WORLD",
+    "tone": "comic",
+    "stage": "Fracture City",
+    "location": "the cracked plaza",
+    "time": {
+      "key": "dusk",
+      "label": "dusk",
+      "warmth": 0.5
+    },
+    "weather": "clear and still",
+    "tensionNum": 0.71,
+    "seed": "sb_hyk2ha8p",
+    "cast": [
+      {
+        "first": "Mahir",
+        "name": "Mahir Vey of the Glass Mouth",
+        "zone": "III",
+        "subtype": "The Hermit",
+        "class": "Blade of Form",
+        "stamp": "Abandonment",
+        "physical": {
+          "build": "Heavy",
+          "skin": "bronze",
+          "hair": "wild and curling",
+          "eyes": "magenta",
+          "garment": "tight harness"
+        },
+        "seed": "seed_mpxfplx3_iqz"
+      },
+      {
+        "first": "Auron",
+        "name": "Auron Crest keeper-born",
+        "zone": "IV",
+        "subtype": "The Circle",
+        "class": "Keeper of Thread",
+        "stamp": "Displacement",
+        "physical": {
+          "build": "Average",
+          "skin": "bronze",
+          "hair": "long and braided",
+          "eyes": "amber",
+          "garment": "priest mantle"
+        },
+        "seed": "seed_mpxfpr4k_1jvh"
+      }
+    ],
+    "script": [
+      {
+        "kind": "action",
+        "text": "Mahir is at the cracked plaza, waiting, in the specific way that looks like not waiting. It is dusk; clear and still."
+      },
+      {
+        "kind": "motif",
+        "text": "The letter sits in the inside pocket, folded, unopened, where it has been for weeks.",
+        "motif_tag": "a folded letter, unopened"
+      },
+      {
+        "kind": "internal",
+        "who": "Mahir",
+        "text": "What Mahir wants is to deliver the the ledger page before the watch changes. It has not been said aloud, not even alone, but it is the shape the day is built around."
+      },
+      {
+        "kind": "action",
+        "text": "Auron is here too, on other business, or on business that is made to look like other business."
+      },
+      {
+        "kind": "dialogue",
+        "speaker": "Auron",
+        "line": "Still at it, then."
+      },
+      {
+        "kind": "dialogue",
+        "speaker": "Mahir",
+        "line": "Somebody has to be."
+      },
+      {
+        "kind": "beat",
+        "note": "hold — the normal, before it stops being normal"
+      },
+      {
+        "kind": "smash-cut",
+        "text": "what say you!!"
+      }
+    ],
+    "_gradeOverride": "auto",
+    "_shotOverride": "auto",
+    "_particleOverride": "auto",
+    "custom": true,
+    "beat_job": "establish the protagonist inside their normal, and the lack under it",
+    "_spine": {
+      "protag": "Mahir",
+      "antag": "Auron",
+      "want": "deliver the the ledger page before the watch changes",
+      "obstacle": "Auron wants the same thing and got there first",
+      "motif": "a folded letter, unopened",
+      "climax_type": "threshold-crossed",
+      "resolution_shape": "transformed",
+      "archetype": "heros-journey"
+    },
+    "_gradeKey": "cool",
+    "beats": [
+      {
+        "label": "Action",
+        "prose": "Mahir is at the cracked plaza, waiting, in the specific way that looks like not waiting. It is dusk; clear and still."
+      },
+      {
+        "label": "Motif",
+        "prose": "The letter sits in the inside pocket, folded, unopened, where it has been for weeks."
+      },
+      {
+        "label": "Internal",
+        "prose": "What Mahir wants is to deliver the the ledger page before the watch changes. It has not been said aloud, not even alone, but it is the shape the day is built around."
+      },
+      {
+        "label": "Action",
+        "prose": "Auron is here too, on other business, or on business that is made to look like other business."
+      },
+      {
+        "label": "Dialogue",
+        "prose": "Still at it, then."
+      },
+      {
+        "label": "Dialogue",
+        "prose": "Somebody has to be."
+      },
+      {
+        "label": "Beat",
+        "prose": "hold — the normal, before it stops being normal"
+      },
+      {
+        "label": "Smash-cut",
+        "prose": "what say you!!"
+      }
+    ]
+  }
+]

@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>The Works — Ex Avner</title>
+  <link rel="stylesheet" href="shared/theme.css" />
+  <link rel="stylesheet" href="style.css" />
+  <!--
+    three.js is vendored locally. It used to load from cdn.jsdelivr.net, which
+    meant this page was one offline moment away from a blank screen — the same
+    failure that killed the game's main menu. The importmap now points at files
+    that ship with the app; the boot check at the bottom says so out loud if
+    they ever go missing, instead of failing silently behind the veil.
+  -->
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "./shared/vendor/three/three.module.js",
+        "three/addons/": "./shared/vendor/three/addons/"
+      }
+    }
+  </script>
+</head>
+<body>
+
+  <canvas id="roombg" class="roombg" aria-hidden="true"></canvas>
+  <canvas id="scene" aria-label="Fractured mirror of works"></canvas>
+
+  <!-- Persistent UI chrome -->
+  <header class="chrome top">
+    <div class="brand">
+      <span class="brand-mark">◆</span>
+      <span class="brand-name">EX&nbsp;AVNER</span>
+      <span class="brand-sep">/</span>
+      <span class="brand-sub">The Works</span>
+    </div>
+    <nav class="nav" id="topnav"></nav>
+  </header>
+
+  <footer class="chrome bottom">
+    <div class="hint">
+      <span class="dot"></span>
+      <span>Drag to rotate · Scroll to zoom · Click a shard to read · ← → turns pages</span>
+    </div>
+    <div class="meta" id="restoreMeta">v0.2 · cracked mirror build</div>
+  </footer>
+
+  <!-- Loading veil -->
+  <div id="veil" class="veil">
+    <div class="veil-inner">
+      <div class="veil-title">THE&nbsp;COLLAPSE&nbsp;OF&nbsp;MEANING</div>
+      <div class="veil-sub">Re-embodiment in the Fractured Mirror</div>
+      <div class="veil-bar"><div class="veil-bar-fill" id="veilbar"></div></div>
+      <div class="veil-error" id="veilError"></div>
+    </div>
+  </div>
+
+  <!-- Reading / detail overlay -->
+  <aside id="panel" class="panel" aria-hidden="true">
+    <button class="panel-close" id="panelClose" aria-label="Close">✕</button>
+    <div class="panel-scroll" id="panelScroll"></div>
+  </aside>
+
+  <!-- The reader — its own full-bleed layer, because a 44vw side panel is a
+       catalogue surface and this is thirty-four thousand words of prose. -->
+  <div id="reader" class="reader" aria-hidden="true">
+    <div class="reader-progress"><div class="reader-progress-fill" id="readerBar"></div></div>
+
+    <header class="reader-top">
+      <button class="rbtn" id="readerBack" title="Contents (Esc)">‹&nbsp;&nbsp;CONTENTS</button>
+      <div class="reader-where" id="readerWhere"></div>
+      <div class="reader-tools">
+        <button class="rbtn icon" id="readerMark" title="Bookmark this place (B)">◆</button>
+        <button class="rbtn icon" id="readerSmaller" title="Smaller type (−)">A−</button>
+        <button class="rbtn icon" id="readerBigger" title="Larger type (+)">A+</button>
+        <button class="rbtn icon" id="readerMeasure" title="Column width (M)">↔</button>
+      </div>
+    </header>
+
+    <div class="reader-scroll" id="readerScroll">
+      <article class="reader-body" id="readerBody"></article>
+    </div>
+
+    <footer class="reader-bottom">
+      <button class="rbtn" id="readerPrev">‹&nbsp;&nbsp;PREVIOUS</button>
+      <div class="reader-pct" id="readerPct">0%</div>
+      <button class="rbtn" id="readerNext">NEXT&nbsp;&nbsp;›</button>
+    </footer>
+
+    <div class="reader-toast" id="readerToast"></div>
+  </div>
+
+  <!-- Hover tooltip following the cursor -->
+  <div id="tooltip" class="tooltip" aria-hidden="true"></div>
+
+  <script type="module" src="app.js"></script>
+  <script>
+    // If the module never ran, the page would otherwise sit behind the veil
+    // forever with no explanation. Say what is wrong, and where to look.
+    setTimeout(function(){
+      if (window.__works) return;
+      var e = document.getElementById('veilError');
+      if (!e) return;
+      e.textContent = 'The 3D engine did not load. Check that '
+        + 'shared/vendor/three/three.module.js is present next to this page.';
+      e.style.opacity = '1';
+    }, 8000);
+  </script>
+</body>
+</html>

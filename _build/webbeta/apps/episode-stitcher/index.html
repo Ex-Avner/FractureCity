@@ -1,0 +1,1164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Episode Stitcher · Fracture City</title>
+<script>
+(function(){
+  if (window.fracture && window.fracture.shell) return;
+  const prefix = 'fracture::episode-stitcher::';
+  window.fracture = {
+    shell:false, appSlug:'episode-stitcher', received:null,
+    save(k,v){ try{ localStorage.setItem(prefix+k, JSON.stringify(v)); }catch(e){} return Promise.resolve(true); },
+    read(k){ try{ const r=localStorage.getItem(prefix+k); return Promise.resolve(r==null?null:JSON.parse(r)); }catch(e){ return Promise.resolve(null); } },
+    list(){ const o=[]; for(let i=0;i<localStorage.length;i++){ const k=localStorage.key(i); if(k&&k.startsWith(prefix)) o.push(k.slice(prefix.length)); } return Promise.resolve(o); },
+    delete(k){ localStorage.removeItem(prefix+k); return Promise.resolve(true); },
+    listApps(){ return Promise.resolve([]); },
+    openApp(){ return Promise.resolve({ok:false,error:'standalone'}); },
+    emit(){ return Promise.resolve(true); },
+    subscribe(){ return ()=>{}; },
+    onPayload(){},
+  };
+})();
+</script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+:root{
+  --bg:#080614; --bg-2:#11091d; --panel:rgba(20,12,38,.82);
+  --line:rgba(120,200,255,.18); --line-2:rgba(180,140,255,.55);
+  --ink:#e7e2ff; --ink-dim:#9c93c6; --ink-fade:#6a608a;
+  --teal:#80ffff; --magenta:#ff60d0; --violet:#a040ff;
+  --gold:#ffd47a; --green:#7dffb3; --red:#ff7088;
+}
+html,body{
+  background:radial-gradient(ellipse at 50% 0%,#1a0f33 0%,#080614 70%);
+  min-height:100vh;color:var(--ink);
+  font-family:'Inter','Helvetica Neue',sans-serif;
+  -webkit-font-smoothing:antialiased;overflow-x:hidden;
+}
+body{padding:20px 16px 60px;}
+.shell{max-width:1380px;margin:0 auto;}
+.mono{font-family:'SF Mono','Menlo','Courier New',monospace;}
+
+.hdr{display:flex;align-items:center;gap:18px;
+  border-bottom:1px solid var(--line);padding-bottom:14px;margin-bottom:16px;}
+.hdr .mark{width:46px;height:46px;}
+.hdr h1{font-family:'Courier New',monospace;font-size:22px;letter-spacing:8px;
+  background:linear-gradient(180deg,#80ffff 0%,#ff60d0 65%,#a040ff 100%);
+  -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
+  line-height:1;margin-bottom:4px;}
+.hdr .sub{font-family:'Courier New',monospace;font-size:10px;letter-spacing:4px;
+  color:var(--ink-dim);text-transform:uppercase;}
+.hdr .ctx{margin-left:auto;font-size:10px;color:var(--ink-fade);
+  font-family:'Courier New',monospace;letter-spacing:2px;}
+
+.toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;
+  margin-bottom:18px;padding:12px 14px;
+  background:var(--panel);border:1px solid var(--line);border-radius:5px;}
+.btn{font-family:'Courier New',monospace;font-size:11px;letter-spacing:3px;
+  text-transform:uppercase;background:rgba(40,20,80,.6);color:var(--teal);
+  border:1px solid var(--line-2);padding:8px 14px;cursor:pointer;border-radius:3px;
+  transition:all .15s;}
+.btn:hover{background:rgba(80,40,160,.7);color:#fff;
+  box-shadow:0 0 14px rgba(255,80,220,.4);}
+.btn.primary{background:linear-gradient(180deg,rgba(120,80,200,.5),rgba(60,20,120,.6));
+  color:#fff;border-color:rgba(255,140,220,.6);}
+.btn.danger{border-color:var(--red);color:var(--red);}
+
+.workspace{display:grid;grid-template-columns:300px 1fr 320px;gap:14px;align-items:start;}
+@media (max-width:1180px){.workspace{grid-template-columns:1fr;}}
+.col{background:var(--panel);border:1px solid var(--line);border-radius:5px;padding:18px;}
+.col h3{font-family:'Courier New',monospace;font-size:11px;letter-spacing:4px;
+  color:var(--magenta);text-transform:uppercase;margin:18px 0 8px;}
+.col h3:first-child{margin-top:0;}
+
+/* Scene library picker */
+.scene-list{max-height:380px;overflow-y:auto;border:1px solid var(--line);
+  border-radius:3px;background:rgba(8,4,16,.5);padding:6px;}
+.scene-entry{display:flex;align-items:center;gap:8px;padding:7px 8px;cursor:pointer;
+  border-radius:3px;transition:background .12s;}
+.scene-entry:hover{background:rgba(80,40,160,.2);}
+.scene-entry input{cursor:pointer;flex:0 0 auto;}
+.scene-entry .se-body{flex:1;min-width:0;}
+.scene-entry .se-title{font-family:'Cormorant Garamond',Georgia,serif;font-size:13px;
+  color:var(--ink);line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.scene-entry .se-meta{font-family:'Courier New',monospace;font-size:9px;letter-spacing:1px;
+  color:var(--ink-fade);margin-top:2px;text-transform:uppercase;}
+.scene-empty{color:var(--ink-fade);font-size:12px;text-align:center;padding:14px;}
+.scene-empty a{color:var(--teal);cursor:pointer;text-decoration:underline;}
+
+.param{margin-bottom:10px;}
+.param label{display:block;font-family:'Courier New',monospace;font-size:10px;
+  letter-spacing:2px;color:var(--ink-fade);text-transform:uppercase;margin-bottom:4px;}
+.param select, .param input[type=text]{width:100%;background:rgba(8,4,16,.7);
+  border:1px solid var(--line);color:var(--ink);padding:6px 10px;border-radius:3px;
+  font-family:'SF Mono',monospace;font-size:12px;outline:none;}
+.param select:focus, .param input:focus{border-color:var(--magenta);}
+
+/* CENTER — Episode timeline + content */
+.ep-head{display:flex;align-items:flex-start;gap:14px;
+  border-bottom:1px solid var(--line);padding-bottom:14px;margin-bottom:14px;}
+.ep-title-block{flex:1;}
+.ep-title-block .ep-num{font-family:'Courier New',monospace;font-size:10px;letter-spacing:4px;
+  color:var(--ink-fade);text-transform:uppercase;margin-bottom:4px;}
+.ep-title-block h2{font-family:'Cormorant Garamond',Georgia,serif;font-size:30px;
+  color:var(--ink);line-height:1.1;letter-spacing:.5px;font-weight:500;margin-bottom:6px;}
+.ep-title-block .ep-logline{font-family:'Cormorant Garamond',Georgia,serif;font-style:italic;
+  font-size:15px;color:var(--ink-dim);line-height:1.5;}
+.ep-regen-block{display:flex;flex-direction:column;gap:6px;}
+.regen-mini{font-family:'Courier New',monospace;font-size:9px;letter-spacing:2px;
+  background:none;border:1px solid var(--line);color:var(--ink-fade);
+  padding:4px 8px;border-radius:2px;cursor:pointer;text-transform:uppercase;}
+.regen-mini:hover{color:var(--teal);border-color:var(--teal);}
+
+/* Tension arc */
+.arc-wrap{margin-bottom:18px;padding:14px;background:rgba(8,4,16,.55);
+  border:1px solid var(--line);border-radius:5px;}
+#arc-svg{width:100%;height:160px;display:block;}
+
+/* Acts + scenes */
+.acts{display:flex;flex-direction:column;gap:18px;}
+.act{}
+.act-label{display:flex;align-items:center;gap:10px;margin-bottom:8px;
+  font-family:'Courier New',monospace;font-size:10px;letter-spacing:4px;
+  color:var(--gold);text-transform:uppercase;}
+.act-label::after{content:'';flex:1;height:1px;
+  background:linear-gradient(90deg, var(--line), transparent);}
+.act-runtime{font-size:9px;color:var(--ink-fade);letter-spacing:2px;}
+
+.scene-row{display:flex;gap:12px;padding:10px 0;border-left:2px solid var(--line);
+  padding-left:12px;margin-left:6px;}
+.scene-num{flex:0 0 24px;font-family:'Courier New',monospace;font-size:12px;
+  color:var(--magenta);font-weight:600;letter-spacing:1px;padding-top:2px;}
+.scene-body{flex:1;}
+.scene-row .s-title{font-family:'Cormorant Garamond',Georgia,serif;font-size:17px;
+  color:var(--ink);line-height:1.2;margin-bottom:3px;}
+.scene-row .s-meta{font-family:'Courier New',monospace;font-size:9px;letter-spacing:1px;
+  color:var(--ink-fade);text-transform:uppercase;margin-bottom:6px;}
+.scene-row .s-cast{font-size:11.5px;color:var(--ink-dim);font-style:italic;}
+
+.scene-actions{display:flex;flex-direction:column;gap:3px;}
+.scene-actions button{background:none;border:1px solid var(--line);color:var(--ink-fade);
+  width:22px;height:22px;border-radius:2px;cursor:pointer;font-size:10px;
+  display:flex;align-items:center;justify-content:center;line-height:1;}
+.scene-actions button:hover{color:var(--teal);border-color:var(--teal);}
+.scene-actions button.rm:hover{color:var(--red);border-color:var(--red);}
+
+.transition{font-family:'Cormorant Garamond',Georgia,serif;font-size:13px;
+  font-style:italic;color:var(--ink-dim);padding:6px 12px 6px 24px;
+  border-left:1px dashed var(--ink-fade);margin-left:18px;line-height:1.5;
+  position:relative;}
+.transition .t-label{font-family:'Courier New',monospace;font-size:8px;
+  letter-spacing:3px;color:var(--ink-fade);text-transform:uppercase;
+  font-style:normal;display:block;margin-bottom:2px;}
+.transition .t-regen{float:right;font-family:'Courier New',monospace;font-size:8px;
+  letter-spacing:1px;background:none;border:none;color:var(--ink-fade);cursor:pointer;
+  text-transform:uppercase;padding:0;}
+.transition .t-regen:hover{color:var(--teal);}
+
+.empty-stage{text-align:center;padding:60px 20px;color:var(--ink-fade);}
+.empty-stage .es-title{font-family:'Courier New',monospace;font-size:13px;letter-spacing:5px;
+  color:var(--ink-dim);margin-bottom:10px;}
+.empty-stage .es-body{font-size:13px;line-height:1.7;max-width:480px;margin:0 auto;}
+
+/* RIGHT — production card */
+.prod{font-family:'Inter',sans-serif;font-size:12.5px;color:var(--ink-dim);line-height:1.6;}
+.prod .pk{font-family:'Courier New',monospace;font-size:10px;letter-spacing:2px;
+  color:var(--ink-fade);text-transform:uppercase;margin-top:14px;margin-bottom:4px;}
+.prod .pk:first-child{margin-top:0;}
+.prod .pv{color:var(--ink);font-size:13px;}
+.prod .pv strong{color:var(--teal);}
+.theme-tags{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px;}
+.theme-tag{font-family:'Courier New',monospace;font-size:9px;letter-spacing:1px;
+  text-transform:uppercase;background:rgba(80,40,160,.3);color:var(--ink-dim);
+  border:1px solid var(--line);padding:3px 7px;border-radius:2px;}
+.continuity{margin-top:6px;}
+.continuity .crow{display:flex;justify-content:space-between;align-items:center;
+  padding:3px 0;border-bottom:1px solid var(--line);font-size:11.5px;}
+.continuity .crow:last-child{border-bottom:none;}
+.continuity .cname{color:var(--ink);}
+.continuity .ccount{font-family:'Courier New',monospace;font-size:10px;
+  color:var(--magenta);letter-spacing:1px;}
+
+@media print {
+  body{background:#fff;color:#111;padding:0;}
+  .toolbar,.col:first-child,.col:last-child,.regen-mini,.scene-actions,.t-regen{display:none!important;}
+  .workspace{grid-template-columns:1fr;}
+  .col{background:#fff;border:1px solid #ccc;}
+  .ep-title-block h2{color:#222;}
+  .ep-title-block .ep-logline{color:#444;}
+  .scene-row .s-title{color:#222;}
+  .act-label{color:#888;}
+  .transition{color:#555;border-color:#bbb;}
+  .arc-wrap{background:#fff;border:1px solid #ccc;}
+  .hdr h1{color:#444;background:none;-webkit-text-fill-color:initial;}
+}
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <div class="hdr">
+    <div class="mark" id="hdr-mark"></div>
+    <div>
+      <h1>EPISODE STITCHER</h1>
+      <div class="sub">Fracture City · Scene → Arc → Episode</div>
+    </div>
+    <div class="ctx" id="ctx">—</div>
+  </div>
+
+  <div class="toolbar">
+    <button class="btn primary" onclick="Stitcher.autoArrange()">⟲ AUTO-ARRANGE</button>
+    <button class="btn" onclick="Stitcher.regenAll()">REGEN TITLE+TRANS</button>
+    <button class="btn" onclick="Stitcher.clear()">CLEAR EPISODE</button>
+    <button class="btn" onclick="Stitcher.save()">SAVE</button>
+    <button class="btn" onclick="window.print()">PRINT</button>
+    <button class="btn" onclick="Stitcher.exportJSON()">EXPORT JSON</button>
+    <button class="btn" onclick="Stitcher.exportProse()">EXPORT TREATMENT</button>
+  </div>
+
+  <div class="workspace">
+
+    <!-- LEFT: scene library + episode meta -->
+    <div class="col">
+      <h3>Scene Library</h3>
+      <div class="scene-list" id="scene-list">
+        <div class="scene-empty">No scenes yet.<br>
+          <a onclick="Stitcher.openSceneComposer()">Open Scene Composer</a> to make some.</div>
+      </div>
+
+      <h3>Episode Meta</h3>
+      <div class="param">
+        <label>Season · Episode #</label>
+        <input type="text" id="p-num" placeholder="1.01" value="1.01">
+      </div>
+      <div class="param">
+        <label>Runtime Target</label>
+        <select id="p-runtime">
+          <option value="22">22 minutes (half-hour)</option>
+          <option value="44">44 minutes (hour)</option>
+          <option value="11">11 minutes (short)</option>
+        </select>
+      </div>
+      <div class="param">
+        <label>Seed</label>
+        <input type="text" id="p-seed" placeholder="(auto)">
+      </div>
+    </div>
+
+    <!-- CENTER: episode timeline -->
+    <div class="col">
+      <div class="ep-head">
+        <div class="ep-title-block">
+          <div class="ep-num" id="ep-num">SEASON ?, EPISODE ?</div>
+          <h2 id="ep-title">—</h2>
+          <div class="ep-logline" id="ep-logline">—</div>
+        </div>
+        <div class="ep-regen-block">
+          <button class="regen-mini" onclick="Stitcher.regenTitle()">↻ TITLE</button>
+          <button class="regen-mini" onclick="Stitcher.regenLogline()">↻ LOGLINE</button>
+        </div>
+      </div>
+
+      <div class="arc-wrap">
+        <svg id="arc-svg" viewBox="0 0 800 160"></svg>
+      </div>
+
+      <div class="acts" id="acts">
+        <div class="empty-stage">
+          <div class="es-title">NO SCENES SELECTED</div>
+          <div class="es-body">Check 3 or more scenes in the left panel, then click
+            <strong>AUTO-ARRANGE</strong> to assemble an episode.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT: production card -->
+    <div class="col">
+      <h3>Production</h3>
+      <div class="prod" id="prod-card">—</div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// =============================================================================
+// RNG
+// =============================================================================
+function hashSeed(str){
+  let h=1779033703 ^ str.length;
+  for(let i=0;i<str.length;i++){
+    h=Math.imul(h ^ str.charCodeAt(i), 3432918353);
+    h=h<<13 | h>>>19;
+  }
+  return (h^=h>>>16) >>> 0;
+}
+function mulberry32(seed){
+  let s=seed;
+  return function(){
+    let t=s+=0x6D2B79F5;
+    t=Math.imul(t ^ t>>>15, t|1);
+    t^=t+Math.imul(t ^ t>>>7, t|61);
+    return ((t ^ t>>>14)>>>0)/4294967296;
+  };
+}
+class RNG{
+  constructor(seed){
+    this.seed=typeof seed==='string'?hashSeed(seed):(seed>>>0);
+    this.next=mulberry32(this.seed);
+  }
+  pick(arr){ return arr[Math.floor(this.next()*arr.length)]; }
+  pickN(arr,n){
+    const a=arr.slice();const out=[];
+    for(let i=0;i<n && a.length;i++){
+      out.push(a.splice(Math.floor(this.next()*a.length),1)[0]);
+    }
+    return out;
+  }
+  int(min,max){ return Math.floor(this.next()*(max-min+1))+min; }
+  bool(p=0.5){ return this.next()<p; }
+}
+
+// =============================================================================
+// ACT STRUCTURE
+// =============================================================================
+const ACT_DEFS = {
+  cold_open: { label:'Cold Open',  target_minutes:1.5, min:1, max:2 },
+  act1:      { label:'Act One',    target_minutes:6,   min:2, max:3 },
+  act2:      { label:'Act Two',    target_minutes:8,   min:3, max:5 },
+  act3:      { label:'Act Three',  target_minutes:5,   min:2, max:3 },
+  tag:       { label:'Tag',        target_minutes:1.5, min:1, max:1 },
+};
+const ACT_KEYS = ['cold_open','act1','act2','act3','tag'];
+
+const TIME_PROGRESSION = [
+  'pre-dawn','dawn','mid-morning','midday','afternoon','dusk','evening','late-night','midnight','bleak-hour'
+];
+
+// =============================================================================
+// TITLE + LOGLINE GENERATORS
+// =============================================================================
+const TITLE_PATTERNS = [
+  ({rng, scenes}) => {
+    const place = scenes[Math.floor(scenes.length/2)]?.location || 'the river';
+    const cleaned = place.replace(/^(a |the )/i,'');
+    return `Where ${cleaned.charAt(0).toUpperCase()+cleaned.slice(1)} Goes`;
+  },
+  ({rng, scenes}) => {
+    const what = rng.pick(['Promises','Bells','Names','Lanterns','Boots','Threads','Letters','Coats','Doors','Stones','Maps','Bones','Salt']);
+    const what2 = rng.pick(['Smoke','Ash','Rain','Glass','Iron','Dust','Coal','Hours','Bread','Silver']);
+    return `${what} and ${what2}`;
+  },
+  ({rng, scenes}) => {
+    const adj = rng.pick(['Long','Quiet','Late','Bright','Bare','Last','First','Cold','Heavy','Brief']);
+    const noun = rng.pick(['Visitor','Threshold','Crossing','Vigil','Argument','Apology','Inheritance','Arrival','Departure']);
+    return `The ${adj} ${noun}`;
+  },
+  ({rng, scenes}) => {
+    return `What ${rng.pick(['the Watchman','the Wanderer','the Cartographer','the Translator','the Bell-Ringer','the Cook'])} ${rng.pick(['Said','Knew','Forgot','Refused','Carried','Remembered'])}`;
+  },
+  ({rng, scenes}) => {
+    const noun1 = rng.pick(['Two','Three','Four','Six']);
+    const noun2 = rng.pick(['Letters','Crossings','Names','Doors','Witnesses','Refusals','Returns','Vigils']);
+    return `${noun1} ${noun2}`;
+  },
+  ({rng, scenes}) => {
+    const time = scenes[0]?.time?.label || 'evening';
+    return `Before ${rng.pick(['the','a'])} ${time.charAt(0).toUpperCase()+time.slice(1)}`;
+  },
+];
+
+const LOGLINE_PATTERNS = [
+  ({rng, scenes, characters, locations}) => {
+    const place = scenes[0]?.location || locations[0] || 'the city';
+    const cls = `${characters[0]?.first || 'a stranger'} and ${characters[1]?.first || 'someone they have not seen in years'}`;
+    return `Across one night in ${place.replace(/^(a |the )/,'')}, ${cls} ${rng.pick(['meet again','find what they have been avoiding','realize they have been carrying the same thing','make and break a promise','set down a question they have carried for years'])}.`;
+  },
+  ({rng, scenes, characters, locations}) => {
+    const who = characters[0]?.first || 'a single watcher';
+    const stage = scenes[0]?.stage || 'the city';
+    return `${who} crosses ${stage}, looking for ${rng.pick(['someone they should have called years ago','a sentence they have been refusing to say','the last person who would understand','a quieter version of the truth','a way to leave that does not look like leaving'])} — and finds, instead, ${rng.pick(['themselves','the work','a stranger who has been waiting','the kind of evening that does not end the way it should','everyone they had been avoiding'])}.`;
+  },
+  ({rng, scenes, characters, locations}) => {
+    const arcType = scenes.some(s => s.type?.key === 'revelation') ? 'a truth' :
+                    scenes.some(s => s.type?.key === 'parting') ? 'a farewell' :
+                    scenes.some(s => s.type?.key === 'confrontation') ? 'an unresolved argument' :
+                    'an evening that no one expected to end this way';
+    return `In ${ rng.pick(['a single evening','one long night','the slow turn of a day','three hours that nobody anticipated','the time between one bell and the next']) }, ${arcType} surfaces — and the people present have to decide what to do with it.`;
+  },
+  ({rng, scenes, characters, locations}) => {
+    const themes = ['inheritance','silence','obligation','recognition','forgiveness','the cost of being seen','the price of being unseen','what cannot be set down'];
+    return `An episode about ${rng.pick(themes)} — set in ${scenes[0]?.stage || 'Fracture City'}, told across ${scenes.length} scenes ${rng.pick(['that almost line up','that nobody could have predicted','that begin and end at the same threshold','that arrive at the same question by different doors'])}.`;
+  },
+];
+
+function makeTitle(rng, scenes){
+  return rng.pick(TITLE_PATTERNS)({rng, scenes});
+}
+
+function makeLogline(rng, scenes, characters, locations){
+  return rng.pick(LOGLINE_PATTERNS)({rng, scenes, characters, locations});
+}
+
+// =============================================================================
+// TRANSITION GENERATOR — between two scenes
+// =============================================================================
+function makeTransition(prev, next, rng){
+  const sameStage = prev.stage === next.stage;
+  const sameLoc = prev.location === next.location;
+  const prevTimeIdx = TIME_PROGRESSION.indexOf(prev.time?.key);
+  const nextTimeIdx = TIME_PROGRESSION.indexOf(next.time?.key);
+  const timeForward = nextTimeIdx > prevTimeIdx && prevTimeIdx >= 0;
+  const sharedCast = (prev.cast || []).filter(c => (next.cast || []).some(n => n.first === c.first));
+
+  // Choose a transition flavor
+  const flavors = [];
+
+  if (sameLoc){
+    flavors.push(rng.pick([
+      `Time gathers, then moves. Where the last scene ended — ${prev.location} — the next one begins, hours later or only minutes; the room has not changed.`,
+      `The place holds. What follows happens in the same room, in a different light.`,
+    ]));
+  } else if (sameStage){
+    flavors.push(rng.pick([
+      `Elsewhere in ${prev.stage}, ${next.location.replace(/^(a |the )/,'')} keeps its own time.`,
+      `Across ${prev.stage}, the night moves. At ${next.location}, something else is happening.`,
+      `Not far from where the last scene closed — still within ${prev.stage} — the next opens at ${next.location}.`,
+    ]));
+  } else {
+    flavors.push(rng.pick([
+      `The city turns. We cross from ${prev.stage} to ${next.stage}; the distance is not only spatial.`,
+      `Cut away. ${next.stage} continues without reference to what just happened, and continues to do so.`,
+      `Elsewhere — ${next.stage} — the same night carries different weight.`,
+    ]));
+  }
+
+  if (timeForward){
+    flavors.push(rng.pick([
+      `Some hours pass between then and now; the light has shifted from ${prev.time?.label || '—'} to ${next.time?.label || '—'}.`,
+      `By the time we see them again, it is ${next.time?.label}.`,
+      `${prev.time?.label?.charAt(0).toUpperCase() + (prev.time?.label?.slice(1) || '')} gives way to ${next.time?.label}.`,
+    ]));
+  }
+
+  if (sharedCast.length){
+    flavors.push(rng.pick([
+      `${sharedCast[0].first} carries from the last scene into this one — though not, perhaps, intact.`,
+      `${sharedCast[0].first} is still moving when we find them again.`,
+      `Between ${sharedCast.map(c=>c.first).join(' and ')} and what came before, nothing has been resolved.`,
+    ]));
+  }
+
+  // Pick 1-2 flavors and join
+  const n = rng.bool(0.4) ? 2 : 1;
+  return rng.pickN(flavors, n).join(' ');
+}
+
+// =============================================================================
+// THEME INFERENCE
+// =============================================================================
+function inferThemes(scenes, characters){
+  const themes = new Set();
+  const moods = scenes.flatMap(s => s.moods || []);
+  if (moods.includes('tender')) themes.add('care across distance');
+  if (moods.includes('charged')) themes.add('what cannot be said');
+  if (moods.includes('held-back')) themes.add('the cost of silence');
+  if (moods.includes('untethered')) themes.add('belonging without place');
+  if (moods.includes('contemplative')) themes.add('attention as practice');
+  if (moods.includes('breaking-open')) themes.add('the moment of recognition');
+  if (moods.includes('tense')) themes.add('thresholds');
+  // From character stamps
+  const stamps = characters.map(c => c.stamp).filter(s => s && s !== 'None');
+  if (stamps.includes('Scarcity')) themes.add('inheritance and want');
+  if (stamps.includes('Displacement')) themes.add('the country one carries');
+  if (stamps.includes('Violence')) themes.add('what survives');
+  if (stamps.includes('Silencing')) themes.add('finding one\'s own voice');
+  if (stamps.includes('Abandonment')) themes.add('being left');
+  // From scene types
+  const types = scenes.map(s => s.type?.key).filter(Boolean);
+  if (types.includes('parting')) themes.add('letting go');
+  if (types.includes('revelation')) themes.add('what surfaces');
+  if (types.includes('vigil')) themes.add('keeping watch');
+  if (types.includes('threshold')) themes.add('decisions');
+  if (themes.size === 0) themes.add('the ordinary');
+  return Array.from(themes).slice(0, 6);
+}
+
+// =============================================================================
+// AUTO-ARRANGEMENT
+// Sorts selected scenes into act buckets based on tension curve heuristic:
+//   cold open: a self-contained low-medium tension scene that doesn't include cast peak
+//   act 1: rising — quiet → medium
+//   act 2: peak — high tension scenes go here
+//   act 3: falling — confrontation/revelation resolution
+//   tag: a quiet beat closing
+// =============================================================================
+function autoArrangeScenes(scenes){
+  // Sort scenes by tensionNum
+  const sorted = scenes.slice().sort((a,b)=> (a.tensionNum||0) - (b.tensionNum||0));
+  const buckets = { cold_open:[], act1:[], act2:[], act3:[], tag:[] };
+
+  if (sorted.length === 0) return buckets;
+
+  // Tag = lowest tension scene (settled)
+  buckets.tag.push(sorted.shift());
+
+  // Cold open = next-lowest, ideally a quiet-beat or passage
+  if (sorted.length){
+    const idx = sorted.findIndex(s => ['quiet-beat','passage','memory'].includes(s.type?.key));
+    if (idx >= 0) buckets.cold_open.push(sorted.splice(idx,1)[0]);
+    else buckets.cold_open.push(sorted.shift());
+  }
+
+  // Act 2 (peak) = highest tension scenes
+  const peakCount = Math.min(Math.max(2, Math.floor(sorted.length / 2)), 4);
+  for (let i = 0; i < peakCount && sorted.length; i++){
+    buckets.act2.push(sorted.pop());
+  }
+
+  // Distribute remainder: act1 gets ~half, act3 gets the rest
+  const remaining = sorted.length;
+  const act1Count = Math.ceil(remaining / 2);
+  for (let i = 0; i < act1Count && sorted.length; i++){
+    // Take lower-tension half for setup
+    buckets.act1.push(sorted.shift());
+  }
+  while (sorted.length){
+    buckets.act3.push(sorted.shift());
+  }
+
+  // Within each act, sort by tension (rising for act1/act2, falling for act3)
+  buckets.act1.sort((a,b)=>(a.tensionNum||0)-(b.tensionNum||0));
+  buckets.act2.sort((a,b)=>(a.tensionNum||0)-(b.tensionNum||0));
+  buckets.act3.sort((a,b)=>(b.tensionNum||0)-(a.tensionNum||0));
+
+  return buckets;
+}
+
+// =============================================================================
+// TENSION ARC SVG
+// =============================================================================
+function renderArc(orderedScenes){
+  const W = 800, H = 160, padX = 20, padY = 18;
+  const xs = orderedScenes.length > 1
+    ? orderedScenes.map((_,i)=> padX + i * (W - padX*2) / (orderedScenes.length - 1))
+    : [W/2];
+  const max_amp = H - padY*2;
+  const baseline = H - padY;
+  const ys = orderedScenes.map((s,i)=> baseline - (s.tensionNum || 0.3) * max_amp);
+  const pts = xs.map((x,i)=> [x, ys[i]]);
+
+  // Catmull-Rom smoothing
+  function catmull(p0,p1,p2,p3,n=14){
+    const out=[];
+    for(let i=0;i<=n;i++){
+      const t=i/n, t2=t*t, t3=t2*t;
+      out.push([
+        0.5*((2*p1[0]) + (-p0[0]+p2[0])*t + (2*p0[0]-5*p1[0]+4*p2[0]-p3[0])*t2 + (-p0[0]+3*p1[0]-3*p2[0]+p3[0])*t3),
+        0.5*((2*p1[1]) + (-p0[1]+p2[1])*t + (2*p0[1]-5*p1[1]+4*p2[1]-p3[1])*t2 + (-p0[1]+3*p1[1]-3*p2[1]+p3[1])*t3),
+      ]);
+    }
+    return out;
+  }
+  let curve = [];
+  if (pts.length >= 2){
+    const padded = [pts[0]].concat(pts).concat([pts[pts.length-1]]);
+    for (let i=0; i<padded.length-3; i++){
+      const seg = catmull(padded[i], padded[i+1], padded[i+2], padded[i+3]);
+      curve = curve.concat(curve.length ? seg.slice(1) : seg);
+    }
+  } else {
+    curve = pts;
+  }
+  const pathD = 'M ' + curve.map(p=>p.join(',')).join(' L ');
+
+  let svg = `<defs>
+    <linearGradient id="arcG" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#80ffff"/>
+      <stop offset="50%" stop-color="#ffd47a"/>
+      <stop offset="100%" stop-color="#ff60d0"/>
+    </linearGradient>
+  </defs>`;
+
+  // Baseline
+  svg += `<line x1="${padX}" y1="${baseline}" x2="${W-padX}" y2="${baseline}"
+    stroke="rgba(180,140,255,.3)" stroke-width="1"/>`;
+
+  // Drop lines
+  pts.forEach(([x,y])=>{
+    svg += `<line x1="${x}" y1="${y}" x2="${x}" y2="${baseline}"
+      stroke="rgba(180,140,255,.15)" stroke-width="1"/>`;
+  });
+
+  // Curve
+  svg += `<path d="${pathD}" fill="none" stroke="url(#arcG)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>`;
+
+  // Dots + labels
+  pts.forEach(([x,y], i)=>{
+    const t = orderedScenes[i].tensionNum || 0.3;
+    const col = t > 0.75 ? '#ffd47a' : t > 0.5 ? '#80ffff' : '#ff60d0';
+    svg += `<circle cx="${x}" cy="${y}" r="6" fill="${col}" opacity="0.25"/>`;
+    svg += `<circle cx="${x}" cy="${y}" r="3.5" fill="${col}"/>`;
+    svg += `<text x="${x}" y="${baseline+14}" text-anchor="middle"
+      font-family="Courier New, monospace" font-size="9" fill="#9c93c6" letter-spacing="1">${i+1}</text>`;
+  });
+
+  return svg;
+}
+
+// =============================================================================
+// APP CONTROLLER
+// =============================================================================
+const Stitcher = (function(){
+  let state = {
+    library: [],       // {key, data}
+    selected: new Set(),  // scene seeds
+    episode: null,     // { title, logline, buckets, transitions, ...}
+    seed: null,
+  };
+
+  function $(id){ return document.getElementById(id); }
+
+  function paintHdrMark(){
+    let svg = `<svg viewBox="0 0 46 46" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <radialGradient id="hm" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stop-color="rgba(160,64,255,.4)"/>
+          <stop offset="100%" stop-color="rgba(0,0,0,0)"/>
+        </radialGradient>
+        <linearGradient id="ag" x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" stop-color="#ff60d0"/>
+          <stop offset="50%" stop-color="#ffd47a"/>
+          <stop offset="100%" stop-color="#80ffff"/>
+        </linearGradient>
+      </defs>
+      <circle cx="23" cy="23" r="22" fill="url(#hm)"/>
+      <line x1="6" y1="32" x2="40" y2="32" stroke="rgba(180,140,255,.5)" stroke-width="1"/>
+      <path d="M 8 28 Q 14 22, 18 19 T 28 13 T 38 24"
+        fill="none" stroke="url(#ag)" stroke-width="2" stroke-linecap="round"/>
+      <circle cx="8" cy="28" r="2" fill="#ff60d0"/>
+      <circle cx="18" cy="18" r="2" fill="#80ffff"/>
+      <circle cx="28" cy="13" r="2.5" fill="#ffd47a"/>
+      <circle cx="38" cy="24" r="2" fill="#ff60d0"/>
+    </svg>`;
+    $('hdr-mark').innerHTML = svg;
+  }
+
+  // ── Scene library ────────────────────────────────────────────────────────
+// ─── References, not copies ─────────────────────────────────────────────────
+//  Apps in this hub used to keep a full private copy of everything they were
+//  sent: cached_character_<seed>, cached_profile_<id>, cached_scene_<seed>.
+//  Ten characters existed as twenty files, and the copies agreed with their
+//  originals only because nobody had edited one yet — rename a character in
+//  Character Forge and every copy kept the old name silently, forever.
+//
+//  A received record is now stored as a reference — ref_<kind>_<id> holding
+//  {$ref:"<slug>/<key>"} — and resolved through the shell on load, so what an
+//  app shows is whatever the source currently says.
+//
+//  Legacy cached_ copies are still read, so nothing disappears if the source no
+//  longer has the original, and are converted to references on sight when they
+//  can be resolved.
+const PalmRefs = {
+  //  kind: 'character' | 'profile' | 'scene'  — names the local key prefix
+  //  type: the contract type recorded against the person (claim)
+  //  source(id): "slug/key" where the real record lives
+  //  idOf(rec): the field that identifies it
+  //  valid(rec): does this look like a real record of this kind
+  make({ kind, type, source, idOf, valid }){
+    const refPrefix    = 'ref_'    + kind + '_';
+    const legacyPrefix = 'cached_' + kind + '_';
+    const F = () => (typeof window !== 'undefined' && window.fracture) || null;
+
+    const api = {
+      kind, type, refPrefix, legacyPrefix, source, idOf, valid,
+
+      supported(){ return !!(F() && typeof F().resolve === 'function'); },
+
+      //  Record a received item by reference. Falls back to a copy on a shell
+      //  too old to resolve, so this is safe to ship ahead of the shell update.
+      async receive(payload){
+        const f = F(); if (!f || !payload) return;
+        const id = idOf(payload); if (!id) return;
+        if (api.supported()){
+          await f.save(refPrefix + id, {
+            $ref: source(id), id, receivedAt: new Date().toISOString(),
+          });
+          if (f.claim){ try { await f.claim(type, source(id)); } catch (e){} }
+        } else {
+          await f.save(legacyPrefix + id, payload);
+        }
+      },
+
+      //  Everything this app holds of this kind, resolved live.
+      //  Returns [{ key, id, data, missing?, legacy? }].
+      async loadAll(){
+        const f = F(); if (!f) return [];
+        const out = [], seen = new Set();
+        const keys = await f.list();
+
+        for (const k of keys.filter(k => k.startsWith(refPrefix))){
+          const rec = await f.read(k);
+          if (!rec || !rec.$ref) continue;
+          // Tolerate an id under any of the names a reference has been written
+          // with, and fall back to the key itself, so a record can never lose
+          // its identity just because the field was renamed.
+          const rid = rec.id || rec.seed || rec.participant_id || k.slice(refPrefix.length);
+          const data = api.supported() ? await f.resolve(rec.$ref) : null;
+          if (data && valid(data)){ out.push({ key:k, id:rid, data }); }
+          else {
+            // Keep the record rather than dropping the user's row, but say so
+            // instead of rendering something blank.
+            out.push({ key:k, id:rid, missing:true, ref:rec.$ref });
+          }
+          seen.add(rid);
+        }
+
+        for (const k of keys.filter(k => k.startsWith(legacyPrefix))){
+          const data = await f.read(k);
+          if (!data || !valid(data)) continue;
+          const id = idOf(data) || k.slice(legacyPrefix.length);
+          if (seen.has(id)){ await api._retire(k); continue; }
+          if (api.supported() && await f.resolve(source(id))){
+            await api.receive(data);
+            await api._retire(k);
+            out.push({ key: refPrefix + id, id, data: await f.resolve(source(id)) });
+          } else {
+            out.push({ key:k, id, data, legacy:true });
+          }
+          seen.add(id);
+        }
+        return out;
+      },
+
+      //  The common case: just the records, skipping anything unresolvable.
+      async values(){
+        return (await api.loadAll()).filter(r => !r.missing).map(r => r.data);
+      },
+
+      async _retire(key){
+        const f = F();
+        try { if (f && f.delete) await f.delete(key); } catch (e){}
+      },
+    };
+    return api;
+  },
+};
+
+//  The three kinds this hub actually passes around.
+const CharRefs = PalmRefs.make({
+  kind: 'character', type: 'character.identity.v1',
+  source: id => 'character-forge/character_' + id,
+  idOf:  r => r && r.seed,
+  valid: r => !!(r && r.name),
+});
+const ProfileRefs = PalmRefs.make({
+  kind: 'profile', type: 'tot.profile.v1',
+  source: id => 'coherence-assessment/profile_' + id,
+  idOf:  r => r && r.participant_id,
+  valid: r => !!(r && r.zone),
+});
+const SceneRefs = PalmRefs.make({
+  kind: 'scene', type: 'scene.moment.v1',
+  source: id => 'scene-composer/scene_' + id,
+  idOf:  r => r && r.seed,
+  valid: r => !!(r && r.title),
+});
+
+if (typeof window !== 'undefined'){
+  window.PalmRefs = PalmRefs;          /* debug + tests */
+  window.CharRefs = CharRefs;
+  window.ProfileRefs = ProfileRefs;
+  window.SceneRefs = SceneRefs;
+}
+
+  async function loadLibrary(){
+    // Live from Scene Composer — see PalmRefs above.
+    state.library = (await SceneRefs.loadAll())
+      .filter(r => !r.missing).map(({ key, data }) => ({ key, data }));
+    // Sort newest first
+    state.library.sort((a,b) => new Date(b.data.timestamp || 0) - new Date(a.data.timestamp || 0));
+    renderSceneList();
+  }
+
+  function renderSceneList(){
+    const el = $('scene-list');
+    if (state.library.length === 0){
+      el.innerHTML = `<div class="scene-empty">No scenes yet.<br>
+        <a onclick="Stitcher.openSceneComposer()">Open Scene Composer</a> to make some.</div>`;
+      return;
+    }
+    el.innerHTML = state.library.map(({key, data}) => {
+      const checked = state.selected.has(data.seed) ? 'checked' : '';
+      const time = data.time?.label || '—';
+      const loc = data.location || '—';
+      const tensIcon = (data.tensionNum || 0) > 0.75 ? '●●●' :
+                       (data.tensionNum || 0) > 0.5 ? '●●○' : '●○○';
+      return `<label class="scene-entry">
+        <input type="checkbox" ${checked} onchange="Stitcher.toggleSelect('${data.seed}')">
+        <div class="se-body">
+          <div class="se-title">${data.title}</div>
+          <div class="se-meta">${loc.toUpperCase()} · ${time.toUpperCase()} · ${tensIcon}</div>
+        </div>
+      </label>`;
+    }).join('');
+  }
+
+  function toggleSelect(seed){
+    if (state.selected.has(seed)) state.selected.delete(seed);
+    else state.selected.add(seed);
+  }
+
+  // ── Auto-arrange + render ────────────────────────────────────────────────
+  function autoArrange(){
+    const selectedScenes = state.library
+      .filter(({data}) => state.selected.has(data.seed))
+      .map(({data}) => data);
+
+    if (selectedScenes.length === 0){
+      alert('Select at least 1 scene first.');
+      return;
+    }
+
+    state.seed = $('p-seed').value.trim() || ('ep_' + Date.now().toString(36) + '_' + Math.floor(Math.random()*1e6).toString(36));
+    $('p-seed').value = state.seed;
+
+    const rng = new RNG(state.seed);
+    const buckets = autoArrangeScenes(selectedScenes);
+    const ordered = ACT_KEYS.flatMap(k => buckets[k]);
+
+    // Generate transitions between consecutive scenes
+    const transitions = [];
+    for (let i = 1; i < ordered.length; i++){
+      const tRng = new RNG(state.seed + '::trans::' + i);
+      transitions.push(makeTransition(ordered[i-1], ordered[i], tRng));
+    }
+
+    // Collect characters across episode
+    const characterMap = new Map();
+    for (const s of ordered){
+      for (const c of (s.cast || [])){
+        const key = c.first || c.name;
+        if (!characterMap.has(key)) characterMap.set(key, { name: c.name || c.first, first: c.first || c.name, count: 0, zones: new Set() });
+        const entry = characterMap.get(key);
+        entry.count += 1;
+        if (c.zone) entry.zones.add(c.zone);
+      }
+    }
+    const characters = Array.from(characterMap.values()).sort((a,b)=>b.count-a.count);
+
+    // Locations
+    const locations = Array.from(new Set(ordered.map(s => s.location).filter(Boolean)));
+
+    const themes = inferThemes(ordered, ordered.flatMap(s => s.cast || []));
+
+    state.episode = {
+      seed: state.seed,
+      episode_number: $('p-num').value || '1.01',
+      runtime_target: parseInt($('p-runtime').value, 10),
+      title: makeTitle(rng, ordered),
+      logline: makeLogline(rng, ordered, characters, locations),
+      buckets,
+      ordered,
+      transitions,
+      characters,
+      locations,
+      themes,
+      timestamp: new Date().toISOString(),
+    };
+    renderEpisode();
+  }
+
+  function renderEpisode(){
+    const ep = state.episode;
+    if (!ep){
+      $('acts').innerHTML = `<div class="empty-stage">
+        <div class="es-title">NO SCENES SELECTED</div>
+        <div class="es-body">Check 3 or more scenes in the left panel, then click
+          <strong>AUTO-ARRANGE</strong> to assemble an episode.</div>
+      </div>`;
+      $('arc-svg').innerHTML = '';
+      $('ep-title').textContent = '—';
+      $('ep-logline').textContent = '—';
+      $('ep-num').textContent = 'SEASON ?, EPISODE ?';
+      $('prod-card').innerHTML = '—';
+      return;
+    }
+
+    const epNum = ep.episode_number.includes('.') ? ep.episode_number : '1.' + ep.episode_number.padStart(2,'0');
+    const [season, num] = epNum.split('.');
+    $('ep-num').textContent = `SEASON ${season} · EPISODE ${num.padStart(2,'0')} · ${ep.runtime_target} MIN`;
+    $('ep-title').textContent = ep.title;
+    $('ep-logline').textContent = ep.logline;
+
+    $('arc-svg').innerHTML = renderArc(ep.ordered);
+
+    // Render acts
+    let html = '';
+    let sceneCounter = 0;
+    let transitionCounter = 0;
+    for (const actKey of ACT_KEYS){
+      const scenes = ep.buckets[actKey];
+      if (!scenes.length) continue;
+      const def = ACT_DEFS[actKey];
+      // Distribute runtime across acts
+      const totalAct = scenes.length;
+      const actRuntime = Math.round(def.target_minutes * (ep.runtime_target / 22));
+      html += `<div class="act">
+        <div class="act-label">${def.label}
+          <span class="act-runtime">≈${actRuntime} MIN · ${scenes.length} SCENE${scenes.length===1?'':'S'}</span>
+        </div>`;
+      scenes.forEach((s, idx) => {
+        sceneCounter++;
+        const cast = (s.cast || []).map(c => c.first || c.name).join(', ') || '(no cast)';
+        // Transition BEFORE this scene if it isn't the first overall
+        if (sceneCounter > 1){
+          const tIdx = transitionCounter;
+          html += `<div class="transition">
+            <span class="t-label">TRANSITION
+              <button class="t-regen" onclick="Stitcher.regenTransition(${tIdx})">↻ REGEN</button>
+            </span>
+            ${ep.transitions[tIdx]}
+          </div>`;
+          transitionCounter++;
+        }
+        html += `<div class="scene-row">
+          <div class="scene-num">${sceneCounter.toString().padStart(2,'0')}</div>
+          <div class="scene-body">
+            <div class="s-title">${s.title}</div>
+            <div class="s-meta">${s.location?.toUpperCase()||'—'} · ${s.time?.label?.toUpperCase()||'—'} · ${s.type?.label?.split('—')[0]?.trim()?.toUpperCase()||'—'} · TENSION ${(s.tensionNum*100|0)}%</div>
+            <div class="s-cast">${cast}</div>
+          </div>
+          <div class="scene-actions">
+            <button onclick="Stitcher.moveScene('${actKey}', ${idx}, -1)" title="Move up">▲</button>
+            <button onclick="Stitcher.moveScene('${actKey}', ${idx}, 1)" title="Move down">▼</button>
+            <button class="rm" onclick="Stitcher.removeScene('${actKey}', ${idx})" title="Remove">×</button>
+          </div>
+        </div>`;
+      });
+      html += `</div>`;
+    }
+    $('acts').innerHTML = html;
+
+    // Production card
+    const totalScenes = ep.ordered.length;
+    const avgTension = ep.ordered.reduce((s,x)=>s+(x.tensionNum||0),0) / Math.max(1, totalScenes);
+    const peakTension = Math.max(...ep.ordered.map(s=>s.tensionNum||0));
+
+    $('prod-card').innerHTML = `
+      <div class="pk">Episode</div><div class="pv"><strong>${epNum}</strong> · ${ep.runtime_target} min</div>
+      <div class="pk">Title</div><div class="pv">${ep.title}</div>
+      <div class="pk">Scenes</div><div class="pv">${totalScenes} total · avg tension ${(avgTension*100|0)}% · peak ${(peakTension*100|0)}%</div>
+      <div class="pk">Themes</div>
+        <div class="theme-tags">${ep.themes.map(t=>`<span class="theme-tag">${t}</span>`).join('')}</div>
+      <div class="pk">Locations (${ep.locations.length})</div>
+        <div class="pv" style="font-size:12px;line-height:1.5;">${ep.locations.join(' · ')}</div>
+      <div class="pk">Cast Continuity</div>
+        <div class="continuity">${ep.characters.map(c=>`
+          <div class="crow">
+            <span class="cname">${c.first}</span>
+            <span class="ccount">${c.count} / ${totalScenes}</span>
+          </div>`).join('') || '<div class="pv" style="color:var(--ink-fade);font-style:italic;">No cast continuity.</div>'}</div>
+      <div class="pk" style="margin-top:16px;">Seed</div>
+      <div class="pv mono" style="font-size:10px;">${ep.seed}</div>
+    `;
+  }
+
+  // ── Scene-level controls ─────────────────────────────────────────────────
+  function moveScene(actKey, idx, direction){
+    if (!state.episode) return;
+    const list = state.episode.buckets[actKey];
+    const newIdx = idx + direction;
+    if (newIdx < 0 || newIdx >= list.length) return;
+    [list[idx], list[newIdx]] = [list[newIdx], list[idx]];
+    rebuildOrderedAndTransitions();
+    renderEpisode();
+  }
+
+  function removeScene(actKey, idx){
+    if (!state.episode) return;
+    state.episode.buckets[actKey].splice(idx, 1);
+    rebuildOrderedAndTransitions();
+    renderEpisode();
+  }
+
+  function rebuildOrderedAndTransitions(){
+    if (!state.episode) return;
+    state.episode.ordered = ACT_KEYS.flatMap(k => state.episode.buckets[k]);
+    const rng = new RNG(state.episode.seed + '::rebuild');
+    state.episode.transitions = [];
+    for (let i = 1; i < state.episode.ordered.length; i++){
+      state.episode.transitions.push(makeTransition(state.episode.ordered[i-1], state.episode.ordered[i], new RNG(state.episode.seed + '::trans::' + i)));
+    }
+  }
+
+  function regenTransition(idx){
+    if (!state.episode) return;
+    const ordered = state.episode.ordered;
+    const rng = new RNG(state.episode.seed + '::trans::' + idx + '::' + Math.random());
+    state.episode.transitions[idx] = makeTransition(ordered[idx], ordered[idx+1], rng);
+    renderEpisode();
+  }
+
+  function regenTitle(){
+    if (!state.episode) return;
+    const rng = new RNG(state.episode.seed + '::title::' + Math.random());
+    state.episode.title = makeTitle(rng, state.episode.ordered);
+    renderEpisode();
+  }
+
+  function regenLogline(){
+    if (!state.episode) return;
+    const rng = new RNG(state.episode.seed + '::logline::' + Math.random());
+    state.episode.logline = makeLogline(rng, state.episode.ordered, state.episode.characters, state.episode.locations);
+    renderEpisode();
+  }
+
+  function regenAll(){
+    if (!state.episode) return;
+    const rng = new RNG(state.episode.seed + '::all::' + Math.random());
+    state.episode.title = makeTitle(rng, state.episode.ordered);
+    state.episode.logline = makeLogline(rng, state.episode.ordered, state.episode.characters, state.episode.locations);
+    rebuildOrderedAndTransitions();
+    renderEpisode();
+  }
+
+  function clear(){
+    if (state.episode && !confirm('Clear the current episode?')) return;
+    state.episode = null;
+    state.selected.clear();
+    renderSceneList();
+    renderEpisode();
+  }
+
+  // ── Persistence ──────────────────────────────────────────────────────────
+  async function save(){
+    if (!state.episode) return;
+    const record = {
+      ...state.episode,
+      timestamp: new Date().toISOString(),
+      type: 'episode.outline.v1',
+    };
+    await window.fracture.save('episode_' + state.episode.seed, record);
+    if (window.fracture.shell) await window.fracture.emit('episode.outline.v1', record);
+    flashStatus('Episode saved.');
+  }
+
+  function exportJSON(){
+    if (!state.episode) return;
+    const blob = new Blob([JSON.stringify(state.episode, null, 2)], {type:'application/json'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `episode_${state.episode.episode_number}_${state.episode.title.replace(/[^a-zA-Z0-9]+/g,'_')}.json`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  }
+
+  function exportProse(){
+    if (!state.episode) return;
+    const ep = state.episode;
+    const lines = [];
+    lines.push(`FRACTURE CITY`);
+    lines.push(`SEASON ${ep.episode_number.split('.')[0]} · EPISODE ${ep.episode_number.split('.')[1].padStart(2,'0')}`);
+    lines.push(`"${ep.title.toUpperCase()}"`);
+    lines.push('');
+    lines.push(`LOGLINE: ${ep.logline}`);
+    lines.push('');
+    lines.push(`RUNTIME: ${ep.runtime_target} minutes`);
+    lines.push(`SCENES: ${ep.ordered.length}`);
+    lines.push(`THEMES: ${ep.themes.join(', ')}`);
+    lines.push(`LOCATIONS: ${ep.locations.join(', ')}`);
+    lines.push(`CAST: ${ep.characters.map(c=>c.first).join(', ')}`);
+    lines.push('');
+    lines.push('---');
+    lines.push('');
+
+    let sceneNum = 0;
+    let transNum = 0;
+    for (const actKey of ACT_KEYS){
+      const scenes = ep.buckets[actKey];
+      if (!scenes.length) continue;
+      const def = ACT_DEFS[actKey];
+      lines.push(`[${def.label.toUpperCase()}]`);
+      lines.push('');
+      scenes.forEach(s => {
+        sceneNum++;
+        if (sceneNum > 1){
+          lines.push(`  TRANSITION:`);
+          lines.push(`  ${ep.transitions[transNum]}`);
+          lines.push('');
+          transNum++;
+        }
+        lines.push(`SCENE ${sceneNum.toString().padStart(2,'0')} — "${s.title}"`);
+        lines.push(`  ${s.location?.toUpperCase()||'—'} · ${s.time?.label?.toUpperCase()||'—'} · ${s.weather?.toUpperCase()||'—'}`);
+        lines.push(`  CAST: ${(s.cast||[]).map(c=>c.first||c.name).join(', ') || '(no cast)'}`);
+        lines.push(`  TYPE: ${s.type?.label || '—'} · TENSION: ${(s.tensionNum*100|0)}%`);
+        lines.push('');
+        for (const b of (s.beats || [])){
+          lines.push(`  [${b.label.toUpperCase()}]`);
+          lines.push(`  ${b.prose}`);
+          if (b.dialogue){
+            for (const d of b.dialogue){
+              lines.push('');
+              lines.push(`    ${d.speaker.toUpperCase()}:`);
+              lines.push(`    ${d.line}`);
+            }
+          }
+          lines.push('');
+        }
+        lines.push('');
+      });
+    }
+
+    const blob = new Blob([lines.join('\n')], {type:'text/plain'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `episode_${ep.episode_number}_${ep.title.replace(/[^a-zA-Z0-9]+/g,'_')}.txt`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  }
+
+  async function openSceneComposer(){
+    if (window.fracture && window.fracture.shell){
+      await window.fracture.openApp('scene-composer');
+    } else {
+      alert('Open Scene Composer from the Fracture City shell.');
+    }
+  }
+
+  function flashStatus(msg){
+    const el = $('ctx');
+    const before = el.textContent;
+    el.textContent = msg;
+    setTimeout(() => { el.textContent = before; }, 2000);
+  }
+
+  function setupBus(){
+    if (window.fracture && window.fracture.shell){
+      window.fracture.subscribe('scene.moment.v1', async (payload) => {
+        if (payload && payload.seed){
+          await SceneRefs.receive(payload);
+          await loadLibrary();
+          flashStatus('Scene received.');
+        }
+      });
+    }
+  }
+
+  async function boot(){
+    paintHdrMark();
+    $('ctx').textContent = window.fracture?.shell ? 'IN SHELL · LIVE BUS' : 'STANDALONE';
+    setupBus();
+    await loadLibrary();
+    renderEpisode();
+  }
+  document.addEventListener('DOMContentLoaded', boot);
+
+  return { autoArrange, regenAll, regenTitle, regenLogline, regenTransition,
+           moveScene, removeScene, clear, save, exportJSON, exportProse,
+           toggleSelect, openSceneComposer };
+})();
+</script>
+</body>
+</html>

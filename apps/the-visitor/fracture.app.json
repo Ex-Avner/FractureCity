@@ -1,0 +1,30 @@
+{
+  "slug": "the-visitor",
+  "name": "The Visitor",
+  "version": "0.1.0",
+  "icon": "icon.png",
+  "entry": "index.html",
+  "runtime": "html5",
+  "description": "Once a day, at your set time, a stranger arrives at your apartment door in Fracture City. You have 15 minutes. Let them in, talk through the door, lie, help, or send them away. Your decisions accumulate — your apartment fills with the evidence of who you've been. Painterly AI-rendered scenes. Daily ritual.",
+  "inputs": [
+    {
+      "type": "tot.profile.v1",
+      "description": "Optional. Your own Coherence Assessment profile shapes who comes to your door."
+    },
+    {
+      "type": "character.identity.v1",
+      "description": "Optional. Pre-forged characters can appear as visitors instead of fully procedural ones."
+    }
+  ],
+  "outputs": [
+    {
+      "type": "visit.log.v1",
+      "description": "Record of each visit — visitor, your choices, what they wanted, what was left behind."
+    }
+  ],
+  "tags": ["game", "narrative", "daily", "fracture-city", "ai-rendered", "ritual", "single-player"],
+  "author": "Avner Media",
+  "license": "personal-use",
+  "window_width": 1280,
+  "window_height": 820
+}

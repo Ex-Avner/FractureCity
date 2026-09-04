@@ -1,0 +1,73 @@
+{
+  "name": {
+    "first": "Marek",
+    "last": "Ardent",
+    "full": "Marek Ardent of the Watchspires",
+    "origin_descriptor": "of the Watchspires"
+  },
+  "epithet": "who tended graves no one visited",
+  "zone": "V",
+  "subtype": "The Historian",
+  "class": "Blade of Form",
+  "stamp": "None",
+  "capture": "None",
+  "origin": "The Spire",
+  "age": "Ancient",
+  "physical": {
+    "build": "Tall",
+    "skin": "silver-blue",
+    "hair": "long and braided",
+    "eyes": "grey",
+    "garment": "scholar wraps"
+  },
+  "mannerisms": [
+    "finishes meals before anyone else has noticed they began",
+    "pauses three beats before answering anything difficult",
+    "writes letters they never send",
+    "will not say a name they have not earned"
+  ],
+  "voice": "precise as cut glass and just as hard to argue with",
+  "aspiration": "to name the dead correctly, once, and aloud",
+  "fear": "a life that adds up to nothing in particular",
+  "gift": "they speak the truth others find unsayable",
+  "wound": "a decade given to the wrong thing",
+  "secret": "that they have been carrying a body, metaphorically, for decades",
+  "threads": [
+    {
+      "kind": "A rival",
+      "desc": "who has been chasing the same prize for so long that the chase is the friendship"
+    },
+    {
+      "kind": "A stranger",
+      "desc": "who appears in their dreams more often than makes sense"
+    },
+    {
+      "kind": "A parent",
+      "desc": "whom {name} has been forgiving in installments for years"
+    }
+  ],
+  "seed": "seed_mpx5xmt5_zub",
+  "timestamp": "2026-06-02T21:42:11.681Z",
+  "backstory": {
+    "origin": "Marek was born in The Spire, of the Watchspires, the unwanted child of a ferryman and a translator.",
+    "weight": "No single hardship marked their ancestry. The line behind them was ordinary and largely unbroken — which, they will sometimes admit, is its own kind of inheritance.",
+    "fracture": "Around thirty, Marek sat down with the family papers and did not get up the same person. There was nobody else who would do this work, and so they did it, and so they became it.",
+    "between": "The years that followed were not as remarkable as either the beginning or the present. Marek took a clerk's post, lost it, took the night shift at a glassworks, kept it longer than they expected. There was a season of silence that nobody who knew them then forgets.",
+    "present": "Now, Marek works in a trade older than the city, lives in rooms they keep neat enough that no one would know how few possessions they own, and spends most of their evenings walking the same route. They are, by their own measure, closer to finished than to beginning.",
+    "threadsIntro": "Three people belong, in different ways, to the shape of Marek's life:",
+    "threads": [
+      {
+        "kind": "A rival",
+        "desc": "who has been chasing the same prize for so long that the chase is the friendship"
+      },
+      {
+        "kind": "A stranger",
+        "desc": "who appears in their dreams more often than makes sense"
+      },
+      {
+        "kind": "A parent",
+        "desc": "whom {name} has been forgiving in installments for years"
+      }
+    ]
+  }
+}

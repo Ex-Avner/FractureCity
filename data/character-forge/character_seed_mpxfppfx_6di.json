@@ -1,0 +1,73 @@
+{
+  "name": {
+    "first": "Kade",
+    "last": "Nox",
+    "full": "Kade Nox of the Unseamed",
+    "origin_descriptor": "of the Unseamed"
+  },
+  "epithet": "who carried a stillness like a held breath",
+  "zone": "III",
+  "subtype": "The Hermit",
+  "class": "Keeper of Thread",
+  "stamp": "Scarcity",
+  "capture": "Vertex",
+  "origin": "The Void Below",
+  "age": "Ancient",
+  "physical": {
+    "build": "Slight",
+    "skin": "silver-blue",
+    "hair": "short and tangled",
+    "eyes": "green",
+    "garment": "traveler hood"
+  },
+  "mannerisms": [
+    "traces patterns in the air with a finger when bored",
+    "doubles back on conversations to test the echo",
+    "pauses three beats before answering anything difficult",
+    "speaks of certain things only at dusk"
+  ],
+  "voice": "low and unhurried, like sand settling",
+  "aspiration": "to touch the ground beneath the ground one more time",
+  "fear": "their children carrying the same hunger",
+  "gift": "they finish what they begin",
+  "wound": "a sibling who did not survive the lean year",
+  "secret": "that they no longer believe what they have been teaching",
+  "threads": [
+    {
+      "kind": "A child",
+      "desc": "(theirs, or theirs by acclamation) who carries the same wound at half the speed"
+    },
+    {
+      "kind": "A teacher",
+      "desc": "who never knew how thoroughly {name} listened"
+    },
+    {
+      "kind": "A friend",
+      "desc": "who is dying slowly enough that there is still time to do this correctly"
+    }
+  ],
+  "seed": "seed_mpxfppfx_6di",
+  "timestamp": "2026-06-03T02:15:47.100Z",
+  "backstory": {
+    "origin": "The story Kade tells about their beginnings starts in The Void Below, of the Unseamed, with two parents who agreed on almost nothing and stayed together anyway.",
+    "weight": "Two generations back, the cupboard was actually empty more often than not. The memory of that emptiness travels — Kade's grandmother taught their mother to portion bread before tasting it, and the habit reaches Kade still.",
+    "fracture": "It happened in a season when Kade should not have been alone, but was — at thirty, in a place they no longer name — and what they encountered there set the angle of their gaze permanently downward, toward the underneath.",
+    "between": "They drifted through a stretch of years that produced fewer stories than the decade before. Kade grew quieter, then briefly louder, then quieter again. There was a project — a book — that almost worked.",
+    "present": "Currently, Kade is keeping a promise that nobody else remembers, refusing to call the dead by anything other than their right names, and watching for for permission they will not, in the end, wait for. The plan, if one can call it that, is to do all three for as long as it takes.",
+    "threadsIntro": "Three people belong, in different ways, to the shape of Kade's life:",
+    "threads": [
+      {
+        "kind": "A child",
+        "desc": "(theirs, or theirs by acclamation) who carries the same wound at half the speed"
+      },
+      {
+        "kind": "A teacher",
+        "desc": "who never knew how thoroughly {name} listened"
+      },
+      {
+        "kind": "A friend",
+        "desc": "who is dying slowly enough that there is still time to do this correctly"
+      }
+    ]
+  }
+}

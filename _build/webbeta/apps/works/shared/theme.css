@@ -1,0 +1,42 @@
+/* ===========================================================================
+   Fracture City — Shared Theme Tokens
+   Apps inside the ecosystem can include this for consistent palette/spacing:
+     <link rel="stylesheet" href="../../shared/theme.css">
+   Tokens are CSS custom properties. Apps may override per-app.
+   =========================================================================== */
+:root{
+  /* Backgrounds */
+  --fc-bg:        #080614;
+  --fc-bg-2:      #11091d;
+  --fc-bg-3:      #1a0f33;
+  --fc-panel:     rgba(20,12,38,.78);
+
+  /* Lines */
+  --fc-line:        rgba(120,200,255,.18);
+  --fc-line-bright: rgba(180,140,255,.55);
+
+  /* Ink */
+  --fc-ink:       #e7e2ff;
+  --fc-ink-dim:   #9c93c6;
+  --fc-ink-fade:  #6a608a;
+
+  /* Axes — used to color-code Vertical / Horizontal / Temporal */
+  --fc-axis-v: #ffd47a;   /* gold — Vertical (Depth) */
+  --fc-axis-h: #80ffff;   /* teal — Horizontal (Breath) */
+  --fc-axis-t: #ff60d0;   /* magenta — Temporal (Obligation) */
+
+  /* Accents */
+  --fc-violet:  #a040ff;
+  --fc-green:   #7dffb3;
+  --fc-gold:    #ffd47a;
+  --fc-red:     #ff7088;
+
+  /* Type */
+  --fc-font-mono: 'SF Mono','Menlo','Courier New',monospace;
+  --fc-font-ui:   'Inter','Helvetica Neue',sans-serif;
+
+  /* Geometry */
+  --fc-radius-sm: 3px;
+  --fc-radius:    5px;
+  --fc-radius-lg: 8px;
+}

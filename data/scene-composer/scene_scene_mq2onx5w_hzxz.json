@@ -1,0 +1,91 @@
+{
+  "stage": "The Outer Ruins",
+  "location": "the husk quarter",
+  "time": {
+    "key": "pre-dawn",
+    "label": "pre-dawn",
+    "light": "blue-grey",
+    "warmth": 0.1
+  },
+  "weather": "clear and still",
+  "type": {
+    "key": "encounter",
+    "label": "encounter — characters meet"
+  },
+  "tension": "low — companionable, easy",
+  "seed": "scene_mq2onx5w_hzxz",
+  "title": "Cups Beyond Steps",
+  "cast": [
+    {
+      "name": "Orion Fenwick of the Hive Choir",
+      "first": "Orion",
+      "zone": "V",
+      "subtype": "The Burden-Bearer",
+      "class": "Weaver of Bond",
+      "stamp": "Abandonment"
+    },
+    {
+      "name": "Kestrel Gale of the Final Stair",
+      "first": "Kestrel",
+      "zone": "IV",
+      "subtype": "The Circle",
+      "class": "Keeper of Thread",
+      "stamp": "Displacement"
+    },
+    {
+      "name": "Sorrel Vey from before the Tally",
+      "first": "Sorrel",
+      "zone": "IV",
+      "subtype": "The Greenhouse",
+      "class": "Blade of Form",
+      "stamp": "None"
+    }
+  ],
+  "beats": [
+    {
+      "prose": "The husk quarter at pre-dawn. Clear and still. The air of a place no one tends — and beneath it, the light here is blue-grey, and everyone is briefly inside it.",
+      "label": "Establish"
+    },
+    {
+      "prose": "Orion, Kestrel, and Sorrel steps through. As if they have done this on this same evening, several lives in a row. Behind them, the door (or its open equivalent) closes by itself.",
+      "label": "Enter"
+    },
+    {
+      "prose": "For a moment, Orion thinks Kestrel is someone else. The mistake corrects itself, but the corrected version carries the ghost of the first one.",
+      "label": "Recognize"
+    },
+    {
+      "prose": "Between sentences, the salt and dust.",
+      "dialogue": [
+        {
+          "speaker": "Orion",
+          "line": "\"You're here,\" Orion said, in the voice they used when they were trying not to make it sound like a question."
+        },
+        {
+          "speaker": "Kestrel",
+          "line": "Kestrel did not answer for a moment. Then: \"I was on my way back.\""
+        }
+      ],
+      "label": "Engage"
+    },
+    {
+      "prose": "Orion says something small, almost not meant to be heard. Kestrel hears it anyway, and lets it sit. The conversation, if that is what it is, turns slightly.",
+      "label": "Turn"
+    },
+    {
+      "prose": "Orion is, for a moment, exactly who they are. The framework of habit drops, and what is underneath shows itself — a parent who left and called it work, or some shape of it, becomes briefly visible.",
+      "label": "Reveal"
+    },
+    {
+      "prose": "Nothing is finished. Orion and Kestrel sit, or stand, or walk slowly toward the door, and what is between them stays between them. The light here is blue-grey, and it changes everything.",
+      "label": "Settle (open)"
+    }
+  ],
+  "moods": [
+    "tender",
+    "untethered",
+    "quiet"
+  ],
+  "tensionNum": 0.25,
+  "timestamp": "2026-06-06T18:25:22.699Z"
+}

@@ -1,0 +1,1674 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Coherence — Triadic Orientation Assessment</title>
+<script>
+/* fracture-client inline shim — works whether or not the shell is present.
+   If the shell preload already injected window.fracture, leave it alone.
+   Otherwise, fall back to localStorage with a per-app namespace. */
+(function(){
+  if (window.fracture && window.fracture.shell) return;
+  const prefix = 'fracture::coherence-assessment::';
+  window.fracture = {
+    shell: false, appSlug: 'coherence-assessment', received: null,
+    save(k,v){ try{ localStorage.setItem(prefix+k, JSON.stringify(v)); }catch(e){} return Promise.resolve(true); },
+    read(k){ try{ const r=localStorage.getItem(prefix+k); return Promise.resolve(r==null?null:JSON.parse(r)); }catch(e){ return Promise.resolve(null); } },
+    list(){ const o=[]; for(let i=0;i<localStorage.length;i++){ const k=localStorage.key(i); if(k&&k.startsWith(prefix)) o.push(k.slice(prefix.length)); } return Promise.resolve(o); },
+    delete(k){ localStorage.removeItem(prefix+k); return Promise.resolve(true); },
+    listApps(){ return Promise.resolve([]); },
+    openApp(){ return Promise.resolve({ok:false,error:'standalone'}); },
+    emit(){ return Promise.resolve(true); },
+    subscribe(){ return ()=>{}; },
+    onPayload(){},
+  };
+})();
+</script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+:root{
+  --bg:#080614;
+  --bg-2:#11091d;
+  --panel:rgba(20,12,38,.78);
+  --line:rgba(120,200,255,.18);
+  --line-bright:rgba(180,140,255,.55);
+  --ink:#e7e2ff;
+  --ink-dim:#9c93c6;
+  --ink-fade:#6a608a;
+  --teal:#80ffff;
+  --magenta:#ff60d0;
+  --violet:#a040ff;
+  --green:#7dffb3;
+  --gold:#ffd47a;
+  --red:#ff7088;
+}
+html,body{
+  background:radial-gradient(ellipse at 50% 0%,#1a0f33 0%,#080614 60%);
+  min-height:100vh;color:var(--ink);
+  font-family:'Inter','Helvetica Neue',sans-serif;
+  -webkit-font-smoothing:antialiased;letter-spacing:.01em;
+}
+body{padding:32px 16px 64px;}
+.shell{max-width:980px;margin:0 auto;}
+h1{font-family:'Courier New',monospace;font-size:34px;letter-spacing:10px;
+   background:linear-gradient(180deg,#80ffff 0%,#ff60d0 60%,#a040ff 100%);
+   -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
+   text-shadow:0 0 24px rgba(160,64,255,.35);margin-bottom:6px;}
+
+/* ── LOGO ── */
+.logo-block{display:flex;align-items:center;gap:22px;margin-bottom:14px;
+  padding:14px 0 18px;border-bottom:1px solid var(--line);}
+.logo-mark{width:84px;height:84px;flex:0 0 84px;position:relative;
+  filter:drop-shadow(0 0 12px rgba(160,64,255,.45));}
+.logo-mark svg{width:100%;height:100%;}
+.logo-mark .spin{animation:logo-spin 32s linear infinite;transform-origin:50% 50%;}
+@keyframes logo-spin{from{transform:rotate(0deg);}to{transform:rotate(360deg);}}
+.logo-text{flex:1;}
+.logo-title{font-family:'Courier New',monospace;font-size:26px;letter-spacing:14px;
+  background:linear-gradient(180deg,#80ffff 0%,#ff60d0 65%,#a040ff 100%);
+  -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
+  text-shadow:0 0 18px rgba(160,64,255,.3);line-height:1;margin-bottom:6px;}
+.logo-sub{font-family:'Courier New',monospace;font-size:10px;letter-spacing:5px;
+  color:var(--ink-dim);text-transform:uppercase;}
+.logo-rule{margin-top:6px;display:flex;gap:3px;align-items:center;}
+.logo-rule span{font-family:'Courier New',monospace;font-size:9px;letter-spacing:3px;
+  text-transform:uppercase;}
+.logo-rule .v{color:var(--gold);}
+.logo-rule .h{color:var(--teal);}
+.logo-rule .t{color:var(--magenta);}
+.logo-rule .sep{color:var(--ink-fade);}
+@media (max-width:540px){
+  .logo-block{flex-direction:column;align-items:flex-start;gap:10px;}
+  .logo-title{font-size:20px;letter-spacing:8px;}
+}
+h2{font-family:'Courier New',monospace;font-size:18px;letter-spacing:6px;
+   color:var(--teal);text-transform:uppercase;margin:32px 0 14px;
+   border-bottom:1px solid var(--line);padding-bottom:8px;}
+h3{font-family:'Courier New',monospace;font-size:13px;letter-spacing:4px;
+   color:var(--magenta);text-transform:uppercase;margin:18px 0 8px;}
+p,li{line-height:1.55;color:var(--ink);}
+.subtitle{color:var(--ink-dim);font-size:13px;letter-spacing:3px;
+  text-transform:uppercase;margin-bottom:24px;}
+.panel{background:var(--panel);border:1px solid var(--line);
+  border-radius:6px;padding:24px 28px;margin-bottom:18px;
+  box-shadow:0 0 32px rgba(80,40,160,.12);}
+.btn{font-family:'Courier New',monospace;font-size:12px;letter-spacing:4px;
+  text-transform:uppercase;background:rgba(40,20,80,.6);color:var(--teal);
+  border:1px solid var(--line-bright);padding:10px 22px;cursor:pointer;
+  border-radius:3px;transition:all .18s;}
+.btn:hover{background:rgba(80,40,160,.7);color:#fff;
+  box-shadow:0 0 18px rgba(255,80,220,.4);}
+.btn.primary{background:linear-gradient(180deg,rgba(120,80,200,.5),rgba(60,20,120,.6));
+  color:#fff;border-color:rgba(255,140,220,.6);}
+.btn-row{display:flex;gap:12px;flex-wrap:wrap;margin-top:18px;}
+.muted{color:var(--ink-dim);}
+.faint{color:var(--ink-fade);}
+.mono{font-family:'Courier New',monospace;}
+
+/* Intro */
+#screen-intro p{margin-bottom:12px;}
+.axes-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:18px 0;}
+.axis-card{background:rgba(20,12,38,.5);border:1px solid var(--line);
+  border-radius:5px;padding:14px;}
+.axis-card .ax-name{font-family:'Courier New',monospace;font-size:11px;
+  letter-spacing:3px;color:var(--teal);text-transform:uppercase;margin-bottom:6px;}
+.axis-card .ax-poles{font-size:12px;color:var(--ink-dim);}
+.axis-card .ax-poles strong{color:var(--ink);}
+
+/* Assessment */
+.progress-wrap{margin-bottom:18px;}
+.progress-bar{height:4px;background:rgba(120,80,200,.18);border-radius:2px;overflow:hidden;}
+.progress-fill{height:100%;background:linear-gradient(90deg,var(--teal),var(--magenta),var(--violet));
+  transition:width .25s;}
+.progress-text{font-family:'Courier New',monospace;font-size:11px;letter-spacing:3px;
+  color:var(--ink-dim);margin-top:6px;text-transform:uppercase;}
+.item-block{padding:14px 0;border-bottom:1px solid var(--line);}
+.item-block:last-child{border-bottom:none;}
+.item-id{font-family:'Courier New',monospace;font-size:10px;letter-spacing:3px;
+  color:var(--ink-fade);margin-bottom:6px;text-transform:uppercase;}
+.item-text{font-size:15px;line-height:1.55;margin-bottom:10px;color:var(--ink);}
+.likert-row{display:flex;gap:6px;flex-wrap:wrap;align-items:center;}
+.likert-btn{width:36px;height:36px;border-radius:4px;
+  background:rgba(20,12,38,.7);border:1px solid var(--line);
+  color:var(--ink-dim);font-family:'Courier New',monospace;font-size:14px;
+  cursor:pointer;transition:all .15s;}
+.likert-btn:hover{border-color:var(--line-bright);color:var(--ink);}
+.likert-btn.selected{background:linear-gradient(180deg,rgba(160,64,255,.6),rgba(80,20,160,.6));
+  color:#fff;border-color:var(--magenta);
+  box-shadow:0 0 12px rgba(255,80,220,.5);}
+.likert-labels{display:flex;justify-content:space-between;font-family:'Courier New',monospace;
+  font-size:10px;letter-spacing:2px;color:var(--ink-fade);margin-top:6px;
+  text-transform:uppercase;max-width:280px;}
+.scale-key{font-family:'Courier New',monospace;font-size:11px;color:var(--ink-dim);
+  margin-top:18px;padding-top:14px;border-top:1px solid var(--line);}
+
+/* Report */
+.summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));
+  gap:12px;margin-bottom:18px;}
+.summary-cell{background:rgba(20,12,38,.65);border:1px solid var(--line);
+  border-radius:4px;padding:14px;}
+.summary-cell .label{font-family:'Courier New',monospace;font-size:10px;letter-spacing:2px;
+  color:var(--ink-fade);text-transform:uppercase;margin-bottom:6px;}
+.summary-cell .value{font-family:'Courier New',monospace;font-size:16px;color:var(--teal);
+  letter-spacing:2px;}
+.summary-cell .sub{font-size:12px;color:var(--ink-dim);margin-top:4px;}
+
+.bar-row{display:flex;align-items:center;gap:10px;margin-bottom:8px;font-size:13px;}
+.bar-row .bar-label{flex:0 0 130px;color:var(--ink-dim);
+  font-family:'Courier New',monospace;font-size:11px;letter-spacing:2px;
+  text-transform:uppercase;}
+.bar-track{flex:1;height:14px;background:rgba(20,12,38,.7);
+  border:1px solid var(--line);border-radius:2px;overflow:hidden;position:relative;}
+.bar-fill{height:100%;background:linear-gradient(90deg,var(--violet),var(--magenta));}
+.bar-fill.teal{background:linear-gradient(90deg,#2c5478,var(--teal));}
+.bar-fill.gold{background:linear-gradient(90deg,#7a5a20,var(--gold));}
+.bar-row .bar-val{flex:0 0 50px;text-align:right;color:var(--ink);
+  font-family:'Courier New',monospace;font-size:11px;}
+
+/* Signed bars (axes) */
+.signed-track{flex:1;height:16px;background:rgba(20,12,38,.7);
+  border:1px solid var(--line);border-radius:2px;position:relative;}
+.signed-track::after{content:'';position:absolute;left:50%;top:0;bottom:0;
+  width:1px;background:var(--line-bright);}
+.signed-fill{position:absolute;top:0;bottom:0;
+  background:linear-gradient(90deg,var(--magenta),var(--violet));}
+
+.zone-box{background:linear-gradient(135deg,rgba(160,64,255,.12),rgba(80,40,160,.05));
+  border:1px solid var(--line-bright);border-radius:5px;padding:18px;margin-bottom:14px;}
+.zone-box .zone-name{font-family:'Courier New',monospace;font-size:22px;letter-spacing:4px;
+  color:var(--teal);margin-bottom:6px;}
+.zone-box .zone-char{color:var(--ink);font-size:14px;}
+
+.subtype-box{background:rgba(20,12,38,.5);border:1px solid var(--line);
+  border-radius:4px;padding:14px;margin-bottom:8px;}
+.subtype-box.primary{border-color:var(--magenta);
+  box-shadow:0 0 14px rgba(255,80,220,.18);}
+.subtype-box .st-name{font-family:'Courier New',monospace;font-size:14px;
+  letter-spacing:3px;color:var(--magenta);text-transform:uppercase;}
+.subtype-box .st-desc{color:var(--ink-dim);font-size:13px;margin-top:4px;}
+.subtype-box .st-dist{font-family:'Courier New',monospace;font-size:11px;
+  color:var(--ink-fade);margin-top:4px;}
+
+.deform-list{list-style:none;padding:0;}
+.deform-list li{font-family:'Courier New',monospace;font-size:13px;
+  color:var(--gold);padding:6px 0;letter-spacing:1px;}
+.deform-list li::before{content:'▸ ';color:var(--magenta);}
+
+.stamp-row{display:flex;align-items:center;gap:12px;padding:8px 0;
+  border-bottom:1px solid var(--line);}
+.stamp-row:last-child{border-bottom:none;}
+.stamp-row .st-name{flex:0 0 180px;font-family:'Courier New',monospace;
+  font-size:12px;letter-spacing:2px;color:var(--ink);text-transform:uppercase;}
+.stamp-row .st-bar{flex:1;height:8px;background:rgba(20,12,38,.7);
+  border:1px solid var(--line);border-radius:2px;overflow:hidden;}
+.stamp-row .st-bar-fill{height:100%;background:linear-gradient(90deg,#7a3050,var(--red));}
+.stamp-row .st-val{flex:0 0 55px;text-align:right;font-family:'Courier New',monospace;
+  font-size:11px;color:var(--ink);}
+.stamp-row.detected .st-name{color:var(--red);}
+
+.narrative{font-size:14.5px;line-height:1.65;color:var(--ink);}
+.narrative p{margin-bottom:10px;}
+
+.viz-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:6px;}
+@media (max-width:720px){.viz-grid{grid-template-columns:1fr;}}
+.viz-box{background:rgba(8,4,16,.6);border:1px solid var(--line);
+  border-radius:5px;padding:14px;text-align:center;}
+.viz-box .viz-title{font-family:'Courier New',monospace;font-size:11px;
+  letter-spacing:3px;color:var(--ink-dim);text-transform:uppercase;margin-bottom:10px;}
+
+/* Capture table */
+.cap-table{width:100%;border-collapse:collapse;font-size:13px;}
+.cap-table th{font-family:'Courier New',monospace;font-size:10px;letter-spacing:2px;
+  color:var(--ink-fade);text-transform:uppercase;text-align:left;
+  padding:6px 8px;border-bottom:1px solid var(--line);}
+.cap-table td{padding:6px 8px;border-bottom:1px solid var(--line);color:var(--ink);}
+.cap-table td.num{font-family:'Courier New',monospace;color:var(--teal);text-align:right;}
+
+.history-row{display:flex;justify-content:space-between;align-items:center;
+  padding:8px 0;border-bottom:1px solid var(--line);font-size:13px;}
+.history-row:last-child{border-bottom:none;}
+.history-row .h-id{font-family:'Courier New',monospace;font-size:11px;color:var(--ink-dim);}
+
+input[type=text]{background:rgba(20,12,38,.7);border:1px solid var(--line);
+  color:var(--ink);padding:8px 12px;border-radius:3px;font-family:inherit;
+  font-size:13px;width:240px;}
+input[type=text]:focus{outline:none;border-color:var(--magenta);}
+
+.hide{display:none!important;}
+
+/* Print */
+@media print {
+  body{background:#fff;color:#111;padding:0;}
+  .shell{max-width:none;}
+  h1,h2,h3{color:#222;background:none;-webkit-text-fill-color:initial;text-shadow:none;}
+  h2{border-bottom:1px solid #ccc;color:#444;}
+  h3{color:#666;}
+  .panel{background:#fff;border:1px solid #ddd;box-shadow:none;page-break-inside:avoid;}
+  .zone-box{background:#f6f0ff;border:1px solid #ccc;}
+  .zone-box .zone-name{color:#444;}
+  .summary-cell{background:#f8f8f8;border:1px solid #ddd;}
+  .summary-cell .value{color:#222;}
+  .bar-row .bar-label,.subtitle,.muted,.faint,.summary-cell .label,.summary-cell .sub{color:#555;}
+  p,li,.narrative,.zone-box .zone-char,.subtype-box .st-desc{color:#222;}
+  .btn,.likert-row,.btn-row,.no-print{display:none!important;}
+  .deform-list li{color:#b46500;}
+  .stamp-row .st-name{color:#222;}
+  .subtype-box .st-name{color:#7a3da5;}
+  .viz-box{background:#fff;border:1px solid #ddd;}
+  .logo-block{border-bottom:1px solid #ccc;}
+  .logo-mark{filter:none!important;}
+  .logo-mark .spin{animation:none!important;}
+  .logo-title{color:#222;background:none;-webkit-text-fill-color:initial;text-shadow:none;}
+  .logo-sub,.logo-rule span{color:#555;}
+}
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <!-- ========== INTRO ========== -->
+  <div id="screen-intro">
+    <div class="logo-block">
+      <div class="logo-mark" id="logo-mark-intro"></div>
+      <div class="logo-text">
+        <div class="logo-title">COHERENCE</div>
+        <div class="logo-sub">Triadic Orientation Assessment</div>
+        <div class="logo-rule">
+          <span class="v">VERTICAL</span><span class="sep">·</span>
+          <span class="h">HORIZONTAL</span><span class="sep">·</span>
+          <span class="t">TEMPORAL</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <p>This instrument maps where you stand inside a three-axis model of conscious experience.
+        It does not assign a personality type. It locates an <strong>orientation</strong> —
+        a position inside a geometric interior — and describes the shape of that interior.</p>
+      <p>Every person is oriented along three axes simultaneously.
+        Where you sit determines the <em>zone</em> you occupy; the rest of the report
+        describes the texture of that position: subtype, shape, capture, signature, deformation.</p>
+
+      <div class="axes-grid">
+        <div class="axis-card">
+          <div class="ax-name">Vertical · Depth</div>
+          <div class="ax-poles"><strong>Ohn</strong> (depth, ground) ↔ <strong>Hoc</strong> (surface, immediate)</div>
+        </div>
+        <div class="axis-card">
+          <div class="ax-name">Horizontal · Breath</div>
+          <div class="ax-poles"><strong>Him</strong> (singular self) ↔ <strong>Allmen</strong> (plural other)</div>
+        </div>
+        <div class="axis-card">
+          <div class="ax-name">Temporal · Obligation</div>
+          <div class="ax-poles"><strong>Wasonce</strong> (ancestral past) ↔ <strong>Willbe</strong> (unborn future)</div>
+        </div>
+      </div>
+
+      <p class="muted" style="font-size:13px;">
+        36 statements. Rate each from 1 (Strongly Disagree) to 7 (Strongly Agree).
+        Type a number or click. Press Enter to advance.
+        Takes about 5 minutes.</p>
+
+      <div class="btn-row">
+        <label class="muted mono" style="font-size:11px;letter-spacing:3px;">
+          PARTICIPANT ID
+          <input type="text" id="participant-id" placeholder="(auto)" style="margin-left:8px;">
+        </label>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn primary" onclick="App.start()">BEGIN ASSESSMENT</button>
+        <button class="btn" onclick="App.showHistory()">PAST RESULTS</button>
+        <button class="btn" onclick="App.showAbout()">METHODOLOGY</button>
+      </div>
+    </div>
+
+    <div class="panel hide" id="history-panel">
+      <h3>Past Results</h3>
+      <div id="history-list"></div>
+    </div>
+
+    <div class="panel hide" id="about-panel">
+      <h3>Theoretical Basis</h3>
+      <p style="font-size:13.5px;">Based on the Triaxial Orientation Theory framework (P.R. Erickson,
+        2025). Three orthogonal axes generate eight zones (octants of an octahedron),
+        24 subtypes (3 per zone), and a continuous <em>shape parameter</em> (Lp norm)
+        that describes how costly it is to hold multiple orientations at once.</p>
+      <h3 style="margin-top:14px;">Condensation Methodology</h3>
+      <p style="font-size:13.5px;">This form is a 36-item condensation of the original 66-item
+        v2.0 instrument. Selection was driven by the v1.0→v2.0 validity audit,
+        which classified items as CLEAN, GRAY (cross-axis or ambiguous),
+        or PROBLEM (measuring the wrong construct).</p>
+      <p style="font-size:13.5px;">For each pole the 5 cleanest items were retained based on:
+        (1) experiential rather than aspirational language;
+        (2) forced tradeoff or specific behavior rather than generic agreement;
+        (3) low cross-axis loading;
+        (4) low social desirability variance.
+        The 6 reverse-coded integration items were kept; the 6 positive-coded ones
+        were dropped — the audit identified those as adding noise (self-reported capacity
+        is overestimated, while felt cost is reported honestly).</p>
+      <h3 style="margin-top:14px;">What Is Computed</h3>
+      <p style="font-size:13.5px;"><strong>Pole scores</strong> (six 0–1 means) → <strong>axis scores</strong>
+        (signed differences + temporal extension) → <strong>zone</strong> (octant classification)
+        → <strong>subtype</strong> (nearest of three interior biases) →
+        <strong>shape parameter</strong> (blended self-report + empirical entropy-based estimate) →
+        <strong>asymmetric geometry</strong> (per-axis health, scale, exchange rates between axis pairs) →
+        <strong>capture analysis</strong> (vertex/edge/face proximity) →
+        <strong>stamp detection</strong> (correlation against five inherited deformation profiles).</p>
+      <p class="faint" style="font-size:12px;margin-top:10px;">
+        Pre-validation research instrument. Not a diagnostic tool. Results describe a current
+        orientation, not a fixed identity.</p>
+    </div>
+  </div>
+
+  <!-- ========== ASSESSMENT ========== -->
+  <div id="screen-assess" class="hide">
+    <div class="logo-block">
+      <div class="logo-mark" id="logo-mark-assess"></div>
+      <div class="logo-text">
+        <div class="logo-title" style="font-size:20px;letter-spacing:9px;">ASSESSMENT</div>
+        <div class="logo-sub">36 items · 1 (disagree) → 7 (agree) · Enter to advance</div>
+      </div>
+    </div>
+    <div class="progress-wrap">
+      <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+      <div class="progress-text" id="progress-text">0 / 36</div>
+    </div>
+    <div class="panel" id="items-container"></div>
+    <div class="btn-row">
+      <button class="btn" onclick="App.cancel()">CANCEL</button>
+      <button class="btn primary" onclick="App.submit()" id="submit-btn" disabled>SCORE ASSESSMENT</button>
+    </div>
+  </div>
+
+  <!-- ========== REPORT ========== -->
+  <div id="screen-report" class="hide">
+    <div class="logo-block">
+      <div class="logo-mark" id="logo-mark-report"></div>
+      <div class="logo-text">
+        <div class="logo-title" style="font-size:20px;letter-spacing:9px;">PROFILE REPORT</div>
+        <div class="logo-sub" id="report-meta">—</div>
+      </div>
+    </div>
+    <div id="report-body"></div>
+    <div class="btn-row no-print">
+      <button class="btn primary" onclick="window.print()">PRINT / SAVE PDF</button>
+      <button class="btn" onclick="App.exportJSON()">EXPORT JSON</button>
+      <button class="btn" onclick="App.exportHTML()">EXPORT HTML</button>
+      <button class="btn" onclick="App.reset()">NEW ASSESSMENT</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// =============================================================================
+// CONDENSED ITEM BANK — 36 items
+// 5 items × 6 poles + 6 reverse-coded integration items
+// Selection based on v1.0→v2.0 validity audit (cleanest items per pole).
+// =============================================================================
+const ITEMS = [
+  // OHN — Depth / Ground of Being
+  {id:'V02',pole:'Ohn',axis:'Vertical',
+   text:"There are moments when everyday experience opens into something that feels deeper or more real."},
+  {id:'V04',pole:'Ohn',axis:'Vertical',
+   text:"Silence and stillness feel nourishing rather than empty to me."},
+  {id:'V06',pole:'Ohn',axis:'Vertical',
+   text:"The word 'sacred' has personal meaning to me, whether or not I am religious."},
+  {id:'V07',pole:'Ohn',axis:'Vertical',
+   text:"I sometimes sense a ground or foundation beneath the surface of things, even if I cannot explain it."},
+  {id:'V09',pole:'Ohn',axis:'Vertical',
+   text:"I have direct experiences of meaningfulness that feel discovered rather than chosen, as if the meaning was already there."},
+
+  // HOC — Surface / Present Moment
+  {id:'V11',pole:'Hoc',axis:'Vertical',
+   text:"I prefer practical solutions to philosophical questions."},
+  {id:'V12',pole:'Hoc',axis:'Vertical',
+   text:"The tangible and measurable feel more real to me than the abstract."},
+  {id:'V14',pole:'Hoc',axis:'Vertical',
+   text:"I do not spend much time looking for deeper significance in everyday experiences."},
+  {id:'V15',pole:'Hoc',axis:'Vertical',
+   text:"Efficiency and results matter more to me than process or depth."},
+  {id:'V17',pole:'Hoc',axis:'Vertical',
+   text:"I feel uncomfortable when conversations become too abstract or existential."},
+
+  // HIM — Singular Self
+  {id:'H02',pole:'Him',axis:'Horizontal',
+   text:"When my view conflicts with the people closest to me, I usually hold my position rather than adjusting."},
+  {id:'H03',pole:'Him',axis:'Horizontal',
+   text:"I need significant time alone to feel like myself."},
+  {id:'H05',pole:'Him',axis:'Horizontal',
+   text:"I would rather be right alone than wrong with the group."},
+  {id:'H07',pole:'Him',axis:'Horizontal',
+   text:"My most important work happens in solitude."},
+  {id:'H09',pole:'Him',axis:'Horizontal',
+   text:"I feel more like myself when alone than when with others."},
+
+  // ALLMEN — Plural / Collective
+  {id:'H10',pole:'Allmen',axis:'Horizontal',
+   text:"I feel most alive in genuine conversation with another person."},
+  {id:'H11',pole:'Allmen',axis:'Horizontal',
+   text:"Other people's experiences and perspectives genuinely change how I see things."},
+  {id:'H12',pole:'Allmen',axis:'Horizontal',
+   text:"I am drawn to community and collaborative work."},
+  {id:'H14',pole:'Allmen',axis:'Horizontal',
+   text:"Being in relationship with others is essential to who I am."},
+  {id:'H17',pole:'Allmen',axis:'Horizontal',
+   text:"I learn more from dialogue than from solitary reflection."},
+
+  // WASONCE — Ancestral Past
+  {id:'T01',pole:'Wasonce',axis:'Temporal',
+   text:"I feel a genuine connection to those who came before me."},
+  {id:'T02',pole:'Wasonce',axis:'Temporal',
+   text:"The choices made by previous generations still shape my life in specific ways I can identify."},
+  {id:'T04',pole:'Wasonce',axis:'Temporal',
+   text:"Understanding where I come from is essential to understanding who I am."},
+  {id:'T05',pole:'Wasonce',axis:'Temporal',
+   text:"I sometimes feel the weight of inherited patterns I did not create."},
+  {id:'T07',pole:'Wasonce',axis:'Temporal',
+   text:"Historical events that happened before I was born feel personally relevant to me."},
+
+  // WILLBE — Unborn Future
+  {id:'T11',pole:'Willbe',axis:'Temporal',
+   text:"I feel responsible to future generations I will never meet."},
+  {id:'T13',pole:'Willbe',axis:'Temporal',
+   text:"I orient my work toward what will be needed after I am gone."},
+  {id:'T14',pole:'Willbe',axis:'Temporal',
+   text:"The unborn have a legitimate claim on how present-day decisions are made."},
+  {id:'T15',pole:'Willbe',axis:'Temporal',
+   text:"I plan beyond my own lifespan."},
+  {id:'T18',pole:'Willbe',axis:'Temporal',
+   text:"Building something that outlasts me feels like a genuine obligation, not just ambition."},
+
+  // INTEGRATION (reverse-coded) — felt cost of holding multiple axes
+  {id:'I01',pole:'Integration',axis:'Integration',reverse:true,
+   text:"When I focus deeply on one important thing, everything else in my life tends to fall apart."},
+  {id:'I03',pole:'Integration',axis:'Integration',reverse:true,
+   text:"Attending to the past and the future makes it hard for me to be present."},
+  {id:'I05',pole:'Integration',axis:'Integration',reverse:true,
+   text:"Pursuing depth in one area of my life requires me to sacrifice connection in another."},
+  {id:'I07',pole:'Integration',axis:'Integration',reverse:true,
+   text:"Caring about the long term exhausts my capacity for dealing with the present."},
+  {id:'I09',pole:'Integration',axis:'Integration',reverse:true,
+   text:"When one area of life demands my full attention, other areas necessarily collapse."},
+  {id:'I11',pole:'Integration',axis:'Integration',reverse:true,
+   text:"Trying to maintain orientation on too many things at once causes me to lose all of them."},
+];
+
+const POLE_INFO = {
+  Ohn:    {axis:'Vertical',  label:'Depth (Ohn)',     direction:'negative'},
+  Hoc:    {axis:'Vertical',  label:'Surface (Hoc)',   direction:'positive'},
+  Him:    {axis:'Horizontal',label:'Singular (Him)',  direction:'negative'},
+  Allmen: {axis:'Horizontal',label:'Plural (Allmen)', direction:'positive'},
+  Wasonce:{axis:'Temporal',  label:'Past (Wasonce)',  direction:'negative'},
+  Willbe: {axis:'Temporal',  label:'Future (Willbe)', direction:'positive'},
+};
+
+const ZONES = {
+  I:    {n:'I',   name:'The Performer',
+         char:'Surface, singular, present-locked. Isolated, high-function, meaningless.',
+         v:'surface',h:'singular',t:'collapsed'},
+  II:   {n:'II',  name:'The Crowd',
+         char:'Surface, plural, present-locked. Diffuse, socially active, rootless.',
+         v:'surface',h:'plural',  t:'collapsed'},
+  III:  {n:'III', name:'The Mystic',
+         char:'Deep, singular, present-locked. Source contact without social integration or temporal obligation.',
+         v:'deep',   h:'singular',t:'collapsed'},
+  IV:   {n:'IV',  name:'The Congregation',
+         char:'Deep, plural, present-locked. Communal depth without historical grounding.',
+         v:'deep',   h:'plural',  t:'collapsed'},
+  V:    {n:'V',   name:'The Archivist',
+         char:'Surface, singular, temporally active. Historical individualism — the lone ancestor-bearer.',
+         v:'surface',h:'singular',t:'active'},
+  VI:   {n:'VI',  name:'The Tradition',
+         char:'Surface, plural, temporally active. Cultural tradition without depth.',
+         v:'surface',h:'plural',  t:'active'},
+  VII:  {n:'VII', name:'The Prophet',
+         char:'Deep, singular, temporally active. Prophetic isolation — depth and obligation but no community.',
+         v:'deep',   h:'singular',t:'active'},
+  VIII: {n:'VIII',name:'The Somey',
+         char:'Deep, plural, temporally active. Full integration — contact with source, with others, with time.',
+         v:'deep',   h:'plural',  t:'active'},
+};
+
+const SUBTYPES = {
+  I: [
+    {name:'The Optimizer',desc:'Peak performance as purpose replacement.',bias:[0,0,0.5]},
+    {name:'The Ghost',    desc:'Functional dissociation. Present in the room, absent from experience.',bias:[0,-0.3,0.3]},
+    {name:'The Competitor',desc:'Identity through opposition. The self exists only against something.',bias:[0,-0.5,0.2]},
+  ],
+  II: [
+    {name:'The Mirror',   desc:'Identity shifts to match whoever is in the room.',bias:[0,0.5,0.3]},
+    {name:'The Influencer',desc:'Social presence as substitute for self. Audience as identity.',bias:[0,0.3,0.5]},
+    {name:'The Swarm',    desc:'Group identity without individual moral discernment.',bias:[0,0.5,0.5]},
+  ],
+  III: [
+    {name:'The Hermit',   desc:'Genuine depth contact, total withdrawal from the horizontal.',bias:[0,-0.5,-0.5]},
+    {name:'The Psychonaut',desc:'Depth through altered states. No integration.',bias:[0,-0.3,-0.3]},
+    {name:'The Sage Trap',desc:'Depth contact weaponized as superiority.',bias:[0,-0.5,-0.3]},
+  ],
+  IV: [
+    {name:'The Revival',  desc:'Intense communal spiritual experience. No history. No tomorrow.',bias:[0,0.5,-0.5]},
+    {name:'The Circle',   desc:'Authentic community depth that reinvents the wheel every generation.',bias:[0,0.3,-0.3]},
+    {name:'The Greenhouse',desc:'Genuine transformation in a sealed environment. No export.',bias:[0,0.3,-0.5]},
+  ],
+  V: [
+    {name:'The Burden-Bearer',desc:'Carries generational weight alone. Cannot put it down.',bias:[-0.3,-0.3,0.3]},
+    {name:'The Historian',desc:'Knows everything about what happened. Connects to nothing deeper.',bias:[0,-0.3,0.5]},
+    {name:'The Sentinel', desc:'Watches the long-term consequences. Nobody is listening.',bias:[0.3,-0.3,0.3]},
+  ],
+  VI: [
+    {name:'The Custodian',desc:'Maintains form after meaning has departed.',bias:[-0.3,0.3,0.3]},
+    {name:'The Monument', desc:'Collective identity through heritage performance rather than living practice.',bias:[0,0.5,0.3]},
+    {name:'The Institution',desc:'Organizational memory without living purpose.',bias:[0,0.3,0.5]},
+  ],
+  VII: [
+    {name:'The Visionary',desc:'Genuine sight. Genuine isolation. The framework without the room.',bias:[0,-0.5,-0.3]},
+    {name:'The Martyr',   desc:'Depth and obligation without community. Sacrificial by structure.',bias:[-0.3,-0.5,-0.3]},
+    {name:'The Builder',  desc:'Creates the architecture nobody has been invited into.',bias:[0.3,-0.3,-0.5]},
+  ],
+  VIII: [
+    {name:'The Moment',   desc:'Temporary full orientation. Cannot be held. Can be recognized.',bias:[0,0,0]},
+    {name:'The Elder',    desc:'Sustained practice across all three axes. Never permanent. Always returning.',bias:[0,0,-0.2]},
+    {name:'The Bridge',   desc:'Connects shards. Facilitates the assembly without directing it.',bias:[0,0.2,0]},
+  ],
+};
+
+const EDGE_NAMES = {
+  // sorted-pair key → name
+  'Ohn|Him':      'The Consumed Contemplative',
+  'Allmen|Ohn':   'The Ecstatic Gathering',
+  'Him|Hoc':      'The High-Performing Loner',
+  'Allmen|Hoc':   'The Scroll',
+  'Ohn|Wasonce':  'The Archival Mystic',
+  'Ohn|Willbe':   'The Visionary Prophet',
+  'Hoc|Wasonce':  'The Nostalgist',
+  'Hoc|Willbe':   'The Techno-Optimist',
+  'Him|Wasonce':  'The Duty-Bound Loner',
+  'Him|Willbe':   'The Absent Builder',
+  'Allmen|Wasonce':'The Empty Ceremony',
+  'Allmen|Willbe':'The Hollow Movement',
+};
+
+const STAMPS = {
+  Scarcity: {
+    desc:'Famine, poverty, or resource deprivation sustained across generations. Produces a tight, angular interior where depth and trust are costs the system cannot afford.',
+    weights:[0.2, 0.8, -0.6, -0.2, -0.5, 0.1],
+    effect:'compression',v_bias:'surface',h_bias:'singular',t_bias:'past',
+  },
+  Displacement: {
+    desc:'Forced migration, exile, cultural severance across generations. Survival-mode surface fused with clinging to displaced community; both ends of the temporal axis severed.',
+    weights:[0.1, 0.7, -0.3, 0.6, -0.1, -0.1],
+    effect:'compression',v_bias:'surface',h_bias:'plural',t_bias:'collapsed',
+  },
+  Violence: {
+    desc:'Sustained exposure to violence across generations. Dissociation from depth, hypervigilance toward the past, horizontal axis fractured rather than collapsed.',
+    weights:[0.1, 0.6, -0.1, -0.1, -0.6, 0.0],
+    effect:'fracture',v_bias:'surface',h_bias:'fractured',t_bias:'past',
+  },
+  Silencing: {
+    desc:'Sustained suppression of voice, truth, identity, or expression. Depth is present but inverted (toxic), horizontal oscillation operates through a performative false self.',
+    weights:[-0.4, 0.3, -0.2, 0.2, -0.1, 0.0],
+    effect:'inversion',v_bias:'inverted',h_bias:'performative',t_bias:'neutral',
+  },
+  Abandonment: {
+    desc:'Parental absence, repeated relational severing across generations. Depth accessible but unshared; recoil from connection; orientation toward the next thing rather than the present.',
+    weights:[0.2, 0.2, -0.6, -0.3, 0.0, 0.5],
+    effect:'compression',v_bias:'unfunded',h_bias:'singular',t_bias:'future',
+  },
+};
+
+// =============================================================================
+// ENGINE — ported from tot_engine.py
+// =============================================================================
+const Engine = (function(){
+  const TEMPORAL_THRESHOLD = 0.35;
+  const POLE_ORDER = ['Ohn','Hoc','Him','Allmen','Wasonce','Willbe'];
+
+  function mean(arr){return arr.length? arr.reduce((a,b)=>a+b,0)/arr.length : 0;}
+  function clamp(x,lo,hi){return Math.max(lo,Math.min(hi,x));}
+
+  // Lanczos gamma function approximation (for interior volume)
+  function gamma(z){
+    const g = 7;
+    const c = [0.99999999999980993,676.5203681218851,-1259.1392167224028,
+               771.32342877765313,-176.61502916214059,12.507343278686905,
+               -0.13857109526572012,9.9843695780195716e-6,1.5056327351493116e-7];
+    if(z<0.5) return Math.PI/(Math.sin(Math.PI*z)*gamma(1-z));
+    z-=1; let x=c[0];
+    for(let i=1;i<g+2;i++) x+=c[i]/(z+i);
+    const t = z+g+0.5;
+    return Math.sqrt(2*Math.PI)*Math.pow(t,z+0.5)*Math.exp(-t)*x;
+  }
+
+  function scoreResponses(responses){
+    const buckets = {Ohn:[],Hoc:[],Him:[],Allmen:[],Wasonce:[],Willbe:[]};
+    const integrationScores = [];
+    for(const item of ITEMS){
+      const raw = responses[item.id];
+      if(raw==null) continue;
+      const norm = (raw-1)/6.0; // 0..1
+      if(item.pole==='Integration'){
+        const v = item.reverse ? 1-norm : norm;
+        integrationScores.push(v);
+      } else {
+        buckets[item.pole].push(norm);
+      }
+    }
+    const poles = {};
+    for(const p of POLE_ORDER) poles[p] = buckets[p].length ? mean(buckets[p]) : 0.5;
+    return {poles, integrationScores};
+  }
+
+  function computeAxes(poles){
+    return {
+      vertical: poles.Hoc - poles.Ohn,
+      horizontal: poles.Allmen - poles.Him,
+      temporal_extension: (poles.Wasonce + poles.Willbe)/2,
+      temporal_balance: poles.Willbe - poles.Wasonce,
+    };
+  }
+
+  function classifyZone(axes){
+    const isDeep = axes.vertical < 0;
+    const isPlural = axes.horizontal > 0;
+    const isTemporal = axes.temporal_extension > TEMPORAL_THRESHOLD;
+    const confidence = Math.min(
+      Math.abs(axes.vertical),
+      Math.abs(axes.horizontal),
+      Math.abs(axes.temporal_extension - TEMPORAL_THRESHOLD)
+    );
+    let z;
+    if(isDeep && isPlural && isTemporal) z='VIII';
+    else if(isDeep && !isPlural && isTemporal) z='VII';
+    else if(!isDeep && isPlural && isTemporal) z='VI';
+    else if(!isDeep && !isPlural && isTemporal) z='V';
+    else if(isDeep && isPlural && !isTemporal) z='IV';
+    else if(isDeep && !isPlural && !isTemporal) z='III';
+    else if(!isDeep && isPlural && !isTemporal) z='II';
+    else z='I';
+    return {zone:z, confidence};
+  }
+
+  function matchSubtype(zoneKey, axes){
+    const zdef = ZONES[zoneKey];
+    const center = [
+      zdef.h==='plural'  ? 0.5 : -0.5,
+      0.0,
+      zdef.v==='surface' ? 0.5 : -0.5,
+    ];
+    const pos = [axes.horizontal, axes.temporal_balance, axes.vertical];
+    const distances = SUBTYPES[zoneKey].map(s=>{
+      const target = [center[0]+s.bias[0], center[1]+s.bias[1], center[2]+s.bias[2]];
+      const d = Math.hypot(pos[0]-target[0], pos[1]-target[1], pos[2]-target[2]);
+      return {name:s.name, desc:s.desc, distance:d};
+    });
+    distances.sort((a,b)=>a.distance-b.distance);
+    return {primary:distances[0], all:distances};
+  }
+
+  function shapeFromIntegrationMean(mInt){
+    if(mInt<=0.5) return 0.5 + mInt;
+    if(mInt<=0.75) return 1.0 + (mInt-0.5)*4.0;
+    return 2.0 + (mInt-0.75)*8.0;
+  }
+
+  function estimateShapeSelfReport(intScores){
+    if(!intScores.length) return 1.0;
+    return clamp(shapeFromIntegrationMean(mean(intScores)), 0.3, 5.0);
+  }
+
+  function estimateShapeEmpirical(poles){
+    const arr = POLE_ORDER.map(p=>poles[p]);
+    const activeArr = arr.filter(v=>v>0.5);
+    const activeCount = activeArr.length;
+    const activeMean = activeCount ? mean(activeArr) : 0;
+    const total = arr.reduce((a,b)=>a+b,0) + 1e-10;
+    let entropy = 0;
+    for(const v of arr){ const p = v/total; entropy -= p * Math.log(p + 1e-10); }
+    const normEntropy = entropy / Math.log(6);
+    const countSignal = activeCount/6;
+    const signal = 0.4*countSignal + 0.3*activeMean + 0.3*normEntropy;
+    return clamp(shapeFromIntegrationMean(signal), 0.3, 5.0);
+  }
+
+  function axisHealth(a, b){
+    const peak = Math.max(a,b);
+    const floor = Math.min(a,b);
+    return clamp(peak*0.7 + floor*0.5*0.3 + floor*0.1, 0, 1);
+  }
+
+  function asymmetricGeometry(poles, pSelfReport, primaryStamp){
+    const vH = axisHealth(poles.Ohn, poles.Hoc);
+    const hH = axisHealth(poles.Him, poles.Allmen);
+    const tH = axisHealth(poles.Wasonce, poles.Willbe);
+    const vS = 0.3 + 0.7*vH;
+    const hS = 0.3 + 0.7*hH;
+    const tS = 0.3 + 0.7*tH;
+    const pBase = estimateShapeEmpirical(poles);
+    const p_vh = pBase * Math.pow(vH*hH, 0.3);
+    const p_vt = pBase * Math.pow(vH*tH, 0.3);
+    const p_ht = pBase * Math.pow(hH*tH, 0.3);
+    const pGlobal = 0.4*pSelfReport + 0.6*pBase;
+    const healths = {'Vertical (Depth)':vH,'Horizontal (Breath)':hH,'Temporal (Obligation)':tH};
+    const entries = Object.entries(healths);
+    entries.sort((a,b)=>a[1]-b[1]);
+    const weakest = entries[0][0];
+    const strongest = entries[entries.length-1][0];
+    const imbalance = entries[entries.length-1][1] - entries[0][1];
+    const meanHealth = (vH+hH+tH)/3;
+    const deformations = [];
+    if(imbalance > 0.25) deformations.push(`Axial Compression (${weakest.split('(')[0].trim()} compressed)`);
+    if(primaryStamp){
+      const s = STAMPS[primaryStamp];
+      if(s.effect==='fracture') deformations.push(`Axial Fracture (${s.h_bias} horizontal)`);
+      if(s.effect==='inversion') deformations.push(`Polar Inversion (${s.v_bias} vertical)`);
+    }
+    if(meanHealth < 0.4) deformations.push('Volumetric Collapse (global shrinkage)');
+    if(entries[entries.length-1][1] > 0.8 && entries[0][1] < 0.4) deformations.push('Planar Skew (asymmetric distortion)');
+    return {
+      v_health:vH, h_health:hH, t_health:tH,
+      v_scale:vS, h_scale:hS, t_scale:tS,
+      p_vh, p_vt, p_ht,
+      p_global:pGlobal, p_empirical:pBase, p_self_report:pSelfReport,
+      weakest_axis:weakest, strongest_axis:strongest,
+      axis_imbalance:imbalance, mean_health:meanHealth,
+      deformations,
+    };
+  }
+
+  function shapeName(p){
+    if(p<0.8) return 'Suboctahedron (Crisis)';
+    if(p<1.2) return 'Octahedron (Constrained)';
+    if(p<1.8) return 'Rounded Octahedron (Functional)';
+    if(p<2.3) return 'Sphere (Integrated)';
+    return 'Hyperround (Generative)';
+  }
+
+  function interiorVolume(p){
+    try{
+      return 8.0 * Math.pow(gamma(1+1/p),3) / gamma(1+3/p);
+    } catch(e){return 0;}
+  }
+
+  function analyzeCaptures(poles, axes){
+    const arr = POLE_ORDER.map(p=>poles[p]);
+    const vertexNames = {
+      Ohn:'Ground (Consumed Mystic)',
+      Hoc:'Surface (Flat Performer)',
+      Him:'Singular (Sealed Self)',
+      Allmen:'Collective (Dissolved)',
+      Wasonce:'Ancestral (Haunted)',
+      Willbe:'Futural (Ungrounded Visionary)',
+    };
+    const vertex = {};
+    let maxV=0, maxVName='';
+    POLE_ORDER.forEach((p,i)=>{
+      const others = arr.filter((_,j)=>j!==i);
+      const otherMean = mean(others);
+      const dominance = clamp(arr[i]-otherMean, 0, 1);
+      vertex[vertexNames[p]] = dominance;
+      if(dominance>maxV){ maxV=dominance; maxVName=vertexNames[p]; }
+    });
+
+    const edges = [
+      ['Ohn','Him'],['Ohn','Allmen'],['Hoc','Him'],['Hoc','Allmen'],
+      ['Ohn','Wasonce'],['Ohn','Willbe'],['Hoc','Wasonce'],['Hoc','Willbe'],
+      ['Him','Wasonce'],['Him','Willbe'],['Allmen','Wasonce'],['Allmen','Willbe'],
+    ];
+    const edgeProx = {};
+    let maxE=0, maxEName='';
+    edges.forEach(([a,b])=>{
+      const ia = POLE_ORDER.indexOf(a), ib = POLE_ORDER.indexOf(b);
+      const pair = (arr[ia]+arr[ib])/2;
+      const others = arr.filter((_,j)=>j!==ia && j!==ib);
+      const dominance = clamp(pair - mean(others), 0, 1);
+      const key = [a,b].sort().join('|');
+      const name = EDGE_NAMES[key] || `${a}-${b}`;
+      edgeProx[name] = dominance;
+      if(dominance>maxE){ maxE=dominance; maxEName=name; }
+    });
+
+    const faceProx = {};
+    Object.entries(ZONES).forEach(([k,zdef])=>{
+      const v_match = zdef.v==='deep' ? (1-axes.vertical)/2 : (1+axes.vertical)/2;
+      const h_match = zdef.h==='plural' ? (1+axes.horizontal)/2 : (1-axes.horizontal)/2;
+      const t_match = zdef.t==='active' ? axes.temporal_extension : 1-axes.temporal_extension;
+      faceProx[`Zone ${zdef.n}: ${zdef.name}`] = (v_match+h_match+t_match)/3;
+    });
+    const maxFaceEntry = Object.entries(faceProx).reduce((a,b)=>a[1]>b[1]?a:b);
+    const maxFaceVal = maxFaceEntry[1];
+
+    let type='None', primary='None', intensity=0;
+    if(maxV > 0.6){ type='Vertex'; primary=maxVName; intensity=maxV; }
+    else if(maxE > 0.5){ type='Edge'; primary=maxEName; intensity=maxE; }
+    else if(maxFaceVal > 0.7){ type='Face'; primary=maxFaceEntry[0]; intensity=maxFaceVal; }
+
+    return {type, primary, intensity, vertex, edge:edgeProx, face:faceProx};
+  }
+
+  function detectStamps(poles){
+    const arr = POLE_ORDER.map(p=>poles[p]);
+    const scores = {};
+    const detected = [];
+    for(const [name,sdef] of Object.entries(STAMPS)){
+      const w = sdef.weights;
+      let raw=0;
+      for(let i=0;i<6;i++) raw += arr[i]*w[i];
+      const maxPossible = w.reduce((a,b)=>a+Math.abs(b),0);
+      const norm = maxPossible>0 ? (raw + maxPossible)/(2*maxPossible) : 0.5;
+      scores[name] = norm;
+      if(norm > 0.40) detected.push({name, score:norm});
+    }
+    detected.sort((a,b)=>b.score-a.score);
+    return {scores, detected, primary: detected.length ? detected[0].name : null};
+  }
+
+  function computeProfile(responses, participantId){
+    const {poles, integrationScores} = scoreResponses(responses);
+    const axes = computeAxes(poles);
+    const {zone, confidence} = classifyZone(axes);
+    const subtype = matchSubtype(zone, axes);
+    const pSelf = estimateShapeSelfReport(integrationScores);
+    const stamps = detectStamps(poles);
+    const geometry = asymmetricGeometry(poles, pSelf, stamps.primary);
+    const shapeParameter = geometry.p_global;
+    const captures = analyzeCaptures(poles, axes);
+    return {
+      participant_id: participantId,
+      timestamp: new Date().toISOString(),
+      responses,
+      poles, axes,
+      zone, zone_def: ZONES[zone], zone_confidence: confidence,
+      subtype,
+      shape_parameter: shapeParameter,
+      shape_name: shapeName(shapeParameter),
+      interior_volume: interiorVolume(shapeParameter),
+      geometry,
+      captures,
+      stamps,
+    };
+  }
+
+  return {computeProfile, scoreResponses, POLE_ORDER};
+})();
+
+// =============================================================================
+// VISUALIZATIONS — SVG, no dependencies
+// =============================================================================
+const Viz = (function(){
+
+  function octahedronSVG(geometry, axes){
+    // Isometric projection of a deformed octahedron with per-axis scale.
+    // Plus a position marker at the participant's location.
+    const W=320, H=300, cx=W/2, cy=H/2+10;
+    const k = 75; // base unit length
+    // Per-axis scale
+    const sx = geometry.h_scale; // horizontal → screen X
+    const sy = geometry.t_scale; // temporal   → in/out (we'll fold into x)
+    const sz = geometry.v_scale; // vertical   → screen Y
+
+    // Isometric: x' = (x - y*0.5)*k, y' = (-z + (x+y)*0.25)*k
+    function proj(x,y,z){
+      const X = cx + (x - y*0.5)*k;
+      const Y = cy + (-z + (x+y)*0.25)*k * -1;
+      return [X, Y];
+    }
+
+    // Vertices of the deformed octahedron
+    const V = {
+      Allmen:  proj( sx, 0, 0),
+      Him:     proj(-sx, 0, 0),
+      Willbe:  proj( 0, sy, 0),
+      Wasonce: proj( 0,-sy, 0),
+      Hoc:     proj( 0, 0, sz),
+      Ohn:     proj( 0, 0,-sz),
+    };
+    // Reference (ghost) octahedron at unit scale
+    const G = {
+      Allmen:  proj( 1, 0, 0),
+      Him:     proj(-1, 0, 0),
+      Willbe:  proj( 0, 1, 0),
+      Wasonce: proj( 0,-1, 0),
+      Hoc:     proj( 0, 0, 1),
+      Ohn:     proj( 0, 0,-1),
+    };
+
+    const edges = [
+      ['Allmen','Willbe'],['Allmen','Wasonce'],['Allmen','Hoc'],['Allmen','Ohn'],
+      ['Him','Willbe'],   ['Him','Wasonce'],   ['Him','Hoc'],   ['Him','Ohn'],
+      ['Willbe','Hoc'],   ['Willbe','Ohn'],    ['Wasonce','Hoc'],['Wasonce','Ohn'],
+    ];
+
+    // Participant position: (horizontal, temporal_balance, vertical)
+    // Map to deformed coords by scaling
+    const px = axes.horizontal * geometry.h_scale;
+    const py = axes.temporal_balance * geometry.t_scale;
+    const pz = axes.vertical * geometry.v_scale; // vertical: -=deep
+    const [PX, PY] = proj(px, py, pz);
+
+    let svg = `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;">`;
+    // ghost wireframe
+    svg += `<g stroke="rgba(120,200,255,.18)" stroke-width="1" fill="none">`;
+    for(const [a,b] of edges){
+      svg += `<line x1="${G[a][0]}" y1="${G[a][1]}" x2="${G[b][0]}" y2="${G[b][1]}" stroke-dasharray="2 3"/>`;
+    }
+    svg += `</g>`;
+    // deformed wireframe
+    svg += `<g stroke="rgba(255,140,220,.85)" stroke-width="1.5" fill="none">`;
+    for(const [a,b] of edges){
+      svg += `<line x1="${V[a][0]}" y1="${V[a][1]}" x2="${V[b][0]}" y2="${V[b][1]}"/>`;
+    }
+    svg += `</g>`;
+    // vertex labels
+    const labels = [
+      ['Allmen', V.Allmen, 'end'],
+      ['Him',    V.Him,    'start'],
+      ['Willbe', V.Willbe, 'middle'],
+      ['Wasonce',V.Wasonce,'middle'],
+      ['Hoc',    V.Hoc,    'middle'],
+      ['Ohn',    V.Ohn,    'middle'],
+    ];
+    svg += `<g font-family="Courier New, monospace" font-size="9" fill="#9c93c6" letter-spacing="1">`;
+    for(const [t,[x,y],anchor] of labels){
+      const dx = anchor==='end'?-6:anchor==='start'?6:0;
+      const dy = (t==='Hoc'?-8:t==='Ohn'?14:0);
+      svg += `<text x="${x+dx}" y="${y+dy}" text-anchor="${anchor}">${t.toUpperCase()}</text>`;
+    }
+    svg += `</g>`;
+    // axis lines through origin (faint)
+    const O = proj(0,0,0);
+    svg += `<g stroke="rgba(255,255,255,.06)" stroke-width="1">`;
+    svg += `<line x1="${V.Him[0]}" y1="${V.Him[1]}" x2="${V.Allmen[0]}" y2="${V.Allmen[1]}"/>`;
+    svg += `<line x1="${V.Wasonce[0]}" y1="${V.Wasonce[1]}" x2="${V.Willbe[0]}" y2="${V.Willbe[1]}"/>`;
+    svg += `<line x1="${V.Ohn[0]}" y1="${V.Ohn[1]}" x2="${V.Hoc[0]}" y2="${V.Hoc[1]}"/>`;
+    svg += `</g>`;
+    // origin
+    svg += `<circle cx="${O[0]}" cy="${O[1]}" r="2" fill="rgba(255,255,255,.3)"/>`;
+    // participant marker
+    svg += `<circle cx="${PX}" cy="${PY}" r="8" fill="rgba(128,255,255,.18)" stroke="rgba(128,255,255,1)" stroke-width="2"/>`;
+    svg += `<circle cx="${PX}" cy="${PY}" r="3" fill="rgba(255,80,220,1)"/>`;
+    svg += `</svg>`;
+    return svg;
+  }
+
+  function radarSVG(poles){
+    const W=320, H=300, cx=W/2, cy=H/2;
+    const R = 95;
+    const poleOrder = ['Ohn','Willbe','Allmen','Hoc','Wasonce','Him'];
+    const pts = poleOrder.map((p,i)=>{
+      const theta = -Math.PI/2 + i*(2*Math.PI/6);
+      const r = poles[p] * R;
+      return [cx + Math.cos(theta)*r, cy + Math.sin(theta)*r];
+    });
+    let svg = `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;">`;
+    // grid rings
+    for(let k=1;k<=4;k++){
+      const ringPts = poleOrder.map((p,i)=>{
+        const theta = -Math.PI/2 + i*(2*Math.PI/6);
+        const r = R * (k/4);
+        return `${cx + Math.cos(theta)*r},${cy + Math.sin(theta)*r}`;
+      }).join(' ');
+      svg += `<polygon points="${ringPts}" fill="none" stroke="rgba(120,200,255,.12)"/>`;
+    }
+    // spokes
+    poleOrder.forEach((p,i)=>{
+      const theta = -Math.PI/2 + i*(2*Math.PI/6);
+      const x = cx + Math.cos(theta)*R;
+      const y = cy + Math.sin(theta)*R;
+      svg += `<line x1="${cx}" y1="${cy}" x2="${x}" y2="${y}" stroke="rgba(120,200,255,.12)"/>`;
+      const lx = cx + Math.cos(theta)*(R+18);
+      const ly = cy + Math.sin(theta)*(R+18);
+      svg += `<text x="${lx}" y="${ly+3}" text-anchor="middle" font-family="Courier New, monospace" font-size="9" fill="#9c93c6" letter-spacing="1">${p.toUpperCase()}</text>`;
+    });
+    // data polygon
+    const ptsStr = pts.map(p=>p.join(',')).join(' ');
+    svg += `<polygon points="${ptsStr}" fill="rgba(255,80,220,.22)" stroke="rgba(255,80,220,1)" stroke-width="1.5"/>`;
+    pts.forEach(([x,y])=>{
+      svg += `<circle cx="${x}" cy="${y}" r="3" fill="rgba(128,255,255,1)"/>`;
+    });
+    svg += `</svg>`;
+    return svg;
+  }
+
+  return {octahedronSVG, radarSVG};
+})();
+
+// =============================================================================
+// REPORT RENDERING
+// =============================================================================
+const Report = (function(){
+
+  function pct(v){return (v*100).toFixed(1)+'%';}
+  function num(v,d=2){return Number(v).toFixed(d);}
+
+  function bar(label, value, klass=''){
+    const w = Math.max(0, Math.min(1, value)) * 100;
+    return `<div class="bar-row">
+      <div class="bar-label">${label}</div>
+      <div class="bar-track"><div class="bar-fill ${klass}" style="width:${w}%"></div></div>
+      <div class="bar-val">${value.toFixed(2)}</div>
+    </div>`;
+  }
+
+  function signedBar(label, value){
+    const v = Math.max(-1, Math.min(1, value));
+    const left = v >= 0 ? 50 : 50 + v*50;
+    const w = Math.abs(v)*50;
+    return `<div class="bar-row">
+      <div class="bar-label">${label}</div>
+      <div class="signed-track"><div class="signed-fill" style="left:${left}%;width:${w}%"></div></div>
+      <div class="bar-val">${v>=0?'+':''}${v.toFixed(2)}</div>
+    </div>`;
+  }
+
+  function topN(obj, n=5){
+    return Object.entries(obj)
+      .sort((a,b)=>b[1]-a[1])
+      .slice(0,n);
+  }
+
+  function captureTable(obj, n){
+    const rows = topN(obj, n).map(([k,v])=>
+      `<tr><td>${k}</td><td class="num">${v.toFixed(3)}</td></tr>`
+    ).join('');
+    return `<table class="cap-table"><tr><th>Position</th><th style="text-align:right;">Proximity</th></tr>${rows}</table>`;
+  }
+
+  function narrativeFor(profile){
+    const z = profile.zone_def;
+    const st = profile.subtype.primary;
+    const g = profile.geometry;
+    const sp = profile.shape_parameter;
+    const stamp = profile.stamps.primary;
+    const cap = profile.captures;
+
+    const parts = [];
+    parts.push(`<p>This profile occupies <strong>Zone ${z.n}: ${z.name}</strong> — ${z.char.toLowerCase()} Within that zone, the closest subtype match is <strong>${st.name}</strong>: ${st.desc.toLowerCase()}</p>`);
+
+    let shapeLine;
+    if(sp < 1.2)      shapeLine = `The interior shape is constrained (p = ${num(sp)}). Holding multiple orientations at once is genuinely expensive — each axis tends to come at the cost of another.`;
+    else if(sp < 1.8) shapeLine = `The interior shape is functional but stretched (p = ${num(sp)}). Two axes can be held with effort; the third tends to give way under load.`;
+    else if(sp < 2.3) shapeLine = `The interior shape is integrated (p ≈ ${num(sp)}, near-spherical). All three axes can be active simultaneously without one collapsing the others.`;
+    else              shapeLine = `The interior shape is generative (p = ${num(sp)}). Orientations reinforce rather than trade off — a rare configuration.`;
+    parts.push(`<p>${shapeLine} The strongest axis is <strong>${g.strongest_axis}</strong>; the weakest is <strong>${g.weakest_axis}</strong>${g.axis_imbalance > 0.25 ? ' (an imbalance large enough to register as axial compression)' : ''}.</p>`);
+
+    if(g.deformations.length){
+      parts.push(`<p>Detected geometric deformations: <strong>${g.deformations.join('; ')}</strong>. These describe how the interior space differs from a symmetric octahedron — collapsed regions, fractures, or asymmetric distortions in the boundary surface.</p>`);
+    }
+
+    if(cap.type !== 'None'){
+      parts.push(`<p>A <strong>${cap.type} Capture</strong> is present at <em>${cap.primary}</em> (intensity ${num(cap.intensity)}). Capture describes the gravitational pull of a particular position — being held there rather than moving freely through the interior.</p>`);
+    } else {
+      parts.push(`<p>No strong capture is detected. The position is mobile rather than fixed — orientation can shift across the interior without being pinned to a single vertex, edge, or face.</p>`);
+    }
+
+    if(stamp){
+      const s = STAMPS[stamp];
+      parts.push(`<p>The dominant inherited signature is the <strong>${stamp} Stamp</strong>. ${s.desc} A detected stamp does <em>not</em> mean the originating condition was experienced personally — it means the interior geometry carries the signature deformation pattern associated with that condition.</p>`);
+    } else {
+      parts.push(`<p>No stamp signature reaches detection threshold. The interior is not strongly patterned by any of the five inherited deformation profiles.</p>`);
+    }
+    return parts.join('');
+  }
+
+  function render(profile){
+    const g = profile.geometry;
+    const z = profile.zone_def;
+    const st = profile.subtype;
+    const cap = profile.captures;
+    const stamps = profile.stamps;
+    const p = profile.poles;
+
+    let html = '';
+
+    // ── SUMMARY ──
+    html += `<div class="panel">
+      <h2>Summary</h2>
+      <div class="summary-grid">
+        <div class="summary-cell"><div class="label">Zone</div>
+          <div class="value">${z.n}</div><div class="sub">${z.name}</div></div>
+        <div class="summary-cell"><div class="label">Subtype</div>
+          <div class="value">${st.primary.name}</div><div class="sub">d = ${num(st.primary.distance,3)}</div></div>
+        <div class="summary-cell"><div class="label">Shape</div>
+          <div class="value">p = ${num(profile.shape_parameter)}</div><div class="sub">${profile.shape_name}</div></div>
+        <div class="summary-cell"><div class="label">Capture</div>
+          <div class="value">${cap.type}</div><div class="sub">${cap.type!=='None' ? cap.primary : '—'}</div></div>
+        <div class="summary-cell"><div class="label">Primary Stamp</div>
+          <div class="value">${stamps.primary || 'None'}</div>
+          <div class="sub">${stamps.primary ? num(stamps.scores[stamps.primary],2) : '—'}</div></div>
+        <div class="summary-cell"><div class="label">Interior Volume</div>
+          <div class="value">${num(profile.interior_volume,3)}</div>
+          <div class="sub">Lp unit ball</div></div>
+      </div>
+    </div>`;
+
+    // ── VISUALIZATIONS ──
+    html += `<div class="panel">
+      <h2>Geometry</h2>
+      <div class="viz-grid">
+        <div class="viz-box">
+          <div class="viz-title">Deformed Octahedron</div>
+          ${Viz.octahedronSVG(g, profile.axes)}
+          <div class="faint mono" style="font-size:10px;margin-top:6px;">
+            Ghost wireframe = reference. Solid = your interior.<br>
+            Marker = your position inside it.
+          </div>
+        </div>
+        <div class="viz-box">
+          <div class="viz-title">Pole Radar</div>
+          ${Viz.radarSVG(p)}
+          <div class="faint mono" style="font-size:10px;margin-top:6px;">
+            Six poles. Higher reach = stronger orientation toward that pole.
+          </div>
+        </div>
+      </div>
+    </div>`;
+
+    // ── ZONE ──
+    html += `<div class="panel">
+      <h2>Zone Classification</h2>
+      <div class="zone-box">
+        <div class="zone-name">Zone ${z.n} · ${z.name}</div>
+        <div class="zone-char">${z.char}</div>
+        <div class="faint mono" style="font-size:11px;margin-top:8px;letter-spacing:2px;">
+          V = ${z.v.toUpperCase()} · H = ${z.h.toUpperCase()} · T = ${z.t.toUpperCase()}
+          · CONFIDENCE = ${num(profile.zone_confidence,3)}
+        </div>
+      </div>
+    </div>`;
+
+    // ── SUBTYPE ──
+    html += `<div class="panel">
+      <h2>Subtype Match</h2>`;
+    st.all.forEach((s,i)=>{
+      html += `<div class="subtype-box ${i===0?'primary':''}">
+        <div class="st-name">${i===0?'▸ ':''}${s.name}</div>
+        <div class="st-desc">${s.desc}</div>
+        <div class="st-dist">DISTANCE: ${num(s.distance,3)}${i===0?' · PRIMARY':''}</div>
+      </div>`;
+    });
+    html += `</div>`;
+
+    // ── POLE SCORES ──
+    html += `<div class="panel">
+      <h2>Pole Scores</h2>
+      <h3>Vertical Axis · Depth</h3>
+      ${bar('Ohn (Depth)',    p.Ohn)}
+      ${bar('Hoc (Surface)',  p.Hoc, 'gold')}
+      <h3>Horizontal Axis · Breath</h3>
+      ${bar('Him (Singular)', p.Him)}
+      ${bar('Allmen (Plural)',p.Allmen, 'teal')}
+      <h3>Temporal Axis · Obligation</h3>
+      ${bar('Wasonce (Past)', p.Wasonce)}
+      ${bar('Willbe (Future)',p.Willbe, 'teal')}
+    </div>`;
+
+    // ── AXIS SCORES ──
+    html += `<div class="panel">
+      <h2>Axis Scores</h2>
+      <p class="faint" style="font-size:12px;margin-bottom:10px;">
+        Signed: negative = first pole, positive = second pole.
+      </p>
+      ${signedBar('Vertical (Ohn↔Hoc)',     profile.axes.vertical)}
+      ${signedBar('Horizontal (Him↔Allmen)',profile.axes.horizontal)}
+      ${signedBar('Temporal Balance',       profile.axes.temporal_balance)}
+      ${bar('Temporal Extension', profile.axes.temporal_extension, 'teal')}
+    </div>`;
+
+    // ── SHAPE / GEOMETRY DETAIL ──
+    html += `<div class="panel">
+      <h2>Shape & Asymmetric Geometry</h2>
+      <h3>Global Shape Parameter</h3>
+      <p><strong>p = ${num(profile.shape_parameter,3)}</strong> — ${profile.shape_name}</p>
+      <div class="muted" style="font-size:13px;margin-top:6px;">
+        Empirical estimate (from pole distribution): <span class="mono">${num(g.p_empirical,3)}</span>
+        · Self-report (from integration cost items): <span class="mono">${num(g.p_self_report,3)}</span>
+        · Combined (40% self-report + 60% empirical): <span class="mono">${num(g.p_global,3)}</span>
+      </div>
+
+      <h3>Per-Axis Health</h3>
+      ${bar('Vertical (Depth)',     g.v_health, 'gold')}
+      ${bar('Horizontal (Breath)',  g.h_health, 'teal')}
+      ${bar('Temporal (Obligation)',g.t_health)}
+      <div class="muted" style="font-size:12px;margin-top:6px;">
+        Strongest: <strong>${g.strongest_axis}</strong> ·
+        Weakest: <strong>${g.weakest_axis}</strong> ·
+        Imbalance: ${num(g.axis_imbalance,3)}
+      </div>
+
+      <h3>Per-Pair Exchange Rate (Sub-Shape)</h3>
+      <div class="muted mono" style="font-size:12px;">
+        Vertical↔Horizontal: <strong>p = ${num(g.p_vh,3)}</strong><br>
+        Vertical↔Temporal: <strong>p = ${num(g.p_vt,3)}</strong><br>
+        Horizontal↔Temporal: <strong>p = ${num(g.p_ht,3)}</strong>
+      </div>
+      <p class="faint" style="font-size:12px;margin-top:6px;">
+        Higher pair-p = those two axes integrate more easily with each other.
+        Lower pair-p = the exchange between them is angular (one collapses when the other extends).
+      </p>
+
+      ${g.deformations.length ? `
+        <h3>Detected Deformations</h3>
+        <ul class="deform-list">
+          ${g.deformations.map(d=>`<li>${d}</li>`).join('')}
+        </ul>` : ''}
+    </div>`;
+
+    // ── CAPTURE ──
+    html += `<div class="panel">
+      <h2>Capture Analysis</h2>
+      <p><strong>${cap.type} Capture${cap.type!=='None' ? ' — ' + cap.primary : ''}</strong>
+        ${cap.type!=='None' ? ' (intensity ' + num(cap.intensity,3) + ')' : ''}</p>
+      <p class="muted" style="font-size:13px;">
+        Capture describes the gravitational pull of a particular configuration —
+        vertex (single pole), edge (two-pole axis), or face (one zone face).
+        No capture = mobile orientation.
+      </p>
+      <h3>Top Vertex Proximities</h3>
+      ${captureTable(cap.vertex, 6)}
+      <h3>Top Edge Proximities</h3>
+      ${captureTable(cap.edge, 5)}
+      <h3>Top Face Proximities (Zones)</h3>
+      ${captureTable(cap.face, 4)}
+    </div>`;
+
+    // ── STAMPS ──
+    html += `<div class="panel">
+      <h2>Stamp Signatures</h2>
+      <p class="muted" style="font-size:13px;margin-bottom:10px;">
+        Five inherited deformation signatures. Detection threshold ≥ 0.40.
+        A detected stamp describes a geometric pattern in your interior —
+        not a personal history.
+      </p>`;
+    Object.entries(stamps.scores).sort((a,b)=>b[1]-a[1]).forEach(([name,score])=>{
+      const detected = score > 0.40;
+      const w = score*100;
+      html += `<div class="stamp-row ${detected?'detected':''}">
+        <div class="st-name">${name}${detected?' ●':''}</div>
+        <div class="st-bar"><div class="st-bar-fill" style="width:${w}%"></div></div>
+        <div class="st-val">${num(score,3)}</div>
+      </div>`;
+    });
+    if(stamps.primary){
+      html += `<h3 style="margin-top:14px;">Primary Stamp: ${stamps.primary}</h3>
+        <p style="font-size:13.5px;">${STAMPS[stamps.primary].desc}</p>`;
+    }
+    html += `</div>`;
+
+    // ── NARRATIVE ──
+    html += `<div class="panel">
+      <h2>Interpretation</h2>
+      <div class="narrative">${narrativeFor(profile)}</div>
+    </div>`;
+
+    // ── METHODOLOGY FOOTNOTE ──
+    html += `<div class="panel">
+      <h2>Notes</h2>
+      <p class="faint" style="font-size:12.5px;">
+        Instrument: Coherence Triadic Orientation Assessment — Condensed Form (36 items).
+        Based on Erickson, R. (2025), <em>Triaxial Orientation Theory</em>, Avner Media.
+        Scoring engine: pole means (0–1 normalized 7-point Likert) → signed axis scores
+        → octant zone classification (V<0 deep, H>0 plural, T_ext > 0.35 active) →
+        nearest-subtype Euclidean match within the zone interior →
+        blended shape parameter (40% self-report from reverse-coded integration items,
+        60% empirical from pole entropy + active count + active mean) →
+        per-axis health derived from per-pole peak + oscillation →
+        Lp interior volume via the gamma-function form
+        V<sub>p</sub> = 8·Γ(1+1/p)³ / Γ(1+3/p).
+      </p>
+      <p class="faint" style="font-size:12.5px;margin-top:8px;">
+        Capture detection thresholds: vertex 0.6, edge 0.5, face 0.7.
+        Stamp detection threshold: 0.40 (dot product of pole vector against
+        stamp signature weights, rescaled to 0–1).
+        Pre-validation research instrument — describes a current orientation, not a fixed type.
+      </p>
+    </div>`;
+
+    return html;
+  }
+
+  return {render};
+})();
+
+// =============================================================================
+// APPLICATION
+// =============================================================================
+const App = (function(){
+  let state = {
+    screen:'intro',
+    responses:{},
+    participantId:'',
+    profile:null,
+  };
+
+  function $(id){return document.getElementById(id);}
+
+  function show(screen){
+    state.screen = screen;
+    ['intro','assess','report'].forEach(s=>{
+      const el = $('screen-'+s);
+      if(el) el.classList.toggle('hide', s!==screen);
+    });
+    window.scrollTo(0,0);
+  }
+
+  function autoId(){
+    const r = Math.random().toString(36).slice(2,10);
+    return `p_${r}`;
+  }
+
+  function start(){
+    state.participantId = $('participant-id').value.trim() || autoId();
+    state.responses = {};
+    renderItems();
+    show('assess');
+    updateProgress();
+  }
+
+  function renderItems(){
+    const container = $('items-container');
+    container.innerHTML = ITEMS.map((item,idx)=>{
+      const v = state.responses[item.id];
+      const buttons = [1,2,3,4,5,6,7].map(n=>
+        `<button class="likert-btn ${v===n?'selected':''}"
+                 onclick="App.setResponse('${item.id}',${n})"
+                 data-item="${item.id}" data-val="${n}">${n}</button>`
+      ).join('');
+      return `<div class="item-block">
+        <div class="item-id">${idx+1} / 36 · ${item.id} · ${item.axis}</div>
+        <div class="item-text">${item.text}</div>
+        <div class="likert-row">${buttons}</div>
+        <div class="likert-labels">
+          <span>1 strongly disagree</span><span>7 strongly agree</span>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  function setResponse(id, value){
+    state.responses[id] = value;
+    // Update button visuals locally without full re-render
+    document.querySelectorAll(`.likert-btn[data-item="${id}"]`).forEach(b=>{
+      b.classList.toggle('selected', Number(b.dataset.val)===value);
+    });
+    updateProgress();
+    // Scroll to next unanswered item
+    const idx = ITEMS.findIndex(i=>i.id===id);
+    if(idx>=0 && idx<ITEMS.length-1){
+      const nextItem = ITEMS.slice(idx+1).find(i=>!state.responses[i.id]);
+      if(nextItem){
+        const el = document.querySelector(`.likert-btn[data-item="${nextItem.id}"]`);
+        if(el) el.closest('.item-block').scrollIntoView({behavior:'smooth',block:'center'});
+      }
+    }
+  }
+
+  function updateProgress(){
+    const done = Object.keys(state.responses).length;
+    const total = ITEMS.length;
+    $('progress-fill').style.width = (done/total*100)+'%';
+    $('progress-text').textContent = `${done} / ${total}${done===total ? ' · READY TO SCORE' : ''}`;
+    $('submit-btn').disabled = done < total;
+  }
+
+  function submit(){
+    if(Object.keys(state.responses).length < ITEMS.length){
+      alert(`Please complete all ${ITEMS.length} items.`);
+      return;
+    }
+    state.profile = Engine.computeProfile(state.responses, state.participantId);
+    saveToHistory(state.profile);
+    renderReport();
+    show('report');
+  }
+
+  function renderReport(){
+    const p = state.profile;
+    $('report-meta').textContent =
+      `${p.participant_id} · ${new Date(p.timestamp).toLocaleString()}`;
+    $('report-body').innerHTML = Report.render(p);
+  }
+
+  function reset(){
+    state.responses = {};
+    state.profile = null;
+    $('participant-id').value = '';
+    show('intro');
+  }
+
+  function cancel(){
+    if(!confirm('Discard current responses?')) return;
+    state.responses = {};
+    show('intro');
+  }
+
+  function exportJSON(){
+    if(!state.profile) return;
+    const blob = new Blob([JSON.stringify(state.profile,null,2)], {type:'application/json'});
+    download(blob, `coherence_${state.profile.participant_id}_${stamp()}.json`);
+  }
+
+  function exportHTML(){
+    if(!state.profile) return;
+    const logoSVG = buildLogoSVG();
+    const headerBlock = `<div class="logo-block">
+      <div class="logo-mark">${logoSVG}</div>
+      <div class="logo-text">
+        <div class="logo-title">COHERENCE</div>
+        <div class="logo-sub">Triadic Orientation Profile · ${state.profile.participant_id}</div>
+        <div class="logo-sub" style="margin-top:4px;">${new Date(state.profile.timestamp).toLocaleString()}</div>
+      </div>
+    </div>`;
+    const blob = new Blob([
+      `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Coherence Report · ${state.profile.participant_id}</title>`,
+      document.head.innerHTML,
+      `</head><body><div class="shell">`,
+      headerBlock,
+      Report.render(state.profile),
+      `</div></body></html>`
+    ], {type:'text/html'});
+    download(blob, `coherence_${state.profile.participant_id}_${stamp()}.html`);
+  }
+
+  function download(blob, filename){
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename; a.click();
+    setTimeout(()=>URL.revokeObjectURL(url), 1000);
+  }
+
+  function stamp(){
+    return new Date().toISOString().replace(/[:.]/g,'-').slice(0,19);
+  }
+
+  function saveToHistory(profile){
+    try{
+      const key = 'coherence_history_v1';
+      const arr = JSON.parse(localStorage.getItem(key) || '[]');
+      arr.push({
+        id: profile.participant_id,
+        ts: profile.timestamp,
+        zone: profile.zone,
+        zone_name: profile.zone_def.name,
+        subtype: profile.subtype.primary.name,
+        p: profile.shape_parameter,
+        shape: profile.shape_name,
+        primary_stamp: profile.stamps.primary,
+        profile,
+      });
+      // Keep last 50
+      if(arr.length>50) arr.splice(0, arr.length-50);
+      localStorage.setItem(key, JSON.stringify(arr));
+    } catch(e){console.warn('history save failed', e);}
+
+    // Fracture City: also persist each profile as a standalone file in
+    // data/coherence-assessment/profile_<id>.json so other apps in the
+    // ecosystem can consume tot.profile.v1 outputs. Emit on the bus too.
+    if (window.fracture) {
+      window.fracture.save('profile_' + profile.participant_id, profile);
+      if (window.fracture.shell) {
+        window.fracture.emit('tot.profile.v1', profile);
+      }
+    }
+  }
+
+  function loadHistory(){
+    try{
+      return JSON.parse(localStorage.getItem('coherence_history_v1') || '[]');
+    } catch(e){return [];}
+  }
+
+  function showHistory(){
+    const panel = $('history-panel');
+    const list = $('history-list');
+    const arr = loadHistory().slice().reverse();
+    if(!arr.length){
+      list.innerHTML = '<p class="faint">No past results stored locally.</p>';
+    } else {
+      list.innerHTML = arr.map((h,i)=>`
+        <div class="history-row">
+          <div>
+            <div><strong>${h.id}</strong> · Zone ${h.zone} (${h.zone_name})</div>
+            <div class="h-id">${new Date(h.ts).toLocaleString()} · ${h.subtype} · p=${Number(h.p).toFixed(2)} ${h.primary_stamp?'· '+h.primary_stamp:''}</div>
+          </div>
+          <button class="btn" onclick="App.viewHistory(${arr.length-1-i})">VIEW</button>
+        </div>`).join('');
+    }
+    panel.classList.toggle('hide');
+    $('about-panel').classList.add('hide');
+  }
+
+  function viewHistory(index){
+    const arr = loadHistory();
+    if(!arr[index]) return;
+    state.profile = arr[index].profile;
+    renderReport();
+    show('report');
+  }
+
+  function showAbout(){
+    $('about-panel').classList.toggle('hide');
+    $('history-panel').classList.add('hide');
+  }
+
+  // Keyboard: type 1-7 on focused item, Enter advances
+  function setupKeys(){
+    document.addEventListener('keydown', e=>{
+      if(state.screen !== 'assess') return;
+      if(e.target.tagName === 'INPUT') return;
+      const key = e.key;
+      if(/^[1-7]$/.test(key)){
+        // find the topmost partially visible item
+        const blocks = document.querySelectorAll('.item-block');
+        let target = null;
+        for(const b of blocks){
+          const r = b.getBoundingClientRect();
+          if(r.top > -50 && r.top < window.innerHeight*0.6){ target = b; break; }
+        }
+        if(!target) target = blocks[0];
+        const itemId = target.querySelector('.likert-btn').dataset.item;
+        setResponse(itemId, Number(key));
+        e.preventDefault();
+      }
+    });
+  }
+
+  // Boot
+  document.addEventListener('DOMContentLoaded', ()=>{
+    setupKeys();
+    paintLogos();
+  });
+
+  function buildLogoSVG(){
+    // Isometric octahedron mark. Three axes color-coded:
+    //   Vertical (Depth)        → gold
+    //   Horizontal (Breath)     → teal
+    //   Temporal (Obligation)   → magenta
+    // Rotating wireframe inside, fixed gem outline outside.
+    const cx=42, cy=42, k=28;
+    function proj(x,y,z){
+      return [
+        cx + (x - y*0.5)*k,
+        cy + (-z + (x+y)*0.25)*k * -1,
+      ];
+    }
+    const V = {
+      ax_p: proj( 1, 0, 0), ax_n: proj(-1, 0, 0),
+      tm_p: proj( 0, 1, 0), tm_n: proj( 0,-1, 0),
+      vt_p: proj( 0, 0, 1), vt_n: proj( 0, 0,-1),
+    };
+    const edges = [
+      [V.ax_p,V.tm_p],[V.ax_p,V.tm_n],[V.ax_p,V.vt_p],[V.ax_p,V.vt_n],
+      [V.ax_n,V.tm_p],[V.ax_n,V.tm_n],[V.ax_n,V.vt_p],[V.ax_n,V.vt_n],
+      [V.tm_p,V.vt_p],[V.tm_p,V.vt_n],[V.tm_n,V.vt_p],[V.tm_n,V.vt_n],
+    ];
+    // Outer hexagonal silhouette (the octahedron's iso outline) — fixed
+    const silhouette = [V.vt_p, V.ax_p, V.tm_p, V.vt_n, V.ax_n, V.tm_n]
+      .map(p=>p.join(',')).join(' ');
+    let svg = `<svg viewBox="0 0 84 84" xmlns="http://www.w3.org/2000/svg">`;
+    // Defs
+    svg += `<defs>
+      <radialGradient id="lgrad" cx="50%" cy="50%" r="55%">
+        <stop offset="0%" stop-color="rgba(160,64,255,.35)"/>
+        <stop offset="55%" stop-color="rgba(80,30,160,.12)"/>
+        <stop offset="100%" stop-color="rgba(0,0,0,0)"/>
+      </radialGradient>
+      <linearGradient id="lh" x1="0%" y1="0%" x2="100%" y2="0%">
+        <stop offset="0%" stop-color="rgba(128,255,255,.95)"/>
+        <stop offset="100%" stop-color="rgba(128,255,255,.45)"/>
+      </linearGradient>
+      <linearGradient id="lv" x1="0%" y1="0%" x2="0%" y2="100%">
+        <stop offset="0%" stop-color="rgba(255,212,122,.9)"/>
+        <stop offset="100%" stop-color="rgba(255,212,122,.4)"/>
+      </linearGradient>
+      <linearGradient id="lt" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="rgba(255,96,208,.9)"/>
+        <stop offset="100%" stop-color="rgba(160,64,255,.5)"/>
+      </linearGradient>
+    </defs>`;
+    // Aura background
+    svg += `<circle cx="${cx}" cy="${cy}" r="40" fill="url(#lgrad)"/>`;
+    // Outer silhouette (gem outline) — soft purple, fixed
+    svg += `<polygon points="${silhouette}" fill="none" stroke="rgba(180,140,255,.55)" stroke-width="1.2" stroke-linejoin="round"/>`;
+    // Spinning interior wireframe
+    svg += `<g class="spin" transform-origin="${cx} ${cy}">`;
+    svg += `<g stroke="rgba(180,140,255,.55)" stroke-width=".8" fill="none">`;
+    for(const [a,b] of edges){
+      svg += `<line x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}"/>`;
+    }
+    svg += `</g>`;
+    // The three axes — colored, glowing
+    svg += `<line x1="${V.ax_n[0]}" y1="${V.ax_n[1]}" x2="${V.ax_p[0]}" y2="${V.ax_p[1]}" stroke="url(#lh)" stroke-width="2" stroke-linecap="round"/>`;
+    svg += `<line x1="${V.tm_n[0]}" y1="${V.tm_n[1]}" x2="${V.tm_p[0]}" y2="${V.tm_p[1]}" stroke="url(#lt)" stroke-width="2" stroke-linecap="round"/>`;
+    svg += `<line x1="${V.vt_n[0]}" y1="${V.vt_n[1]}" x2="${V.vt_p[0]}" y2="${V.vt_p[1]}" stroke="url(#lv)" stroke-width="2" stroke-linecap="round"/>`;
+    // Pole nodes
+    const nodes = [
+      [V.ax_p,'rgba(128,255,255,1)'],[V.ax_n,'rgba(128,255,255,1)'],
+      [V.tm_p,'rgba(255,96,208,1)'], [V.tm_n,'rgba(255,96,208,1)'],
+      [V.vt_p,'rgba(255,212,122,1)'],[V.vt_n,'rgba(255,212,122,1)'],
+    ];
+    for(const [[x,y],c] of nodes){
+      svg += `<circle cx="${x}" cy="${y}" r="2.2" fill="${c}"/>`;
+    }
+    // Center spark (origin)
+    svg += `<circle cx="${cx}" cy="${cy}" r="1.5" fill="rgba(255,255,255,.9)"/>`;
+    svg += `</g>`;
+    svg += `</svg>`;
+    return svg;
+  }
+
+  function paintLogos(){
+    const svg = buildLogoSVG();
+    ['logo-mark-intro','logo-mark-assess','logo-mark-report'].forEach(id=>{
+      const el = document.getElementById(id);
+      if(el) el.innerHTML = svg;
+    });
+  }
+
+  return {start, submit, reset, cancel, setResponse,
+          exportJSON, exportHTML, showHistory, viewHistory, showAbout};
+})();
+</script>
+</body>
+</html>

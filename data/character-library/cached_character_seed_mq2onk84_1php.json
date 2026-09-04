@@ -1,0 +1,73 @@
+{
+  "name": {
+    "first": "Talia",
+    "last": "Halloran",
+    "full": "Talia Halloran of the Final Stair",
+    "origin_descriptor": "of the Final Stair"
+  },
+  "epithet": "who held three threads without breaking any",
+  "zone": "VIII",
+  "subtype": "The Moment",
+  "class": "Blade of Form",
+  "stamp": "Silencing",
+  "capture": "Face",
+  "origin": "The Ascent",
+  "age": "Ancient",
+  "physical": {
+    "build": "Lean",
+    "skin": "pearl",
+    "hair": "shaved bald",
+    "eyes": "teal",
+    "garment": "mourner shroud"
+  },
+  "mannerisms": [
+    "speaks more softly when angry",
+    "cannot enter a room without learning what it needs",
+    "will not say a name they have not earned",
+    "collects the names of streets they will not return to"
+  ],
+  "voice": "lilting, with an accent no one can quite place",
+  "aspiration": "to be of use without being central",
+  "fear": "speaking and having the room change subject",
+  "gift": "they finish what they begin",
+  "wound": "the silence that grew between them and a parent who could not bear it",
+  "secret": "that they fear losing the gift more than they fear anything else",
+  "threads": [
+    {
+      "kind": "A parent",
+      "desc": "who never said it and is unlikely to"
+    },
+    {
+      "kind": "A rival",
+      "desc": "who became necessary to the work without either of them saying so"
+    },
+    {
+      "kind": "A teacher",
+      "desc": "who taught them by example and would have hated being thanked"
+    }
+  ],
+  "seed": "seed_mq2onk84_1php",
+  "timestamp": "2026-06-06T18:24:54.233Z",
+  "backstory": {
+    "origin": "Talia came up in The Ascent, of the Final Stair. Their undertaker was easily moved, their singer was generous to strangers.",
+    "weight": "Their mother had been told to be quiet, and her mother before her, and the inheritance of that arrives in Talia as a slight delay before any honest sentence.",
+    "fracture": "There was no single fracture. Talia simply learned, slowly, around twenty-two, that they did not have to choose between the depth and the others and the long arc — that all three could be carried at once, if one was willing to keep returning.",
+    "between": "Between then and now, they did most of the ordinary things. They lived in a barge that never finished its route for a time, learned a useful kind of patience, and grew briefly close to a person whose name they will not say in mixed company.",
+    "present": "Currently, Talia is keeping a small fire going through the long off-season, refusing to settle for the easier version, and watching for for permission they will not, in the end, wait for. The plan, if one can call it that, is to do all three for as long as it takes.",
+    "threadsIntro": "Three people belong, in different ways, to the shape of Talia's life:",
+    "threads": [
+      {
+        "kind": "A parent",
+        "desc": "who never said it and is unlikely to"
+      },
+      {
+        "kind": "A rival",
+        "desc": "who became necessary to the work without either of them saying so"
+      },
+      {
+        "kind": "A teacher",
+        "desc": "who taught them by example and would have hated being thanked"
+      }
+    ]
+  }
+}

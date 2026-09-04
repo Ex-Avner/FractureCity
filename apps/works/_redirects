@@ -1,0 +1,5 @@
+# Cloudflare Pages _redirects — single-page app fallback.
+# Any unknown path falls back to the index so deep-links don't 404 once we
+# add client-side routing (e.g. /book, /wardrobe). Status 200 = SPA rewrite,
+# not a 301, so the URL the user sees stays intact.
+/*    /index.html   200

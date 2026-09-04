@@ -1,0 +1,1576 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Character Forge · Fracture City</title>
+<script>
+/* fracture-client shim — works in shell and standalone */
+(function(){
+  if (window.fracture && window.fracture.shell) return;
+  const prefix = 'fracture::character-forge::';
+  window.fracture = {
+    shell:false, appSlug:'character-forge', received:null,
+    save(k,v){ try{ localStorage.setItem(prefix+k, JSON.stringify(v)); }catch(e){} return Promise.resolve(true); },
+    read(k){ try{ const r=localStorage.getItem(prefix+k); return Promise.resolve(r==null?null:JSON.parse(r)); }catch(e){ return Promise.resolve(null); } },
+    list(){ const o=[]; for(let i=0;i<localStorage.length;i++){ const k=localStorage.key(i); if(k&&k.startsWith(prefix)) o.push(k.slice(prefix.length)); } return Promise.resolve(o); },
+    delete(k){ localStorage.removeItem(prefix+k); return Promise.resolve(true); },
+    listApps(){ return Promise.resolve([]); },
+    openApp(){ return Promise.resolve({ok:false,error:'standalone'}); },
+    emit(){ return Promise.resolve(true); },
+    subscribe(){ return ()=>{}; },
+    onPayload(){},
+  };
+})();
+</script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+:root{
+  --bg:#080614; --bg-2:#11091d; --panel:rgba(20,12,38,.78);
+  --line:rgba(120,200,255,.18); --line-2:rgba(180,140,255,.55);
+  --ink:#e7e2ff; --ink-dim:#9c93c6; --ink-fade:#6a608a;
+  --teal:#80ffff; --magenta:#ff60d0; --violet:#a040ff;
+  --gold:#ffd47a; --green:#7dffb3; --red:#ff7088;
+}
+html,body{
+  background:radial-gradient(ellipse at 50% 0%,#1a0f33 0%,#080614 70%);
+  min-height:100vh;color:var(--ink);
+  font-family:'Inter','Helvetica Neue',sans-serif;
+  -webkit-font-smoothing:antialiased;
+  overflow-x:hidden;
+}
+body{padding:20px 16px 60px;}
+.shell{max-width:1320px;margin:0 auto;}
+.mono{font-family:'SF Mono','Menlo','Courier New',monospace;}
+
+/* ── Header ──────────────────────────────────────────────────────────── */
+.hdr{display:flex;align-items:center;gap:18px;
+  border-bottom:1px solid var(--line);padding-bottom:14px;margin-bottom:16px;}
+.hdr .mark{width:46px;height:46px;}
+.hdr h1{font-family:'Courier New',monospace;font-size:22px;letter-spacing:8px;
+  background:linear-gradient(180deg,#80ffff 0%,#ff60d0 65%,#a040ff 100%);
+  -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
+  line-height:1;margin-bottom:4px;}
+.hdr .sub{font-family:'Courier New',monospace;font-size:10px;letter-spacing:4px;
+  color:var(--ink-dim);text-transform:uppercase;}
+.hdr .ctx{margin-left:auto;font-size:10px;color:var(--ink-fade);
+  font-family:'Courier New',monospace;letter-spacing:2px;}
+
+/* ── Toolbar ──────────────────────────────────────────────────────────── */
+.toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;
+  margin-bottom:18px;padding:12px 14px;
+  background:var(--panel);border:1px solid var(--line);border-radius:5px;}
+.toolbar label{font-family:'Courier New',monospace;font-size:10px;letter-spacing:3px;
+  color:var(--ink-fade);text-transform:uppercase;display:flex;align-items:center;gap:8px;}
+.toolbar input[type=text],.toolbar select{
+  background:rgba(8,4,16,.6);border:1px solid var(--line);
+  color:var(--ink);padding:6px 10px;border-radius:3px;
+  font-family:'SF Mono',monospace;font-size:12px;outline:none;}
+.toolbar input[type=text]:focus,.toolbar select:focus{border-color:var(--magenta);}
+.toolbar input[type=text]{width:180px;}
+.toolbar select{min-width:140px;}
+.btn{font-family:'Courier New',monospace;font-size:11px;letter-spacing:3px;
+  text-transform:uppercase;background:rgba(40,20,80,.6);color:var(--teal);
+  border:1px solid var(--line-2);padding:8px 14px;cursor:pointer;border-radius:3px;
+  transition:all .15s;}
+.btn:hover{background:rgba(80,40,160,.7);color:#fff;
+  box-shadow:0 0 14px rgba(255,80,220,.4);}
+.btn.primary{background:linear-gradient(180deg,rgba(120,80,200,.5),rgba(60,20,120,.6));
+  color:#fff;border-color:rgba(255,140,220,.6);}
+.btn.danger{border-color:var(--red);color:var(--red);}
+
+/* ── Layout ──────────────────────────────────────────────────────────── */
+.studio{display:grid;grid-template-columns:280px 1fr 380px;gap:14px;
+  align-items:start;}
+@media (max-width:1100px){.studio{grid-template-columns:1fr;}}
+.col{background:var(--panel);border:1px solid var(--line);border-radius:5px;
+  padding:18px;}
+.col h3{font-family:'Courier New',monospace;font-size:11px;letter-spacing:4px;
+  color:var(--magenta);text-transform:uppercase;margin:18px 0 8px;}
+.col h3:first-child{margin-top:0;}
+
+/* Controls panel */
+.ctrl{margin-bottom:10px;}
+.ctrl-row{display:flex;align-items:center;gap:8px;margin-bottom:6px;}
+.ctrl-row .lk{flex:0 0 18px;}
+.ctrl-row label{font-family:'Courier New',monospace;font-size:10px;letter-spacing:1px;
+  color:var(--ink-fade);text-transform:uppercase;flex:0 0 70px;}
+.ctrl-row select{flex:1;background:rgba(8,4,16,.7);border:1px solid var(--line);
+  color:var(--ink);padding:5px 8px;border-radius:3px;
+  font-family:'SF Mono',monospace;font-size:11px;outline:none;}
+.ctrl-row select:focus{border-color:var(--magenta);}
+.lock-btn{background:none;border:1px solid var(--line);color:var(--ink-fade);
+  width:18px;height:18px;border-radius:2px;cursor:pointer;font-size:10px;
+  display:flex;align-items:center;justify-content:center;}
+.lock-btn.on{color:var(--gold);border-color:var(--gold);background:rgba(255,212,122,.1);}
+
+/* Portrait column */
+.portrait-wrap{position:relative;text-align:center;}
+#portrait{width:100%;max-width:380px;height:auto;display:block;margin:0 auto 14px;
+  background:linear-gradient(180deg,#0a0518,#03020a);
+  border:1px solid var(--line-2);border-radius:8px;
+  box-shadow:0 0 40px rgba(160,64,255,.2);}
+.identity-card{text-align:left;padding-top:8px;}
+.id-name{font-family:'Cormorant Garamond',Georgia,serif;font-size:30px;
+  color:var(--ink);letter-spacing:1px;line-height:1.05;margin-bottom:2px;
+  font-weight:500;}
+.id-epithet{font-family:'Cormorant Garamond',Georgia,serif;font-style:italic;
+  font-size:16px;color:var(--magenta);margin-bottom:10px;}
+.id-tags{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;}
+.id-tag{font-family:'Courier New',monospace;font-size:9px;letter-spacing:2px;
+  text-transform:uppercase;background:rgba(80,40,160,.3);color:var(--ink-dim);
+  border:1px solid var(--line);padding:3px 7px;border-radius:2px;}
+.id-tag.zone{color:var(--teal);border-color:rgba(128,255,255,.4);}
+.id-tag.subtype{color:var(--magenta);border-color:rgba(255,96,208,.4);}
+.id-tag.class{color:var(--gold);border-color:rgba(255,212,122,.4);}
+.id-tag.stamp{color:var(--red);border-color:rgba(255,112,136,.4);}
+
+.id-grid{display:grid;grid-template-columns:90px 1fr;gap:6px 12px;font-size:12px;
+  margin-bottom:14px;}
+.id-grid .k{font-family:'Courier New',monospace;font-size:10px;letter-spacing:1px;
+  color:var(--ink-fade);text-transform:uppercase;align-self:start;line-height:1.5;}
+.id-grid .v{color:var(--ink);font-size:12.5px;line-height:1.5;}
+
+.section-label{font-family:'Courier New',monospace;font-size:10px;letter-spacing:3px;
+  color:var(--ink-fade);text-transform:uppercase;margin:12px 0 6px;
+  border-top:1px solid var(--line);padding-top:10px;}
+
+.mannerism-list,.aspect-list{font-size:12.5px;color:var(--ink);line-height:1.55;
+  padding-left:16px;}
+.mannerism-list li,.aspect-list li{margin-bottom:3px;}
+
+.tri{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;}
+.tri .tri-cell{background:rgba(8,4,16,.5);border:1px solid var(--line);
+  border-radius:3px;padding:8px;}
+.tri .tri-cell .tl{font-family:'Courier New',monospace;font-size:9px;letter-spacing:2px;
+  color:var(--ink-fade);text-transform:uppercase;margin-bottom:4px;}
+.tri .tri-cell .tv{font-size:12px;color:var(--ink);font-style:italic;
+  font-family:'Cormorant Garamond',Georgia,serif;line-height:1.4;}
+
+/* Backstory column */
+.backstory{font-family:'Cormorant Garamond',Georgia,serif;font-size:15px;
+  line-height:1.75;color:var(--ink);}
+.backstory h4{font-family:'Courier New',monospace;font-size:10px;letter-spacing:4px;
+  color:var(--gold);text-transform:uppercase;margin:18px 0 8px;font-weight:normal;
+  border-bottom:1px dotted var(--line);padding-bottom:4px;}
+.backstory h4:first-child{margin-top:0;}
+.backstory p{margin-bottom:10px;}
+.backstory .threads{display:flex;flex-direction:column;gap:10px;}
+.backstory .thread{background:rgba(8,4,16,.4);border-left:2px solid var(--magenta);
+  padding:8px 12px;}
+.backstory .thread .tname{font-family:'Courier New',monospace;font-size:10px;
+  letter-spacing:2px;color:var(--magenta);text-transform:uppercase;margin-bottom:3px;}
+.backstory .thread .tdesc{font-size:13.5px;font-style:italic;line-height:1.5;}
+
+.regenerate-btn{font-family:'Courier New',monospace;font-size:9px;letter-spacing:2px;
+  background:none;border:1px solid var(--line);color:var(--ink-fade);
+  padding:3px 8px;border-radius:2px;cursor:pointer;float:right;margin-top:-2px;
+  text-transform:uppercase;}
+.regenerate-btn:hover{color:var(--teal);border-color:var(--teal);}
+
+.seed-line{font-family:'SF Mono',monospace;font-size:10px;color:var(--ink-fade);
+  text-align:center;margin-top:14px;letter-spacing:1px;}
+
+@media print {
+  body{background:#fff;color:#111;padding:0;}
+  .toolbar,.col:first-child,.regenerate-btn,.btn,.hdr .ctx{display:none!important;}
+  .studio{grid-template-columns:1fr 1fr;}
+  .col{background:#fff;border:1px solid #ccc;}
+  .id-name{color:#222;}
+  .id-epithet{color:#7a3da5;}
+  .backstory{color:#222;}
+  .backstory h4{color:#888;}
+  .id-tag{background:#f0e8ff;color:#444;}
+  .hdr h1{color:#444;background:none;-webkit-text-fill-color:initial;}
+}
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <div class="hdr">
+    <div class="mark" id="hdr-mark"></div>
+    <div>
+      <h1>CHARACTER FORGE</h1>
+      <div class="sub">Fracture City World · Identity Assembler</div>
+    </div>
+    <div class="ctx" id="ctx">—</div>
+  </div>
+
+  <div class="toolbar">
+    <button class="btn primary" onclick="Forge.newCharacter()">⟲ NEW CHARACTER</button>
+    <button class="btn" onclick="Forge.shuffleUnlocked()">SHUFFLE</button>
+    <label>SEED <input type="text" id="seed-input" placeholder="(any string)"></label>
+    <label>FROM PROFILE
+      <select id="profile-select"><option value="">— none —</option></select>
+    </label>
+    <button class="btn" onclick="Forge.save()">SAVE TO LIBRARY</button>
+    <button class="btn" onclick="Forge.exportPortrait()">EXPORT PNG</button>
+    <button class="btn" onclick="window.print()">PRINT SHEET</button>
+    <button class="btn" onclick="Forge.exportJSON()">EXPORT JSON</button>
+  </div>
+
+  <div class="studio">
+
+    <!-- LEFT: Controls -->
+    <div class="col" id="controls-col">
+      <h3>Framework</h3>
+      <div class="ctrl" id="ctrl-zone"></div>
+      <div class="ctrl" id="ctrl-subtype"></div>
+      <div class="ctrl" id="ctrl-class"></div>
+      <div class="ctrl" id="ctrl-stamp"></div>
+      <div class="ctrl" id="ctrl-capture"></div>
+
+      <h3>Origin</h3>
+      <div class="ctrl" id="ctrl-origin"></div>
+      <div class="ctrl" id="ctrl-age"></div>
+
+      <h3>Physical</h3>
+      <div class="ctrl" id="ctrl-build"></div>
+      <div class="ctrl" id="ctrl-skin"></div>
+      <div class="ctrl" id="ctrl-hair"></div>
+      <div class="ctrl" id="ctrl-eyes"></div>
+      <div class="ctrl" id="ctrl-garment"></div>
+
+      <p class="mono" style="font-size:9px;color:var(--ink-fade);letter-spacing:2px;
+        margin-top:18px;line-height:1.6;">
+        ⏶ LOCK A FIELD TO HOLD IT WHEN SHUFFLING. SEED MAKES RESULTS REPRODUCIBLE.
+      </p>
+    </div>
+
+    <!-- CENTER: Portrait + identity card -->
+    <div class="col">
+      <div class="portrait-wrap">
+        <svg id="portrait" viewBox="0 0 380 460"></svg>
+      </div>
+
+      <div class="identity-card">
+        <div class="id-name" id="id-name">—</div>
+        <div class="id-epithet" id="id-epithet">—</div>
+        <div class="id-tags" id="id-tags"></div>
+
+        <div class="id-grid" id="id-grid"></div>
+
+        <div class="section-label">MANNERISMS</div>
+        <ul class="mannerism-list" id="mannerisms"></ul>
+
+        <div class="section-label">VOICE</div>
+        <div id="voice" style="font-size:12.5px;color:var(--ink);font-style:italic;
+          font-family:'Cormorant Garamond',Georgia,serif;line-height:1.6;"></div>
+
+        <div class="section-label">THE THREE — GIFT · WOUND · SECRET</div>
+        <div class="tri">
+          <div class="tri-cell"><div class="tl">GIFT</div><div class="tv" id="gift">—</div></div>
+          <div class="tri-cell"><div class="tl">WOUND</div><div class="tv" id="wound">—</div></div>
+          <div class="tri-cell"><div class="tl">SECRET</div><div class="tv" id="secret">—</div></div>
+        </div>
+
+        <div class="section-label">ASPIRATION &amp; FEAR</div>
+        <ul class="aspect-list">
+          <li><strong style="color:var(--gold);">Aspires:</strong> <span id="aspiration">—</span></li>
+          <li><strong style="color:var(--red);">Fears:</strong> <span id="fear">—</span></li>
+        </ul>
+
+        <div class="seed-line" id="seed-line">—</div>
+      </div>
+    </div>
+
+    <!-- RIGHT: Backstory -->
+    <div class="col">
+      <h3>Backstory <button class="regenerate-btn" onclick="Forge.regenBackstory()">↻ regen</button></h3>
+      <div class="backstory" id="backstory">—</div>
+    </div>
+
+  </div>
+
+</div>
+
+<script>
+// =============================================================================
+// SEEDED RNG (mulberry32) — deterministic, reproducible.
+// =============================================================================
+function hashSeed(str){
+  let h = 1779033703 ^ str.length;
+  for (let i = 0; i < str.length; i++){
+    h = Math.imul(h ^ str.charCodeAt(i), 3432918353);
+    h = h << 13 | h >>> 19;
+  }
+  return (h ^= h >>> 16) >>> 0;
+}
+function mulberry32(seed){
+  let s = seed;
+  return function(){
+    let t = s += 0x6D2B79F5;
+    t = Math.imul(t ^ t >>> 15, t | 1);
+    t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+class RNG {
+  constructor(seed){
+    this.seed = typeof seed === 'string' ? hashSeed(seed) : (seed >>> 0);
+    this.next = mulberry32(this.seed);
+  }
+  pick(arr){ return arr[Math.floor(this.next() * arr.length)]; }
+  pickN(arr, n){
+    const a = arr.slice(); const out = [];
+    for(let i=0;i<n && a.length;i++){
+      const idx = Math.floor(this.next()*a.length);
+      out.push(a.splice(idx,1)[0]);
+    }
+    return out;
+  }
+  int(min, max){ return Math.floor(this.next() * (max-min+1)) + min; }
+  bool(p=0.5){ return this.next() < p; }
+  weighted(entries){
+    // entries: [[item, weight], ...]
+    const total = entries.reduce((s,[,w])=>s+w, 0);
+    let r = this.next()*total;
+    for(const [item,w] of entries){ r-=w; if(r<=0) return item; }
+    return entries[entries.length-1][0];
+  }
+}
+
+// =============================================================================
+// FRAMEWORK CONSTANTS
+// =============================================================================
+const ZONES = {
+  I:    { name:'The Performer',     char:'isolated, high-function, meaningless' },
+  II:   { name:'The Crowd',         char:'diffuse, socially active, rootless' },
+  III:  { name:'The Mystic',        char:'deep source contact without social integration or temporal obligation' },
+  IV:   { name:'The Congregation',  char:'religious community without historical grounding' },
+  V:    { name:'The Archivist',     char:'historical individualism, the lone ancestor-bearer' },
+  VI:   { name:'The Tradition',     char:'cultural tradition without depth' },
+  VII:  { name:'The Prophet',       char:'prophetic isolation — depth, obligation, but no community' },
+  VIII: { name:'The Somey',         char:'full integration — contact with source, others, and time' },
+};
+const SUBTYPES = {
+  I:   ['The Optimizer','The Ghost','The Competitor'],
+  II:  ['The Mirror','The Influencer','The Swarm'],
+  III: ['The Hermit','The Psychonaut','The Sage Trap'],
+  IV:  ['The Revival','The Circle','The Greenhouse'],
+  V:   ['The Burden-Bearer','The Historian','The Sentinel'],
+  VI:  ['The Custodian','The Monument','The Institution'],
+  VII: ['The Visionary','The Martyr','The Builder'],
+  VIII:['The Moment','The Elder','The Bridge'],
+};
+const CLASSES = ['Blade of Form','Keeper of Thread','Weaver of Bond'];
+const STAMPS = ['None','Scarcity','Displacement','Violence','Silencing','Abandonment'];
+const CAPTURES = ['None','Vertex','Edge','Face'];
+const ORIGINS = [
+  'The Outer Ruins','Fracture City','The Forge','The Flood Gate',
+  'The Archive','The Undercroft','The Burning Maze','The Void Below',
+  'The Spire','The Ascent',
+];
+const AGE_BANDS = ['Child','Adolescent','Young Adult','Adult','Elder','Ancient'];
+const BUILDS  = ['Slight','Lean','Average','Strong','Heavy','Tall','Compact'];
+const SKINS   = ['ash','bronze','copper','umber','pearl','obsidian','silver-blue','rose-ochre'];
+const HAIRS   = ['close-cropped','long and braided','short and tangled','shaved bald','silver and falling',
+                 'pulled back severe','wild and curling','grey at the temples','a hood that hides it'];
+const EYES    = ['gold','teal','magenta','silver','black','green','violet','amber','grey'];
+const GARMENTS = ['ragged cloak','long coat','draped robe','tight harness','scholar wraps',
+                  'soldier vest','traveler hood','priest mantle','mourner shroud'];
+
+// =============================================================================
+// PHRASE POOLS — combinatorial deep narrative
+// =============================================================================
+
+// Names — first / last / origin-flavored
+const NAMES_FIRST = [
+  'Avner','Mira','Theron','Kestrel','Sable','Cassian','Vesper','Iolanthe','Bram','Lior',
+  'Anouk','Severin','Yael','Tovin','Reni','Calix','Mahir','Sef','Idrien','Olwen',
+  'Pyre','Hain','Nessa','Auron','Sela','Bren','Mavi','Halen','Esmer','Kade',
+  'Talia','Orion','Vela','Niko','Sorrel','Marek','Aria','Cyrus','Liraz','Dane',
+];
+const NAMES_LAST = [
+  'Vey','Solm','Ardent','Halloran','Crest','Marrow','Tann','Sablewood','Vox','Embers',
+  'Thren','Cinderhand','Greythorne','Mott','Vasque','Hollow','Briar','Caine','Nox','Wren',
+  'Astor','Brackish','Caelin','Drumm','Fenwick','Gale','Harrowmere','Iverson','Jin','Kassel',
+];
+const ORIGIN_PREFIX = {
+  'The Outer Ruins':['of the Husk Quarter','of the Long Salt','of the Hollow Mile','from before the Tally'],
+  'Fracture City':  ['of the Tin Lanes','of the Sundered Row','of the Lower Veins','of the Watch District'],
+  'The Forge':      ['of the Iron Below','of the Glass Mouth','of the Heat-Year','of the Bellows'],
+  'The Flood Gate': ['of the Drowned Step','of the Bitter Tide','of the Sluice Houses','born in high water'],
+  'The Archive':    ['of the Stack Halls','of the Spent Light','of the Marginalia','keeper-born'],
+  'The Undercroft': ['of the Hum','of the Hive Choir','of the Soft Dark','of the Knit Cells'],
+  'The Burning Maze':['of the Coalshade','of the Smoke Lattice','of the Ember Run','of the Twice-Burned'],
+  'The Void Below': ['of the Rift Edge','of the No-Above','of the Unseamed','of the Quiet'],
+  'The Spire':      ['of the High Step','of the Cold Air','of the Watchspires','of the Bell-Tower'],
+  'The Ascent':     ['of the Long Climb','of the Final Stair','of the Sky-Mark','of the Final Light'],
+};
+
+// Epithets — three per zone
+const EPITHETS = {
+  I:   ['who turned the wheel without asking what it ground',
+        'who polished the room they were dying inside',
+        'who counted everything except the cost'],
+  II:  ['whose face was a room with no chair of its own',
+        'who never met a song they would not sing along to',
+        'who walked through their own life on someone else\'s feet'],
+  III: ['who knelt in places no one else could find',
+        'who listened to the underneath of things',
+        'who carried a stillness like a held breath'],
+  IV:  ['who knew the singing but not the dead',
+        'who held the circle and lost the rope',
+        'whose joy had no road home'],
+  V:   ['who carried the names alone',
+        'who tended graves no one visited',
+        'who remembered what no one had asked to be remembered'],
+  VI:  ['who kept the form after the fire went out',
+        'who tended a meaning they no longer believed',
+        'who sang the right notes in the wrong room'],
+  VII: ['who saw the next century and could not be heard',
+        'who built a door without first finding a room',
+        'who carried a future no one had asked for'],
+  VIII:['who held three threads without breaking any',
+        'who returned the way the road had taught them',
+        'who learned, and stayed, and taught'],
+};
+
+// Mannerisms — pools tagged by archetype / class
+const MANNERISMS = {
+  common: [
+    'pauses three beats before answering anything difficult',
+    'touches the back of their own left hand when listening',
+    'collects the names of streets they will not return to',
+    'writes letters they never send',
+    'speaks more softly when angry',
+    'eats fruit from the inside out',
+    'never sits with their back to a door',
+    'will not say a name they have not earned',
+  ],
+  blade: [
+    'walks with weight on the front foot',
+    'unclasps and reclasps belts when thinking',
+    'knows the exact distance to every doorway',
+    'finishes meals before anyone else has noticed they began',
+  ],
+  thread: [
+    'traces patterns in the air with a finger when bored',
+    'doubles back on conversations to test the echo',
+    'leaves rooms by a different door than they entered',
+    'sings under their breath in spaces between others',
+  ],
+  bond: [
+    'touches strangers\' shoulders gently when passing',
+    'asks the names of waiters, ferrymen, the children of friends',
+    'remembers what others were wearing the last time they met',
+    'gives gifts that smell like home',
+  ],
+  deep: [
+    'holds silences past what is comfortable',
+    'looks past your shoulder when they answer',
+    'lights candles in daylight without seeming to notice',
+    'speaks of certain things only at dusk',
+  ],
+  surface: [
+    'measures the height of doorframes by habit',
+    'keeps three working pens at all times',
+    'reads receipts twice',
+    'sleeps with their boots aligned at the bed\'s edge',
+  ],
+  singular: [
+    'arrives early to find a seat alone',
+    'declines invitations with elaborate politeness',
+    'has a notebook nobody is allowed to read',
+    'walks past mirrors without looking',
+  ],
+  plural: [
+    'finishes other people\'s sentences with their permission',
+    'cooks more food than the table can hold',
+    'keeps a list of people whose birthdays no one else remembers',
+    'cannot enter a room without learning what it needs',
+  ],
+};
+
+// Voice
+const VOICE_QUALITIES = [
+  'low and unhurried, like sand settling',
+  'bright and quick, with a laugh always near the surface',
+  'rasping at the edges, smoke or grief or both',
+  'careful and metered, as if each word were being paid for',
+  'distant, like a voice through water',
+  'warm but cracked, an old hearth still drawing air',
+  'precise as cut glass and just as hard to argue with',
+  'flat, deliberate, no music allowed in',
+  'lilting, with an accent no one can quite place',
+];
+
+// Aspirations — by zone
+const ASPIRATIONS = {
+  I:   ['to be the indispensable one in any room they enter',
+        'to be remembered as someone who never broke',
+        'to win the thing whose winning will not satisfy them'],
+  II:  ['to belong somewhere completely',
+        'to be loved by everyone they pass',
+        'to find a self they did not borrow'],
+  III: ['to touch the ground beneath the ground one more time',
+        'to die without ever having had to explain themselves',
+        'to be left alone long enough to finish what they started'],
+  IV:  ['to keep the circle alive a little longer',
+        'to feel that joy again, the one with no edges',
+        'to build a temple their children will recognize'],
+  V:   ['to set the record straight before they go',
+        'to name the dead correctly, once, and aloud',
+        'to leave a ledger no one will be able to dispute'],
+  VI:  ['to preserve what they were given, intact',
+        'to be the last keeper of a thing worth keeping',
+        'to teach the form even after the meaning has gone'],
+  VII: ['to be heard while there is still time',
+        'to build the thing they have seen',
+        'to find one person who will continue the work'],
+  VIII:['to hand the work forward and stay',
+        'to be of use without being central',
+        'to keep returning, gently, for as long as it takes'],
+};
+
+// Fears — by stamp + general
+const FEARS = {
+  None: ['becoming the thing they used to mock',
+         'a life that adds up to nothing in particular',
+         'being misunderstood after they are gone',
+         'arriving and finding the room already empty'],
+  Scarcity: ['waking to find the cupboard genuinely empty',
+             'asking for help and being told no',
+             'their children carrying the same hunger'],
+  Displacement: ['being unable to name the country they came from',
+                 'losing the last word in a language nobody else speaks',
+                 'arriving somewhere new and finding it is also gone'],
+  Violence: ['the hand they cannot see behind them',
+             'becoming the thing they had to survive',
+             'the quiet that comes just before'],
+  Silencing: ['finding their voice has stopped working when it matters',
+              'being right and remaining unheard',
+              'speaking and having the room change subject'],
+  Abandonment: ['being left a second time',
+                'reaching for a hand and finding empty air',
+                'the last person walking out without saying anything'],
+};
+
+// Secrets — by zone
+const SECRETS = {
+  I:   ['that the work no longer means anything to them',
+        'that they faked the credential everyone trusts',
+        'that they have been planning to disappear for years'],
+  II:  ['that they do not know who they are when alone',
+        'that they have been performing the same lines since childhood',
+        'that the friend they describe most warmly does not actually exist'],
+  III: ['that the experience they claim to have had keeps slipping away',
+        'that they have been keeping a child they cannot afford',
+        'that they no longer believe what they have been teaching'],
+  IV:  ['that the community fractured years ago and they hide it',
+        'that they have been writing letters in another\'s name',
+        'that the founder they revere was a fraud'],
+  V:   ['that the family record they preserve has a name they have removed',
+        'that the inheritance they pass on is mostly debt',
+        'that they have been carrying a body, metaphorically, for decades'],
+  VI:  ['that the tradition was invented in their lifetime',
+        'that they break the form in private',
+        'that the rite they perform no longer has a witness who understands it'],
+  VII: ['that they are not sure the vision was real',
+        'that they have already failed once and started over without telling anyone',
+        'that the person they need to convince is themselves'],
+  VIII:['that the integration costs them more than they let on',
+        'that the moment they describe so well has not happened in years',
+        'that they fear losing the gift more than they fear anything else'],
+};
+
+// Wounds — by stamp + general
+const WOUNDS = {
+  None: ['a friendship that ended without any of them knowing why',
+         'the slow disappointment of a parent who never said it',
+         'a decade given to the wrong thing'],
+  Scarcity: ['a winter when nobody came to the door',
+             'a meal they remember because of how small it was',
+             'a sibling who did not survive the lean year'],
+  Displacement: ['the country that is no longer on any map',
+                 'the cousin whose name they cannot remember in the right language',
+                 'the last meal in the old house'],
+  Violence: ['a sound they will not describe to anyone',
+             'a knot that will not finish untying',
+             'a hand that should have stopped them and did not'],
+  Silencing: ['a truth they spoke once and were taught not to',
+              'a manuscript burned by someone who claimed to love them',
+              'the silence that grew between them and a parent who could not bear it'],
+  Abandonment: ['a doorway they watched until dark',
+                'a letter they wrote at eight and still keep',
+                'a parent who left and called it work'],
+};
+
+// Gifts — by class + subtype-flavored
+const GIFTS = [
+  'they can hold another person\'s grief without flinching',
+  'they remember the names of strangers\' children',
+  'they make ordinary objects feel ceremonial',
+  'they can tell when a room is about to turn',
+  'they finish what they begin',
+  'they speak the truth others find unsayable',
+  'they listen as if it were a craft they have studied',
+  'they can sit with someone dying and not flinch',
+  'they make people braver than they came in',
+  'they notice the one who is being left out',
+  'they tell a story and the temperature of the room changes',
+  'they keep their word in conditions that release others from theirs',
+];
+
+// =============================================================================
+// BACKSTORY ENGINE
+// Multi-section narrative composed from pools and templates.
+// =============================================================================
+
+const BACKSTORY = {
+
+  origin_para: [
+    "{name} was born {origin_phrase}, the {birth_order} child of a {parent_a} and a {parent_b}.",
+    "{name} came up {origin_phrase}. Their {parent_a} was {parent_a_trait}, their {parent_b} was {parent_b_trait}.",
+    "The story {name} tells about their beginnings starts {origin_phrase}, with two parents who {parent_pair_phrase}.",
+    "Born {origin_phrase}, {name} grew up in a household where {household_phrase}.",
+  ],
+
+  weight_para: {
+    // Stamp-conditioned ancestry paragraph
+    None: [
+      "No single hardship marked their ancestry. The line behind them was ordinary and largely unbroken — which, they will sometimes admit, is its own kind of inheritance.",
+      "Their family carries no particular signature wound. What they inherited instead was a long, quiet expectation that one ought to be reasonable.",
+    ],
+    Scarcity: [
+      "Two generations back, the cupboard was actually empty more often than not. The memory of that emptiness travels — {name}'s grandmother taught their mother to portion bread before tasting it, and the habit reaches {name} still.",
+      "Scarcity wrote itself into the line before {name} was born. Their grandparents lived through a year that the family does not name aloud, and from that year came a way of looking at every gift as already half-spent.",
+    ],
+    Displacement: [
+      "The line was elsewhere first. {name}'s grandparents crossed a border in a year nobody in the family will agree on, and the country they left does not exist now in the form they remember it.",
+      "Two displacements shaped this family before {name} arrived. The map has been redrawn twice in living memory, and they were on the wrong side of both lines.",
+    ],
+    Violence: [
+      "Violence ran underneath the family the way a river runs under a city — usually unseen, sometimes flooding the basements. {name} does not always know what year a particular silence in the house referred to.",
+      "Something happened to their grandfather. Nobody describes it directly. {name} learned early to read the weather of a room before walking into it.",
+    ],
+    Silencing: [
+      "Generations of {name}'s line learned to keep their mouths small. There was a thing one did not say, and then another, and the list grew. {name} was born holding the list without yet knowing what was on it.",
+      "Their mother had been told to be quiet, and her mother before her, and the inheritance of that arrives in {name} as a slight delay before any honest sentence.",
+    ],
+    Abandonment: [
+      "The family is built on a series of leavings. Two generations back, a father vanished into work and never quite returned. {name}'s parent learned to expect this kind of departure, and so did {name}.",
+      "Doors closed in this family without being slammed. The pattern of being almost-loved-and-then-left runs back further than anyone has the heart to trace.",
+    ],
+  },
+
+  fracture_para: {
+    // Zone-conditioned — the moment their current orientation crystallized
+    I: [
+      "The fracture, when it came, was quiet. They were {fracture_age}, and someone told them — gently, almost kindly — that effort would be rewarded. {name} has been performing that bargain ever since.",
+      "Around the time they turned {fracture_age}, {name} understood that being good at things was the surest way to be left mostly alone. The understanding settled, and they built a life around it.",
+    ],
+    II: [
+      "It happened the year they were {fracture_age}. A larger group took them in — really took them in — and {name} realized that being held by a crowd was easier than being held by a single person. They have rarely been alone since.",
+      "At {fracture_age}, {name} found a circle that was warm enough that staying in it became the simplest of all answers. They have not really left it, even when they are walking away.",
+    ],
+    III: [
+      "Somewhere in their {fracture_age}s, the floor gave way. What they touched on the other side has not left them, and they have, since then, been more interested in what is under things than what is on them.",
+      "It happened in a season when {name} should not have been alone, but was — at {fracture_age}, in a place they no longer name — and what they encountered there set the angle of their gaze permanently downward, toward the underneath.",
+    ],
+    IV: [
+      "They were {fracture_age} the night the singing did not stop. {name} found themselves inside something larger than themselves, and the memory of that warmth has organized every choice since.",
+      "At {fracture_age}, {name} entered a circle that was both deep and shared, and they have spent every year afterward trying to find another room of the same shape.",
+    ],
+    V: [
+      "It was their grandmother's last week. {name} was {fracture_age}, and they understood, suddenly and with no warning, that nobody else was going to carry what she had carried. They have been carrying it since.",
+      "Around {fracture_age}, {name} sat down with the family papers and did not get up the same person. There was nobody else who would do this work, and so they did it, and so they became it.",
+    ],
+    VI: [
+      "Their job, at {fracture_age}, was to keep the form intact while the meaning quietly drained out of it. {name} discovered they were good at this, and the discovery shaped them.",
+      "It happened slowly, in their {fracture_age}s — the realization that maintaining the tradition was not the same as believing it, and that they could do the first without doing the second.",
+    ],
+    VII: [
+      "At {fracture_age}, {name} saw something — a pattern, a need, a coming shape — that nobody else seemed to see. They have spent every year since trying to make it visible to anyone who will look.",
+      "Around their {fracture_age}s, the vision came. Or the obligation came. Whichever it was, {name} could not put it down, and they have been carrying it largely alone since.",
+    ],
+    VIII: [
+      "There was no single fracture. {name} simply learned, slowly, around {fracture_age}, that they did not have to choose between the depth and the others and the long arc — that all three could be carried at once, if one was willing to keep returning.",
+      "By {fracture_age}, {name} had been broken enough times to stop trying to avoid it, and what they found on the other side of that giving-up was a kind of motion that could include everything they cared about.",
+    ],
+  },
+
+  between_para: [
+    "The years that followed were not as remarkable as either the beginning or the present. {name} took {between_job_a}, lost it, took {between_job_b}, kept it longer than they expected. There was a season of {between_phase} that nobody who knew them then forgets.",
+    "Between then and now, they did most of the ordinary things. They lived in {between_place} for a time, learned {between_skill}, and grew briefly close to a person whose name they will not say in mixed company.",
+    "They drifted through a stretch of years that produced fewer stories than the decade before. {name} grew quieter, then briefly louder, then quieter again. There was a project — {between_project} — that almost worked.",
+  ],
+
+  threads_intro: [
+    "Three people belong, in different ways, to the shape of {name}'s life:",
+    "Three threads run through what {name} carries:",
+    "Three relationships, alive or otherwise, hold the architecture in place:",
+  ],
+
+  thread_kinds: [
+    {kind:'A teacher', desc:[
+      'who never knew how thoroughly {name} listened',
+      'whose own work was unfinished and is now {name}\'s to finish or set down',
+      'who taught them by example and would have hated being thanked',
+    ]},
+    {kind:'A friend', desc:[
+      'who left without an argument, and whose silence {name} still rehearses answers to',
+      'who knows the unflattering version of {name} and stays anyway',
+      'who is dying slowly enough that there is still time to do this correctly',
+    ]},
+    {kind:'A child', desc:[
+      '(not theirs) who calls when nobody else does',
+      '(theirs, or theirs by acclamation) who carries the same wound at half the speed',
+      'they failed once and have been quietly making it up to since',
+    ]},
+    {kind:'A rival', desc:[
+      'who became necessary to the work without either of them saying so',
+      'who has been chasing the same prize for so long that the chase is the friendship',
+      'whom {name} cannot quite forgive, and cannot quite stop calling',
+    ]},
+    {kind:'A parent', desc:[
+      'who never said it and is unlikely to',
+      'whom {name} has been forgiving in installments for years',
+      'who left a letter that {name} has not finished reading',
+    ]},
+    {kind:'A stranger', desc:[
+      'who said the right sentence at the right moment, and is unaware of any of it',
+      'who once needed help in a station and got it; {name} has been quietly waiting for the chance to receive the favor back',
+      'who appears in their dreams more often than makes sense',
+    ]},
+  ],
+
+  present_para: [
+    "Now, {name} works {present_work}, lives {present_living}, and spends most of their evenings {present_evening}. They are, by their own measure, {present_self_assessment}.",
+    "These days, {name} can be found {present_location} most mornings. They have a {present_object} that they will not throw away, and a habit of {present_habit} that even their oldest friends find slightly strange.",
+    "Currently, {name} is keeping {present_keeping}, refusing {present_refusing}, and watching for {present_watching}. The plan, if one can call it that, is to do all three for as long as it takes.",
+  ],
+
+  // ── small pools used as fillers ──
+  fillers: {
+    birth_order: ['only','first','second','third','last','middle','unwanted','long-awaited'],
+    parent_a: ['baker','ferryman','soldier','scribe','glassblower','dyer','watch-keeper','undertaker','locksmith','herbalist'],
+    parent_b: ['midwife','translator','smith','priest','tailor','cartographer','singer','cook','clerk','gardener'],
+    parent_a_trait: ['kind in distracted ways','quiet at the table','easily angered','easily moved','rarely home','never angry where the children could see'],
+    parent_b_trait: ['patient past reason','sharp-tongued','elsewhere in the eyes','generous to strangers','tender in private','known for laughter that did not last long'],
+    parent_pair_phrase: [
+      'argued only in front of priests',
+      'never quite forgave each other for the early years',
+      'looked, to outsiders, like a love story',
+      'shared a silence that lasted longer than either of their lives',
+      'agreed on almost nothing and stayed together anyway',
+    ],
+    household_phrase: [
+      'the kitchen was warm and the rest of the house was not',
+      'meals were taken in shifts and the table never sat all of them at once',
+      'one book was on every shelf and another had been forbidden',
+      'guests were rare, and treated like a small disaster',
+      'something was always being repaired, never quite finished',
+    ],
+    fracture_age: ['eleven','thirteen','fifteen','seventeen','nineteen','twenty-two','twenty-five','twenty-eight','thirty','thirty-four'],
+    between_job_a: ['a clerk\'s post','a courier route','a tutoring contract','a soldier\'s commission','a midwife\'s apprenticeship','a printer\'s bench'],
+    between_job_b: ['the night shift at a glassworks','a market stall','a watch tower','an archive desk','an old man\'s correspondence','a teaching post nobody wanted'],
+    between_phase: ['drinking','silence','letter-writing','traveling on foot','holding two jobs','quiet faith','vocal politics','illness'],
+    between_place: ['three rooms above a bakery','a barge that never finished its route','a city they do not name','a town that was theirs only in winters','a house borrowed and not returned'],
+    between_skill: ['the names of the local birds','a useful kind of patience','to mend their own clothes','to keep a ledger their family could read','to sleep wherever they were put','a language they no longer speak'],
+    between_project: ['a book','a small school','a translation','a workshop','a society of three','a letter to the council that took years'],
+    present_work: ['quietly','past the hour','for someone they do not entirely trust','in a trade older than the city','at a thing whose name has changed twice in their lifetime','for free, mostly'],
+    present_living: ['alone, by choice','with two cats and a third who visits','above a shop they own a piece of','in the back room of a friend\'s house','in a place that is not theirs but belongs to them anyway','in rooms they keep neat enough that no one would know how few possessions they own'],
+    present_evening: ['reading or pretending to','walking the same route','keeping company with one or two regulars','writing letters they will not send','at a window'],
+    present_self_assessment: ['doing all right','not where they wanted to be, but not where they feared','older than they expected to live','closer to finished than to beginning','still a little surprised to be here'],
+    present_location: ['at the same café','walking the long way to wherever','at the river','in the workshop','at the watch wall','in the upstairs room'],
+    present_object: ['stack of unanswered letters','box of photographs they cannot identify','knife they no longer use','small icon they did not buy','book they have re-read four times'],
+    present_habit: ['lighting one candle before breakfast','speaking briefly aloud to the dead','rereading the same page until they fall asleep','walking three blocks past where they need to go','counting under their breath at thresholds'],
+    present_keeping: ['a promise that nobody else remembers','a piece of work nobody has asked for','one person\'s number alive in their book','a room exactly as it was','a small fire going through the long off-season'],
+    present_refusing: ['to call the dead by anything other than their right names','to stop the work','to settle for the easier version','to make peace with a thing that does not deserve it','to be made comfortable when comfort would cost the truth'],
+    present_watching: ['someone they have not seen in years','a pattern in the weather that the city is missing','the slow turning of a thing nobody else has noticed','for the right person to ask','for permission they will not, in the end, wait for'],
+  },
+};
+
+// =============================================================================
+// CHARACTER ASSEMBLY
+// =============================================================================
+function buildCharacter(rng, traits){
+  // traits may pre-specify any field; rng fills the rest.
+  const zone   = traits.zone   || rng.pick(Object.keys(ZONES));
+  const subtype= traits.subtype|| rng.pick(SUBTYPES[zone]);
+  const cls    = traits.cls    || rng.pick(CLASSES);
+  const stamp  = traits.stamp  || rng.weighted([['None',2],['Scarcity',1],['Displacement',1],['Violence',1],['Silencing',1],['Abandonment',1]]);
+  const capture= traits.capture|| rng.weighted([['None',3],['Vertex',1],['Edge',1],['Face',1]]);
+  const origin = traits.origin || rng.pick(ORIGINS);
+  const age    = traits.age    || rng.pick(AGE_BANDS);
+  const build  = traits.build  || rng.pick(BUILDS);
+  const skin   = traits.skin   || rng.pick(SKINS);
+  const hair   = traits.hair   || rng.pick(HAIRS);
+  const eyes   = traits.eyes   || rng.pick(EYES);
+  const garment= traits.garment|| rng.pick(GARMENTS);
+
+  // Name + origin descriptor
+  const first = rng.pick(NAMES_FIRST);
+  const last  = rng.pick(NAMES_LAST);
+  const originDescriptor = rng.pick(ORIGIN_PREFIX[origin] || ['']);
+  const fullName = `${first} ${last} ${originDescriptor}`.trim();
+
+  const epithet = rng.pick(EPITHETS[zone]);
+
+  // Mannerisms — 3-4 picked from common + axis/class-tagged pools
+  const isDeep = ['III','IV','VII','VIII'].includes(zone);
+  const isPlural = ['II','IV','VI','VIII'].includes(zone);
+  const classPool = cls.includes('Form') ? MANNERISMS.blade
+                  : cls.includes('Thread') ? MANNERISMS.thread
+                  : MANNERISMS.bond;
+  const orientationPool = (isDeep ? MANNERISMS.deep : MANNERISMS.surface)
+    .concat(isPlural ? MANNERISMS.plural : MANNERISMS.singular);
+  const mannerismPool = [].concat(MANNERISMS.common, classPool, orientationPool);
+  const mannerisms = rng.pickN(mannerismPool, 4);
+
+  const voice = rng.pick(VOICE_QUALITIES);
+  const aspiration = rng.pick(ASPIRATIONS[zone]);
+  const fear = rng.pick(FEARS[stamp]);
+  const secret = rng.pick(SECRETS[zone]);
+  const wound = rng.pick(WOUNDS[stamp]);
+  const gift = rng.pick(GIFTS);
+
+  // Threads — 3 unique relationships
+  const threadKinds = rng.pickN(BACKSTORY.thread_kinds, 3);
+  const threads = threadKinds.map(t => ({
+    kind: t.kind,
+    desc: rng.pick(t.desc),
+  }));
+
+  return {
+    name: { first, last, full: fullName, origin_descriptor: originDescriptor },
+    epithet,
+    zone, subtype, class: cls, stamp, capture, origin, age,
+    physical: { build, skin, hair, eyes, garment },
+    mannerisms, voice, aspiration, fear,
+    gift, wound, secret,
+    threads,
+  };
+}
+
+// =============================================================================
+// BACKSTORY COMPOSITION
+// =============================================================================
+function fillTemplate(tmpl, fillers, ctx){
+  return tmpl.replace(/\{(\w+)\}/g, (_, key) => {
+    if (key === 'name') return ctx.name;
+    if (key === 'origin_phrase') return ctx.origin_phrase;
+    if (fillers && fillers[key]) return ctx.rng.pick(fillers[key]);
+    return '?';
+  });
+}
+
+function composeBackstory(character, rng){
+  const f = BACKSTORY.fillers;
+  const originPhrase = `in ${character.origin}, ${character.name.origin_descriptor}`.trim().replace(/,$/, '');
+  const ctx = { name: character.name.first, origin_phrase: originPhrase, rng };
+
+  const origin = fillTemplate(rng.pick(BACKSTORY.origin_para), f, ctx);
+  const weight = rng.pick(BACKSTORY.weight_para[character.stamp]).replace(/\{name\}/g, character.name.first);
+  const fracture = rng.pick(BACKSTORY.fracture_para[character.zone]).replace(/\{(\w+)\}/g, (_,k) => {
+    if (k==='name') return character.name.first;
+    if (f[k]) return rng.pick(f[k]);
+    return '?';
+  });
+  const between = fillTemplate(rng.pick(BACKSTORY.between_para), f, ctx);
+  const present = fillTemplate(rng.pick(BACKSTORY.present_para), f, ctx);
+  const threadsIntro = rng.pick(BACKSTORY.threads_intro).replace(/\{name\}/g, character.name.first);
+
+  return {
+    origin, weight, fracture, between, present, threadsIntro,
+    threads: character.threads,
+  };
+}
+
+// =============================================================================
+// SVG PORTRAIT GENERATOR
+// =============================================================================
+const AXIS_COLOR = { V:'#ffd47a', H:'#80ffff', T:'#ff60d0' };
+const SKIN_RGB = {
+  ash:'#ddd0e6', bronze:'#caa67d', copper:'#c47a55', umber:'#7b4a30',
+  pearl:'#f3e9d8', obsidian:'#2c2233','silver-blue':'#b5c3d4','rose-ochre':'#cf9785',
+};
+const HAIR_FORM = {
+  'close-cropped':'crop','long and braided':'braid','short and tangled':'tangle',
+  'shaved bald':'bald','silver and falling':'fall','pulled back severe':'pulled',
+  'wild and curling':'curl','grey at the temples':'temples','a hood that hides it':'hood',
+};
+const EYE_COLOR = { gold:'#ffd47a', teal:'#80ffff', magenta:'#ff60d0', silver:'#dde3ef',
+                    black:'#1a1626', green:'#7dffb3', violet:'#a040ff', amber:'#f3a64d', grey:'#9aa0b3' };
+
+function renderPortrait(character, rng){
+  // Primary axis color for aura — chosen by zone
+  let primaryAxis = 'V';
+  if (['II','IV','VI','VIII'].includes(character.zone)) primaryAxis = 'H';
+  if (['V','VI','VII','VIII'].includes(character.zone)) primaryAxis = 'T';
+  // For depth-and-plural zones, mix toward magenta; deep+temporal → gold; etc.
+  // Simpler: rotate through three by zone
+  primaryAxis = ['V','H','T'][['I','III','V','VII','II','IV','VI','VIII'].indexOf(character.zone) % 3];
+  const aura = AXIS_COLOR[primaryAxis];
+
+  // Garment color = secondary axis
+  const secondary = primaryAxis === 'V' ? 'H' : primaryAxis === 'H' ? 'T' : 'V';
+  const garmentColor = AXIS_COLOR[secondary];
+
+  const W = 380, H = 460, cx = W/2;
+  const skinHex = SKIN_RGB[character.physical.skin];
+  const eyeHex = EYE_COLOR[character.physical.eyes];
+
+  // Vary head shape slightly by hair/build
+  const headR = 52;
+  const headCy = 150;
+
+  // Build width scales shoulder width
+  const buildScale = {
+    Slight:0.85, Lean:0.92, Average:1.0, Strong:1.1, Heavy:1.18, Tall:0.95, Compact:1.08
+  }[character.physical.build] || 1.0;
+  const shoulderW = 100 * buildScale;
+
+  let svg = `<defs>
+    <radialGradient id="aura" cx="50%" cy="32%" r="50%">
+      <stop offset="0%" stop-color="${aura}" stop-opacity="0.45"/>
+      <stop offset="60%" stop-color="${aura}" stop-opacity="0.06"/>
+      <stop offset="100%" stop-color="${aura}" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="garmentG" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="${garmentColor}" stop-opacity="0.55"/>
+      <stop offset="100%" stop-color="${garmentColor}" stop-opacity="0.12"/>
+    </linearGradient>
+    <radialGradient id="bgFade" cx="50%" cy="0%" r="80%">
+      <stop offset="0%" stop-color="#1a0f33"/>
+      <stop offset="100%" stop-color="#04020a"/>
+    </radialGradient>
+  </defs>`;
+
+  // Background
+  svg += `<rect width="${W}" height="${H}" fill="url(#bgFade)" rx="8"/>`;
+
+  // Origin hint — faint horizon line based on origin stage index
+  const originIdx = ORIGINS.indexOf(character.origin);
+  const horizonY = 280 + (originIdx - 5) * 6;
+  svg += `<line x1="20" y1="${horizonY}" x2="${W-20}" y2="${horizonY}"
+            stroke="rgba(180,140,255,.15)" stroke-width="1" stroke-dasharray="2 5"/>`;
+
+  // Faint constellation marks — count = zone roman numeral
+  const zoneRoman = character.zone;
+  const dotCount = {I:1,II:2,III:3,IV:4,V:5,VI:6,VII:7,VIII:8}[zoneRoman] || 3;
+  for(let i=0;i<dotCount;i++){
+    const x = 40 + rng.next()*(W-80);
+    const y = 30 + rng.next()*60;
+    const r = 1 + rng.next()*1.5;
+    svg += `<circle cx="${x}" cy="${y}" r="${r}" fill="rgba(255,255,255,.5)"/>`;
+  }
+
+  // Aura halo
+  svg += `<ellipse cx="${cx}" cy="${headCy}" rx="170" ry="180" fill="url(#aura)"/>`;
+
+  // Garment first (behind silhouette overlap area)
+  const garmentTop = headCy + headR - 6;
+  const garmentBottom = H - 20;
+  const garmentLeftTop = cx - shoulderW;
+  const garmentRightTop = cx + shoulderW;
+  const garmentLeftBot = cx - shoulderW*1.7;
+  const garmentRightBot = cx + shoulderW*1.7;
+
+  // Garment style variations
+  if (character.physical.garment.includes('cloak') || character.physical.garment.includes('shroud') ||
+      character.physical.garment.includes('mantle') || character.physical.garment.includes('robe')) {
+    // Wide draped silhouette
+    svg += `<path d="M ${garmentLeftTop} ${garmentTop}
+                     C ${garmentLeftTop-20} ${garmentTop+80}, ${garmentLeftBot-20} ${garmentBottom-60}, ${garmentLeftBot} ${garmentBottom}
+                     L ${garmentRightBot} ${garmentBottom}
+                     C ${garmentRightBot+20} ${garmentBottom-60}, ${garmentRightTop+20} ${garmentTop+80}, ${garmentRightTop} ${garmentTop}
+                     Z"
+                fill="url(#garmentG)" stroke="rgba(180,140,255,.4)" stroke-width="1"/>`;
+  } else if (character.physical.garment.includes('coat') || character.physical.garment.includes('vest') ||
+             character.physical.garment.includes('harness') || character.physical.garment.includes('wraps')) {
+    // Structured tighter form
+    svg += `<path d="M ${cx-shoulderW} ${garmentTop}
+                     L ${cx-shoulderW*0.95} ${garmentBottom}
+                     L ${cx+shoulderW*0.95} ${garmentBottom}
+                     L ${cx+shoulderW} ${garmentTop} Z"
+                fill="url(#garmentG)" stroke="rgba(180,140,255,.5)" stroke-width="1"/>`;
+    // Center line / straps
+    svg += `<line x1="${cx}" y1="${garmentTop+4}" x2="${cx}" y2="${garmentBottom-10}"
+              stroke="rgba(180,140,255,.5)" stroke-width="1.2"/>`;
+  } else {
+    // Hood / generic
+    svg += `<path d="M ${cx-shoulderW-15} ${garmentTop}
+                     C ${cx-shoulderW-25} ${headCy-30}, ${cx-headR-10} ${headCy-headR-20}, ${cx} ${headCy-headR-30}
+                     C ${cx+headR+10} ${headCy-headR-20}, ${cx+shoulderW+25} ${headCy-30}, ${cx+shoulderW+15} ${garmentTop}
+                     L ${cx+shoulderW*1.5} ${garmentBottom}
+                     L ${cx-shoulderW*1.5} ${garmentBottom} Z"
+                fill="url(#garmentG)" stroke="rgba(180,140,255,.4)" stroke-width="1"/>`;
+  }
+
+  // Neck
+  svg += `<rect x="${cx-12}" y="${headCy+headR-8}" width="24" height="22" fill="${skinHex}" opacity="0.85"/>`;
+
+  // Head (face)
+  svg += `<ellipse cx="${cx}" cy="${headCy}" rx="${headR}" ry="${headR*1.05}" fill="${skinHex}"
+            stroke="rgba(0,0,0,.25)" stroke-width="1"/>`;
+
+  // Hair (style-dependent)
+  const hf = HAIR_FORM[character.physical.hair];
+  const hairColor = ['silver and falling','grey at the temples'].includes(character.physical.hair) ? '#d8d6e8'
+                  : ['shaved bald'].includes(character.physical.hair) ? null
+                  : '#2b1f3a';
+  if (hf === 'bald') {
+    // nothing
+  } else if (hf === 'hood') {
+    // Hood was drawn already; just nothing on top
+  } else if (hf === 'pulled' || hf === 'crop') {
+    svg += `<path d="M ${cx-headR} ${headCy-15}
+                     Q ${cx} ${headCy-headR-12}, ${cx+headR} ${headCy-15}
+                     L ${cx+headR-4} ${headCy-headR*0.4}
+                     L ${cx-headR+4} ${headCy-headR*0.4} Z"
+                fill="${hairColor}"/>`;
+  } else if (hf === 'braid') {
+    svg += `<path d="M ${cx-headR} ${headCy-15}
+                     Q ${cx} ${headCy-headR-15}, ${cx+headR} ${headCy-15}
+                     L ${cx+headR-4} ${headCy} L ${cx-headR+4} ${headCy} Z"
+                fill="${hairColor}"/>`;
+    // Braid down the front-left
+    svg += `<path d="M ${cx-headR+8} ${headCy-headR*0.2}
+                     C ${cx-headR-6} ${headCy+30}, ${cx-headR-2} ${headCy+80}, ${cx-headR+14} ${headCy+120}"
+                fill="none" stroke="${hairColor}" stroke-width="6" stroke-linecap="round"/>`;
+  } else if (hf === 'tangle' || hf === 'curl') {
+    svg += `<path d="M ${cx-headR-6} ${headCy-10}
+                     Q ${cx-headR} ${headCy-headR-18}, ${cx-15} ${headCy-headR-12}
+                     Q ${cx} ${headCy-headR-22}, ${cx+15} ${headCy-headR-12}
+                     Q ${cx+headR} ${headCy-headR-18}, ${cx+headR+6} ${headCy-10}
+                     L ${cx+headR-4} ${headCy} L ${cx-headR+4} ${headCy} Z"
+                fill="${hairColor}"/>`;
+  } else if (hf === 'fall') {
+    svg += `<path d="M ${cx-headR-2} ${headCy-15}
+                     Q ${cx} ${headCy-headR-15}, ${cx+headR+2} ${headCy-15}
+                     L ${cx+headR+8} ${headCy+headR+20}
+                     L ${cx-headR-8} ${headCy+headR+20} Z"
+                fill="${hairColor}"/>`;
+  } else if (hf === 'temples') {
+    svg += `<path d="M ${cx-headR} ${headCy-12}
+                     Q ${cx} ${headCy-headR-10}, ${cx+headR} ${headCy-12}
+                     L ${cx+headR-4} ${headCy-headR*0.3} L ${cx-headR+4} ${headCy-headR*0.3} Z"
+                fill="${hairColor}"/>`;
+    // Grey at temples
+    svg += `<path d="M ${cx-headR+2} ${headCy-headR*0.3} L ${cx-headR+8} ${headCy+5} L ${cx-headR+2} ${headCy+5} Z" fill="#d8d6e8"/>`;
+    svg += `<path d="M ${cx+headR-2} ${headCy-headR*0.3} L ${cx+headR-8} ${headCy+5} L ${cx+headR-2} ${headCy+5} Z" fill="#d8d6e8"/>`;
+  }
+
+  // Eyes — colored glow
+  const eyeY = headCy - 4;
+  const eyeOffset = 14;
+  svg += `<circle cx="${cx-eyeOffset}" cy="${eyeY}" r="6" fill="${eyeHex}" opacity="0.18"/>`;
+  svg += `<circle cx="${cx+eyeOffset}" cy="${eyeY}" r="6" fill="${eyeHex}" opacity="0.18"/>`;
+  svg += `<ellipse cx="${cx-eyeOffset}" cy="${eyeY}" rx="3.5" ry="2.2" fill="${eyeHex}"/>`;
+  svg += `<ellipse cx="${cx+eyeOffset}" cy="${eyeY}" rx="3.5" ry="2.2" fill="${eyeHex}"/>`;
+  svg += `<circle cx="${cx-eyeOffset}" cy="${eyeY}" r="1.2" fill="rgba(0,0,0,.85)"/>`;
+  svg += `<circle cx="${cx+eyeOffset}" cy="${eyeY}" r="1.2" fill="rgba(0,0,0,.85)"/>`;
+
+  // Mouth — subtle, mood depends on subtype
+  const mouthY = headCy + 18;
+  const mouthMoodCurve = character.subtype.includes('Hermit')||character.subtype.includes('Martyr')||
+                        character.subtype.includes('Burden')||character.subtype.includes('Ghost') ? -2 :
+                        character.subtype.includes('Influencer')||character.subtype.includes('Revival')||
+                        character.subtype.includes('Bridge')||character.subtype.includes('Moment') ? 2 : 0;
+  svg += `<path d="M ${cx-10} ${mouthY} Q ${cx} ${mouthY+mouthMoodCurve}, ${cx+10} ${mouthY}"
+            fill="none" stroke="rgba(0,0,0,.4)" stroke-width="1.3" stroke-linecap="round"/>`;
+
+  // Subtle face shading
+  svg += `<path d="M ${cx+headR-3} ${headCy-25} Q ${cx+headR+5} ${headCy+10}, ${cx+headR-8} ${headCy+headR*0.6}"
+            fill="none" stroke="rgba(0,0,0,.12)" stroke-width="4"/>`;
+
+  // Sigil — class symbol below the figure, centered at bottom
+  const sigilCy = H - 50;
+  if (character.class.includes('Form')) {
+    // Diamond
+    svg += `<polygon points="${cx},${sigilCy-12} ${cx+12},${sigilCy} ${cx},${sigilCy+12} ${cx-12},${sigilCy}"
+              fill="none" stroke="${AXIS_COLOR.V}" stroke-width="1.5"/>`;
+  } else if (character.class.includes('Thread')) {
+    // Wavy line
+    svg += `<path d="M ${cx-16} ${sigilCy} Q ${cx-8} ${sigilCy-8}, ${cx} ${sigilCy} T ${cx+16} ${sigilCy}"
+              fill="none" stroke="${AXIS_COLOR.T}" stroke-width="1.5" stroke-linecap="round"/>`;
+  } else {
+    // Linked rings
+    svg += `<circle cx="${cx-7}" cy="${sigilCy}" r="6" fill="none" stroke="${AXIS_COLOR.H}" stroke-width="1.5"/>`;
+    svg += `<circle cx="${cx+7}" cy="${sigilCy}" r="6" fill="none" stroke="${AXIS_COLOR.H}" stroke-width="1.5"/>`;
+  }
+
+  // Three glowing axis points on the figure (the framework hook)
+  // Vertical/Depth = forehead
+  svg += `<circle cx="${cx}" cy="${headCy-headR+8}" r="3" fill="${AXIS_COLOR.V}" opacity="0.9"/>`;
+  // Horizontal/Breath = throat
+  svg += `<circle cx="${cx}" cy="${headCy+headR+10}" r="3" fill="${AXIS_COLOR.H}" opacity="0.9"/>`;
+  // Temporal/Obligation = heart
+  svg += `<circle cx="${cx-6}" cy="${garmentTop+45}" r="3" fill="${AXIS_COLOR.T}" opacity="0.9"/>`;
+
+  // Stamp mark — a small glyph in the corner, only if a stamp is present
+  if (character.stamp && character.stamp !== 'None') {
+    const stampColor = { Scarcity:'#a87330', Displacement:'#7390c0', Violence:'#b03050',
+                          Silencing:'#6a6a8a', Abandonment:'#a06090' }[character.stamp];
+    svg += `<rect x="${W-50}" y="${H-50}" width="30" height="30" rx="3"
+              fill="none" stroke="${stampColor}" stroke-width="1.3"/>`;
+    const letter = character.stamp[0];
+    svg += `<text x="${W-35}" y="${H-30}" text-anchor="middle"
+              font-family="Courier New, monospace" font-size="14" fill="${stampColor}"
+              letter-spacing="1">${letter}</text>`;
+  }
+
+  return svg;
+}
+
+// =============================================================================
+// APP CONTROLLER
+// =============================================================================
+const Forge = (function(){
+
+  let state = {
+    seed: '',
+    character: null,
+    backstory: null,
+    locks: new Set(),  // field names locked from shuffle
+    profiles: [],
+  };
+
+  function $(id){ return document.getElementById(id); }
+
+  // ── UI rendering ─────────────────────────────────────────────────────────
+  function paintHdrMark(){
+    const cx=23, cy=23;
+    let svg = `<svg viewBox="0 0 46 46" xmlns="http://www.w3.org/2000/svg">`;
+    svg += `<defs><radialGradient id="hm" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="rgba(160,64,255,.4)"/>
+      <stop offset="100%" stop-color="rgba(0,0,0,0)"/></radialGradient></defs>`;
+    svg += `<circle cx="${cx}" cy="${cy}" r="22" fill="url(#hm)"/>`;
+    svg += `<ellipse cx="${cx}" cy="${cy}" rx="16" ry="20" fill="none"
+      stroke="rgba(180,140,255,.7)" stroke-width="1"/>`;
+    // Tiny figure
+    svg += `<circle cx="${cx}" cy="${cy-6}" r="4" fill="rgba(40,22,80,.95)"
+      stroke="rgba(180,140,255,.8)" stroke-width="0.8"/>`;
+    svg += `<path d="M ${cx-7} ${cy} L ${cx+7} ${cy} L ${cx+9} ${cy+10} L ${cx-9} ${cy+10} Z"
+      fill="rgba(40,22,80,.95)" stroke="rgba(180,140,255,.8)" stroke-width="0.8"/>`;
+    // Three axis dots
+    svg += `<circle cx="${cx}" cy="${cy-9}" r="1.5" fill="#ffd47a"/>`;
+    svg += `<circle cx="${cx}" cy="${cy-2}" r="1.5" fill="#80ffff"/>`;
+    svg += `<circle cx="${cx-1}" cy="${cy+5}" r="1.5" fill="#ff60d0"/>`;
+    svg += `</svg>`;
+    $('hdr-mark').innerHTML = svg;
+  }
+
+  function buildControl(id, label, options, currentValue){
+    const opts = options.map(o => `<option value="${o}" ${o===currentValue?'selected':''}>${o}</option>`).join('');
+    const isLocked = state.locks.has(id);
+    return `<div class="ctrl-row">
+      <button class="lock-btn ${isLocked?'on':''}" onclick="Forge.toggleLock('${id}')" title="Lock">⏶</button>
+      <label>${label}</label>
+      <select id="sel-${id}" onchange="Forge.setTrait('${id}', this.value)">${opts}</select>
+    </div>`;
+  }
+
+  function renderControls(){
+    const c = state.character;
+    if (!c) return;
+    $('ctrl-zone').innerHTML    = buildControl('zone', 'Zone', Object.keys(ZONES).map(z=>`${z}`), c.zone);
+    $('ctrl-subtype').innerHTML = buildControl('subtype', 'Subtype', SUBTYPES[c.zone], c.subtype);
+    $('ctrl-class').innerHTML   = buildControl('cls', 'Class', CLASSES, c.class);
+    $('ctrl-stamp').innerHTML   = buildControl('stamp', 'Stamp', STAMPS, c.stamp);
+    $('ctrl-capture').innerHTML = buildControl('capture', 'Capture', CAPTURES, c.capture);
+    $('ctrl-origin').innerHTML  = buildControl('origin', 'Origin', ORIGINS, c.origin);
+    $('ctrl-age').innerHTML     = buildControl('age', 'Age', AGE_BANDS, c.age);
+    $('ctrl-build').innerHTML   = buildControl('build', 'Build', BUILDS, c.physical.build);
+    $('ctrl-skin').innerHTML    = buildControl('skin', 'Skin', SKINS, c.physical.skin);
+    $('ctrl-hair').innerHTML    = buildControl('hair', 'Hair', HAIRS, c.physical.hair);
+    $('ctrl-eyes').innerHTML    = buildControl('eyes', 'Eyes', EYES, c.physical.eyes);
+    $('ctrl-garment').innerHTML = buildControl('garment', 'Garment', GARMENTS, c.physical.garment);
+  }
+
+  function renderCharacter(){
+    const c = state.character;
+    if (!c) return;
+
+    // Portrait
+    const rng = new RNG(state.seed + '::portrait');
+    $('portrait').innerHTML = renderPortrait(c, rng);
+
+    // Identity card
+    $('id-name').textContent = c.name.full;
+    $('id-epithet').textContent = '“' + c.epithet + '”';
+    $('id-tags').innerHTML = [
+      `<span class="id-tag zone">Zone ${c.zone}</span>`,
+      `<span class="id-tag subtype">${c.subtype}</span>`,
+      `<span class="id-tag class">${c.class}</span>`,
+      c.stamp !== 'None' ? `<span class="id-tag stamp">${c.stamp} Stamp</span>` : '',
+      c.capture !== 'None' ? `<span class="id-tag">${c.capture} Capture</span>` : '',
+    ].join('');
+    $('id-grid').innerHTML = `
+      <div class="k">Origin</div><div class="v">${c.origin}</div>
+      <div class="k">Age</div><div class="v">${c.age}</div>
+      <div class="k">Build</div><div class="v">${c.physical.build}</div>
+      <div class="k">Skin</div><div class="v">${c.physical.skin}</div>
+      <div class="k">Hair</div><div class="v">${c.physical.hair}</div>
+      <div class="k">Eyes</div><div class="v">${c.physical.eyes}</div>
+      <div class="k">Garment</div><div class="v">${c.physical.garment}</div>
+    `;
+    $('mannerisms').innerHTML = c.mannerisms.map(m => `<li>${m}</li>`).join('');
+    $('voice').textContent = c.voice;
+    $('gift').textContent = c.gift;
+    $('wound').textContent = c.wound;
+    $('secret').textContent = c.secret;
+    $('aspiration').textContent = c.aspiration;
+    $('fear').textContent = c.fear;
+    $('seed-line').textContent = `seed: ${state.seed}`;
+
+    // Backstory
+    if (state.backstory){
+      const b = state.backstory;
+      const threadHTML = b.threads.map(t => `
+        <div class="thread">
+          <div class="tname">${t.kind}</div>
+          <div class="tdesc">${t.desc.replace(/\{name\}/g, c.name.first)}</div>
+        </div>`).join('');
+      $('backstory').innerHTML = `
+        <h4>Origin</h4><p>${b.origin}</p>
+        <h4>The Weight Behind</h4><p>${b.weight}</p>
+        <h4>The Fracture</h4><p>${b.fracture}</p>
+        <h4>The Years Between</h4><p>${b.between}</p>
+        <h4>Three Threads</h4>
+        <p style="font-style:italic;color:var(--ink-dim);">${b.threadsIntro}</p>
+        <div class="threads">${threadHTML}</div>
+        <h4>Where They Stand Now</h4><p>${b.present}</p>
+      `;
+    }
+  }
+
+  // ── Generation ───────────────────────────────────────────────────────────
+  function generate(seedOverride, presetTraits){
+    state.seed = seedOverride || ('seed_' + Date.now().toString(36) + '_' + Math.floor(Math.random()*100000).toString(36));
+    $('seed-input').value = state.seed;
+
+    const rng = new RNG(state.seed);
+    state.character = buildCharacter(rng, presetTraits || {});
+    const backRng = new RNG(state.seed + '::story');
+    state.backstory = composeBackstory(state.character, backRng);
+    renderControls();
+    renderCharacter();
+  }
+
+  function newCharacter(){
+    // Honor locks if present
+    const locked = {};
+    if (state.character) {
+      for (const f of state.locks){
+        if (f === 'cls') locked.cls = state.character.class;
+        else if (['build','skin','hair','eyes','garment'].includes(f)) locked[f] = state.character.physical[f];
+        else locked[f] = state.character[f];
+      }
+    }
+    generate(null, locked);
+  }
+
+  function shuffleUnlocked(){
+    if (!state.character){ newCharacter(); return; }
+    newCharacter();  // same as new, honors locks
+  }
+
+  function regenBackstory(){
+    if (!state.character) return;
+    const backRng = new RNG(state.seed + '::story::' + Math.random());
+    state.backstory = composeBackstory(state.character, backRng);
+    renderCharacter();
+  }
+
+  function toggleLock(field){
+    if (state.locks.has(field)) state.locks.delete(field);
+    else state.locks.add(field);
+    renderControls();
+  }
+
+  function setTrait(field, value){
+    if (!state.character) return;
+    const c = state.character;
+    if (field === 'zone'){
+      c.zone = value;
+      // Reset subtype to first in new zone
+      c.subtype = SUBTYPES[value][0];
+      // Re-pick zone-conditioned fields
+      const rng = new RNG(state.seed + '::trait::' + Date.now());
+      c.epithet = rng.pick(EPITHETS[value]);
+      c.aspiration = rng.pick(ASPIRATIONS[value]);
+      c.secret = rng.pick(SECRETS[value]);
+    }
+    else if (field === 'subtype') c.subtype = value;
+    else if (field === 'cls') c.class = value;
+    else if (field === 'stamp'){
+      c.stamp = value;
+      const rng = new RNG(state.seed + '::stamp::' + Date.now());
+      c.fear = rng.pick(FEARS[value]);
+      c.wound = rng.pick(WOUNDS[value]);
+    }
+    else if (field === 'capture') c.capture = value;
+    else if (field === 'origin'){
+      c.origin = value;
+      const desc = ORIGIN_PREFIX[value] || [''];
+      const rng = new RNG(state.seed + '::origin::' + Date.now());
+      c.name.origin_descriptor = rng.pick(desc);
+      c.name.full = `${c.name.first} ${c.name.last} ${c.name.origin_descriptor}`.trim();
+    }
+    else if (field === 'age') c.age = value;
+    else if (['build','skin','hair','eyes','garment'].includes(field)) c.physical[field] = value;
+    // Re-render
+    const backRng = new RNG(state.seed + '::story');
+    state.backstory = composeBackstory(c, backRng);
+    renderControls();
+    renderCharacter();
+  }
+
+  // ── Profile integration ──────────────────────────────────────────────────
+  async function loadProfiles(){
+    state.profiles = [];
+    // Profiles stored by the assessment app, under its data namespace.
+    // When inside the shell, the data layer is scoped per-app; we can't read
+    // assessment data directly. Instead, listen on the bus AND let the user
+    // paste/import. For Phase 1, we list locally cached versions (received via bus).
+// ─── References, not copies ─────────────────────────────────────────────────
+//  Apps in this hub used to keep a full private copy of everything they were
+//  sent: cached_character_<seed>, cached_profile_<id>, cached_scene_<seed>.
+//  Ten characters existed as twenty files, and the copies agreed with their
+//  originals only because nobody had edited one yet — rename a character in
+//  Character Forge and every copy kept the old name silently, forever.
+//
+//  A received record is now stored as a reference — ref_<kind>_<id> holding
+//  {$ref:"<slug>/<key>"} — and resolved through the shell on load, so what an
+//  app shows is whatever the source currently says.
+//
+//  Legacy cached_ copies are still read, so nothing disappears if the source no
+//  longer has the original, and are converted to references on sight when they
+//  can be resolved.
+const PalmRefs = {
+  //  kind: 'character' | 'profile' | 'scene'  — names the local key prefix
+  //  type: the contract type recorded against the person (claim)
+  //  source(id): "slug/key" where the real record lives
+  //  idOf(rec): the field that identifies it
+  //  valid(rec): does this look like a real record of this kind
+  make({ kind, type, source, idOf, valid }){
+    const refPrefix    = 'ref_'    + kind + '_';
+    const legacyPrefix = 'cached_' + kind + '_';
+    const F = () => (typeof window !== 'undefined' && window.fracture) || null;
+
+    const api = {
+      kind, type, refPrefix, legacyPrefix, source, idOf, valid,
+
+      supported(){ return !!(F() && typeof F().resolve === 'function'); },
+
+      //  Record a received item by reference. Falls back to a copy on a shell
+      //  too old to resolve, so this is safe to ship ahead of the shell update.
+      async receive(payload){
+        const f = F(); if (!f || !payload) return;
+        const id = idOf(payload); if (!id) return;
+        if (api.supported()){
+          await f.save(refPrefix + id, {
+            $ref: source(id), id, receivedAt: new Date().toISOString(),
+          });
+          if (f.claim){ try { await f.claim(type, source(id)); } catch (e){} }
+        } else {
+          await f.save(legacyPrefix + id, payload);
+        }
+      },
+
+      //  Everything this app holds of this kind, resolved live.
+      //  Returns [{ key, id, data, missing?, legacy? }].
+      async loadAll(){
+        const f = F(); if (!f) return [];
+        const out = [], seen = new Set();
+        const keys = await f.list();
+
+        for (const k of keys.filter(k => k.startsWith(refPrefix))){
+          const rec = await f.read(k);
+          if (!rec || !rec.$ref) continue;
+          // Tolerate an id under any of the names a reference has been written
+          // with, and fall back to the key itself, so a record can never lose
+          // its identity just because the field was renamed.
+          const rid = rec.id || rec.seed || rec.participant_id || k.slice(refPrefix.length);
+          const data = api.supported() ? await f.resolve(rec.$ref) : null;
+          if (data && valid(data)){ out.push({ key:k, id:rid, data }); }
+          else {
+            // Keep the record rather than dropping the user's row, but say so
+            // instead of rendering something blank.
+            out.push({ key:k, id:rid, missing:true, ref:rec.$ref });
+          }
+          seen.add(rid);
+        }
+
+        for (const k of keys.filter(k => k.startsWith(legacyPrefix))){
+          const data = await f.read(k);
+          if (!data || !valid(data)) continue;
+          const id = idOf(data) || k.slice(legacyPrefix.length);
+          if (seen.has(id)){ await api._retire(k); continue; }
+          if (api.supported() && await f.resolve(source(id))){
+            await api.receive(data);
+            await api._retire(k);
+            out.push({ key: refPrefix + id, id, data: await f.resolve(source(id)) });
+          } else {
+            out.push({ key:k, id, data, legacy:true });
+          }
+          seen.add(id);
+        }
+        return out;
+      },
+
+      //  The common case: just the records, skipping anything unresolvable.
+      async values(){
+        return (await api.loadAll()).filter(r => !r.missing).map(r => r.data);
+      },
+
+      async _retire(key){
+        const f = F();
+        try { if (f && f.delete) await f.delete(key); } catch (e){}
+      },
+    };
+    return api;
+  },
+};
+
+//  The three kinds this hub actually passes around.
+const CharRefs = PalmRefs.make({
+  kind: 'character', type: 'character.identity.v1',
+  source: id => 'character-forge/character_' + id,
+  idOf:  r => r && r.seed,
+  valid: r => !!(r && r.name),
+});
+const ProfileRefs = PalmRefs.make({
+  kind: 'profile', type: 'tot.profile.v1',
+  source: id => 'coherence-assessment/profile_' + id,
+  idOf:  r => r && r.participant_id,
+  valid: r => !!(r && r.zone),
+});
+const SceneRefs = PalmRefs.make({
+  kind: 'scene', type: 'scene.moment.v1',
+  source: id => 'scene-composer/scene_' + id,
+  idOf:  r => r && r.seed,
+  valid: r => !!(r && r.title),
+});
+
+if (typeof window !== 'undefined'){
+  window.PalmRefs = PalmRefs;          /* debug + tests */
+  window.CharRefs = CharRefs;
+  window.ProfileRefs = ProfileRefs;
+  window.SceneRefs = SceneRefs;
+}
+
+    const select = $('profile-select');
+    select.innerHTML = '<option value="">— none —</option>';
+    if (window.fracture){
+      // Live from Coherence Assessment. Retaking the assessment updates the
+      // profile here without a second copy going stale behind it.
+      for (const { key, data } of await ProfileRefs.loadAll()){
+        if (!data) continue;
+        state.profiles.push(data);
+        select.innerHTML += `<option value="${key}">${data.participant_id} · Zone ${data.zone}</option>`;
+      }
+    }
+  }
+
+  async function applyProfile(profileKey){
+    if (!profileKey) return;
+    const p = state.profiles.find((x,i) => x);
+    const stored = await window.fracture.read(profileKey);
+    if (!stored) return;
+    const traits = {
+      zone: stored.zone,
+      subtype: stored.subtype?.primary?.name || undefined,
+      stamp: stored.stamps?.primary || 'None',
+      capture: stored.captures?.type || 'None',
+    };
+    generate(null, traits);
+  }
+
+  // ── Persistence + export ─────────────────────────────────────────────────
+  async function save(){
+    if (!state.character) return;
+    const record = {
+      ...state.character,
+      seed: state.seed,
+      timestamp: new Date().toISOString(),
+      backstory: state.backstory,
+    };
+    await window.fracture.save('character_' + state.seed, record);
+    if (window.fracture.shell) await window.fracture.emit('character.identity.v1', record);
+    flashStatus('Saved.');
+  }
+
+  function exportJSON(){
+    if (!state.character) return;
+    const record = { ...state.character, seed: state.seed,
+      timestamp: new Date().toISOString(), backstory: state.backstory };
+    const blob = new Blob([JSON.stringify(record, null, 2)], {type:'application/json'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `character_${state.character.name.first}_${state.character.name.last}_${state.seed.slice(0,12)}.json`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  }
+
+  function exportPortrait(){
+    const svgEl = $('portrait');
+    const svgStr = new XMLSerializer().serializeToString(svgEl);
+    const blob = new Blob([svgStr], {type:'image/svg+xml;charset=utf-8'});
+    const url = URL.createObjectURL(blob);
+    const img = new Image();
+    img.onload = function(){
+      const c = document.createElement('canvas');
+      c.width = 760; c.height = 920;
+      const ctx = c.getContext('2d');
+      ctx.fillStyle = '#04020a';
+      ctx.fillRect(0,0,c.width,c.height);
+      ctx.drawImage(img, 0, 0, c.width, c.height);
+      c.toBlob(blob => {
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `${state.character.name.first}_${state.character.name.last}.png`;
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+      }, 'image/png');
+      URL.revokeObjectURL(url);
+    };
+    img.src = url;
+  }
+
+  function flashStatus(msg){
+    const el = $('ctx');
+    const before = el.textContent;
+    el.textContent = msg;
+    setTimeout(() => { el.textContent = before; }, 2000);
+  }
+
+  // ── Bus subscription for live profile import ─────────────────────────────
+  function setupBus(){
+    if (window.fracture && window.fracture.shell){
+      window.fracture.subscribe('tot.profile.v1', async (payload) => {
+        // Cache it so we can list it in the dropdown
+        if (payload && payload.participant_id){
+          await ProfileRefs.receive(payload);
+          await loadProfiles();
+          flashStatus('New profile received.');
+        }
+      });
+    }
+  }
+
+  // ── Boot ─────────────────────────────────────────────────────────────────
+  async function boot(){
+    paintHdrMark();
+    $('ctx').textContent = window.fracture?.shell ? 'IN SHELL · LIVE BUS' : 'STANDALONE';
+    $('seed-input').addEventListener('change', e => {
+      if (e.target.value) generate(e.target.value);
+    });
+    $('profile-select').addEventListener('change', e => applyProfile(e.target.value));
+    setupBus();
+    await loadProfiles();
+    generate();
+  }
+
+  document.addEventListener('DOMContentLoaded', boot);
+
+  return { newCharacter, shuffleUnlocked, regenBackstory, toggleLock,
+           setTrait, save, exportJSON, exportPortrait };
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,73 @@
+{
+  "name": {
+    "first": "Auron",
+    "last": "Crest",
+    "full": "Auron Crest keeper-born",
+    "origin_descriptor": "keeper-born"
+  },
+  "epithet": "who held the circle and lost the rope",
+  "zone": "IV",
+  "subtype": "The Circle",
+  "class": "Keeper of Thread",
+  "stamp": "Displacement",
+  "capture": "None",
+  "origin": "The Archive",
+  "age": "Adolescent",
+  "physical": {
+    "build": "Average",
+    "skin": "bronze",
+    "hair": "long and braided",
+    "eyes": "amber",
+    "garment": "priest mantle"
+  },
+  "mannerisms": [
+    "finishes other people's sentences with their permission",
+    "touches the back of their own left hand when listening",
+    "collects the names of streets they will not return to",
+    "eats fruit from the inside out"
+  ],
+  "voice": "low and unhurried, like sand settling",
+  "aspiration": "to build a temple their children will recognize",
+  "fear": "arriving somewhere new and finding it is also gone",
+  "gift": "they speak the truth others find unsayable",
+  "wound": "the country that is no longer on any map",
+  "secret": "that the community fractured years ago and they hide it",
+  "threads": [
+    {
+      "kind": "A teacher",
+      "desc": "who never knew how thoroughly {name} listened"
+    },
+    {
+      "kind": "A child",
+      "desc": "they failed once and have been quietly making it up to since"
+    },
+    {
+      "kind": "A stranger",
+      "desc": "who said the right sentence at the right moment, and is unaware of any of it"
+    }
+  ],
+  "seed": "seed_mpxfpr4k_1jvh",
+  "timestamp": "2026-06-03T02:15:49.316Z",
+  "backstory": {
+    "origin": "Born in The Archive, keeper-born, Auron grew up in a household where something was always being repaired, never quite finished.",
+    "weight": "Two displacements shaped this family before Auron arrived. The map has been redrawn twice in living memory, and they were on the wrong side of both lines.",
+    "fracture": "They were nineteen the night the singing did not stop. Auron found themselves inside something larger than themselves, and the memory of that warmth has organized every choice since.",
+    "between": "The years that followed were not as remarkable as either the beginning or the present. Auron took a soldier's commission, lost it, took an archive desk, kept it longer than they expected. There was a season of letter-writing that nobody who knew them then forgets.",
+    "present": "Currently, Auron is keeping a room exactly as it was, refusing to make peace with a thing that does not deserve it, and watching for someone they have not seen in years. The plan, if one can call it that, is to do all three for as long as it takes.",
+    "threadsIntro": "Three people belong, in different ways, to the shape of Auron's life:",
+    "threads": [
+      {
+        "kind": "A teacher",
+        "desc": "who never knew how thoroughly {name} listened"
+      },
+      {
+        "kind": "A child",
+        "desc": "they failed once and have been quietly making it up to since"
+      },
+      {
+        "kind": "A stranger",
+        "desc": "who said the right sentence at the right moment, and is unaware of any of it"
+      }
+    ]
+  }
+}

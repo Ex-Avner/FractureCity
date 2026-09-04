@@ -1,0 +1,73 @@
+{
+  "name": {
+    "first": "Sorrel",
+    "last": "Vey",
+    "full": "Sorrel Vey from before the Tally",
+    "origin_descriptor": "from before the Tally"
+  },
+  "epithet": "who knew the singing but not the dead",
+  "zone": "IV",
+  "subtype": "The Greenhouse",
+  "class": "Blade of Form",
+  "stamp": "None",
+  "capture": "None",
+  "origin": "The Outer Ruins",
+  "age": "Young Adult",
+  "physical": {
+    "build": "Slight",
+    "skin": "rose-ochre",
+    "hair": "long and braided",
+    "eyes": "green",
+    "garment": "soldier vest"
+  },
+  "mannerisms": [
+    "never sits with their back to a door",
+    "will not say a name they have not earned",
+    "keeps a list of people whose birthdays no one else remembers",
+    "speaks more softly when angry"
+  ],
+  "voice": "flat, deliberate, no music allowed in",
+  "aspiration": "to build a temple their children will recognize",
+  "fear": "being misunderstood after they are gone",
+  "gift": "they finish what they begin",
+  "wound": "a decade given to the wrong thing",
+  "secret": "that the founder they revere was a fraud",
+  "threads": [
+    {
+      "kind": "A rival",
+      "desc": "who became necessary to the work without either of them saying so"
+    },
+    {
+      "kind": "A stranger",
+      "desc": "who said the right sentence at the right moment, and is unaware of any of it"
+    },
+    {
+      "kind": "A parent",
+      "desc": "whom {name} has been forgiving in installments for years"
+    }
+  ],
+  "seed": "seed_mpxcnnif_9v0",
+  "timestamp": "2026-06-03T00:50:14.521Z",
+  "backstory": {
+    "origin": "Born in The Outer Ruins, from before the Tally, Sorrel grew up in a household where the kitchen was warm and the rest of the house was not.",
+    "weight": "Their family carries no particular signature wound. What they inherited instead was a long, quiet expectation that one ought to be reasonable.",
+    "fracture": "At nineteen, Sorrel entered a circle that was both deep and shared, and they have spent every year afterward trying to find another room of the same shape.",
+    "between": "Between then and now, they did most of the ordinary things. They lived in a barge that never finished its route for a time, learned to mend their own clothes, and grew briefly close to a person whose name they will not say in mixed company.",
+    "present": "These days, Sorrel can be found in the workshop most mornings. They have a small icon they did not buy that they will not throw away, and a habit of rereading the same page until they fall asleep that even their oldest friends find slightly strange.",
+    "threadsIntro": "Three people belong, in different ways, to the shape of Sorrel's life:",
+    "threads": [
+      {
+        "kind": "A rival",
+        "desc": "who became necessary to the work without either of them saying so"
+      },
+      {
+        "kind": "A stranger",
+        "desc": "who said the right sentence at the right moment, and is unaware of any of it"
+      },
+      {
+        "kind": "A parent",
+        "desc": "whom {name} has been forgiving in installments for years"
+      }
+    ]
+  }
+}

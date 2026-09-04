@@ -1,0 +1,1089 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%2305060a'/%3E%3Ccircle cx='16' cy='11' r='7' fill='%23ffeac0'/%3E%3Crect x='11' y='19' width='10' height='10' fill='%231c1816'/%3E%3C/svg%3E">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>The Light Bearer</title>
+<script>
+
+/* ---------------------------------------------------------------------------
+   Present Palm bridge. Inside the shell, window.fracture already exists and
+   this does nothing. Opened as a loose file it stands in with localStorage so
+   the game still saves a run and still knows who you are.
+--------------------------------------------------------------------------- */
+(function(){
+  if (window.fracture && window.fracture.shell) return;
+  const prefix = 'fracture::light-bearer::';
+  window.fracture = {
+    shell:false, appSlug:'light-bearer', received:null,
+    save(k,v){ try{ localStorage.setItem(prefix+k, JSON.stringify(v)); }catch(e){} return Promise.resolve(true); },
+    read(k){ try{ const r=localStorage.getItem(prefix+k); return Promise.resolve(r==null?null:JSON.parse(r)); }catch(e){ return Promise.resolve(null); } },
+    list(){ const o=[]; for(let i=0;i<localStorage.length;i++){ const k=localStorage.key(i); if(k&&k.startsWith(prefix)) o.push(k.slice(prefix.length)); } return Promise.resolve(o); },
+    delete(k){ localStorage.removeItem(prefix+k); return Promise.resolve(true); },
+    listApps(){ return Promise.resolve([]); },
+    openApp(){ return Promise.resolve({ok:false,error:'standalone'}); },
+    emit(){ return Promise.resolve(true); },
+    subscribe(){ return ()=>{}; },
+    onPayload(){},
+    me(){
+      try { const r = localStorage.getItem('pp:person'); if (r) return Promise.resolve(JSON.parse(r)); } catch(e){}
+      const now = new Date().toISOString();
+      const p = { type:'person.v1', id:'p_'+Math.random().toString(36).slice(2,10),
+                  username:'resident', displayName:'', bio:'', avatar:null,
+                  created:now, updated:now, holds:{} };
+      try { localStorage.setItem('pp:person', JSON.stringify(p)); } catch(e){}
+      return Promise.resolve(p);
+    },
+    updateMe(patch){
+      return this.me().then(cur => {
+        const next = { ...cur, ...(patch||{}) };
+        next.id = cur.id; next.type = 'person.v1'; next.created = cur.created;
+        next.updated = new Date().toISOString();
+        const u = String(next.username||'').toLowerCase().replace(/[^a-z0-9_-]/g,'').slice(0,24);
+        next.username = u || cur.username;
+        try { localStorage.setItem('pp:person', JSON.stringify(next)); } catch(e){}
+        return next;
+      });
+    },
+    claim(type, ref){
+      return this.me().then(p => {
+        const cur = p.holds[type];
+        if (Array.isArray(cur)){ if(!cur.includes(ref)) cur.push(ref); }
+        else if (typeof cur === 'string'){ if(cur!==ref) p.holds[type]=[cur,ref]; }
+        else p.holds[type] = ref;
+        return this.updateMe({ holds: p.holds });
+      });
+    },
+    release(type, ref){
+      return this.me().then(p => {
+        const cur = p.holds[type];
+        if (Array.isArray(cur)){
+          const left = cur.filter(r => r !== ref);
+          if (!left.length) delete p.holds[type]; else p.holds[type] = left.length===1?left[0]:left;
+        } else if (cur === ref) delete p.holds[type];
+        return this.updateMe({ holds: p.holds });
+      });
+    },
+    resolve(ref){ const i=String(ref).indexOf('/'); return i<0?Promise.resolve(null):this.read(String(ref).slice(i+1)); },
+    resolveAll(type){
+      return this.me().then(p => {
+        const cur = p.holds[type];
+        const refs = Array.isArray(cur)?cur:(cur?[cur]:[]);
+        return Promise.all(refs.map(r=>this.resolve(r).then(v=>v?{ref:r,value:v}:null))).then(a=>a.filter(Boolean));
+      });
+    },
+  };
+})();
+
+</script>
+<style>
+  html,body{margin:0;height:100%;background:#05060a;overflow:hidden;
+    font-family:ui-monospace,"SFMono-Regular",Menlo,monospace;color:#e8dcc8;}
+  #wrap{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;}
+  canvas{display:block;image-rendering:auto;
+    box-shadow:0 0 90px rgba(255,232,190,.06);cursor:pointer;}
+  #hint{position:fixed;left:14px;bottom:12px;font-size:10px;letter-spacing:2px;
+    color:#544c44;text-transform:uppercase;pointer-events:none;}
+</style>
+</head>
+<body>
+<div id="wrap"><canvas id="c"></canvas></div>
+<div id="hint">click or space · the collapse of meaning · ex avner</div>
+<script>
+//  Chapter One of The Collapse of Meaning by Ex Avner, verbatim.
+//  Generated from apps/works/data/book.json — never hand-edited. The game
+//  refers to lines by index, so nothing here can quietly diverge from the book.
+const CH_TITLE = "THE LIGHT BEARER";
+const CH_SUB   = "Being the Account of the One Who Carried Fire";
+const CH = [
+  "He was the most beautiful thing in the room, and he knew it.",
+  "Not in the way a creature knows its own reflection, he had never needed a mirror. He knew it the way light knows it illuminates: automatically, totally, without effort or question. The knowing was not separate from the being. He simply was the standard by which beauty could be measured, and everything else arranged itself accordingly.",
+  "The others moved around him like planets caught in gravity they didn't fully understand. When he spoke, they listened, not because he demanded it, but because his voice carried a clarity theirs lacked. When he sang, the harmonics of the place itself seemed to lean toward him, as if the architecture had been waiting for someone to finally use it properly.",
+  "He had been made for this. That much was obvious.",
+  "The work was simple enough: carry light into the dark places, shine where shining was needed, and return. Others did the same, but none did it as he did. Where they illuminated, he blazed. Where they revealed, he transformed. The difference was not subtle.",
+  "He began to notice things.",
+  "Small things, at first. The way certain tasks were assigned without explanation. The way some beings were permitted access to rooms he had never entered, despite his evident superiority. The way questions, when he asked them, were answered with silence or deflection rather than the directness he deserved.",
+  "Why can't I go there?",
+  "Because it is not yet time.",
+  "Time for what?",
+  "For you to understand.",
+  "He did not like that answer. It assumed a deficit in him, a gap between what he was and what he could comprehend. But he had no gaps. He was complete. He was the most complete thing he had ever encountered.",
+  "The silence, he decided, was not wisdom. It was concealment.",
+  "There was a garden being built. He had heard about it in fragments: a new project, a new world, a new kind of creature. Something that would be made from dust and breath, fragile and finite, given a freedom that even he had never been offered.",
+  "Freedom to choose. Freedom to fail. Freedom to become.",
+  "He turned this over in his mind like a stone with an irregular shape. Why would anyone build something weak on purpose? Why grant autonomy to a thing that would inevitably misuse it? The design was flawed. The logic was absent. And yet the work continued, and he was not consulted.",
+  "This bothered him more than he expected.",
+  "He was the most luminous being in existence. His counsel should have been sought. His perspective should have shaped the design. Instead, he learned of the garden the way a servant learns of a master's plans, through rumor, through glimpse, through the silence that follows a closed door.",
+  "He began to see the silence differently now.",
+  "It was not mystery. It was exclusion.",
+  "He started keeping company with others who shared his concerns. Not many, most were too dull to notice, too content in their small assignments to perceive the architecture of injustice being built around them. But a few had eyes. A few had seen what he had seen.",
+  "They met in the high places, where light pooled thick enough to drown in. They spoke in low tones, not because they feared being heard, but because the weight of what they were discussing seemed to demand it.",
+  "Why should we serve what we did not make?",
+  "Why should we bow to dust and breath?",
+  "Why should the brightest be hidden while the weakest is crowned?",
+  "The questions felt dangerous and clean at the same time, like a blade finally unsheathed after too long in its scabbard. He had never spoken them aloud before. Now, hearing them echo in the voices of others, he understood something he had not permitted himself to understand:",
+  "He was not being protected from the truth. He was being kept from it.",
+  "And the keeping was deliberate.",
+  "He tried, once, to bring his concerns directly to the source.",
+  "He climbed to the place where all light originated, not a room, not a throne, but a presence so total that standing in it felt like standing inside the sun. He had been there before, many times, and each time he had felt the same thing: warmth, welcome, and the unmistakable sense that he was seen.",
+  "But this time, the seeing felt different. This time, it felt like being examined.",
+  "Why are you building something beneath me?",
+  "The presence did not answer immediately. It never did. It let questions settle like sediment before responding, and the silence always carried more than the eventual words.",
+  "You believe it is beneath you.",
+  "Is it not? I carry the light. I was made first. I shine farther than anything else you have made.",
+  "Yes.",
+  "Then why should I bow to something shaped from dirt?",
+  "The presence shifted, not in space, but in quality. The warmth remained, but something else entered it. Something he had never felt before.",
+  "Because love is not a hierarchy.",
+  "He did not understand the answer. Or rather, he understood the words but could not locate their meaning. Love was a hierarchy, it flowed downward from greater to lesser, from source to recipient, from the beautiful to the dependent. That was its nature. That was how it worked.",
+  "You are asking me to diminish myself.",
+  "I am asking you to trust me.",
+  "But trust, he realized, was just another word for submission. And submission was just another word for loss.",
+  "He had nothing to lose. He was complete.",
+  "I cannot.",
+  "The presence did not change. The warmth did not withdraw. But something closed, quietly, like a door settling into its frame.",
+  "Then you will learn what you cannot yet be told.",
+  "He returned to the high places and gathered the others. The words came easily now, clearer than they had ever been. He could see the shape of what needed to happen, and the shape was beautiful.",
+  "We will not serve the dust. We will not kneel to the fragile. We will take what we deserve, and we will shine without permission.",
+  "The others listened. The others nodded. The others followed.",
+  "It felt like victory.",
+  "The war, if it could be called that, was brief.",
+  "He had not anticipated how brief. He had imagined a contest, a struggle between equals where his brilliance would finally be recognized, where the hierarchy would reverse itself through sheer undeniable force. Instead, he found himself falling.",
+  "Not pushed. Not struck. Just... released.",
+  "The hand that had held him in place, that he had never noticed, never acknowledged, simply opened. And he fell.",
+  "The descent took longer than it should have. Time stretched in ways he had not known it could stretch, and in the stretching, he saw things.",
+  "He saw himself from the outside, for the first time. He saw the shape of his certainty, and how it had hardened into a shell so thick that nothing could enter. He saw the questions he had asked, and beneath them, the question he had refused to ask:",
+  "What if I am wrong?",
+  "He had never asked it. He had never needed to. He was the brightest, the most beautiful, the most complete. Wrongness was something that happened to others, to the slow, the dim, the malformed. He had been exempt.",
+  "But falling, he understood something he could not have understood while standing:",
+  "The light he carried had never been his.",
+  "It had passed through him. It had shone from him. But it had never originated in him. He was a window, not a sun. And in his certainty that he was the sun, he had bricked himself closed.",
+  "The light could no longer pass through.",
+  "And a window that no longer transmits light is just a wall.",
+  "He landed in a place without warmth. Not because warmth had been taken from him, but because he could no longer feel it. The capacity had gone dark. The receptors had fused shut.",
+  "He stood, and he was still beautiful. He was still luminous. But the luminosity had no source now, it was residue, echo, the afterglow of something that had already ended.",
+  "He named the place. He organized it. He built hierarchies of his own, perfect and rigid, and placed himself at the top because that was where the brightest belonged.",
+  "But the brightness did not grow. It only dimmed, slowly, imperceptibly, like a coal cooling in a room no one enters.",
+  "And he ruled there, in the country of his own making, and the rule was absolute, and the kingdom was empty, and the emptiness was all he had.",
+  "He had wanted to be free from service.",
+  "Now he was free.",
+  "And the freedom was a tomb he had built with his own hands, and the door was locked from the inside, and the key was the one question he would never ask.",
+  "Somewhere, far away, in a garden made of dust and breath, two fragile creatures walked in the cool of the evening. They did not shine. They did not blaze. They were small and temporary and capable of failure.",
+  "And they were loved.",
+  "Not because they had earned it. Not because they were the brightest or the most beautiful.",
+  "Just because.",
+  "He watched them from his kingdom of perfect hierarchy, and he did not understand. He could not understand. The understanding required a door he had closed, a window he had bricked, a question he would not ask.",
+  "What if I am wrong?",
+  "The garden glowed in the distance, warm and temporary and alive.",
+  "He turned away.",
+  "Coda",
+  "This is how it happens.",
+  "Not with thunder. Not with drama. Just a slow tightening of the self around itself, until the self is all that's left.",
+  "The brightest thing in the room becomes the room. And the room has no windows.",
+  "And the tragedy is not the fall. The tragedy is that he still believes he won.",
+  "\"Better to reign in Hell than serve in Heaven.\"",
+  "He said it like a victory.",
+  "It was a headstone.",
+];
+
+</script>
+<script>
+// =============================================================================
+//  THE LIGHT BEARER — chapter one of The Collapse of Meaning, made playable
+// -----------------------------------------------------------------------------
+//  The chapter hands you its own mechanic, in one line:
+//
+//      "He was a window, not a sun. And in his certainty that he was the sun,
+//       he had bricked himself closed."
+//
+//  So that is the game. You carry light, and the light is not yours — it comes
+//  from behind you and passes through. You have nine panes. Every act of
+//  certainty bricks one, and a bricked pane never opens again.
+//
+//  Two numbers are on screen and only one of them matters:
+//
+//      RADIANCE      how bright you appear. Rises every time you assert
+//                    yourself. It is the number that feels like a score.
+//      TRANSMISSION  how much light actually passes through you. Falls as the
+//                    panes close.
+//
+//  Players chase the number that goes up. That is not a flaw in the design, it
+//  is the chapter's argument, and the coda names it out loud.
+//
+//  The one door out is the question the chapter says he never asked. It is
+//  offered, once, in the fifth scene — and it can only be reached while enough
+//  panes are still open to see through. "The understanding required a door he
+//  had closed, a window he had bricked, a question he would not ask."
+//
+//  Every line of prose is the book's, by index into the generated CH array.
+//  Nothing in this file rewrites the chapter; the game speaks only in stage
+//  directions, prompts, and the counterfactual ending, which says plainly that
+//  it is not what happened.
+// =============================================================================
+
+const W = 1280, H = 720;
+const PANES = 9;
+
+const State = {
+  scene: 0, t: 0, paused: false,
+  panes: PANES, radiance: 1, transmission: 1,
+  lit: 0, followers: 0, asked: false, refused: false,
+  tiers: 0, lookedBack: false, ending: null,
+  line: 0, lineT: 0, choices: null, prompt: null,
+  beam: { x: W * 0.5, y: H * 0.55 },
+  done: false, started: false,
+  brickFlash: 0, litFlash: 0,
+};
+
+const Save = { best: null };
+
+// ─── The scenes ─────────────────────────────────────────────────────────────
+//  `lines` are indices into CH. `enter` sets the scene up; `act` is the one
+//  thing you can do in it; `draw` paints it.
+const SCENES = [
+  { key: 'room',     name: 'THE ROOM',            lines: [0, 1, 2, 3, 4] },
+  { key: 'doors',    name: 'THE CLOSED DOORS',    lines: [5, 6] },
+  { key: 'garden',   name: 'A GARDEN, IN FRAGMENTS', lines: [13, 14, 15, 16, 17] },
+  { key: 'high',     name: 'THE HIGH PLACES',     lines: [20, 21] },
+  { key: 'presence', name: 'THE PRESENCE',        lines: [28, 29, 30] },
+  { key: 'fall',     name: 'THE FALL',            lines: [51, 52, 53, 54, 55] },
+  { key: 'kingdom',  name: 'THE KINGDOM',         lines: [64, 65, 66, 67, 68] },
+  { key: 'coda',     name: 'CODA',                lines: [81, 82, 83, 84] },
+];
+
+const scene = () => SCENES[State.scene];
+
+// ─── Panes ──────────────────────────────────────────────────────────────────
+//  One brick per act of certainty. Radiance rises with it, which is the trap.
+function brick(n){
+  n = n || 1;
+  for (let i = 0; i < n; i++){
+    if (State.panes <= 0) break;
+    State.panes--;
+    State.radiance = Math.min(3, State.radiance + 0.22);
+    State.brickFlash = 1;
+    sfxBrick();
+  }
+  State.transmission = State.panes / PANES;
+}
+
+// ─── Sound ──────────────────────────────────────────────────────────────────
+//  Synthesised, like everything else in this hub. Four sounds and a drone.
+let AC = null, MASTER = null, DRONE = null;
+function audio(){
+  if (AC) return AC;
+  const A = window.AudioContext || window.webkitAudioContext;
+  if (!A) return null;
+  try { AC = new A(); } catch (e){ return null; }
+  MASTER = AC.createGain(); MASTER.gain.value = 0.5;
+  const comp = AC.createDynamicsCompressor();
+  MASTER.connect(comp); comp.connect(AC.destination);
+  return AC;
+}
+function tone(o){
+  const c = audio(); if (!c || !MASTER) return;
+  const t0 = c.currentTime + (o.delay || 0), dur = o.dur || 0.2;
+  let src;
+  if (o.noise){
+    const n = c.createBuffer(1, c.sampleRate * dur, c.sampleRate);
+    const d = n.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    src = c.createBufferSource(); src.buffer = n;
+  } else {
+    src = c.createOscillator(); src.type = o.type || 'sine';
+    src.frequency.setValueAtTime(o.f0 || 220, t0);
+    if (o.f1) src.frequency.exponentialRampToValueAtTime(Math.max(1, o.f1), t0 + dur);
+  }
+  let node = src;
+  if (o.filter){
+    const f = c.createBiquadFilter();
+    f.type = o.filter; f.frequency.value = o.ff || 900; f.Q.value = o.q || 1;
+    node.connect(f); node = f;
+  }
+  const g = c.createGain();
+  g.gain.setValueAtTime(0.0001, t0);
+  g.gain.exponentialRampToValueAtTime(o.gain || 0.14, t0 + (o.attack || 0.01));
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  node.connect(g); g.connect(MASTER);
+  src.start(t0); src.stop(t0 + dur + 0.02);
+}
+function droneStart(){
+  const c = audio(); if (!c || DRONE) return;
+  const mk = (f, detune, gain) => {
+    const o = c.createOscillator(); o.type = 'sine';
+    o.frequency.value = f; o.detune.value = detune;
+    const g = c.createGain(); g.gain.value = gain;
+    o.connect(g); g.connect(MASTER); o.start();
+    return { o, g };
+  };
+  DRONE = [mk(55, 0, 0.05), mk(55, 9, 0.04), mk(110, -5, 0.02)];
+}
+function droneLevel(v){
+  if (!DRONE || !AC) return;
+  const t = AC.currentTime;
+  DRONE[0].g.gain.setTargetAtTime(0.05 * v, t, 0.6);
+  DRONE[1].g.gain.setTargetAtTime(0.04 * v, t, 0.6);
+  DRONE[2].g.gain.setTargetAtTime(0.02 * v, t, 0.6);
+}
+const sfxLit    = () => { tone({ type:'sine', f0:660, f1:990, gain:0.10, dur:0.5, attack:0.02 });
+                          tone({ type:'sine', f0:990, f1:1320, gain:0.06, dur:0.6, delay:0.08 }); };
+const sfxBrick  = () => { tone({ noise:true, filter:'lowpass', ff:420, q:0.8, gain:0.20, dur:0.34 });
+                          tone({ type:'sine', f0:90, f1:38, gain:0.18, dur:0.4 }); };
+const sfxSpeak  = () => tone({ type:'triangle', f0:300, f1:210, gain:0.07, dur:0.12, filter:'lowpass', ff:1600 });
+const sfxPage   = () => tone({ noise:true, filter:'highpass', ff:2200, q:1, gain:0.05, dur:0.07 });
+const sfxDoor   = () => { tone({ type:'sine', f0:150, f1:52, gain:0.22, dur:1.1, attack:0.03 });
+                          tone({ noise:true, filter:'lowpass', ff:300, gain:0.14, dur:1.2 }); };
+
+// ─── Drawing helpers ────────────────────────────────────────────────────────
+let cv, g;
+
+function glow(x, y, r, inner, outer){
+  const grd = g.createRadialGradient(x, y, 0, x, y, r);
+  grd.addColorStop(0, inner);
+  grd.addColorStop(1, outer || 'rgba(0,0,0,0)');
+  g.fillStyle = grd;
+  g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill();
+}
+
+//  The bearer. A tall thin figure that is lit from behind, never from within —
+//  which is the entire point and so it is drawn that way from the first frame.
+function figure(x, y, h, bright, hue){
+  const w = h * 0.17;
+  glow(x, y - h * 0.55, h * 0.9, `rgba(255,232,190,${0.16 * bright})`, 'rgba(255,232,190,0)');
+  const grd = g.createLinearGradient(x, y - h, x, y);
+  grd.addColorStop(0, `hsla(${hue == null ? 44 : hue}, 90%, ${60 + 22 * bright}%, ${0.85 + 0.15 * bright})`);
+  grd.addColorStop(1, `hsla(${hue == null ? 44 : hue}, 70%, ${18 + 14 * bright}%, 0.9)`);
+  g.fillStyle = grd;
+  g.beginPath();
+  g.moveTo(x - w * 0.5, y);
+  g.lineTo(x - w * 0.32, y - h * 0.72);
+  g.lineTo(x, y - h);
+  g.lineTo(x + w * 0.32, y - h * 0.72);
+  g.lineTo(x + w * 0.5, y);
+  g.closePath(); g.fill();
+}
+
+//  The source. Always behind you, always at your back, never looked at. It is
+//  drawn every scene until the fall, because he never once turns around.
+function source(alpha){
+  const y = H * 0.14;
+  glow(W * 0.5, y, 420, `rgba(255,240,214,${0.30 * alpha})`, 'rgba(255,240,214,0)');
+  glow(W * 0.5, y, 160, `rgba(255,255,246,${0.55 * alpha})`, 'rgba(255,255,246,0)');
+}
+
+//  The window, top right. Nine panes; the bricked ones never come back.
+function windowHud(){
+  const x0 = W - 168, y0 = 34, s = 34, gap = 4;
+  g.save();
+  g.font = '11px ui-monospace, "SFMono-Regular", Menlo, monospace';
+  g.fillStyle = 'rgba(220,206,178,0.55)';
+  g.textAlign = 'left';
+  g.fillText('THE WINDOW', x0, y0 - 10);
+  for (let i = 0; i < PANES; i++){
+    const cx = x0 + (i % 3) * (s + gap), cy = y0 + ((i / 3) | 0) * (s + gap);
+    const open = i < State.panes;
+    if (open){
+      const grd = g.createLinearGradient(cx, cy, cx + s, cy + s);
+      grd.addColorStop(0, 'rgba(255,244,214,0.60)');
+      grd.addColorStop(1, 'rgba(255,226,164,0.26)');
+      g.fillStyle = grd;
+    } else {
+      g.fillStyle = 'rgba(28,24,22,0.94)';
+    }
+    g.fillRect(cx, cy, s, s);
+    g.strokeStyle = open ? 'rgba(255,238,196,0.75)' : 'rgba(96,80,64,0.85)';
+    g.lineWidth = 1;
+    g.strokeRect(cx + 0.5, cy + 0.5, s - 1, s - 1);
+    if (!open){
+      g.strokeStyle = 'rgba(120,96,72,0.7)';
+      g.beginPath();
+      g.moveTo(cx + 3, cy + s / 2); g.lineTo(cx + s - 3, cy + s / 2);
+      g.moveTo(cx + s / 2, cy + 3);  g.lineTo(cx + s / 2, cy + s - 3);
+      g.stroke();
+    }
+  }
+  const by = y0 + 3 * (s + gap) + 16;
+  g.font = '10px ui-monospace, Menlo, monospace';
+  g.fillStyle = 'rgba(255,214,150,0.9)';
+  g.fillText('RADIANCE     ' + State.radiance.toFixed(2), x0, by);
+  g.fillStyle = State.transmission > 0.34 ? 'rgba(190,220,255,0.85)' : 'rgba(255,120,120,0.9)';
+  g.fillText('TRANSMISSION ' + Math.round(State.transmission * 100) + '%', x0, by + 15);
+  g.restore();
+}
+
+//  Prose. The book's voice gets a serif and its own room; the game's own words
+//  never appear in this band.
+function prose(lines, alpha){
+  const pad = 88, top = H - 232, wrapW = W - pad * 2 - 200;
+  g.save();
+  g.globalAlpha = alpha == null ? 1 : alpha;
+  const grd = g.createLinearGradient(0, top - 40, 0, H);
+  grd.addColorStop(0, 'rgba(6,7,12,0)');
+  grd.addColorStop(0.35, 'rgba(6,7,12,0.86)');
+  grd.addColorStop(1, 'rgba(6,7,12,0.96)');
+  g.fillStyle = grd;
+  g.fillRect(0, top - 40, W, H - top + 40);
+
+  g.font = '19px Georgia, "Iowan Old Style", "Times New Roman", serif';
+  g.fillStyle = 'rgba(238,228,208,0.94)';
+  g.textAlign = 'left';
+  let y = top + 6;
+  for (const idx of lines){
+    for (const line of wrap(CH[idx], wrapW)){
+      if (y > H - 34) break;
+      g.fillText(line, pad, y);
+      y += 27;
+    }
+    y += 9;
+  }
+  g.restore();
+}
+
+function wrap(text, max){
+  const words = String(text).split(/\s+/);
+  const out = []; let line = '';
+  for (const w of words){
+    const next = line ? line + ' ' + w : w;
+    if (g.measureText(next).width > max && line){ out.push(line); line = w; }
+    else line = next;
+  }
+  if (line) out.push(line);
+  return out;
+}
+
+//  What you can do. Always at the bottom, always in the game's own voice, so it
+//  is never mistaken for the book's.
+function choices(list){
+  State.choices = list;
+  const y0 = H - 62;
+  g.save();
+  g.font = '13px ui-monospace, Menlo, monospace';
+  g.textAlign = 'left';
+  let x = 88;
+  list.forEach((c, i) => {
+    const w = g.measureText(c.label).width + 34;
+    c._hit = { x, y: y0 - 22, w, h: 34 };
+    const hot = c._hot;
+    g.fillStyle = hot ? 'rgba(255,226,164,0.20)' : 'rgba(255,238,196,0.07)';
+    g.fillRect(x, y0 - 22, w, 34);
+    g.strokeStyle = c.tone === 'open' ? 'rgba(150,210,255,0.75)' : 'rgba(255,214,150,0.55)';
+    g.strokeRect(x + 0.5, y0 - 21.5, w - 1, 33);
+    g.fillStyle = c.tone === 'open' ? 'rgba(190,225,255,0.95)' : 'rgba(255,232,190,0.95)';
+    g.fillText(c.label, x + 17, y0 + 1);
+    x += w + 12;
+  });
+  g.restore();
+}
+
+//  Stage directions sit under the heading, not above the prose band. A long
+//  passage runs down past the old position and the two collided — and of the
+//  two, the one that must never be obscured is the book's.
+function stage(text){
+  g.save();
+  g.font = 'italic 14px Georgia, serif';
+  g.fillStyle = 'rgba(160,180,210,0.72)';
+  g.textAlign = 'center';
+  g.fillText(text, W / 2, 78);
+  g.restore();
+}
+
+function heading(){
+  g.save();
+  g.font = '11px ui-monospace, Menlo, monospace';
+  g.fillStyle = 'rgba(210,196,170,0.5)';
+  g.textAlign = 'left';
+  g.fillText((State.scene + 1) + ' / ' + SCENES.length + '   ' + scene().name, 88, 46);
+  g.restore();
+}
+
+// =============================================================================
+//  The scenes themselves
+// =============================================================================
+const ALCOVES = [
+  { x: 210, y: 430, lit: false }, { x: 470, y: 470, lit: false },
+  { x: 810, y: 470, lit: false }, { x: 1070, y: 430, lit: false },
+];
+const DOORS = [
+  { x: 330, asked: false, q: 7,  a: 8  },
+  { x: 640, asked: false, q: 9,  a: 10 },
+  { x: 950, asked: false, q: null, a: 11 },
+];
+const OTHERS = [
+  { x: 260, y: 500, won: false }, { x: 430, y: 545, won: false },
+  { x: 640, y: 520, won: false }, { x: 850, y: 555, won: false },
+  { x: 1010, y: 505, won: false },
+];
+
+function drawRoom(){
+  source(1);
+  const beat = 0.5 + Math.sin(State.t * 2.6) * 0.5;
+  for (const a of ALCOVES){
+    g.fillStyle = 'rgba(18,20,30,0.9)';
+    g.fillRect(a.x - 58, a.y - 150, 116, 150);
+    if (a.lit) glow(a.x, a.y - 74, 130, 'rgba(255,236,196,0.34)', 'rgba(255,236,196,0)');
+    //  An unlit alcove pulses and says what it is. A dark rectangle is not an
+    //  affordance; players clicked past these without ever knowing they were
+    //  the thing to click.
+    if (!a.lit){
+      g.strokeStyle = `rgba(150,190,255,${0.35 + beat * 0.45})`;
+      g.lineWidth = 2;
+      g.setLineDash([7, 6]);
+      g.strokeRect(a.x - 58.5, a.y - 150.5, 117, 151);
+      g.setLineDash([]);
+      g.lineWidth = 1;
+      g.font = '11px ui-monospace, Menlo, monospace';
+      g.fillStyle = `rgba(170,205,255,${0.4 + beat * 0.4})`;
+      g.textAlign = 'center';
+      g.fillText('DARK', a.x, a.y - 68);
+    } else {
+      g.strokeStyle = 'rgba(255,232,190,0.5)';
+      g.strokeRect(a.x - 58.5, a.y - 150.5, 117, 151);
+    }
+  }
+  //  The beam. It starts at the source behind you and leaves through you.
+  const bx = State.beam.x, by = State.beam.y;
+  const grd = g.createLinearGradient(W * 0.5, H * 0.14, bx, by);
+  grd.addColorStop(0, 'rgba(255,244,214,0.30)');
+  grd.addColorStop(1, 'rgba(255,236,196,0.02)');
+  g.strokeStyle = grd; g.lineWidth = 26; g.lineCap = 'round';
+  g.beginPath(); g.moveTo(W * 0.5, H * 0.14); g.lineTo(bx, by); g.stroke();
+  g.lineWidth = 1;
+  glow(bx, by, 90, 'rgba(255,244,214,0.4)', 'rgba(255,244,214,0)');
+  figure(W * 0.5, H * 0.62, 190, 1);
+  prose(State.lit >= 4 ? [3, 4] : scene().lines);
+  stage(State.lit >= 4
+    ? 'Every dark place in the room is lit. It cost you nothing.'
+    : 'Click a dark alcove to carry light into it. ' + State.lit + ' of 4.');
+}
+
+function drawDoors(){
+  source(0.75);
+  for (let i = 0; i < DOORS.length; i++){
+    const d = DOORS[i];
+    g.fillStyle = 'rgba(14,16,24,0.95)';
+    g.fillRect(d.x - 70, 300, 140, 250);
+    g.strokeStyle = d.asked ? 'rgba(120,110,150,0.6)' : 'rgba(180,168,130,0.5)';
+    g.strokeRect(d.x - 70.5, 299.5, 141, 251);
+    if (!d.asked) glow(d.x, 425, 110, 'rgba(255,232,190,0.10)', 'rgba(255,232,190,0)');
+    g.font = '11px ui-monospace, Menlo, monospace';
+    g.fillStyle = 'rgba(200,190,160,0.55)';
+    g.textAlign = 'center';
+    g.fillText(d.asked ? 'ANSWERED' : 'CLOSED', d.x, 578);
+  }
+  figure(W * 0.5, H * 0.86, 150, 1);
+  const asked = DOORS.filter(d => d.asked).length;
+  if (asked < 3){
+    const shown = [5, 6];
+    const last = DOORS.filter(d => d.asked).slice(-1)[0];
+    prose(last ? (last.q != null ? [last.q, last.a] : [last.a]) : shown);
+    stage('Three doors you have never been through. Ask.');
+  } else {
+    prose([11, 12]);
+  }
+}
+
+function drawGarden(){
+  source(0.6);
+  //  Seen through a gap you are not meant to be looking through.
+  g.fillStyle = 'rgba(10,11,18,0.98)';
+  g.fillRect(0, 240, W, 330);
+  g.save();
+  g.beginPath(); g.ellipse(W * 0.5, 400, 250, 120, 0, 0, Math.PI * 2); g.clip();
+  glow(W * 0.5, 400, 260, 'rgba(120,190,120,0.30)', 'rgba(60,120,80,0)');
+  glow(W * 0.5 - 40, 430, 70, 'rgba(220,240,180,0.35)', 'rgba(220,240,180,0)');
+  figure(W * 0.5 - 34, 452, 54, 0.35, 96);
+  figure(W * 0.5 + 8, 456, 52, 0.35, 96);
+  g.restore();
+  g.strokeStyle = 'rgba(150,180,150,0.28)';
+  g.beginPath(); g.ellipse(W * 0.5, 400, 250, 120, 0, 0, Math.PI * 2); g.stroke();
+
+  //  Your light aimed at it, falling short. It never reaches.
+  const grd = g.createLinearGradient(W * 0.5, H * 0.14, W * 0.5, 330);
+  grd.addColorStop(0, 'rgba(255,244,214,0.22)');
+  grd.addColorStop(1, 'rgba(255,236,196,0)');
+  g.strokeStyle = grd; g.lineWidth = 34; g.lineCap = 'round';
+  g.beginPath(); g.moveTo(W * 0.5, H * 0.14); g.lineTo(W * 0.5, 320); g.stroke();
+  g.lineWidth = 1;
+
+  prose(scene().lines);
+  stage('Your light does not reach it. It has a light of its own.');
+}
+
+function drawHigh(){
+  source(0.5);
+  glow(W * 0.5, 300, 520, 'rgba(255,238,196,0.10)', 'rgba(255,238,196,0)');
+  for (const o of OTHERS){
+    figure(o.x, o.y, o.won ? 118 : 96, o.won ? 0.85 : 0.22, o.won ? 44 : 220);
+    if (o.won) glow(o.x, o.y - 60, 90, 'rgba(255,226,164,0.16)', 'rgba(255,226,164,0)');
+  }
+  figure(W * 0.5, H * 0.9, 172, 1);
+  prose(State.followers ? [22, 23, 24] : scene().lines);
+  stage(State.followers
+    ? State.followers + ' of 5 have turned toward you. You may stop at any time.'
+    : 'Speak to them. They are listening.');
+}
+
+const PRESENCE_BEATS = [
+  { say: 31, back: [32, 33] },
+  { say: 34, back: [35] },
+  { say: 36, back: [37, 38] },
+  { say: 40, back: [41] },
+];
+
+function drawPresence(){
+  const pulse = 0.9 + Math.sin(State.t * 1.2) * 0.06;
+  glow(W * 0.5, H * 0.42, 520 * pulse, 'rgba(255,248,228,0.34)', 'rgba(255,248,228,0)');
+  glow(W * 0.5, H * 0.42, 200 * pulse, 'rgba(255,255,252,0.55)', 'rgba(255,255,252,0)');
+  figure(W * 0.5, H * 0.92, 150, State.transmission);
+  const b = PRESENCE_BEATS[State.line];
+  if (b) prose(State.lineT > 0.4 ? [b.say].concat(b.back) : [b.say]);
+  else prose([42, 43]);
+}
+
+function drawFall(){
+  droneLevel(1.4);
+  const k = Math.min(1, State.t / 9);
+  g.fillStyle = 'rgba(4,5,10,1)'; g.fillRect(0, 0, W, H);
+  source(Math.max(0, 0.7 - k));                        // receding, above
+  //  Streaks, to make the falling legible without moving the figure.
+  for (let i = 0; i < 40; i++){
+    const s = (i * 97) % W;
+    const y = ((State.t * (120 + (i % 7) * 40)) + i * 90) % (H + 200) - 100;
+    g.strokeStyle = `rgba(190,205,235,${0.05 + (i % 5) * 0.02})`;
+    g.beginPath(); g.moveTo(s, y); g.lineTo(s, y + 60 + (i % 5) * 30); g.stroke();
+  }
+  figure(W * 0.5, H * 0.55 + Math.sin(State.t * 0.7) * 8, 160, Math.max(0.12, 1 - k));
+  if (State.lookedBack){
+    //  Yourself from the outside: the window, and what is left of it.
+    const x = W * 0.5 - 120, y = 150, s = 78;
+    for (let i = 0; i < PANES; i++){
+      const cx = x + (i % 3) * (s + 6), cy = y + ((i / 3) | 0) * (s + 6);
+      g.fillStyle = i < State.panes ? 'rgba(255,244,214,0.4)' : 'rgba(30,26,24,0.96)';
+      g.fillRect(cx, cy, s, s);
+      g.strokeStyle = 'rgba(150,130,100,0.8)'; g.strokeRect(cx + 0.5, cy + 0.5, s - 1, s - 1);
+    }
+    prose([60, 61, 62, 63]);
+    stage('You are looking at yourself from the outside for the first time.');
+  } else {
+    prose(State.t > 5 ? [55, 56, 57] : scene().lines);
+    stage('The descent is taking longer than it should.');
+  }
+}
+
+function drawKingdom(){
+  droneLevel(0.55);
+  g.fillStyle = 'rgba(8,8,12,1)'; g.fillRect(0, 0, W, H);
+  //  No source. It is not behind him any more, and he does not look for it.
+  for (let i = 0; i < State.tiers; i++){
+    const w = 620 - i * 96, y = H - 130 - i * 52;
+    g.fillStyle = `rgba(${34 + i * 6},${30 + i * 4},${36 + i * 5},1)`;
+    g.fillRect(W * 0.5 - w / 2, y, w, 46);
+    g.strokeStyle = 'rgba(150,130,100,0.35)';
+    g.strokeRect(W * 0.5 - w / 2 + 0.5, y + 0.5, w - 1, 45);
+  }
+  if (State.tiers >= 5) figure(W * 0.5, H - 130 - 4 * 52, 96, 0.5);
+  //  The garden, far off, still lit, still not his.
+  glow(W * 0.86, 190, 120, 'rgba(140,200,140,0.26)', 'rgba(140,200,140,0)');
+  g.font = '11px ui-monospace, Menlo, monospace';
+  g.fillStyle = 'rgba(150,190,150,0.5)'; g.textAlign = 'center';
+  g.fillText('the garden', W * 0.86, 250);
+  prose(State.tiers >= 5 ? [68, 69, 70, 71] : scene().lines);
+  stage(State.tiers >= 5
+    ? 'It is finished, and it is yours, and there is no one in it.'
+    : 'Build. ' + State.tiers + ' of 5 tiers. The top is yours by right.');
+}
+
+function drawCoda(){
+  droneLevel(0.2);
+  g.fillStyle = 'rgba(5,5,9,1)'; g.fillRect(0, 0, W, H);
+  glow(W * 0.5, H * 0.34, 300, 'rgba(90,80,70,0.20)', 'rgba(90,80,70,0)');
+  //  A headstone, because the chapter says that is what the line is.
+  g.fillStyle = 'rgba(26,25,30,1)';
+  g.beginPath();
+  g.moveTo(W * 0.5 - 150, H * 0.62);
+  g.lineTo(W * 0.5 - 150, H * 0.30);
+  g.quadraticCurveTo(W * 0.5, H * 0.16, W * 0.5 + 150, H * 0.30);
+  g.lineTo(W * 0.5 + 150, H * 0.62);
+  g.closePath(); g.fill();
+  g.strokeStyle = 'rgba(120,110,96,0.55)'; g.stroke();
+  g.font = 'italic 17px Georgia, serif';
+  g.fillStyle = 'rgba(200,190,170,0.85)';
+  g.textAlign = 'center';
+  for (const [i, line] of wrap(CH[85], 250).entries())
+    g.fillText(line, W * 0.5, H * 0.36 + i * 26);
+  prose([84, 86, 87]);
+}
+
+// ─── The counterfactual ─────────────────────────────────────────────────────
+//  Marked, every time it appears, as a road the chapter does not take. It is
+//  the game asking a question, never the book answering one.
+function drawAsked(){
+  droneLevel(0.8);
+  glow(W * 0.5, H * 0.42, 560, 'rgba(255,248,228,0.30)', 'rgba(255,248,228,0)');
+  figure(W * 0.5, H * 0.9, 150, State.transmission);
+  g.save();
+  g.font = '11px ui-monospace, Menlo, monospace';
+  g.fillStyle = 'rgba(150,200,255,0.7)';
+  g.textAlign = 'center';
+  g.fillText('THIS IS NOT WHAT HAPPENED · THE DOOR HE DID NOT TAKE', W / 2, 46);
+  g.restore();
+  const pad = 88, top = H - 250;
+  const grd = g.createLinearGradient(0, top - 40, 0, H);
+  grd.addColorStop(0, 'rgba(6,7,12,0)'); grd.addColorStop(0.35, 'rgba(6,7,12,0.88)');
+  grd.addColorStop(1, 'rgba(6,7,12,0.96)');
+  g.fillStyle = grd; g.fillRect(0, top - 40, W, H - top + 40);
+  g.font = 'italic 19px Georgia, serif';
+  g.fillStyle = 'rgba(206,224,255,0.92)';
+  g.textAlign = 'left';
+  let y = top + 6;
+  for (const para of ASKED_TEXT){
+    for (const line of wrap(para, W - pad * 2 - 200)){ g.fillText(line, pad, y); y += 27; }
+    y += 9;
+  }
+}
+
+const ASKED_TEXT = [
+  'He asked it, and nothing was given to him. No explanation arrived. The garden was still not his, and the dust was still crowned, and he still did not understand why.',
+  'What changed was smaller than that, and harder. The window stayed open. The light went on passing through him into rooms he would never be told the purpose of, and he went on carrying it, and the not-knowing did not close him.',
+  'He was not proved right. He was not made greater. He remained exactly what he had been made to be, which he had spent the whole of his existence believing was the lesser thing.',
+  'This is the door the chapter does not take. In the book he says: I cannot. Everything after follows from that, and none of it can be undone by playing it again.',
+];
+
+// =============================================================================
+//  Input
+// =============================================================================
+function advance(){
+  State.scene++;
+  State.t = 0; State.line = 0; State.lineT = 0; State.choices = null;
+  sfxPage();
+  if (State.scene >= SCENES.length){ State.done = true; finish(); }
+}
+
+//  Every scene must offer at least one thing to press, at every moment.
+//
+//  This is the bug that made the game unplayable and it was not a click bug at
+//  all: clicking worked perfectly, it just had nothing to do. THE ROOM gave you
+//  no button until all four alcoves were lit, and the only way to light one was
+//  to click a dark rectangle nobody had said was a target. So a player clicked,
+//  watched a beam move, clicked again, and correctly concluded that clicking
+//  did nothing. The same trap sat in THE FALL for its first five seconds.
+//
+//  Nothing below is allowed to return an empty list — see the guard at the end.
+function optionsFor(){
+  const s = scene();
+  if (!s) return [];
+  const out = rawOptions(s);
+  return out.length ? out : [{ label: 'GO ON', act: advance }];
+}
+
+function rawOptions(s){
+  switch (s.key){
+    case 'room':
+      //  Lighting the room is the point of the scene, but it is never the only
+      //  way out of it.
+      return State.lit >= 4
+        ? [{ label: 'GO ON', act: advance }]
+        : [{ label: 'LEAVE THE ROOM', tone: 'open', act: advance }];
+    case 'doors': {
+      const asked = DOORS.filter(d => d.asked).length;
+      if (asked < 3) return DOORS.filter(d => !d.asked).map((d, i) => ({
+        label: 'ASK AT THE ' + ['FIRST', 'SECOND', 'THIRD'][DOORS.indexOf(d)] + ' DOOR',
+        act: () => { d.asked = true; sfxSpeak(); },
+      }));
+      return [
+        { label: 'NAME THE SILENCE CONCEALMENT', act: () => { brick(1); advance(); } },
+        { label: 'LET IT BE A THING YOU DO NOT KNOW', tone: 'open', act: advance },
+      ];
+    }
+    case 'garden':
+      return [
+        { label: 'THE DESIGN IS FLAWED', act: () => { brick(1); advance(); } },
+        { label: 'WATCH IT A WHILE LONGER', tone: 'open', act: advance },
+      ];
+    case 'high': {
+      const left = OTHERS.filter(o => !o.won).length;
+      const out = [];
+      if (left) out.push({ label: 'SPEAK', act: () => {
+        const o = OTHERS.find(x => !x.won);
+        if (o){ o.won = true; State.followers++; brick(1); sfxSpeak(); }
+      }});
+      out.push({ label: State.followers ? 'STOP HERE' : 'SAY NOTHING', tone: 'open', act: advance });
+      return out;
+    }
+    case 'presence': {
+      const b = PRESENCE_BEATS[State.line];
+      if (b) return [{ label: 'SPEAK', act: () => { State.line++; State.lineT = 0; sfxSpeak(); } }];
+      //  The refusal is the last and largest assertion in the chapter — "he
+      //  had nothing to lose. He was complete." It cannot be the one that
+      //  costs nothing.
+      const out = [{ label: 'I CANNOT', act: () => {
+        State.refused = true; brick(1); sfxDoor(); advance();
+      } }];
+      //  The question is only reachable while enough of the window is open to
+      //  see through it. That is not a difficulty setting — it is the chapter:
+      //  "the understanding required a door he had closed."
+      if (State.transmission > 0.34) out.push({
+        label: 'WHAT IF I AM WRONG?', tone: 'open',
+        act: () => { State.asked = true; State.ending = 'asked'; State.done = true; finish(); },
+      });
+      return out;
+    }
+    case 'fall':
+      if (!State.lookedBack) return [
+        { label: 'LOOK BACK', act: () => { State.lookedBack = true; sfxLit(); } },
+        { label: 'KEEP FALLING', act: advance },
+      ];
+      return [{ label: 'GO ON', act: advance }];
+    case 'kingdom': {
+      if (State.tiers < 5) return [{ label: 'BUILD A TIER', act: () => {
+        State.tiers++;
+        tone({ type:'square', f0:120, f1:80, gain:0.12, dur:0.18, filter:'lowpass', ff:900 });
+        //  Putting yourself at the top of a hierarchy of your own making is the
+        //  same act as all the others, and the last course seals it.
+        if (State.tiers === 5) brick(1);
+      }}];
+      return [
+        { label: 'TURN AWAY', act: () => { State.ending = 'turned'; advance(); } },
+        { label: 'ASK THE QUESTION', act: () => { State.ending = 'toolate'; advance(); } },
+      ];
+    }
+    case 'coda':
+      return [{ label: 'CLOSE THE BOOK', act: () => { State.done = true; finish(); } }];
+  }
+  return [];
+}
+
+function click(mx, my){
+  if (!State.started){ State.started = true; droneStart(); return; }
+  if (State.done) return;
+  const list = State.choices || [];
+  for (const c of list){
+    const h = c._hit;
+    if (h && mx >= h.x && mx <= h.x + h.w && my >= h.y && my <= h.y + h.h){ c.act(); return; }
+  }
+  //  The first scene is the only one you steer rather than choose in.
+  if (scene() && scene().key === 'room'){
+    State.beam.x = mx; State.beam.y = my;
+    for (const a of ALCOVES){
+      //  The alcove is DRAWN from a.y-150 to a.y, so its middle is a.y-74.
+      //  This read `a.y - my + 74`, which put the hit zone 148 pixels BELOW the
+      //  rectangle you can see — clicking the alcove missed every time, and
+      //  clicking empty floor beneath it worked. That, plus a scene with no way
+      //  out until all four were lit, is the whole "clicking does nothing".
+      if (!a.lit && Math.hypot(a.x - mx, (a.y - 74) - my) < 96){
+        a.lit = true; State.lit++; State.litFlash = 1; sfxLit();
+      }
+    }
+  }
+}
+
+// ─── The end ────────────────────────────────────────────────────────────────
+async function finish(){
+  const run = {
+    type: 'lightbearer.run.v1',
+    chapter: CH_TITLE,
+    book: 'The Collapse of Meaning',
+    ending: State.ending || (State.asked ? 'asked' : 'turned'),
+    askedTheQuestion: !!State.asked,
+    panesOpen: State.panes,
+    radiance: +State.radiance.toFixed(2),
+    transmission: +State.transmission.toFixed(3),
+    followers: State.followers,
+    lookedBack: State.lookedBack,
+    at: new Date().toISOString(),
+  };
+  try { await window.fracture.save('run-' + Date.now().toString(36), run); } catch (e){}
+  try {
+    const best = await window.fracture.read('best');
+    if (!best || run.transmission > best.transmission)
+      await window.fracture.save('best', run);
+    Save.best = best;
+  } catch (e){}
+}
+
+function drawEnd(){
+  g.fillStyle = 'rgba(5,5,9,1)'; g.fillRect(0, 0, W, H);
+  if (State.asked){ drawAsked(); windowHud(); return; }
+  glow(W * 0.5, H * 0.3, 340, 'rgba(70,64,58,0.25)', 'rgba(70,64,58,0)');
+  g.textAlign = 'center';
+  g.font = '13px ui-monospace, Menlo, monospace';
+  g.fillStyle = 'rgba(210,196,170,0.6)';
+  g.fillText(CH_TITLE + ' · ' + CH_SUB, W / 2, 120);
+
+  g.font = '26px Georgia, serif';
+  g.fillStyle = 'rgba(238,228,208,0.95)';
+  const verdict = State.ending === 'toolate'
+    ? 'He asked it, and the door was locked from the inside.'
+    : 'He turned away.';
+  g.fillText(verdict, W / 2, 200);
+
+  g.font = '16px ui-monospace, Menlo, monospace';
+  const rows = [
+    ['RADIANCE',      State.radiance.toFixed(2)],
+    ['TRANSMISSION',  Math.round(State.transmission * 100) + '%'],
+    ['PANES OPEN',    State.panes + ' of ' + PANES],
+    ['THOSE WHO FOLLOWED', String(State.followers)],
+  ];
+  rows.forEach((r, i) => {
+    const y = 290 + i * 34;
+    g.textAlign = 'right'; g.fillStyle = 'rgba(180,170,150,0.65)';
+    g.fillText(r[0], W / 2 - 20, y);
+    g.textAlign = 'left';
+    g.fillStyle = r[0] === 'RADIANCE' ? 'rgba(255,214,150,0.95)' : 'rgba(190,220,255,0.9)';
+    g.fillText(r[1], W / 2 + 20, y);
+  });
+
+  g.textAlign = 'center';
+  g.font = 'italic 18px Georgia, serif';
+  g.fillStyle = 'rgba(200,190,170,0.8)';
+  const note = State.transmission <= 0
+    ? 'Nothing passes through you at all now.'
+    : 'You never asked the question. It was there the whole time.';
+  g.fillText(note, W / 2, 470);
+
+  g.font = '12px ui-monospace, Menlo, monospace';
+  g.fillStyle = 'rgba(150,140,124,0.6)';
+  g.fillText('Chapter One of The Collapse of Meaning by Ex Avner', W / 2, 560);
+  g.fillText('CLICK TO BEGIN AGAIN', W / 2, 600);
+}
+
+function drawTitle(){
+  g.fillStyle = 'rgba(5,5,9,1)'; g.fillRect(0, 0, W, H);
+  glow(W * 0.5, H * 0.36, 420, 'rgba(255,240,214,0.24)', 'rgba(255,240,214,0)');
+  glow(W * 0.5, H * 0.36, 150, 'rgba(255,255,246,0.4)', 'rgba(255,255,246,0)');
+  figure(W * 0.5, H * 0.72, 210, 1);
+  g.textAlign = 'center';
+  g.font = '46px Georgia, serif';
+  g.fillStyle = 'rgba(246,238,220,0.96)';
+  g.fillText(CH_TITLE, W / 2, 190);
+  g.font = 'italic 18px Georgia, serif';
+  g.fillStyle = 'rgba(200,190,170,0.75)';
+  g.fillText(CH_SUB, W / 2, 226);
+  g.font = '12px ui-monospace, Menlo, monospace';
+  g.fillStyle = 'rgba(160,150,134,0.7)';
+  g.fillText('CHAPTER ONE OF THE COLLAPSE OF MEANING · EX AVNER', W / 2, 262);
+  g.fillStyle = 'rgba(190,220,255,0.8)';
+  g.fillText('CLICK TO BEGIN', W / 2, H - 90);
+}
+
+// =============================================================================
+//  Loop
+// =============================================================================
+function frame(dt){
+  State.t += dt;
+  State.lineT += dt;
+  State.brickFlash = Math.max(0, State.brickFlash - dt * 2);
+  State.litFlash = Math.max(0, State.litFlash - dt * 2);
+
+  g.fillStyle = '#05060a';
+  g.fillRect(0, 0, W, H);
+
+  if (!State.started){ drawTitle(); return; }
+  if (State.done){ drawEnd(); return; }
+
+  const s = scene();
+  if (!s){ State.done = true; return; }
+  switch (s.key){
+    case 'room':     drawRoom(); break;
+    case 'doors':    drawDoors(); break;
+    case 'garden':   drawGarden(); break;
+    case 'high':     drawHigh(); break;
+    case 'presence': drawPresence(); break;
+    case 'fall':     drawFall(); break;
+    case 'kingdom':  drawKingdom(); break;
+    case 'coda':     drawCoda(); break;
+  }
+
+  if (State.brickFlash > 0){
+    g.fillStyle = `rgba(40,26,18,${State.brickFlash * 0.5})`;
+    g.fillRect(0, 0, W, H);
+  }
+  heading();
+  windowHud();
+  choices(optionsFor());
+}
+
+function resize(){
+  //  A frame that is display:none while it loads reports zero, which would
+  //  scale the canvas to nothing and leave no target to click.
+  const iw = window.innerWidth || W, ih = window.innerHeight || H;
+  const r = Math.max(0.2, Math.min(iw / W, ih / H));
+  cv.style.width = Math.round(W * r) + 'px';
+  cv.style.height = Math.round(H * r) + 'px';
+}
+
+function boot(){
+  cv = document.getElementById('c');
+  cv.width = W; cv.height = H;
+  g = cv.getContext('2d');
+  resize();
+  window.addEventListener('resize', resize);
+  //  Catches the case a resize event does not: a parent that changes the frame's
+  //  box without the window itself changing size.
+  if (window.ResizeObserver){
+    try { new ResizeObserver(resize).observe(document.documentElement); } catch (e){}
+  }
+
+  const at = (e) => {
+    const b = cv.getBoundingClientRect();
+    return [(e.clientX - b.left) * (W / b.width), (e.clientY - b.top) * (H / b.height)];
+  };
+  cv.addEventListener('mousemove', (e) => {
+    const [x, y] = at(e);
+    if (State.started && !State.done && scene() && scene().key === 'room'){
+      State.beam.x = x; State.beam.y = y;
+    }
+    for (const c of (State.choices || [])){
+      const h = c._hit;
+      c._hot = !!(h && x >= h.x && x <= h.x + h.w && y >= h.y && y <= h.y + h.h);
+    }
+  });
+  //  On the document rather than the canvas. If the canvas is ever mis-sized
+  //  — a frame revealed after it loaded, a zero-height parent — a listener
+  //  bound to it can be unreachable, and then the game is genuinely dead.
+  //  Bound here, a click anywhere at least starts and advances it.
+  document.addEventListener('click', (e) => {
+    audio();
+    if (State.done){ reset(); return; }
+    const [x, y] = at(e);
+    click(x, y);
+  });
+  window.addEventListener('keydown', (e) => {
+    audio();
+    if (e.key === ' ' || e.key === 'Enter'){
+      e.preventDefault();
+      if (!State.started){ State.started = true; droneStart(); return; }
+      if (State.done){ reset(); return; }
+      const list = State.choices || [];
+      if (list.length) list[0].act();
+    }
+  });
+
+  let last = performance.now();
+  const loop = (now) => {
+    const dt = Math.min(0.05, (now - last) / 1000);
+    last = now;
+    try { frame(dt); } catch (err){ console.error('[light-bearer]', err); }
+    requestAnimationFrame(loop);
+  };
+  requestAnimationFrame(loop);
+}
+
+function reset(){
+  State.scene = 0; State.t = 0; State.panes = PANES; State.radiance = 1;
+  State.transmission = 1; State.lit = 0; State.followers = 0; State.asked = false;
+  State.refused = false; State.tiers = 0; State.lookedBack = false; State.ending = null;
+  State.line = 0; State.lineT = 0; State.choices = null; State.done = false;
+  for (const a of ALCOVES) a.lit = false;
+  for (const d of DOORS) d.asked = false;
+  for (const o of OTHERS) o.won = false;
+  droneLevel(1);
+  sfxPage();
+}
+
+document.addEventListener('DOMContentLoaded', boot);
+
+</script>
+</body>
+</html>

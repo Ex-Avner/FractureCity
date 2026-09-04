@@ -1,0 +1,26 @@
+{
+  "slug": "scene-composer",
+  "name": "Scene Composer",
+  "version": "1.0.0",
+  "icon": "icon.png",
+  "entry": "index.html",
+  "runtime": "html5",
+  "description": "Story-driven scene generator for the Fracture City world and animated show. Casts saved characters into a specific location at a specific time and composes a beat-by-beat immersive scene — sensory atmosphere, dialogue, internal experience, mood coded by the framework dimensions of the characters present. Each scene is a printable production document.",
+  "inputs": [
+    {
+      "type": "character.identity.v1",
+      "description": "Cast members. The scene's emotional shape depends on the zone/stamp/capture mix of the characters in it."
+    }
+  ],
+  "outputs": [
+    {
+      "type": "scene.moment.v1",
+      "description": "Full scene record: setting, cast list, prose beats, dialogue, sensory atmosphere, production metadata."
+    }
+  ],
+  "tags": ["scene", "story", "narrative", "show", "production", "fracture-city", "dialogue", "atmosphere"],
+  "author": "Avner Media",
+  "license": "personal-use",
+  "window_width": 1320,
+  "window_height": 880
+}

@@ -1,0 +1,56 @@
+{
+  "seed": "fc-pglixy",
+  "mode": "campaign",
+  "chapter": 0,
+  "chapterTitle": "THE EVENING REPORT",
+  "finished": false,
+  "updatedAt": 1788429931438,
+  "playTime": 0,
+  "credits": 0,
+  "built": 0,
+  "id": "smtld047dwcq",
+  "name": "EVENING REPORT",
+  "campaign": {
+    "chapter": 0,
+    "progress": {},
+    "done": {},
+    "seenSeconds": 0,
+    "districtsSeen": [],
+    "finished": false,
+    "caseDecision": null,
+    "caseFiled": false,
+    "active": true
+  },
+  "player": {
+    "x": 10.2,
+    "y": 5.1000000000000005,
+    "z": 9.4,
+    "yaw": -1.5707963267948966,
+    "pitch": -0.05,
+    "classKey": "bruiser",
+    "hp": 160
+  },
+  "dayTime": 1080,
+  "hud": {
+    "credits": 0,
+    "tasksDone": 0,
+    "distanceWalked": 0,
+    "distanceDriven": 0,
+    "playTime": 0.1,
+    "blocksMined": 0,
+    "blocksPlaced": 0
+  },
+  "inventory": [],
+  "hotbar": [
+    3,
+    11,
+    7,
+    9,
+    4,
+    8,
+    6,
+    2,
+    12
+  ],
+  "peaceful": false
+}

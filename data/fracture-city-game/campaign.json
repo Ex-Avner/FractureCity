@@ -1,0 +1,15 @@
+{
+  "schema": 2,
+  "chapter": 0,
+  "progress": {
+    "wake": 1
+  },
+  "done": {
+    "wake": true
+  },
+  "seenSeconds": 0,
+  "districtsSeen": [],
+  "finished": false,
+  "caseDecision": null,
+  "caseFiled": false
+}

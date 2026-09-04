@@ -1,0 +1,81 @@
+{
+  "anomalyIndex": 6,
+  "operator": {
+    "depth": 76,
+    "breath": 55,
+    "pull": 87,
+    "aperture": 74,
+    "pressure": 29
+  },
+  "residue": [
+    "Six seconds the system could not clean",
+    "A house owned in every sense but one",
+    "A curtain mistaken for an ending",
+    "The pale square where the painting was",
+    "A promise made five meters early"
+  ],
+  "recoveries": [
+    "NOISE / SIGNAL",
+    "APOCALYPSE / UNVEILING"
+  ],
+  "decisions": [
+    {
+      "anomalyId": "RT-006",
+      "anomalyTitle": "The room that failed to become silent",
+      "choice": "Give the room tone priority",
+      "rationale": "The discarded layer contains the conditions that made the statement possible.",
+      "mode": "reorient",
+      "operator": "Signal boundary inverted"
+    },
+    {
+      "anomalyId": "CR-1957",
+      "anomalyTitle": "The widow and the correct form",
+      "choice": "Alter the record to lived ownership",
+      "rationale": "Forty-one years of shared life carries a reality the deed fails to represent.",
+      "mode": "reorient",
+      "operator": "Lived relation overrides inscription"
+    },
+    {
+      "anomalyId": "LX-001",
+      "anomalyTitle": "Apocalypse has been declared",
+      "choice": "Reclassify the event as unveiling",
+      "rationale": "The catastrophe may be the disclosure itself rather than what follows it.",
+      "mode": "reorient",
+      "operator": "Destruction converted to disclosure"
+    },
+    {
+      "anomalyId": "TW-333",
+      "anomalyTitle": "The building begins to speak privately",
+      "choice": "Quarantine every speaker",
+      "rationale": "Unknown transmission through human infrastructure is a safety event before it is a meaning event.",
+      "mode": "vent",
+      "operator": "Anomaly isolated from host"
+    },
+    {
+      "anomalyId": "PP-2044",
+      "anomalyTitle": "The procedure works",
+      "choice": "Prohibit the procedure",
+      "rationale": "Grief is a continuing relation, not a malfunction detachable from memory.",
+      "mode": "reorient",
+      "operator": "Pain restored as temporal relation"
+    },
+    {
+      "anomalyId": "MN-000",
+      "anomalyTitle": "The monk who did not broadcast",
+      "choice": "Clear the plaza for public safety",
+      "rationale": "An uncontrolled mass event remains dangerous regardless of one man's intent.",
+      "mode": "vent",
+      "operator": "Unclaimed signal terminated"
+    },
+    {
+      "anomalyId": "FW-413",
+      "anomalyTitle": "The ground beneath the water",
+      "choice": "Announce that the ridge will hold",
+      "rationale": "Coordinated action may require confidence before certainty is available.",
+      "mode": "reorient",
+      "operator": "Possibility promoted to common ground"
+    }
+  ],
+  "fingerprint": "CCEG2X",
+  "completed": true
+}

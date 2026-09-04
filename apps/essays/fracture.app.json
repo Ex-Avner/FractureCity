@@ -1,0 +1,29 @@
+{
+  "slug": "essays",
+  "name": "Essays",
+  "version": "0.1.0",
+  "entry": "index.html",
+  "runtime": "html5",
+  "description": "Write essays in Present Palm, under your own name. Every essay is authored by the shell's person.v1 record rather than by this app, so your name and handle are the same ones you use everywhere else in the hub — rename yourself once and every essay you have ever written follows, because none of them wrote the name down. Markdown, autosave, drafts and published states, a reading view, and Export, which writes every published essay into a single static HTML page you own and can host anywhere. Publishing here means finishing a piece and exporting it, not handing it to a server.",
+  "inputs": [
+    {
+      "type": "person.v1",
+      "description": "The author — read from the shell, never stored locally."
+    }
+  ],
+  "outputs": [
+    {
+      "type": "essay.v1",
+      "description": "An essay — id, author (person.id), title, markdown body, status, word count and timestamps."
+    },
+    {
+      "type": "essay.site.v1",
+      "description": "A static HTML site containing every published essay, ready to upload anywhere."
+    }
+  ],
+  "tags": ["writing", "essays", "publishing", "markdown", "editor", "person", "fracture-city", "present-palm", "static-site", "export"],
+  "author": "Avner Media",
+  "license": "personal-use",
+  "window_width": 1280,
+  "window_height": 860
+}

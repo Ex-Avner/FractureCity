@@ -1,0 +1,2561 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Still Human</title>
+<script>
+/* ---------------------------------------------------------------------------
+   Present Palm bridge. Inside the shell, window.fracture already exists and
+   this does nothing. Opened as a loose file it stands in with localStorage so
+   the game still saves a run and still knows who you are.
+--------------------------------------------------------------------------- */
+(function(){
+  if (window.fracture && window.fracture.shell) return;
+  const prefix = 'fracture::still-human::';
+  window.fracture = {
+    shell:false, appSlug:'still-human', received:null,
+    save(k,v){ try{ localStorage.setItem(prefix+k, JSON.stringify(v)); }catch(e){} return Promise.resolve(true); },
+    read(k){ try{ const r=localStorage.getItem(prefix+k); return Promise.resolve(r==null?null:JSON.parse(r)); }catch(e){ return Promise.resolve(null); } },
+    list(){ const o=[]; for(let i=0;i<localStorage.length;i++){ const k=localStorage.key(i); if(k&&k.startsWith(prefix)) o.push(k.slice(prefix.length)); } return Promise.resolve(o); },
+    delete(k){ localStorage.removeItem(prefix+k); return Promise.resolve(true); },
+    listApps(){ return Promise.resolve([]); },
+    openApp(){ return Promise.resolve({ok:false,error:'standalone'}); },
+    emit(){ return Promise.resolve(true); },
+    subscribe(){ return ()=>{}; },
+    onPayload(){},
+    me(){
+      try { const r = localStorage.getItem('pp:person'); if (r) return Promise.resolve(JSON.parse(r)); } catch(e){}
+      const now = new Date().toISOString();
+      const p = { type:'person.v1', id:'p_'+Math.random().toString(36).slice(2,10),
+                  username:'resident', displayName:'', bio:'', avatar:null,
+                  created:now, updated:now, holds:{} };
+      try { localStorage.setItem('pp:person', JSON.stringify(p)); } catch(e){}
+      return Promise.resolve(p);
+    },
+    updateMe(patch){
+      return this.me().then(cur => {
+        const next = { ...cur, ...(patch||{}) };
+        next.id = cur.id; next.type = 'person.v1'; next.created = cur.created;
+        next.updated = new Date().toISOString();
+        const u = String(next.username||'').toLowerCase().replace(/[^a-z0-9_-]/g,'').slice(0,24);
+        next.username = u || cur.username;
+        try { localStorage.setItem('pp:person', JSON.stringify(next)); } catch(e){}
+        return next;
+      });
+    },
+    claim(type, ref){
+      return this.me().then(p => {
+        const cur = p.holds[type];
+        if (Array.isArray(cur)){ if(!cur.includes(ref)) cur.push(ref); }
+        else if (typeof cur === 'string'){ if(cur!==ref) p.holds[type]=[cur,ref]; }
+        else p.holds[type] = ref;
+        return this.updateMe({ holds: p.holds });
+      });
+    },
+    release(type, ref){
+      return this.me().then(p => {
+        const cur = p.holds[type];
+        if (Array.isArray(cur)){
+          const left = cur.filter(r => r !== ref);
+          if (!left.length) delete p.holds[type]; else p.holds[type] = left.length===1?left[0]:left;
+        } else if (cur === ref) delete p.holds[type];
+        return this.updateMe({ holds: p.holds });
+      });
+    },
+    resolve(ref){ const i=String(ref).indexOf('/'); return i<0?Promise.resolve(null):this.read(String(ref).slice(i+1)); },
+    resolveAll(type){
+      return this.me().then(p => {
+        const cur = p.holds[type];
+        const refs = Array.isArray(cur)?cur:(cur?[cur]:[]);
+        return Promise.all(refs.map(r=>this.resolve(r).then(v=>v?{ref:r,value:v}:null))).then(a=>a.filter(Boolean));
+      });
+    },
+  };
+})();
+</script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+:root{
+  --ink:#dfe6ef; --dim:#8d97a6; --fade:#5a6474;
+  --warn:#ffc63c; --serum:#66ffcc; --blood:#c8404a; --sod:#ffb45c; --tag:#ffeec0;
+  --line:rgba(160,190,220,.16);
+}
+html,body{height:100%;overflow:hidden;background:#05070c;}
+body{
+  font-family:"Barlow Condensed","Oswald",-apple-system,"Segoe UI",sans-serif;
+  color:var(--ink); user-select:none; cursor:default;
+}
+body.locked{cursor:none;}
+canvas{display:block;position:fixed;inset:0;}
+.hide{display:none !important;}
+
+/* ── screens ─────────────────────────────────────────────────────────── */
+.screen{
+  position:fixed;inset:0;z-index:40;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;text-align:center;
+  background:
+    radial-gradient(ellipse at 50% 42%, rgba(20,30,44,.55), rgba(4,6,10,.97) 68%),
+    repeating-linear-gradient(0deg, rgba(255,255,255,.018) 0 1px, transparent 1px 3px),
+    #05070c;
+}
+#title h1{
+  font-size:clamp(52px,10vw,140px);letter-spacing:.14em;font-weight:600;
+  line-height:.94;text-transform:uppercase;
+  color:#eef4fb;text-shadow:0 0 44px rgba(120,200,255,.16);
+}
+#title h1 em{font-style:normal;color:var(--serum);}
+#title .rule{width:min(560px,72vw);height:1px;background:linear-gradient(90deg,transparent,var(--line),transparent);margin:22px 0 20px;}
+#title .blurb{max-width:560px;font-size:17px;line-height:1.6;color:var(--dim);letter-spacing:.02em;padding:0 22px;}
+#title .blurb b{color:var(--ink);font-weight:500;}
+.keys{display:flex;gap:26px;flex-wrap:wrap;justify-content:center;margin-top:26px;color:var(--fade);font-size:13px;letter-spacing:.14em;text-transform:uppercase;}
+.keys b{color:var(--dim);font-weight:500;}
+.go{
+  margin-top:34px;padding:15px 46px;border:1px solid rgba(102,255,204,.45);
+  background:rgba(102,255,204,.07);color:var(--serum);cursor:pointer;
+  font:inherit;font-size:19px;letter-spacing:.28em;text-transform:uppercase;
+  transition:background .16s,border-color .16s;
+}
+.go:hover{background:rgba(102,255,204,.16);border-color:rgba(102,255,204,.8);}
+#title .best{margin-top:18px;font-size:13px;letter-spacing:.18em;color:var(--fade);text-transform:uppercase;min-height:16px;}
+
+#paused{z-index:45;background:rgba(4,6,10,.72);}
+#paused .go{margin-top:20px;}
+#paused .pl{font-size:15px;letter-spacing:.2em;color:var(--dim);text-transform:uppercase;}
+
+#end{z-index:50;display:none;}
+#end.show{display:flex;}
+#endtitle{font-size:clamp(34px,6vw,74px);letter-spacing:.16em;text-transform:uppercase;font-weight:600;}
+#endtitle.win{color:var(--serum);} #endtitle.lose{color:var(--blood);}
+#endstats{display:flex;gap:44px;margin:30px 0 6px;}
+#endstats div{display:flex;flex-direction:column;gap:4px;}
+#endstats b{font-size:40px;font-weight:600;line-height:1;}
+#endstats span{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--fade);}
+#endstats .cured b{color:var(--serum);}
+#endstats .rested b{color:var(--tag);}
+#endline{max-width:520px;font-size:16px;line-height:1.6;color:var(--dim);margin-top:14px;padding:0 22px;}
+
+/* ── hud ─────────────────────────────────────────────────────────────── */
+#hud{position:fixed;inset:0;z-index:20;pointer-events:none;}
+#cross{
+  position:fixed;left:50%;top:50%;width:16px;height:16px;transform:translate(-50%,-50%);
+  opacity:.62;
+}
+#cross:before,#cross:after{content:"";position:absolute;background:#eaf4ff;}
+#cross:before{left:50%;top:0;width:1px;height:5px;margin-left:-.5px;box-shadow:0 11px 0 #eaf4ff;}
+#cross:after{top:50%;left:0;height:1px;width:5px;margin-top:-.5px;box-shadow:11px 0 0 #eaf4ff;}
+
+#muzzle{
+  position:fixed;left:50%;top:50%;width:220px;height:220px;transform:translate(-50%,-50%);
+  border-radius:50%;pointer-events:none;opacity:0;
+  background:radial-gradient(circle,rgba(255,214,150,.5),transparent 62%);
+}
+#muzzle.on{opacity:1;}
+
+#dmg{
+  position:fixed;inset:0;pointer-events:none;opacity:0;transition:opacity .22s;
+  background:radial-gradient(ellipse at center,transparent 46%,rgba(150,20,28,.78) 100%);
+}
+
+.corner{position:fixed;padding:16px 20px;}
+#wpn{right:0;bottom:0;text-align:right;}
+#wname{font-size:15px;letter-spacing:.24em;color:var(--dim);text-transform:uppercase;}
+#wammo{font-size:38px;font-weight:600;letter-spacing:.06em;line-height:1.05;}
+#slots{display:flex;gap:12px;justify-content:flex-end;margin-top:4px;font-size:11px;letter-spacing:.14em;color:var(--fade);}
+#slots span.on{color:var(--warn);}
+
+#vit{left:0;bottom:0;}
+#hpbar{width:230px;height:9px;background:rgba(255,255,255,.08);border:1px solid var(--line);}
+#hpfill{height:100%;width:100%;background:linear-gradient(90deg,#c8404a,#ff8a6a);transition:width .12s;}
+#hprow{display:flex;align-items:baseline;gap:10px;margin-bottom:5px;}
+#hpnum{font-size:32px;font-weight:600;line-height:1;}
+#hprow span{font-size:11px;letter-spacing:.2em;color:var(--fade);text-transform:uppercase;}
+#doserow{margin-top:12px;display:flex;align-items:baseline;gap:9px;color:var(--fade);}
+#doserow.armed{color:var(--serum);}
+#doses{font-size:22px;font-weight:600;line-height:1;}
+#doserow span{font-size:11px;letter-spacing:.2em;text-transform:uppercase;}
+#backnum{font-size:22px;font-weight:600;line-height:1;margin-left:8px;color:var(--serum);}
+#tagrow{margin-top:8px;display:flex;align-items:baseline;gap:9px;color:var(--tag);}
+#tagnum{font-size:20px;font-weight:600;line-height:1;}
+#tagrow span{font-size:11px;letter-spacing:.2em;text-transform:uppercase;}
+#tagrow em{font-style:normal;font-size:12px;letter-spacing:.12em;color:var(--dim);}
+
+#top{top:0;left:50%;transform:translateX(-50%);text-align:center;}
+#rnum{font-size:15px;letter-spacing:.3em;text-transform:uppercase;color:var(--dim);}
+#rnum:before{content:"ROUND ";color:var(--fade);}
+#rleft{font-size:13px;letter-spacing:.2em;color:var(--warn);text-transform:uppercase;margin-top:3px;}
+#where{position:fixed;top:0;left:0;padding:16px 20px;font-size:12px;letter-spacing:.24em;color:var(--fade);text-transform:uppercase;}
+
+#prompt{
+  position:fixed;left:50%;top:58%;transform:translateX(-50%);
+  font-size:15px;letter-spacing:.22em;text-transform:uppercase;color:var(--warn);
+  opacity:0;transition:opacity .14s;white-space:nowrap;
+}
+#prompt.show{opacity:1;}
+
+#curewrap{
+  position:fixed;left:50%;top:63%;transform:translateX(-50%);
+  width:190px;height:5px;background:rgba(255,255,255,.1);opacity:0;transition:opacity .1s;
+}
+#curewrap.show{opacity:1;}
+#curebar{height:100%;width:0;background:var(--serum);box-shadow:0 0 12px rgba(102,255,204,.7);transition:background .1s;}
+#curewrap.rest #curebar{background:var(--tag);box-shadow:0 0 12px rgba(255,238,192,.75);}
+
+#banner{
+  position:fixed;left:50%;top:26%;transform:translateX(-50%);text-align:center;
+  opacity:0;white-space:nowrap;
+}
+#banner.show{animation:bnr 2.6s ease forwards;}
+@keyframes bnr{0%{opacity:0;transform:translateX(-50%) translateY(10px);}10%{opacity:1;transform:translateX(-50%) translateY(0);}78%{opacity:1;}100%{opacity:0;}}
+#bigline{font-size:44px;font-weight:600;letter-spacing:.2em;text-transform:uppercase;text-shadow:0 0 30px rgba(0,0,0,.9);}
+#smallline{font-size:14px;letter-spacing:.16em;color:var(--dim);margin-top:6px;}
+
+#toast{
+  position:fixed;left:50%;bottom:14%;transform:translateX(-50%);
+  padding:9px 20px;border:1px solid var(--line);background:rgba(8,12,18,.82);
+  font-size:14px;letter-spacing:.06em;color:var(--ink);opacity:0;transition:opacity .25s;
+  white-space:nowrap;
+}
+#toast.show{opacity:1;}
+
+.dnum{
+  position:fixed;z-index:22;pointer-events:none;transform:translate(-50%,-50%);
+  font-size:19px;font-weight:600;letter-spacing:.04em;color:#ffe6c0;
+  text-shadow:0 1px 5px rgba(0,0,0,.95);
+}
+</style>
+</head>
+<body>
+
+<!-- ── title ─────────────────────────────────────────────────────────── -->
+<div id="title" class="screen">
+  <h1>Still<br><em>Human</em></h1>
+  <div class="rule"></div>
+  <p class="blurb">
+    Hold the yard. Between waves a hatch opens onto the lab underneath it, and
+    somewhere down there is the man who knows how to turn them back.
+    <b>The turned and the lupine were people.</b> A revenant was not — it was
+    someone who died down there, and all that is left of one is a name nobody
+    says. Wear it thin with the lantern, then give it one back.
+  </p>
+  <div class="keys">
+    <span><b>WASD</b> move</span><span><b>SHIFT</b> run</span>
+    <span><b>1 2 3</b> weapon</span><span><b>R</b> reload</span>
+    <span><b>E</b> use / take</span><span><b>F</b> hold to save</span>
+  </div>
+  <button class="go" id="startbtn">Begin</button>
+  <div class="best" id="bestline"></div>
+</div>
+
+<!-- ── paused ────────────────────────────────────────────────────────── -->
+<div id="paused" class="screen hide">
+  <div class="pl">Mouse released</div>
+  <button class="go" id="resumebtn">Resume</button>
+</div>
+
+<!-- ── hud ───────────────────────────────────────────────────────────── -->
+<div id="hud" class="hide">
+  <div id="dmg"></div>
+  <div id="cross"></div>
+  <div id="muzzle"></div>
+
+  <div id="where">THE YARD</div>
+
+  <div class="corner" id="top">
+    <div id="rnum">—</div>
+    <div id="rleft"></div>
+  </div>
+
+  <div class="corner" id="vit">
+    <div id="hprow"><div id="hpnum">100</div><span>condition</span></div>
+    <div id="hpbar"><div id="hpfill"></div></div>
+    <div id="doserow">
+      <div id="doses">—</div><span>doses</span>
+      <div id="backnum">—</div><span>saved</span>
+    </div>
+    <div id="tagrow" class="hide">
+      <div id="tagnum">0</div><span>tags</span><em id="tagname"></em>
+    </div>
+  </div>
+
+  <div class="corner" id="wpn">
+    <div id="wname">SIDEARM</div>
+    <div id="wammo">14 / 84</div>
+    <div id="slots"><span id="s1">1 SIDEARM</span><span id="s2">2 SCATTER</span><span id="s3">3 LANTERN</span></div>
+  </div>
+
+  <div id="prompt"></div>
+  <div id="curewrap"><div id="curebar"></div></div>
+  <div id="banner"><div id="bigline"></div><div id="smallline"></div></div>
+  <div id="toast"></div>
+</div>
+
+<!-- ── end ───────────────────────────────────────────────────────────── -->
+<div id="end" class="screen">
+  <div id="endtitle">YOU DID NOT HOLD</div>
+  <div id="endstats"></div>
+  <div id="endline"></div>
+  <button class="go" id="againbtn">Again</button>
+</div>
+
+<script src="three.min.js"></script>
+<script>
+/*  three.min.js ships beside this file so the game works with no network.
+    The fallback is pinned to r158 — the same build it was lit for. Three
+    changed punctual-light units at r155, so an older revision here would
+    blow every lamp in the yard out to white. */
+if (!window.THREE){
+  document.write('<scr'+'ipt src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r158/three.min.js"><\/scr'+'ipt>');
+}
+</script>
+<script>
+// =============================================================================
+//  STILL HUMAN — core, materials, and the creature rig
+// -----------------------------------------------------------------------------
+//  A round-based survival game for Present Palm. You hold a compound through
+//  waves of the turned; between waves a hatch opens and you get a short window
+//  to push deeper into the lab underneath it, looking for the man who knows how
+//  to turn them back.
+//
+//  The title is the mechanic. Zombies and werewolves are people who were
+//  changed and can be changed back — once you have found Dr Aleks Varga and his
+//  serum, killing them stops being the only option. Ghosts cannot be cured,
+//  because a ghost is not someone who was changed. That distinction is the
+//  whole game: after the serum, every shot is a decision about whether the
+//  thing coming at you is still a person.
+// =============================================================================
+
+const TAU = Math.PI * 2;
+const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
+const lerp  = (a, b, t) => a + (b - a) * t;
+const damp  = (a, b, k, dt) => lerp(a, b, 1 - Math.exp(-k * dt));
+
+//  Deterministic RNG so a seed makes the same compound and the same maze.
+class RNG {
+  constructor(seed){
+    let h = 2166136261 >>> 0;
+    const s = String(seed);
+    for (let i = 0; i < s.length; i++){ h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
+    this.s = h >>> 0;
+  }
+  next(){
+    this.s ^= this.s << 13; this.s >>>= 0;
+    this.s ^= this.s >>> 17;
+    this.s ^= this.s << 5;  this.s >>>= 0;
+    return this.s / 4294967296;
+  }
+  range(a, b){ return a + this.next() * (b - a); }
+  int(a, b){ return Math.floor(this.range(a, b + 1)); }
+  bool(p = 0.5){ return this.next() < p; }
+  pick(arr){ return arr[Math.floor(this.next() * arr.length)]; }
+}
+
+// ─── Configuration ──────────────────────────────────────────────────────────
+const CFG = {
+  PLAYER_HEIGHT: 1.68,
+  PLAYER_RADIUS: 0.34,
+  WALK: 4.6,
+  SPRINT: 8.2,
+  JUMP: 6.4,
+  GRAVITY: 20,
+  MOUSE: 0.0022,
+
+  HATCH_SECONDS: 55,          // how long the way down stays open between rounds
+  ROUND_BREAK: 7,             // breather before a wave starts
+  ARENA_R: 30,                // compound radius
+
+  CURE_RANGE: 3.4,
+  CURE_TIME: 1.15,            // seconds of holding the injector on a target
+  CURE_DOSES_START: 0,
+  //  What you are actually here for. Surviving rounds is the pressure; this is
+  //  the goal, and it is the only ending that is not just running out.
+  CURE_GOAL: 12,
+
+  //  A revenant was never someone who was changed, so there is nothing in it to
+  //  change back and the serum is useless. What is left of one is a name nobody
+  //  says any more. Light does not destroy it, it wears it thin — and a thin
+  //  revenant will take a name back if you have one to give.
+  DIM_AT: 0.28,          // fraction of health at which a revenant goes dim
+  REST_TIME: 1.4,        // seconds of holding a tag on a dim revenant
+  REST_RANGE: 4.2,       // further than the serum: you do not have to touch it
+  DOSE_CAP: 6,           // what Varga can carry between waves
+};
+
+//  Personnel of the station, off the tags you find down there. Giving one back
+//  is the whole of the second save: you cannot fix a revenant, you can only
+//  stop it being nobody.
+const TAG_NAMES = [
+  'M. OKAFOR', 'J. HALVERSEN', 'R. ESPOSITO', 'D. NAKASHIMA', 'A. BRENNAN',
+  'S. IVANKOVA', 'P. ADEYEMI', 'L. FONTAINE', 'C. WHITTAKER', 'T. BARROS',
+  'N. GRUBER', 'E. MARCHETTI', 'K. OYELARAN', 'V. SOKOLOV', 'H. LINDQVIST',
+  'B. TAMAYO', 'F. KRISHNAN', 'G. DUCHESNE', 'W. ABARA', 'O. STENSRUD',
+];
+
+const WEAPONS = {
+  sidearm: { name:'SIDEARM',  dmg: 34, rpm: 300, mag: 14, reserve: 84, spread: 0.012, range: 46, pellets: 1, kind:'ball' },
+  scatter: { name:'SCATTER',  dmg: 17, rpm: 78,  mag: 6,  reserve: 32, spread: 0.075, range: 18, pellets: 7, kind:'ball' },
+  lantern: { name:'LANTERN',  dmg: 42, rpm: 130, mag: 10, reserve: 40, spread: 0.02,  range: 26, pellets: 1, kind:'light' },
+};
+
+//  Ghosts ignore anything that is not light. That is the reason the LANTERN
+//  exists and the reason you cannot simply carry one gun all night.
+const HURTS_GHOST = { ball: false, light: true };
+
+// ─── Palette ────────────────────────────────────────────────────────────────
+//  Cold, wet, sodium-lit. The only warm colours in the game are the things
+//  that are still alive.
+const PAL = {
+  night:    0x080a12,
+  fog:      0x0d1018,
+  concrete: 0x5a5e69,
+  concreteDark: 0x3d414b,
+  rust:     0x7a4a34,
+  steel:    0x8d93a1,
+  steelDark:0x4a4f5c,
+  sodium:   0xffb45c,
+  lab:      0xd8e4e8,
+  labDark:  0x8fa4ab,
+  glass:    0x9fd8e0,
+  blood:    0x6e1c22,
+  serum:    0x66ffcc,
+  warn:     0xffc63c,
+  ghost:    0xa8e8ff,
+  wolf:     0x4a3b31,
+  flesh:    0x9aa88c,     // turned skin — greened, not green
+  human:    0xc98f6b,
+};
+
+//  Three.js r155 and later light punctual sources physically: intensity is in
+//  candela and falls off with the square of the distance, so the numbers that
+//  used to read as "a bulb" now read as "off". Everything point-lit in this
+//  game is written in the old, legible units and multiplied through here, which
+//  keeps one number to turn when the whole place is too dark.
+const LUX = 30;
+
+// ─── Geometry helpers ───────────────────────────────────────────────────────
+const G = {};
+function initGeo(){
+  G.box   = new THREE.BoxGeometry(1, 1, 1);
+  G.plane = new THREE.PlaneGeometry(1, 1);
+  G.cyl   = new THREE.CylinderGeometry(0.5, 0.5, 1, 10);
+  G.sphere= new THREE.SphereGeometry(0.5, 10, 8);
+}
+
+const MATS = {};
+function mat(key, opts){
+  if (MATS[key]) return MATS[key];
+  MATS[key] = new THREE.MeshLambertMaterial(opts);
+  return MATS[key];
+}
+function emissive(key, hex){
+  if (MATS[key]) return MATS[key];
+  MATS[key] = new THREE.MeshBasicMaterial({ color: hex });
+  return MATS[key];
+}
+
+//  One merged mesh per material rather than one mesh per box. A crowd of
+//  thirty creatures at forty parts each is twelve hundred draw calls if you do
+//  it the obvious way; baked it is two per creature.
+function bakeParts(parts, opts){
+  const geos = [];
+  for (const p of parts){
+    const g = new THREE.BoxGeometry(p.w, p.h, p.d);
+    g.translate(p.x, p.y, p.z);
+    if (p.rx || p.ry || p.rz){
+      const m = new THREE.Matrix4().makeRotationFromEuler(
+        new THREE.Euler(p.rx || 0, p.ry || 0, p.rz || 0));
+      const t = new THREE.Matrix4().makeTranslation(p.x, p.y, p.z);
+      g.translate(-p.x, -p.y, -p.z);
+      g.applyMatrix4(m); g.applyMatrix4(t);
+    }
+    const col = new THREE.Color(p.c);
+    const n = g.attributes.position.count;
+    const arr = new Float32Array(n * 3);
+    for (let i = 0; i < n; i++){ arr[i*3] = col.r; arr[i*3+1] = col.g; arr[i*3+2] = col.b; }
+    g.setAttribute('color', new THREE.BufferAttribute(arr, 3));
+    geos.push(g);
+  }
+  if (!geos.length) return null;
+  const merged = mergeGeos(geos);
+  for (const g of geos) g.dispose();
+  const m = new THREE.Mesh(merged, opts && opts.emit
+    ? mat('bodyEmit', { vertexColors: true, emissive: 0xffffff, emissiveIntensity: 0 })
+    : mat('body', { vertexColors: true }));
+  return m;
+}
+
+//  Three's BufferGeometryUtils is a separate addon and this build is one file,
+//  so merge by hand. All inputs are BoxGeometry, so the attribute set is known.
+function mergeGeos(geos){
+  let vc = 0, ic = 0;
+  for (const g of geos){ vc += g.attributes.position.count; ic += g.index ? g.index.count : 0; }
+  const pos = new Float32Array(vc * 3);
+  const nor = new Float32Array(vc * 3);
+  const col = new Float32Array(vc * 3);
+  const idx = new Uint32Array(ic);
+  let vo = 0, io = 0;
+  for (const g of geos){
+    const p = g.attributes.position.array, n = g.attributes.normal.array, c = g.attributes.color.array;
+    pos.set(p, vo * 3); nor.set(n, vo * 3); col.set(c, vo * 3);
+    const gi = g.index.array;
+    for (let i = 0; i < gi.length; i++) idx[io + i] = gi[i] + vo;
+    vo += g.attributes.position.count; io += gi.length;
+  }
+  const out = new THREE.BufferGeometry();
+  out.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  out.setAttribute('normal',   new THREE.BufferAttribute(nor, 3));
+  out.setAttribute('color',    new THREE.BufferAttribute(col, 3));
+  out.setIndex(new THREE.BufferAttribute(idx, 1));
+  return out;
+}
+
+// =============================================================================
+//  THE CREATURE RIG
+// -----------------------------------------------------------------------------
+//  This is the part that had to beat everything else in the hub. Fracture
+//  City's people are eight meshes of about 270 triangles: a torso, a head, four
+//  limbs on pivots. Good enough for a crowd seen from across a street.
+//
+//  Here you meet them at arm's length in a corridor, so a creature is built
+//  from forty to sixty described parts — ribs, collarbones, a jaw that hangs,
+//  shoulder blades, individual fingers on the reaching hand, fur tufts along a
+//  spine, ankle bones — and then baked down to five meshes so the cost stays
+//  where the last game left it. Every limb keeps its own pivot so the bake does
+//  not cost the animation.
+//
+//  Each kind is built from the same human skeleton and then deformed, because
+//  they were all people. A werewolf's proportions are a person's proportions
+//  pushed forward onto their hands. A zombie is a person with the tension gone
+//  out of one side. You should be able to see that.
+// =============================================================================
+
+const KINDS = {
+  zombie: {
+    name:'TURNED', speed: 1.55, hp: 70, dmg: 11, reach: 1.5, curable: true,
+    eye: 0xffd07a, skin: PAL.flesh, mass: 1.0,
+  },
+  werewolf: {
+    name:'LUPINE', speed: 5.1, hp: 110, dmg: 19, reach: 1.9, curable: true,
+    eye: 0xffe14a, skin: PAL.wolf, mass: 1.35,
+  },
+  ghost: {
+    name:'REVENANT', speed: 2.9, hp: 120, dmg: 14, reach: 1.7, curable: false,
+    eye: 0xa8e8ff, skin: PAL.ghost, mass: 0.6,
+  },
+};
+
+//  Skin tones for who they used to be — used by the cured civilian and, faintly,
+//  under a zombie's pallor, so a cure reads as a person coming back.
+const SKINS = [0xf2c8a2, 0xdca17d, 0xc98f6b, 0xa8714f, 0x8a5638, 0x6b4230, 0x4a2e22];
+const CLOTHES = [0x2f4858, 0x4a3b52, 0x53412c, 0x2c4c3b, 0x5a2f38, 0x3a3f4a, 0x6b5a3c];
+const HAIRS = [0x1a1410, 0x3a2a1e, 0x5c4432, 0x8a6a46, 0xb0a08a, 0x2a2a30];
+
+function buildCreature(kind, rng, opts){
+  const K = KINDS[kind];
+  const o = opts || {};
+  const skin = o.skin || K.skin;
+  const under = o.under || rng.pick(SKINS);      // who they were
+  const cloth = o.cloth || rng.pick(CLOTHES);
+  const hair  = o.hair  || rng.pick(HAIRS);
+  const scale = o.scale || rng.range(0.92, 1.08);
+
+  const root = new THREE.Group();
+  const rig = { kind, root, def: K, parts: {}, phase: rng.range(0, TAU) };
+
+  // Limbs are their own groups so the bake keeps them animatable.
+  const mk = (name, px, py, pz) => {
+    const g = new THREE.Group();
+    g.position.set(px, py, pz);
+    root.add(g);
+    rig.parts[name] = g;
+    return g;
+  };
+
+  if (kind === 'werewolf') buildWolf(rig, mk, rng, skin, under, cloth);
+  else if (kind === 'ghost') buildGhost(rig, mk, rng, skin, cloth, hair);
+  else buildTurned(rig, mk, rng, skin, under, cloth, hair);
+
+  root.scale.setScalar(scale);
+  rig.scale = scale;
+  return rig;
+}
+
+// ─── The turned: a person, some time after ──────────────────────────────────
+function buildTurned(rig, mk, rng, skin, under, cloth, hair){
+  const torso = mk('torso', 0, 0.98, 0);
+  const head  = mk('head',  0, 1.62, 0);
+  const armL  = mk('armL', -0.26, 1.42, 0);
+  const armR  = mk('armR',  0.26, 1.42, 0);
+  const legL  = mk('legL', -0.12, 0.86, 0);
+  const legR  = mk('legR',  0.12, 0.86, 0);
+
+  const rot = rng.range(-0.14, 0.14);       // nobody stands straight any more
+  const torn = rng.bool(0.55);
+
+  // Torso: ribcage, sternum, shoulder shelf, hips, and a shirt over some of it
+  const body = [
+    { x:0, y:0.06, z:0, w:0.46, h:0.56, d:0.26, c:cloth },        // shirt
+    { x:0, y:0.30, z:0, w:0.50, h:0.14, d:0.28, c:cloth },        // shoulders
+    { x:-0.24, y:0.30, z:0, w:0.10, h:0.10, d:0.22, c:skin },     // collarbone L
+    { x: 0.24, y:0.30, z:0, w:0.10, h:0.10, d:0.22, c:skin },     // collarbone R
+    { x:0, y:-0.26, z:0, w:0.40, h:0.22, d:0.24, c:cloth },       // hips
+  ];
+  if (torn){
+    // the shirt has gone at the front — ribs, and the sternum between them
+    body.push({ x:0, y:0.10, z:0.12, w:0.30, h:0.34, d:0.06, c:skin });
+    for (let i = 0; i < 4; i++)
+      body.push({ x:0, y:0.22 - i*0.09, z:0.145, w:0.26, h:0.035, d:0.04, c:0xb9c0a8 });
+    body.push({ x:0, y:0.10, z:0.16, w:0.05, h:0.32, d:0.03, c:0xc8cfb8 });
+    body.push({ x:0.04, y:-0.04, z:0.16, w:0.16, h:0.16, d:0.03, c:PAL.blood });
+  }
+  torso.add(bakeParts(body));
+  torso.rotation.z = rot;
+
+  // Head: skull, jaw hung open, brow, ear, and hair that is still their hair
+  const hd = [
+    { x:0, y:0, z:0, w:0.30, h:0.30, d:0.30, c:skin },
+    { x:0, y:0.15, z:0, w:0.32, h:0.06, d:0.31, c:hair },        // hairline
+    { x:0, y:0.10, z:-0.10, w:0.30, h:0.16, d:0.14, c:hair },    // back of hair
+    { x:0, y:0.02, z:0.155, w:0.26, h:0.06, d:0.03, c:0x5a5348 },// brow
+    { x:-0.17, y:0, z:0, w:0.05, h:0.10, d:0.09, c:skin },       // ear L
+    { x: 0.17, y:0, z:0, w:0.05, h:0.10, d:0.09, c:skin },       // ear R
+    { x:0, y:-0.19, z:0.05, w:0.20, h:0.12, d:0.20, c:skin, rx: 0.34 }, // jaw, dropped
+    { x:0, y:-0.15, z:0.13, w:0.16, h:0.02, d:0.03, c:0x2a1a18 },
+  ];
+  head.add(bakeParts(hd));
+  // Eyes glow — how you read a creature's state across a dark room
+  const eyeGeo = new THREE.BoxGeometry(0.055, 0.045, 0.03);
+  const eyeMat = new THREE.MeshBasicMaterial({ color: KINDS.zombie.eye });
+  for (const sx of [-0.075, 0.075]){
+    const e = new THREE.Mesh(eyeGeo, eyeMat);
+    e.position.set(sx, 0.03, 0.152);
+    head.add(e);
+  }
+  rig.eyeMat = eyeMat;
+
+  // Arms — one hangs, one reaches. Fingers on the reaching hand.
+  const arm = (side, reaching) => {
+    const a = [
+      { x:0, y:-0.16, z:0, w:0.14, h:0.34, d:0.14, c:cloth },      // upper, sleeved
+      { x:0, y:-0.46, z:0, w:0.12, h:0.30, d:0.12, c:skin },       // forearm
+      { x:0, y:-0.66, z:0.01, w:0.13, h:0.12, d:0.11, c:skin },    // hand
+    ];
+    if (reaching){
+      for (let i = 0; i < 4; i++)
+        a.push({ x:-0.045 + i*0.03, y:-0.75, z:0.03, w:0.022, h:0.10, d:0.04, c:skin });
+      a.push({ x: side * 0.06, y:-0.70, z:0.06, w:0.03, h:0.07, d:0.03, c:skin });
+    } else {
+      a.push({ x:0, y:-0.74, z:0, w:0.10, h:0.06, d:0.09, c:skin });
+    }
+    return a;
+  };
+  const reachL = rng.bool();
+  armL.add(bakeParts(arm(-1, reachL)));
+  armR.add(bakeParts(arm( 1, !reachL)));
+  armL.rotation.x = reachL ? -1.15 : -0.10;
+  armR.rotation.x = reachL ? -0.10 : -1.15;
+  rig.reachL = reachL;
+
+  // Legs — trousers, shin, a foot with an ankle
+  const leg = [
+    { x:0, y:-0.20, z:0, w:0.17, h:0.40, d:0.17, c:cloth },
+    { x:0, y:-0.56, z:0, w:0.14, h:0.34, d:0.14, c:cloth },
+    { x:0, y:-0.76, z:0, w:0.11, h:0.08, d:0.11, c:skin },
+    { x:0, y:-0.82, z:0.04, w:0.14, h:0.07, d:0.22, c:0x2a2620 },
+  ];
+  legL.add(bakeParts(leg));
+  legR.add(bakeParts(leg));
+  rig.under = under;
+}
+
+// ─── Lupine: a person on their hands ────────────────────────────────────────
+function buildWolf(rig, mk, rng, fur, under, cloth){
+  const dark = new THREE.Color(fur).multiplyScalar(0.62).getHex();
+  const pale = new THREE.Color(fur).lerp(new THREE.Color(0xffffff), 0.22).getHex();
+
+  const torso = mk('torso', 0, 1.02, 0);
+  const head  = mk('head',  0, 1.34, 0.42);
+  const armL  = mk('armL', -0.30, 1.16, 0.10);
+  const armR  = mk('armR',  0.30, 1.16, 0.10);
+  const legL  = mk('legL', -0.20, 0.88, -0.22);
+  const legR  = mk('legR',  0.20, 0.88, -0.22);
+  const tail  = mk('tail',  0, 1.00, -0.42);
+
+  // A long forward-pitched chest, spine ridge, and the remains of a shirt
+  const body = [
+    { x:0, y:0, z:0.10, w:0.58, h:0.46, d:0.66, c:fur, rx: 0.30 },
+    { x:0, y:0.16, z:-0.16, w:0.50, h:0.34, d:0.40, c:dark },        // haunches
+    { x:0, y:-0.16, z:0.24, w:0.44, h:0.28, d:0.30, c:pale },        // belly
+    { x:0, y:0.30, z:0.04, w:0.16, h:0.10, d:0.60, c:dark },         // spine ridge
+    { x:-0.30, y:0.16, z:0.16, w:0.10, h:0.24, d:0.22, c:dark },     // shoulder L
+    { x: 0.30, y:0.16, z:0.16, w:0.10, h:0.24, d:0.22, c:dark },     // shoulder R
+    { x:0, y:-0.06, z:-0.02, w:0.52, h:0.24, d:0.22, c:cloth },      // shirt, split
+  ];
+  for (let i = 0; i < 5; i++)                                        // fur tufts
+    body.push({ x:0, y:0.36, z:0.24 - i*0.14, w:0.07, h:0.14, d:0.07, c:dark,
+                rx: rng.range(-0.3, 0.3) });
+  torso.add(bakeParts(body));
+
+  // Head: long skull, muzzle, nose, teeth, ears, ruff
+  const hd = [
+    { x:0, y:0, z:0, w:0.30, h:0.28, d:0.34, c:fur },
+    { x:0, y:-0.05, z:0.26, w:0.20, h:0.17, d:0.26, c:fur },      // muzzle
+    { x:0, y:-0.02, z:0.40, w:0.13, h:0.10, d:0.06, c:0x1a1412 }, // nose
+    { x:0, y:-0.13, z:0.28, w:0.16, h:0.05, d:0.22, c:0x2a1c1a }, // lower jaw
+    { x:0, y:0.10, z:-0.14, w:0.34, h:0.22, d:0.16, c:dark },     // ruff
+    { x:-0.13, y:0.19, z:-0.02, w:0.09, h:0.20, d:0.05, c:dark, rz: -0.24 },  // ear L
+    { x: 0.13, y:0.19, z:-0.02, w:0.09, h:0.20, d:0.05, c:dark, rz:  0.24 },  // ear R
+    { x:-0.13, y:0.24, z:-0.02, w:0.05, h:0.09, d:0.04, c:pale, rz: -0.24 },
+    { x: 0.13, y:0.24, z:-0.02, w:0.05, h:0.09, d:0.04, c:pale, rz:  0.24 },
+  ];
+  for (let i = 0; i < 4; i++){                                    // teeth
+    hd.push({ x:-0.055 + i*0.037, y:-0.085, z:0.375, w:0.022, h:0.055, d:0.02, c:0xe8e2d0 });
+    hd.push({ x:-0.055 + i*0.037, y:-0.135, z:0.375, w:0.020, h:0.045, d:0.02, c:0xd8d2c0 });
+  }
+  head.add(bakeParts(hd));
+  const eyeMat = new THREE.MeshBasicMaterial({ color: KINDS.werewolf.eye });
+  for (const sx of [-0.085, 0.085]){
+    const e = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.04, 0.03), eyeMat);
+    e.position.set(sx, 0.05, 0.16); head.add(e);
+  }
+  rig.eyeMat = eyeMat;
+
+  // Forelimbs, with claws
+  const fore = [
+    { x:0, y:-0.20, z:0, w:0.17, h:0.40, d:0.18, c:fur },
+    { x:0, y:-0.52, z:0.04, w:0.14, h:0.30, d:0.15, c:dark },
+    { x:0, y:-0.70, z:0.10, w:0.17, h:0.11, d:0.22, c:dark },
+  ];
+  for (let i = 0; i < 4; i++)
+    fore.push({ x:-0.06 + i*0.04, y:-0.74, z:0.21, w:0.026, h:0.05, d:0.09, c:0xe8e2d0, rx: 0.5 });
+  armL.add(bakeParts(fore)); armR.add(bakeParts(fore));
+
+  // Hind legs — digitigrade, so a real hock
+  const hind = [
+    { x:0, y:-0.14, z:-0.02, w:0.22, h:0.34, d:0.30, c:fur },
+    { x:0, y:-0.42, z:0.06, w:0.16, h:0.30, d:0.16, c:dark, rx: -0.35 },
+    { x:0, y:-0.68, z:-0.02, w:0.13, h:0.26, d:0.13, c:dark, rx: 0.30 },
+    { x:0, y:-0.84, z:0.08, w:0.15, h:0.09, d:0.24, c:dark },
+  ];
+  legL.add(bakeParts(hind)); legR.add(bakeParts(hind));
+
+  const tl = [];
+  for (let i = 0; i < 5; i++)
+    tl.push({ x:0, y:-i*0.02, z:-i*0.15, w:0.14 - i*0.018, h:0.14 - i*0.018, d:0.17, c: i % 2 ? dark : fur });
+  tail.add(bakeParts(tl));
+  rig.under = under;
+}
+
+// ─── Revenant: what is left when there is nobody to bring back ──────────────
+function buildGhost(rig, mk, rng, tint, cloth, hair){
+  const torso = mk('torso', 0, 1.10, 0);
+  const head  = mk('head',  0, 1.72, 0);
+  const armL  = mk('armL', -0.26, 1.50, 0);
+  const armR  = mk('armR',  0.26, 1.50, 0);
+  const trail = mk('trail', 0, 0.70, 0);
+
+  const pale = new THREE.Color(tint).lerp(new THREE.Color(0xffffff), 0.5).getHex();
+
+  torso.add(bakeParts([
+    { x:0, y:0.04, z:0, w:0.42, h:0.60, d:0.24, c: tint },
+    { x:0, y:0.30, z:0, w:0.48, h:0.12, d:0.26, c: pale },
+    { x:0, y:0.10, z:0.10, w:0.22, h:0.36, d:0.06, c: pale },
+    { x:-0.22, y:0.28, z:0, w:0.09, h:0.10, d:0.20, c: pale },
+    { x: 0.22, y:0.28, z:0, w:0.09, h:0.10, d:0.20, c: pale },
+  ]));
+
+  head.add(bakeParts([
+    { x:0, y:0, z:0, w:0.28, h:0.30, d:0.28, c: tint },
+    { x:0, y:0.14, z:-0.04, w:0.30, h:0.10, d:0.26, c: pale },
+    { x:0, y:-0.06, z:0.13, w:0.10, h:0.09, d:0.05, c: 0x0a1418 },   // hollow
+    { x:0, y:-0.18, z:0.04, w:0.18, h:0.10, d:0.18, c: tint, rx: 0.24 },
+  ]));
+  const eyeMat = new THREE.MeshBasicMaterial({ color: KINDS.ghost.eye });
+  for (const sx of [-0.07, 0.07]){
+    const e = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.06, 0.03), eyeMat);
+    e.position.set(sx, 0.03, 0.145); head.add(e);
+  }
+  rig.eyeMat = eyeMat;
+
+  const arm = [
+    { x:0, y:-0.18, z:0, w:0.12, h:0.36, d:0.12, c: tint },
+    { x:0, y:-0.48, z:0, w:0.10, h:0.28, d:0.10, c: pale },
+    { x:0, y:-0.66, z:0.02, w:0.11, h:0.10, d:0.10, c: pale },
+  ];
+  for (let i = 0; i < 3; i++)
+    arm.push({ x:-0.03 + i*0.03, y:-0.76, z:0.03, w:0.02, h:0.12, d:0.03, c: pale });
+  armL.add(bakeParts(arm)); armR.add(bakeParts(arm));
+
+  //  No legs. It tapers into nothing, and the taper is what animates.
+  const tr = [];
+  for (let i = 0; i < 7; i++)
+    tr.push({ x:0, y:-i*0.11, z:0, w:0.36 - i*0.045, h:0.12, d:0.22 - i*0.026, c: i % 2 ? tint : pale });
+  const trailMesh = bakeParts(tr);
+  trail.add(trailMesh);
+  rig.trailMesh = trailMesh;
+
+  //  Revenants are see-through, which is also how you know shooting lead at
+  //  one is pointless.
+  rig.root.traverse(o => {
+    if (o.isMesh && o.material && o.material.vertexColors){
+      o.material = mat('ghostBody', { vertexColors: true, transparent: true, opacity: 0.46 });
+    }
+  });
+}
+
+// ─── Animation ──────────────────────────────────────────────────────────────
+//  One function drives all three. What differs is the amplitude and what a
+//  limb is FOR: a wolf's forelimbs are legs, a zombie's are reaching.
+function animateCreature(rig, dt, moving, t){
+  const p = rig.parts;
+  rig.phase += dt * (moving ? (rig.kind === 'werewolf' ? 11 : 5.2) : 1.6);
+  const s = Math.sin(rig.phase), c = Math.cos(rig.phase);
+
+  if (rig.kind === 'ghost'){
+    rig.root.position.y = (rig.baseY || 0) + Math.sin(t * 1.7 + rig.phase) * 0.16;
+    if (p.trail) p.trail.rotation.y = Math.sin(t * 0.9) * 0.4;
+    if (p.armL) p.armL.rotation.x = -0.5 + s * 0.18;
+    if (p.armR) p.armR.rotation.x = -0.5 - s * 0.18;
+    if (p.torso) p.torso.rotation.y = Math.sin(t * 0.6) * 0.12;
+    return;
+  }
+
+  if (rig.kind === 'werewolf'){
+    if (p.legL) p.legL.rotation.x =  s * 0.75;
+    if (p.legR) p.legR.rotation.x = -s * 0.75;
+    if (p.armL) p.armL.rotation.x = -s * 0.85;
+    if (p.armR) p.armR.rotation.x =  s * 0.85;
+    if (p.torso) p.torso.position.y = 1.02 + Math.abs(c) * 0.07 * (moving ? 1 : 0.3);
+    if (p.head) p.head.rotation.x = -0.12 + s * 0.10;
+    if (p.tail) { p.tail.rotation.y = s * 0.5; p.tail.rotation.x = -0.3 + Math.abs(c) * 0.2; }
+    return;
+  }
+
+  //  The turned drag. One leg swings less than the other, and the reaching arm
+  //  stays up whether or not they are walking, because it is not for balance.
+  if (p.legL) p.legL.rotation.x =  s * (rig.reachL ? 0.42 : 0.30);
+  if (p.legR) p.legR.rotation.x = -s * (rig.reachL ? 0.30 : 0.42);
+  if (p.torso){ p.torso.rotation.x = 0.10 + s * 0.05; p.torso.position.y = 0.98 + Math.abs(c) * 0.03; }
+  if (p.head) p.head.rotation.z = Math.sin(t * 0.8 + rig.phase) * 0.10;
+  const reach = p[rig.reachL ? 'armL' : 'armR'];
+  const hang  = p[rig.reachL ? 'armR' : 'armL'];
+  if (reach) reach.rotation.x = -1.15 + Math.sin(t * 2.1) * 0.10;
+  if (hang)  hang.rotation.x  = -0.10 + s * 0.30;
+}
+
+
+// =============================================================================
+//  THE COMPOUND, AND THE LAB UNDER IT
+// -----------------------------------------------------------------------------
+//  Two spaces with opposite jobs. Up top is an open yard you defend — sightlines,
+//  cover you can break line-of-sight behind, and one hatch. Down below is a maze
+//  that is deliberately hard to hold: narrow, branching, and dressed so densely
+//  that you navigate by what is in a room rather than by its shape.
+//
+//  The dressing is the point. A corridor with a strip light and nothing else is
+//  a corridor you cannot remember. Every room down here gets a function and the
+//  furniture that function implies — specimen tanks, a gurney with the straps
+//  still done up, server racks, a decontamination shower, a canteen with four
+//  chairs and one of them knocked over.
+// =============================================================================
+
+const World = {
+  group: null, colliders: [], lights: [],
+  hatch: null, maze: null, rooms: [], depth: 1,
+  tags: [],                    // name tags lying about the lab, waiting to be found
+};
+
+function box(w, h, d, m, x, y, z, ry){
+  const mesh = new THREE.Mesh(G.box, m);
+  mesh.scale.set(w, h, d);
+  mesh.position.set(x, y, z);
+  if (ry) mesh.rotation.y = ry;
+  return mesh;
+}
+
+//  Anything the player and the creatures should not walk through.
+//  The collider is kept in the box's own frame rather than as an axis-aligned
+//  bound. Half the cover in the yard sits at whatever angle it was dropped at,
+//  and a square bound around a container turned 45° is nearly twice its real
+//  width — which is exactly what invisible walls are made of.
+function solid(group, w, h, d, m, x, y, z, ry){
+  const mesh = box(w, h, d, m, x, y, z, ry);
+  group.add(mesh);
+  addCollider(x, z, w, d, y - h/2, y + h/2, ry || 0);
+  return mesh;
+}
+
+function addCollider(x, z, w, d, y0, y1, ry){
+  World.colliders.push({ x, z, hw: w/2 + 0.02, hd: d/2 + 0.02, y0, y1,
+                         cs: Math.cos(ry || 0), sn: Math.sin(ry || 0) });
+}
+
+function strip(group, x, y, z, len, colour, ry){
+  const m = box(len, 0.06, 0.16, emissive('lamp' + colour, colour), x, y, z, ry);
+  group.add(m);
+  const l = new THREE.PointLight(colour, 0.55 * LUX, 11, 1.6);
+  l.position.set(x, y - 0.3, z);
+  group.add(l);
+  World.lights.push({ light: l, base: 0.55 * LUX, flicker: Math.random() < 0.3 });
+  return m;
+}
+
+// ─── The yard ───────────────────────────────────────────────────────────────
+function buildCompound(scene, rng){
+  const g = new THREE.Group();
+  const R = CFG.ARENA_R;
+
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(R*2.4, R*2.4),
+    mat('ground', { color: PAL.concreteDark }));
+  ground.rotation.x = -Math.PI/2;
+  g.add(ground);
+
+  // Perimeter wall with a break at each compass point, so nothing has one
+  // safe corner and every wave has to be read.
+  const wallM = mat('wall', { color: PAL.concrete });
+  const seg = 7;
+  for (let i = 0; i < 28; i++){
+    const a0 = (i / 28) * TAU;
+    if (i % 7 === 3) continue;                       // the gaps they come through
+    const x = Math.cos(a0) * R, z = Math.sin(a0) * R;
+    solid(g, seg, 4.2, 0.7, wallM, x, 2.1, z, -a0 + Math.PI/2);
+    if (i % 4 === 0){
+      const post = box(0.5, 6.2, 0.5, mat('post', { color: PAL.steelDark }), x, 3.1, z);
+      g.add(post);
+      const lamp = new THREE.PointLight(PAL.sodium, 0.9 * LUX, 22, 1.5);
+      lamp.position.set(x * 0.92, 5.6, z * 0.92);
+      g.add(lamp);
+      World.lights.push({ light: lamp, base: 0.9 * LUX, flicker: false });
+      g.add(box(0.7, 0.24, 0.7, emissive('sodium', PAL.sodium), x * 0.92, 5.5, z * 0.92));
+    }
+  }
+
+  // Cover: shipping containers, concrete blocks, a dead truck. Placed on rings
+  // so there is always something to put between you and a wolf.
+  //  Nothing lands on the spot you stand up on at the start of a run. Waking
+  //  up inside a shipping container is not an interesting difficulty curve.
+  const SPAWN = { x: 0, z: 10 };
+  const clearOfSpawn = (x, z, pad) => Math.hypot(x - SPAWN.x, z - SPAWN.z) > pad;
+
+  const contM  = [mat('cont1',{color:0x5a4038}), mat('cont2',{color:0x37505a}), mat('cont3',{color:0x4a5240})];
+  for (let i = 0; i < 9; i++){
+    const a = rng.range(0, TAU), rad = rng.range(9, R - 6);
+    const x = Math.cos(a) * rad, z = Math.sin(a) * rad;
+    if (Math.hypot(x, z) < 7) continue;
+    if (!clearOfSpawn(x, z, 6.5)) continue;
+    const rot = rng.range(0, TAU);
+    solid(g, 6.1, 2.6, 2.5, rng.pick(contM), x, 1.3, z, rot);
+    g.add(box(6.2, 0.12, 2.6, mat('contTop',{color:PAL.rust}), x, 2.66, z, rot));
+    if (rng.bool(0.4)) solid(g, 6.1, 2.6, 2.5, rng.pick(contM), x, 3.9, z, rot + rng.range(-0.2,0.2));
+  }
+  for (let i = 0; i < 14; i++){
+    const a = rng.range(0, TAU), rad = rng.range(7, R - 4);
+    const x = Math.cos(a) * rad, z = Math.sin(a) * rad;
+    if (!clearOfSpawn(x, z, 3.4)) continue;
+    solid(g, 1.6, 1.1, 1.6, mat('blk',{color:PAL.concrete}), x, 0.55, z, rng.range(0,TAU));
+  }
+
+  //  Burn barrels. The perimeter lamps are twenty metres away and the middle of
+  //  the yard was a black hole between them; a fire at head height gives the
+  //  mid-ground something to read against and tells you which way is which
+  //  without a map. It is also the only warm thing out here.
+  const barrelM = mat('barrel', { color: 0x53372a });
+  for (let i = 0; i < 5; i++){
+    const a = rng.range(0, TAU), rad = rng.range(8, R - 8);
+    const x = Math.cos(a) * rad, z = Math.sin(a) * rad;
+    if (Math.hypot(x, z) < 7.2 || !clearOfSpawn(x, z, 4)) continue;
+    const drum = new THREE.Mesh(G.cyl, barrelM);
+    drum.scale.set(0.86, 1.1, 0.86); drum.position.set(x, 0.55, z);
+    g.add(drum);
+    for (const ry of [0.24, 0.82]){
+      const band = new THREE.Mesh(G.cyl, mat('barrelBand', { color: 0x3a2620 }));
+      band.scale.set(0.92, 0.09, 0.92); band.position.set(x, ry + 0.02, z);
+      g.add(band);
+    }
+    const flame = new THREE.Mesh(G.cyl, emissive('flame', 0xff8a2c));
+    flame.scale.set(0.62, 0.5, 0.62); flame.position.set(x, 1.3, z);
+    g.add(flame);
+    addCollider(x, z, 0.9, 0.9, 0, 1.15, 0);
+    const fire = new THREE.PointLight(0xff8636, 1.5 * LUX, 15, 1.7);
+    fire.position.set(x, 1.5, z);
+    g.add(fire);
+    World.lights.push({ light: fire, base: 1.5 * LUX, flicker: true, mesh: flame });
+  }
+  // Sandbags around the hatch — somebody tried to hold this before you.
+  // Two courses, the upper one offset half a bag, because that is how anyone
+  // who has actually stacked them does it, and because one long box at knee
+  // height reads as a crate.
+  //  Four arcs with four wide gaps, not a ring. A closed ring would make the
+  //  hatch a fortress nothing slow could ever get into, and camping the middle
+  //  is not the game — the bags are cover to break a wolf's line, not a wall.
+  const bagM = [mat('bag1',{color:0x6b6250}), mat('bag2',{color:0x5f5648}), mat('bag3',{color:0x746a55})];
+  for (let i = 0; i < 26; i++){
+    const a = (i/26)*TAU, rad = 5.4;
+    if ((i % 6.5) < 2.6) continue;                            // the ways in and out
+    const x = Math.cos(a)*rad, z = Math.sin(a)*rad;
+    const tall = rng.bool(0.34);
+    g.add(box(1.05, 0.34, 0.62, rng.pick(bagM), x, 0.17, z, -a + rng.range(-0.06, 0.06)));
+    const a2 = ((i + 0.5)/26)*TAU;
+    g.add(box(1.05, 0.32, 0.6, rng.pick(bagM),
+              Math.cos(a2)*rad, 0.50, Math.sin(a2)*rad, -a2 + rng.range(-0.08, 0.08)));
+    if (tall)
+      g.add(box(1.0, 0.3, 0.58, rng.pick(bagM), x, 0.81, z, -a + rng.range(-0.1, 0.1)));
+    //  One collider for the whole stack, as tall as the bags you can see. The
+    //  courses themselves are decoration; three stacked colliders per position
+    //  is three chances for something to catch on a seam.
+    const h = tall ? 0.96 : 0.66;
+    addCollider(x, z, 1.05, 0.66, 0, h, -a);
+  }
+
+  //  Ground that has been used. Painted hazard bands leading to the hatch, oil
+  //  and wet patches, tyre marks. All flat quads a hair above the slab, so it
+  //  costs nothing and stops the floor reading as one grey sheet.
+  for (const s of [-1, 1]){
+    const band = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 13), mat('paint',{color:0x6a5f30}));
+    band.rotation.x = -Math.PI/2; band.position.set(s * 2.6, 0.012, 8.5);
+    g.add(band);
+  }
+  for (let i = 0; i < 22; i++){
+    const a = rng.range(0, TAU), rad = rng.range(4, R - 2);
+    const w = rng.range(1.6, 5.2), d = rng.range(1.2, 4.4);
+    const patch = new THREE.Mesh(new THREE.PlaneGeometry(w, d),
+      mat(rng.bool(0.5) ? 'wet' : 'stain', { color: rng.bool(0.5) ? 0x22262e : 0x33302c }));
+    patch.rotation.x = -Math.PI/2; patch.rotation.z = rng.range(0, TAU);
+    patch.position.set(Math.cos(a)*rad, 0.008 + i*0.0004, Math.sin(a)*rad);
+    g.add(patch);
+  }
+
+  // The hatch itself: a lit rim in the floor of the yard.
+  const hatch = new THREE.Group();
+  hatch.add(box(3.4, 0.16, 3.4, mat('hatchPad',{color:PAL.steelDark}), 0, 0.08, 0));
+  const rim = box(3.8, 0.1, 3.8, emissive('hatchRim', PAL.warn), 0, 0.03, 0);
+  hatch.add(rim);
+  const lid = box(3.0, 0.22, 3.0, mat('hatchLid',{color:PAL.steel}), 0, 0.24, 0);
+  hatch.add(lid);
+  g.add(hatch);
+  World.hatch = { group: hatch, lid, rim, open: false };
+
+  buildSky(g, rng, R);
+
+  scene.add(g);
+  World.group = g;
+  return g;
+}
+
+//  Above the wall there was nothing at all, which made the yard feel like a
+//  room with the lights off rather than an outdoor place at night. Stars, a
+//  moon, and a city that is still standing out there somewhere — all of it
+//  unfogged so it stays a flat silhouette instead of dissolving into the murk
+//  the near ground is already made of.
+function buildSky(g, rng, R){
+  const N = 460, pos = new Float32Array(N * 3);
+  for (let i = 0; i < N; i++){
+    const th = rng.range(0, TAU), ph = Math.acos(rng.range(0.02, 1));
+    const rad = 190;
+    pos[i*3]   = Math.sin(ph) * Math.cos(th) * rad;
+    pos[i*3+1] = Math.cos(ph) * rad;
+    pos[i*3+2] = Math.sin(ph) * Math.sin(th) * rad;
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  const stars = new THREE.Points(geo, new THREE.PointsMaterial({
+    color: 0xbcd0e8, size: 1.1, sizeAttenuation: true, fog: false, transparent: true, opacity: 0.75 }));
+  g.add(stars);
+
+  const moon = new THREE.Mesh(new THREE.CircleGeometry(9, 22),
+    new THREE.MeshBasicMaterial({ color: 0xd8e2f0, fog: false }));
+  moon.position.set(-96, 82, -132);
+  moon.lookAt(0, 1.6, 0);
+  g.add(moon);
+
+  //  The skyline. Two rings so it has depth, the far one nearly the sky colour.
+  const near = new THREE.MeshBasicMaterial({ color: 0x0e1421, fog: false });
+  const far  = new THREE.MeshBasicMaterial({ color: 0x121a2a, fog: false });
+  const lit  = new THREE.MeshBasicMaterial({ color: 0x3c4a34, fog: false });
+  for (const [ring, m, n] of [[210, far, 40], [148, near, 34]]){
+    for (let i = 0; i < n; i++){
+      const a = (i/n) * TAU + rng.range(-0.04, 0.04);
+      const h = rng.range(14, 58) * (ring > 180 ? 1.3 : 1);
+      const w = rng.range(12, 30);
+      const x = Math.cos(a) * ring, z = Math.sin(a) * ring;
+      const b = box(w, h, w * 0.7, m, x, h/2, z, -a);
+      g.add(b);
+      //  A handful of windows still on, which is the only thing out there that
+      //  suggests anybody else made it.
+      if (rng.bool(0.3)){
+        const wy = rng.range(h * 0.35, h * 0.85);
+        g.add(box(w * 0.62, 0.5, 0.4, lit, x - Math.sin(-a) * (w*0.36), wy, z - Math.cos(-a) * (w*0.36), -a));
+      }
+    }
+  }
+}
+
+// ─── The lab ────────────────────────────────────────────────────────────────
+//  A grid maze carved by depth-first backtracking, then dressed. Rooms are
+//  wide cells; corridors are the links between them.
+const CELL = 9;              // metres per maze cell
+const LAB_Y = -14;           // how far down the lab sits
+
+const ROOM_KINDS = [
+  { key:'specimen', name:'SPECIMEN HOLD',   colour: 0x2c6a72 },
+  { key:'server',   name:'DATA STACK',      colour: 0x3a4a7a },
+  { key:'medical',  name:'MEDICAL',         colour: 0x5a7a5a },
+  { key:'canteen',  name:'MESS',            colour: 0x7a6a44 },
+  { key:'decon',    name:'DECONTAMINATION', colour: 0x6a5a7a },
+  { key:'store',    name:'STORES',          colour: 0x6a5040 },
+  { key:'office',   name:'ADMINISTRATION',  colour: 0x4a5a6a },
+];
+
+function generateMaze(w, h, rng){
+  const cells = [];
+  for (let y = 0; y < h; y++){
+    const row = [];
+    for (let x = 0; x < w; x++) row.push({ x, y, n:1, s:1, e:1, wst:1, seen:false });
+    cells.push(row);
+  }
+  const stack = [cells[0][0]];
+  cells[0][0].seen = true;
+  while (stack.length){
+    const c = stack[stack.length - 1];
+    const opts = [];
+    if (c.y > 0     && !cells[c.y-1][c.x].seen) opts.push('n');
+    if (c.y < h - 1 && !cells[c.y+1][c.x].seen) opts.push('s');
+    if (c.x < w - 1 && !cells[c.y][c.x+1].seen) opts.push('e');
+    if (c.x > 0     && !cells[c.y][c.x-1].seen) opts.push('wst');
+    if (!opts.length){ stack.pop(); continue; }
+    const d = rng.pick(opts);
+    let nx = c.x, ny = c.y;
+    if (d === 'n'){ ny--; c.n = 0; cells[ny][nx].s = 0; }
+    if (d === 's'){ ny++; c.s = 0; cells[ny][nx].n = 0; }
+    if (d === 'e'){ nx++; c.e = 0; cells[ny][nx].wst = 0; }
+    if (d === 'wst'){ nx--; c.wst = 0; cells[ny][nx].e = 0; }
+    cells[ny][nx].seen = true;
+    stack.push(cells[ny][nx]);
+  }
+  //  A perfect maze has exactly one route anywhere, which makes it a chore
+  //  rather than a place. Knock a few walls through so it loops.
+  const extra = Math.floor(w * h * 0.13);
+  for (let i = 0; i < extra; i++){
+    const x = rng.int(0, w-2), y = rng.int(0, h-1);
+    cells[y][x].e = 0; cells[y][x+1].wst = 0;
+  }
+  return cells;
+}
+
+function buildLab(scene, rng, depth){
+  const g = new THREE.Group();
+  World.tags.length = 0;
+  const w = 4 + Math.min(3, depth), h = 4 + Math.min(3, depth);
+  const cells = generateMaze(w, h, rng);
+  World.maze = { cells, w, h };
+  World.rooms = [];
+
+  const floorM = mat('labFloor', { color: 0x2e343c });
+  const wallM  = mat('labWall',  { color: 0x424a55 });
+  const trimM  = mat('labTrim',  { color: PAL.steelDark });
+
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(w*CELL + 4, h*CELL + 4), floorM);
+  floor.rotation.x = -Math.PI/2;
+  floor.position.set((w*CELL)/2 - CELL/2, LAB_Y, (h*CELL)/2 - CELL/2);
+  g.add(floor);
+  const ceil = new THREE.Mesh(new THREE.PlaneGeometry(w*CELL + 4, h*CELL + 4), mat('labCeil',{color:0x1a1e24}));
+  ceil.rotation.x = Math.PI/2;
+  ceil.position.set(floor.position.x, LAB_Y + 3.4, floor.position.z);
+  g.add(ceil);
+
+  const T = 0.6, HH = 3.4;
+  const wallAt = (x, z, len, ry) => {
+    const m = box(len, HH, T, wallM, x, LAB_Y + HH/2, z, ry);
+    g.add(m);
+    addCollider(x, z, len, T, LAB_Y, LAB_Y + HH, ry);
+    // A skirting stripe so a corridor has a horizon line rather than being a tube
+    g.add(box(len, 0.16, T + 0.04, trimM, x, LAB_Y + 0.09, z, ry));
+    g.add(box(len, 0.05, T + 0.06, emissive('labTrimLit', 0x2a3e46), x, LAB_Y + 0.3, z, ry));
+  };
+
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++){
+    const c = cells[y][x];
+    const cx = x * CELL, cz = y * CELL;
+    if (c.n) wallAt(cx, cz - CELL/2, CELL + T, 0);
+    if (c.wst) wallAt(cx - CELL/2, cz, CELL + T, Math.PI/2);
+    if (y === h-1 && c.s) wallAt(cx, cz + CELL/2, CELL + T, 0);
+    if (x === w-1 && c.e) wallAt(cx + CELL/2, cz, CELL + T, Math.PI/2);
+
+    // Every cell is a room with a job. The far corner is always where the
+    // scientist ends up, so it is dressed for him rather than being given a
+    // random room's furniture and then having a workbench dropped through it.
+    const kind = (x === 0 && y === 0) ? { key:'entry', name:'SHAFT FOOT', colour: PAL.warn }
+               : (x === w-1 && y === h-1) ? { key:'cold', name:'COLD ROOM', colour: 0x2a5a6a }
+               : rng.pick(ROOM_KINDS);
+    const room = { x, y, cx, cz, kind, name: kind.name, lit: true };
+    World.rooms.push(room);
+    dressRoom(g, room, rng);
+    //  Roughly half the rooms have somebody's tag still in them. They are the
+    //  only reason to go anywhere in the maze other than straight to Varga.
+    if (kind.key !== 'entry' && rng.bool(0.55)) placeTag(g, room, rng);
+
+    if ((x + y) % 2 === 0 || rng.bool(0.5))
+      strip(g, cx, LAB_Y + 3.24, cz, 3.2, rng.bool(0.15) ? 0x6a7a80 : 0xc8dce4, rng.bool() ? 0 : Math.PI/2);
+  }
+
+  //  The scientist is as far from the shaft as the maze allows.
+  const far = World.rooms.reduce((best, r) =>
+    (r.x + r.y) > (best.x + best.y) ? r : best, World.rooms[0]);
+  far.hasScientist = true;
+  buildScientist(g, far, rng);
+
+  //  The way back up.
+  const shaft = World.rooms[0];
+  g.add(box(2.6, 0.2, 2.6, emissive('shaftPad', PAL.warn), shaft.cx, LAB_Y + 0.1, shaft.cz));
+  for (let i = 0; i < 9; i++)
+    g.add(box(1.6, 0.12, 0.34, trimM, shaft.cx, LAB_Y + 0.4 + i*0.38, shaft.cz - 0.9));
+  World.shaft = { x: shaft.cx, z: shaft.cz };
+
+  scene.add(g);
+  World.labGroup = g;
+  return g;
+}
+
+// ─── Dressing a room ────────────────────────────────────────────────────────
+function dressRoom(g, room, rng){
+  const { cx, cz, kind } = room;
+  const Y = LAB_Y;
+  const steel = mat('dsteel', { color: PAL.steel });
+  const dark  = mat('ddark',  { color: PAL.steelDark });
+  const white = mat('dwhite', { color: PAL.lab });
+  const glass = mat('dglass', { color: PAL.glass, transparent: true, opacity: 0.34 });
+
+  const put = (w,h,d,m,x,y,z,ry) => { g.add(box(w,h,d,m, cx+x, Y+y, cz+z, ry)); };
+  const block = (w,h,d,m,x,y,z,ry) => {
+    g.add(box(w,h,d,m, cx+x, Y+y, cz+z, ry));
+    //  Through addCollider, not by hand — a hand-rolled record with no
+    //  orientation fields makes every comparison in blockedAt NaN, and the
+    //  whole room silently stops being solid.
+    addCollider(cx+x, cz+z, w, d, Y, Y+h, ry || 0);
+  };
+
+  // Floor decal so each room reads differently underfoot
+  const decal = new THREE.Mesh(new THREE.PlaneGeometry(CELL - 1.4, CELL - 1.4),
+    mat('decal' + kind.key, { color: kind.colour, transparent: true, opacity: 0.16 }));
+  decal.rotation.x = -Math.PI/2;
+  decal.position.set(cx, Y + 0.02, cz);
+  g.add(decal);
+
+  switch (kind.key){
+    case 'specimen': {
+      // Tanks with something suspended, and a control lectern.
+      for (let i = 0; i < 3; i++){
+        const x = -2.6 + i * 2.6, z = -2.6;
+        block(1.1, 0.3, 1.1, dark, x, 0.15, z);
+        put(1.0, 2.1, 1.0, glass, x, 1.3, z);
+        put(1.15, 0.16, 1.15, steel, x, 2.42, z);
+        put(0.5, 1.3, 0.35, mat('spec',{color: rng.bool() ? PAL.flesh : PAL.wolf}), x, 1.1, z);
+        const l = new THREE.PointLight(0x50e0c0, 0.5 * LUX, 5, 2);
+        l.position.set(cx + x, Y + 1.4, cz + z); g.add(l);
+        World.lights.push({ light: l, base: 0.5 * LUX, flicker: rng.bool(0.4) });
+      }
+      block(2.4, 1.0, 0.7, steel, 0, 0.5, 2.4);
+      put(2.2, 0.1, 0.6, emissive('lectern', 0x2a6a72), 0, 1.03, 2.4);
+      break;
+    }
+    case 'server': {
+      for (let i = 0; i < 4; i++){
+        const x = -3 + i * 2;
+        block(1.2, 2.4, 0.9, dark, x, 1.2, rng.range(-2.4, 2.4));
+      }
+      for (let i = 0; i < 4; i++){
+        const x = -3 + i * 2, z = -1.6;
+        for (let j = 0; j < 7; j++)
+          put(0.9, 0.05, 0.02, emissive('led' + (j%3), [0x50ff90, 0xffb060, 0x5090ff][j % 3]),
+              x, 0.4 + j*0.28, z + 0.47);
+      }
+      put(CELL-2, 0.1, 0.5, dark, 0, 3.0, 0);       // cable tray
+      break;
+    }
+    case 'medical': {
+      block(1.0, 0.7, 2.2, white, -2.2, 0.35, 0);          // gurney
+      put(1.05, 0.14, 2.25, mat('sheet',{color:0xb8c4c0}), -2.2, 0.76, 0);
+      put(0.9, 0.05, 0.16, dark, -2.2, 0.85, -0.7);        // straps, still done up
+      put(0.9, 0.05, 0.16, dark, -2.2, 0.85, 0.4);
+      block(0.7, 1.7, 0.5, steel, -3.4, 0.85, -2.4);       // drip stand
+      put(0.3, 0.4, 0.3, mat('bag2',{color:0xd8e0c0}), -3.4, 1.9, -2.4);
+      block(2.6, 1.9, 0.6, white, 2.6, 0.95, -1.8);        // cabinet
+      put(2.5, 1.4, 0.05, glass, 2.6, 1.1, -1.5);
+      for (let i = 0; i < 6; i++)
+        put(0.16, 0.34, 0.16, mat('vial',{color: PAL.serum}), 1.6 + i*0.34, 1.35, -1.6);
+      break;
+    }
+    case 'canteen': {
+      block(2.6, 0.12, 1.3, mat('table',{color:0x6a5a44}), 0, 0.78, 0);
+      for (const sx of [-1.0, 1.0]) for (const sz of [-0.5, 0.5])
+        put(0.12, 0.76, 0.12, dark, sx, 0.38, sz);
+      const chairs = [[-1.7,0,0],[1.7,0,0],[0,0,-1.5]];
+      for (const [x,,z] of chairs){
+        put(0.6, 0.1, 0.6, mat('chair',{color:0x50443a}), x, 0.45, z);
+        put(0.6, 0.7, 0.1, mat('chair',{color:0x50443a}), x, 0.8, z - 0.25);
+      }
+      // and one knocked over
+      put(0.6, 0.6, 0.1, mat('chair',{color:0x50443a}), 1.2, 0.1, 1.6, 0.4);
+      block(2.2, 2.0, 0.7, steel, -3.2, 1.0, 2.6);
+      put(0.4, 0.3, 0.3, mat('mug',{color:0xd0c8b0}), 0.4, 0.98, 0.2);
+      break;
+    }
+    case 'decon': {
+      for (let i = 0; i < 2; i++){
+        put(2.6, 0.1, 2.6, mat('grate',{color:0x3a4048}), 0, 0.05, -2 + i*4);
+        for (let j = 0; j < 5; j++)
+          put(2.4, 0.14, 0.1, dark, 0, 0.12, -3 + i*4 + j*0.5);
+      }
+      for (const sx of [-1.2, 1.2]){
+        put(0.12, 3.0, 0.12, steel, sx, 1.5, -2);
+        put(0.5, 0.14, 0.5, steel, sx, 2.9, -2);
+      }
+      block(0.5, 2.4, 2.6, mat('shower',{color:0x6a7a80}), -3.2, 1.2, 0);
+      put(0.9, 1.2, 0.06, mat('sign',{color:PAL.warn}), 3.2, 1.9, 0, Math.PI/2);
+      break;
+    }
+    //  Where he has been living. Freezer doors down one wall, sample drawers,
+    //  a cot he has clearly slept on, and a lot of empty tins. The middle and
+    //  the z = -1.6 line stay clear, because the workbench goes there.
+    case 'cold': {
+      for (let i = 0; i < 3; i++){
+        const z = -2.4 + i * 2.4;
+        block(0.55, 2.6, 2.1, mat('freezer',{color:0xa8b8bc}), -3.5, 1.3, z);
+        put(0.1, 0.5, 0.08, steel, -3.18, 1.5, z + 0.7);           // handle
+        put(0.34, 0.2, 0.02, emissive('freezerLamp', 0x9fe8ff), -3.19, 2.2, z);
+      }
+      block(2.6, 1.5, 0.6, dark, 2.9, 0.75, 1.6, Math.PI/2);        // drawer bank
+      for (let i = 0; i < 4; i++){
+        put(0.5, 0.26, 2.5, steel, 2.9, 0.35 + i*0.34, 1.6, Math.PI/2);
+        put(0.06, 0.06, 0.4, mat('drawerPull',{color:0xd8e0e4}), 2.62, 0.35 + i*0.34, 1.6);
+      }
+      block(2.1, 0.42, 0.9, mat('cot',{color:0x4a4438}), 0.4, 0.21, 3.0);
+      put(2.0, 0.16, 0.85, mat('blanket',{color:0x5a5040}), 0.4, 0.5, 3.0);
+      put(0.5, 0.14, 0.6, mat('pillow',{color:0xb0b4a8}), -0.5, 0.55, 3.0);
+      for (let i = 0; i < 9; i++)
+        put(0.22, 0.28, 0.22, mat('tin',{color:0x8a8478}),
+            rng.range(-2.6, 2.6), 0.14, rng.range(2.0, 3.6), rng.range(0, TAU));
+      //  Frost. It is the only room down here that is genuinely cold.
+      for (let i = 0; i < 7; i++)
+        put(rng.range(0.5,1.6), 0.02, rng.range(0.5,1.6),
+            mat('frost',{color:0xcfe6ee}), rng.range(-3,3), 0.03, rng.range(-3.4,3.6));
+      break;
+    }
+    case 'store': {
+      for (let i = 0; i < 3; i++){
+        const z = -2.6 + i * 2.6;
+        block(3.6, 2.2, 0.7, dark, -2.0, 1.1, z);
+        for (let s = 0; s < 3; s++)
+          put(3.5, 0.08, 0.75, steel, -2.0, 0.5 + s*0.7, z);
+        for (let cr = 0; cr < 4; cr++)
+          put(0.6, 0.5, 0.6, mat('crate',{color: rng.pick([0x6a5a3a,0x4a5a5a,0x5a4a4a])}),
+              -3.4 + cr*0.95, 0.85 + (cr%2)*0.7, z);
+      }
+      block(1.0, 1.0, 1.0, mat('drum',{color:PAL.rust}), 2.8, 0.5, 2.4);
+      block(1.0, 1.0, 1.0, mat('drum',{color:PAL.rust}), 2.8, 1.5, 2.4);
+      break;
+    }
+    default: {  // office / entry
+      block(2.2, 0.1, 1.1, mat('desk',{color:0x5a4a3a}), 2.0, 0.76, -2.0);
+      for (const sx of [-0.9, 0.9]) put(0.1, 0.76, 1.0, dark, 2.0+sx, 0.38, -2.0);
+      put(0.7, 0.5, 0.06, emissive('monitor', 0x3a6a8a), 2.0, 1.16, -2.3);
+      put(0.5, 0.03, 0.3, mat('kb',{color:0x2a2e34}), 2.0, 0.83, -1.8);
+      block(0.9, 1.9, 0.5, dark, -3.0, 0.95, -2.6);     // filing cabinet
+      for (let i = 0; i < 3; i++) put(0.85, 0.05, 0.52, steel, -3.0, 0.55 + i*0.5, -2.35);
+      put(1.4, 1.0, 0.05, mat('board',{color:0xc8c0a8}), 0, 2.1, -CELL/2 + 0.6);
+      for (let i = 0; i < 5; i++)
+        put(0.22, 0.28, 0.01, mat('paper',{color:0xe8e4d8}),
+            -0.5 + (i%3)*0.45, 2.25 - Math.floor(i/3)*0.36, -CELL/2 + 0.56);
+      break;
+    }
+  }
+}
+
+//  A name tag on the floor, on a desk, wherever it was dropped. Small, lit from
+//  inside so the torch finds it across a room, and it turns, because a static
+//  object in a maze of static objects is furniture rather than a pickup.
+function placeTag(g, room, rng){
+  const name = rng.pick(TAG_NAMES);
+  const grp = new THREE.Group();
+  grp.add(box(0.30, 0.44, 0.04, mat('tagBody', { color: 0x7d8794 }), 0, 0, 0));
+  grp.add(box(0.24, 0.05, 0.05, emissive('tagStripe', 0x9fe8ff), 0, 0.11, 0.01));
+  grp.add(box(0.20, 0.04, 0.05, mat('tagLine', { color: 0x2a3038 }), 0, -0.02, 0.01));
+  grp.add(box(0.14, 0.04, 0.05, mat('tagLine', { color: 0x2a3038 }), -0.03, -0.10, 0.01));
+  grp.add(box(0.07, 0.07, 0.05, emissive('tagChip', 0x66ffcc), 0.09, -0.14, 0.01));
+
+  const a = rng.range(0, TAU), rad = rng.range(1.4, 3.2);
+  const x = room.cx + Math.cos(a) * rad, z = room.cz + Math.sin(a) * rad;
+  grp.position.set(x, LAB_Y + 0.62, z);
+  g.add(grp);
+
+  const l = new THREE.PointLight(0x9fe8ff, 0.3 * LUX, 4.5, 2);
+  l.position.set(x, LAB_Y + 0.8, z);
+  g.add(l);
+  World.lights.push({ light: l, base: 0.3 * LUX, flicker: false });
+
+  World.tags.push({ name, x, z, group: grp, light: l, taken: false, spin: rng.range(0, TAU) });
+}
+
+// ─── The scientist ──────────────────────────────────────────────────────────
+function buildScientist(g, room, rng){
+  const grp = new THREE.Group();
+  const rig = buildCreature('zombie', rng, {
+    skin: 0xd8b48c, cloth: 0xd8e0e4, hair: 0xb0b0b0, scale: 1.0,
+  });
+  //  He is not turned — reuse the human skeleton and undo the signs of it.
+  rig.parts.armL.rotation.x = -0.2;
+  rig.parts.armR.rotation.x = -0.2;
+  if (rig.eyeMat) rig.eyeMat.color.setHex(0x6ad0ff);
+  rig.isPerson = true;
+  grp.add(rig.root);
+  grp.position.set(room.cx + 1.6, LAB_Y, room.cz + 1.4);
+  g.add(grp);
+
+  // A workbench with the thing you came for on it.
+  g.add(box(2.6, 0.12, 1.2, mat('bench',{color:PAL.lab}), room.cx, LAB_Y + 0.9, room.cz - 1.6));
+  for (const sx of [-1.1, 1.1])
+    g.add(box(0.12, 0.9, 1.1, mat('ddark',{color:PAL.steelDark}), room.cx+sx, LAB_Y + 0.45, room.cz - 1.6));
+  for (let i = 0; i < 5; i++)
+    g.add(box(0.14, 0.36, 0.14, emissive('serumVial', PAL.serum),
+              room.cx - 0.8 + i*0.4, LAB_Y + 1.14, room.cz - 1.6));
+  const l = new THREE.PointLight(PAL.serum, 1.2 * LUX, 9, 2);
+  l.position.set(room.cx, LAB_Y + 2.2, room.cz - 1.6);
+  g.add(l);
+  World.lights.push({ light: l, base: 1.2 * LUX, flicker: false });
+
+  World.scientist = { rig, group: grp, x: room.cx + 1.6, z: room.cz + 1.4, met: false, room };
+}
+
+// ─── Collision ──────────────────────────────────────────────────────────────
+function blockedAt(x, y, z, r){
+  for (const c of World.colliders){
+    if (y + 1.5 < c.y0 || y > c.y1) continue;
+    const dx = x - c.x, dz = z - c.z;
+    //  Into the box's own frame, so a container at 38° blocks the shape you
+    //  can see rather than the square you cannot.
+    const lx = dx * c.cs - dz * c.sn;
+    const lz = dx * c.sn + dz * c.cs;
+    if (lx > -c.hw - r && lx < c.hw + r && lz > -c.hd - r && lz < c.hd + r) return true;
+  }
+  return false;
+}
+
+function slideMove(pos, dx, dz, r){
+  if (!blockedAt(pos.x + dx, pos.y, pos.z, r)) pos.x += dx;
+  if (!blockedAt(pos.x, pos.y, pos.z + dz, r)) pos.z += dz;
+}
+
+
+// =============================================================================
+//  THE TURNED, THE CURE, AND THE CLOCK
+// -----------------------------------------------------------------------------
+//  Three kinds that want different things from you.
+//
+//    TURNED    slow, many, and they walk straight at you. The pressure is
+//              arithmetic: can you kill faster than they arrive.
+//    LUPINE    fast, and it circles rather than charging, so it punishes you
+//              for standing where you were a second ago.
+//    REVENANT  walks through walls and ignores lead. It is the reason you
+//              cannot solve a round by finding one good corner.
+//
+//  After the serum, the first two stop being only a threat. Holding the
+//  injector on one for a beat and a bit turns it back into whoever it was, and
+//  that person then walks away from the fight and leaves you something. A
+//  revenant cannot be cured, so the decision is always live: is the thing in
+//  front of me somebody, and do I have the seconds.
+// =============================================================================
+
+const Game = {
+  running: false, over: false, phase: 'menu',   // menu | round | between | lab | dead | win
+  round: 0, kills: 0, cured: 0, best: 0,
+  place: 'yard',                                 // yard | lab
+  hatchLeft: 0, breakLeft: 0,
+  enemies: [], corpses: [], people: [],
+  doses: CFG.CURE_DOSES_START, hasSerum: false,
+  tags: [],                      // names you are carrying, oldest first
+  rested: 0,                     // revenants given their names back
+  curing: null, cureT: 0,
+  resting: null, restT: 0,
+  t: 0,
+};
+
+const Player = {
+  pos: new THREE.Vector3(0, CFG.PLAYER_HEIGHT, 8),
+  vel: new THREE.Vector3(),
+  yaw: 0, pitch: 0, onGround: true,
+  hp: 100, hpMax: 100,
+  weapon: 'sidearm',
+  mag: {}, reserve: {},
+  cooldown: 0, reloading: 0, hurt: 0,
+};
+
+function resetRunState(){
+  Game.tags.length = 0;
+  Game.rested = 0;
+  Game.sawDim = false;
+  Game.curing = null; Game.cureT = 0;
+  Game.resting = null; Game.restT = 0;
+}
+
+function resetLoadout(){
+  for (const k in WEAPONS){ Player.mag[k] = WEAPONS[k].mag; Player.reserve[k] = WEAPONS[k].reserve; }
+  Player.weapon = 'sidearm';
+  Player.hp = Player.hpMax = 100;
+  //  Die in the middle of a reload and the next run used to start locked out
+  //  for a second and a third of it.
+  Player.cooldown = 0; Player.reloading = 0; Player.hurt = 0;
+  Player.vel.set(0, 0, 0); Player.onGround = true;
+}
+
+// ─── Spawning ───────────────────────────────────────────────────────────────
+//  What a round is made of. Revenants arrive from round three, because the
+//  lantern is the answer to them and you need a round or two to find it useful.
+function roundComposition(n){
+  const turned = 4 + Math.floor(n * 2.2);
+  const lupine   = n < 2 ? 0 : 1 + Math.floor((n - 2) * 0.9);
+  const revenant = n < 3 ? 0 : 1 + Math.floor((n - 3) * 0.6);
+  return { zombie: turned, werewolf: lupine, ghost: revenant };
+}
+
+function spawnEnemy(kind, rng, scene){
+  const a = rng.range(0, TAU);
+  const rad = CFG.ARENA_R - 1.5;
+  const rig = buildCreature(kind, rng);
+  rig.root.position.set(Math.cos(a) * rad, 0, Math.sin(a) * rad);
+  scene.add(rig.root);
+  const K = KINDS[kind];
+  const e = {
+    kind, rig, def: K,
+    x: rig.root.position.x, z: rig.root.position.z,
+    hp: K.hp, maxHp: K.hp,
+    speed: K.speed * rng.range(0.9, 1.12),
+    state: 'hunt', hitT: 0, swingT: 0, alive: true,
+    orbit: rng.bool() ? 1 : -1, orbitT: rng.range(0, 3),
+    baseY: 0,
+  };
+  if (kind === 'ghost'){ e.baseY = 0.6; rig.baseY = 0.6; }
+  Game.enemies.push(e);
+  return e;
+}
+
+function startRound(n, rng, scene){
+  Game.round = n;
+  Game.phase = 'round';
+  Game.best = Math.max(Game.best, n);
+  const comp = roundComposition(n);
+  for (const kind in comp)
+    for (let i = 0; i < comp[kind]; i++) spawnEnemy(kind, rng, scene);
+  hudBanner(`ROUND ${n}`, describeRound(comp));
+}
+
+function describeRound(c){
+  const bits = [];
+  if (c.zombie) bits.push(`${c.zombie} turned`);
+  if (c.werewolf) bits.push(`${c.werewolf} lupine`);
+  if (c.ghost) bits.push(`${c.ghost} revenant`);
+  return bits.join(' · ');
+}
+
+// ─── Behaviour ──────────────────────────────────────────────────────────────
+function updateEnemies(dt){
+  const px = Player.pos.x, pz = Player.pos.z;
+  for (const e of Game.enemies){
+    if (!e.alive){ e.fade = Math.max(0, (e.fade || 0) - dt); continue; }
+    const dx = px - e.x, dz = pz - e.z;
+    const dist = Math.hypot(dx, dz) || 0.001;
+    const nx = dx / dist, nz = dz / dist;
+
+    //  A revenant does not care about the maze or the containers; everything
+    //  else has to go round them.
+    const phases = e.kind === 'ghost';
+
+    //  Steering commits to a side, which is what stops the dithering — but a
+    //  creature that picked the wrong side of a shipping container will happily
+    //  circle it all night, making perfectly smooth progress in a circle. So
+    //  watch the only thing that matters: is it getting closer. Three seconds
+    //  without gaining ground and it tries the other way round.
+    if (dist < (e.bestD === undefined ? Infinity : e.bestD) - 0.25){
+      e.bestD = dist; e.noProg = 0;
+    } else {
+      e.noProg = (e.noProg || 0) + dt;
+      if (e.noProg > 3){
+        e.side = -(e.side || 1);
+        e.avoidT = 0; e.noProg = 0; e.bestD = dist;
+      }
+    }
+
+    //  A dim revenant has been worn thin by the lantern. It has stopped coming
+    //  for you — it drifts. That pause is the window in which a name will take.
+    const speed = e.dim ? e.speed * 0.3 : e.speed;
+
+    if (e.kind === 'werewolf' && dist > e.def.reach + 0.6){
+      //  Circle in rather than run down the middle. Sidestep decays as it
+      //  closes so the last two metres are still a commitment.
+      e.orbitT -= dt;
+      if (e.orbitT <= 0){ e.orbit *= -1; e.orbitT = 1.4 + Math.random() * 2.2; }
+      const close = clamp((dist - 3) / 9, 0, 1);
+      const sx = -nz * e.orbit * close, sz = nx * e.orbit * close;
+      const mvx = (nx + sx * 1.5) * speed * dt;
+      const mvz = (nz + sz * 1.5) * speed * dt;
+      moveEnemy(e, mvx, mvz, phases, dt);
+    } else if (dist > e.def.reach) {
+      moveEnemy(e, nx * speed * dt, nz * speed * dt, phases, dt);
+    }
+
+    // Strike. Everything up here is reasoned about in two dimensions, so a
+    // creature standing over the shaft would otherwise be able to claw you
+    // through fourteen metres of concrete.
+    e.swingT -= dt;
+    if (Game.place === 'yard' && !e.dim && dist <= e.def.reach && e.swingT <= 0){
+      e.swingT = e.kind === 'werewolf' ? 1.05 : 1.5;
+      hurtPlayer(e.def.dmg, e);
+    }
+
+    e.hitT = Math.max(0, e.hitT - dt);
+    const moving = dist > e.def.reach;
+    animateCreature(e.rig, dt, moving, Game.t);
+    e.rig.root.position.set(e.x, e.baseY, e.z);
+    // face travel, smoothed — nothing in this game snaps its heading
+    const want = Math.atan2(nx, nz);
+    let d = want - e.rig.root.rotation.y;
+    while (d > Math.PI) d -= TAU; while (d < -Math.PI) d += TAU;
+    e.rig.root.rotation.y += clamp(d, -4.5 * dt, 4.5 * dt);
+    if (e.rig.eyeMat && e.hitT > 0) e.rig.eyeMat.color.setHex(0xff4040);
+    else if (e.rig.eyeMat) e.rig.eyeMat.color.setHex(e.dim ? 0xfff0c0 : e.def.eye);
+  }
+  Game.enemies = Game.enemies.filter(e => e.alive || e.fade > 0);
+}
+
+//  There is no pathfinder here and there does not need to be — the yard is
+//  convex cover on an open slab. What there does need to be is steering.
+//
+//  Sliding on each axis separately scrapes along a flat wall but deadlocks the
+//  moment something is square on ahead: neither axis is free, so a creature
+//  stands pawing at a sandbag for the rest of the round. Nudging it sideways
+//  when that happens only trades the deadlock for a dither, because the next
+//  frame the direct route is clear again and it walks straight back in.
+//
+//  So: look where you want to go, and if the road is not clear for a body
+//  length, turn a bit and look again — widening the angle until something
+//  opens. Which side it turned is remembered, so it goes round a container
+//  rather than oscillating at the corner of one.
+//  The fan reaches all the way round to behind, because a creature that has
+//  walked nose-first into a pocket between two sandbags has no forward heading
+//  left and its only honest move is to back out of it.
+const WHISKERS = [0, 0.45, 0.9, 1.35, 1.8, 2.25, 2.7, Math.PI];
+const LOOKAHEAD = 1.15;
+
+const AVOID_HOLD = 0.55;     // seconds of committing to a detour
+
+function moveEnemy(e, dx, dz, phases, dt){
+  if (phases){ e.x += dx; e.z += dz; return; }
+  const step = Math.hypot(dx, dz);
+  if (step < 1e-9) return;
+  const R = 0.42;
+  dt = dt || 1/60;
+
+  //  A detour is held for half a second rather than recomputed every frame.
+  //  Without this a creature deflects round a sandbag, finds the direct line
+  //  briefly clear again, turns back into it, and spends the whole round
+  //  tracing a two-centimetre arc at the corner of one bag. Committing means
+  //  each detour buys most of a metre of lateral travel, which is enough to
+  //  actually clear the thing.
+  if (e.avoidT > 0){
+    e.avoidT -= dt;
+    const hx = Math.sin(e.avoidA), hz = Math.cos(e.avoidA);
+    if (!blockedAt(e.x + hx * step, e.baseY, e.z + hz * step, R)){
+      e.x += hx * step; e.z += hz * step;
+      return;
+    }
+    e.avoidT = 0;              // the committed heading closed; pick again now
+  }
+
+  const base = Math.atan2(dx, dz);
+  if (!e.side) e.side = Math.random() < 0.5 ? 1 : -1;
+
+  //  Two passes. The first wants room to keep going — a body length of clear
+  //  road — so creatures commit to headings that lead somewhere. If nothing
+  //  satisfies that, the second accepts any heading that is merely legal this
+  //  frame, which is enough to creep along a wall until it ends.
+  for (const look of [LOOKAHEAD, 0]){
+    for (const mag of WHISKERS){
+      const sides = mag === 0 || mag === Math.PI ? [1] : [e.side, -e.side];
+      for (const s of sides){
+        const a = base + mag * s;
+        const hx = Math.sin(a), hz = Math.cos(a);
+        if (blockedAt(e.x + hx * step, e.baseY, e.z + hz * step, R)) continue;
+        if (look && blockedAt(e.x + hx * look, e.baseY, e.z + hz * look, R)) continue;
+        e.x += hx * step; e.z += hz * step;
+        if (mag > 0.25){
+          //  A real deflection, so hold it. Straight ahead is not a detour and
+          //  must not lock anything in.
+          if (mag < Math.PI) e.side = s;
+          e.avoidA = a; e.avoidT = AVOID_HOLD;
+        }
+        return;
+      }
+    }
+  }
+  //  Genuinely boxed in on every heading. Stand still rather than shivering.
+}
+
+function hurtEnemy(e, amount, kindOfDamage){
+  if (!e.alive) return false;
+  if (e.kind === 'ghost' && !HURTS_GHOST[kindOfDamage]){
+    e.hitT = 0.12;
+    hudFloat('NO EFFECT', e.x, e.z);
+    return false;
+  }
+  e.hp -= amount;
+  e.hitT = 0.18;
+
+  //  Light does not kill a revenant so much as wear it down to almost nothing.
+  //  At that point it stops hunting and you have a choice: one more shot and it
+  //  is gone, or a name and it rests. Keeping firing is always available, which
+  //  is what makes stopping mean something.
+  //  The threshold is a floor, not a tripwire. A revenant cannot be taken from
+  //  healthy to gone by one good hit — light has no way to do that to it — so a
+  //  shot that would overshoot stops at dim instead. Every revenant therefore
+  //  passes through the window where a name will take, and accurate shooting
+  //  buys you that choice sooner rather than skipping past it.
+  if (e.kind === 'ghost' && !e.dim && e.hp <= e.maxHp * CFG.DIM_AT){
+    e.hp = e.maxHp * CFG.DIM_AT;
+    e.dim = true;
+    goDim(e);
+    hudFloat('DIM', e.x, e.z, 0xfff0c0);
+    if (!Game.sawDim){
+      Game.sawDim = true;
+      hudToast(Game.tags.length
+        ? 'It has stopped. Hold F to give it a name.'
+        : 'It has stopped. A name would settle it — they are on tags in the lab.');
+    }
+  }
+
+  if (e.hp <= 0){ killEnemy(e); return true; }
+  return false;
+}
+
+//  Visibly thin: paler, dimmer, and it stops facing you.
+function goDim(e){
+  e.rig.root.traverse(o => {
+    if (o.isMesh && o.material && o.material.transparent) o.material = mat('ghostDim', {
+      vertexColors: true, transparent: true, opacity: 0.24 });
+  });
+}
+
+function killEnemy(e){
+  e.alive = false; e.fade = 0.9;
+  Game.kills++;
+  e.rig.root.rotation.x = -1.4;
+  e.rig.root.position.y = e.baseY - 0.2;
+  if (e.rig.eyeMat) e.rig.eyeMat.color.setHex(0x201010);
+  //  Bodies stay. A yard you have held for six rounds should look like it.
+  Game.corpses.push(e);
+  setTimeout(() => { if (e.rig.root.parent) e.rig.root.parent.remove(e.rig.root); }, 45000);
+}
+
+// ─── The cure ───────────────────────────────────────────────────────────────
+//  Aim at a curable creature inside arm's reach and hold. It takes long enough
+//  that doing it with three others closing is a real choice.
+function cureTarget(){
+  if (!Game.hasSerum || Game.doses <= 0) return null;
+  const fwd = new THREE.Vector3(0,0,-1).applyEuler(new THREE.Euler(Player.pitch, Player.yaw, 0, 'YXZ'));
+  let best = null, bestScore = 0;
+  for (const e of Game.enemies){
+    if (!e.alive || !e.def.curable) continue;
+    const dx = e.x - Player.pos.x, dz = e.z - Player.pos.z;
+    const d = Math.hypot(dx, dz);
+    if (d > CFG.CURE_RANGE) continue;
+    const facing = (dx/d) * fwd.x + (dz/d) * fwd.z;
+    if (facing < 0.55) continue;
+    const score = facing / d;
+    if (score > bestScore){ bestScore = score; best = e; }
+  }
+  return best;
+}
+
+//  The other half of F. A dim revenant, a name in your pocket, and a little
+//  longer than the serum takes — you do not have to be close, because there is
+//  nothing to inject and nothing to hold down. You just have to stop shooting
+//  and say it.
+function restTarget(){
+  if (!Game.tags.length) return null;
+  const fwd = new THREE.Vector3(0,0,-1).applyEuler(new THREE.Euler(Player.pitch, Player.yaw, 0, 'YXZ'));
+  let best = null, bestScore = 0;
+  for (const e of Game.enemies){
+    if (!e.alive || e.kind !== 'ghost' || !e.dim) continue;
+    const dx = e.x - Player.pos.x, dz = e.z - Player.pos.z;
+    const d = Math.hypot(dx, dz);
+    if (d > CFG.REST_RANGE) continue;
+    const facing = (dx/d) * fwd.x + (dz/d) * fwd.z;
+    if (facing < 0.6) continue;
+    const score = facing / d;
+    if (score > bestScore){ bestScore = score; best = e; }
+  }
+  return best;
+}
+
+//  One key does both, because at the moment you press it there is only ever one
+//  thing in front of you. The serum takes priority when both are somehow live.
+function tickCure(dt, holding){
+  const target = holding ? cureTarget() : null;
+  const ghost  = (holding && !target) ? restTarget() : null;
+
+  if (!target){ Game.curing = null; Game.cureT = 0; }
+  else {
+    if (Game.curing !== target){ Game.curing = target; Game.cureT = 0; }
+    Game.cureT += dt;
+    if (Game.cureT >= CFG.CURE_TIME){
+      applyCure(target);
+      Game.curing = null; Game.cureT = 0;
+    }
+  }
+
+  if (!ghost){ Game.resting = null; Game.restT = 0; return; }
+  if (Game.resting !== ghost){ Game.resting = ghost; Game.restT = 0; }
+  Game.restT += dt;
+  if (Game.restT >= CFG.REST_TIME){
+    applyRest(ghost);
+    Game.resting = null; Game.restT = 0;
+  }
+}
+
+//  It goes up rather than down. Nobody walks away from this one — that is the
+//  difference between a person you got back and a person you were too late for.
+function applyRest(e){
+  e.alive = false;
+  const name = Game.tags.shift();
+  Game.rested++;
+  Game.cured++;
+  const scene = e.rig.root.parent;
+  Game.enemies = Game.enemies.filter(x => x !== e);
+  Game.people.push({ rig: e.rig, x: e.x, z: e.z, age: 0, ax: 0, az: 0, rising: true });
+  if (e.rig.eyeMat) e.rig.eyeMat.color.setHex(0xffffff);
+
+  const left = CFG.CURE_GOAL - Game.cured;
+  hudFloat(name, e.x, e.z, 0xfff0c0);
+  if (left <= 0) endGame(true);
+  else hudToast(`${name}. Laid to rest — ${left} more and you can go home.`);
+}
+
+//  What the game is called. They stand up as themselves and leave.
+function applyCure(e){
+  e.alive = false;
+  Game.doses--;
+  Game.cured++;
+  const scene = e.rig.root.parent;
+  if (scene) scene.remove(e.rig.root);
+
+  const rng = new RNG('cured:' + Game.cured + ':' + Math.floor(e.x));
+  const person = buildCreature('zombie', rng, {
+    skin: e.rig.under || 0xc98f6b, scale: 0.98,
+  });
+  person.parts.armL.rotation.x = -0.15;
+  person.parts.armR.rotation.x = -0.15;
+  if (person.eyeMat) person.eyeMat.color.setHex(0x8fd8ff);
+  person.root.position.set(e.x, 0, e.z);
+  if (scene) scene.add(person.root);
+
+  Game.people.push({ rig: person, x: e.x, z: e.z, age: 0,
+                     ax: Math.cos(Math.random()*TAU), az: Math.sin(Math.random()*TAU) });
+  Game.enemies = Game.enemies.filter(x => x !== e);
+
+  //  They leave you what they were carrying. Curing is not charity.
+  Player.reserve.sidearm += 8;
+  Player.hp = Math.min(Player.hpMax, Player.hp + 6);
+  hudFloat('CURED', e.x, e.z, PAL.serum);
+
+  const left = CFG.CURE_GOAL - Game.cured;
+  if (left <= 0) endGame(true);
+  else hudToast(`${KINDS[e.kind].name} reverted. ${left} more and you can go home.`);
+}
+
+function updatePeople(dt){
+  for (const p of Game.people){
+    p.age += dt;
+    if (p.rising){
+      //  A rested revenant does not walk off — it goes up and thins out.
+      p.rig.root.position.set(p.x, 0.6 + p.age * 1.05, p.z);
+      p.rig.root.rotation.y += dt * 0.5;
+      p.rig.root.traverse(o => {
+        if (o.isMesh && o.material && o.material.transparent)
+          o.material.opacity = Math.max(0, 0.28 * (1 - p.age / 3.4));
+      });
+      if (p.age > 3.4 && p.rig.root.parent){ p.rig.root.parent.remove(p.rig.root); p.gone = true; }
+      continue;
+    }
+    p.x += p.ax * 1.7 * dt;
+    p.z += p.az * 1.7 * dt;
+    p.rig.root.position.set(p.x, 0, p.z);
+    p.rig.root.rotation.y = Math.atan2(p.ax, p.az);
+    animateCreature(p.rig, dt, true, Game.t);
+    if (p.age > 12 && p.rig.root.parent){ p.rig.root.parent.remove(p.rig.root); p.gone = true; }
+  }
+  Game.people = Game.people.filter(p => !p.gone);
+}
+
+// ─── Tags ───────────────────────────────────────────────────────────────────
+function nearestTag(){
+  if (Game.place !== 'lab') return null;
+  let best = null, bd = 2.2;
+  for (const tg of World.tags){
+    if (tg.taken) continue;
+    const d = Math.hypot(tg.x - Player.pos.x, tg.z - Player.pos.z);
+    if (d < bd){ bd = d; best = tg; }
+  }
+  return best;
+}
+
+function takeTag(tg){
+  if (!tg || tg.taken) return false;
+  tg.taken = true;
+  if (tg.group.parent) tg.group.parent.remove(tg.group);
+  if (tg.light.parent) tg.light.parent.remove(tg.light);
+  const li = World.lights.findIndex(l => l.light === tg.light);
+  if (li >= 0) World.lights.splice(li, 1);
+  Game.tags.push(tg.name);
+  hudToast(`${tg.name}. A revenant worn thin by the lantern will take this back.`);
+  return true;
+}
+
+function tickTags(dt){
+  for (const tg of World.tags){
+    if (tg.taken) continue;
+    tg.spin += dt * 1.1;
+    tg.group.rotation.y = tg.spin;
+    tg.group.position.y = LAB_Y + 0.62 + Math.sin(tg.spin * 1.7) * 0.05;
+  }
+}
+
+// ─── Damage to the player ───────────────────────────────────────────────────
+function hurtPlayer(amount, from){
+  if (Game.phase === 'dead') return;
+  Player.hp -= amount;
+  Player.hurt = 0.45;
+  hudDamage();
+  if (Player.hp <= 0){ Player.hp = 0; endGame(false); }
+}
+
+function endGame(won){
+  Game.phase = won ? 'win' : 'dead';
+  Game.running = false;
+  hudEnd(won);
+}
+
+// ─── Round flow ─────────────────────────────────────────────────────────────
+//  Clear a wave and the hatch opens for a fixed window. You decide how much of
+//  it to spend below, knowing the next wave starts whether or not you are back.
+function tickRounds(dt, rng, scene){
+  if (Game.phase === 'round'){
+    const left = Game.enemies.filter(e => e.alive).length;
+    if (left === 0){
+      Game.phase = 'between';
+      Game.hatchLeft = CFG.HATCH_SECONDS;
+      World.hatch.open = true;
+      World.hatch.lid.visible = false;
+      hudBanner('WAVE CLEAR', 'The hatch is open. Go down or hold the yard.');
+    }
+  } else if (Game.phase === 'between'){
+    Game.hatchLeft -= dt;
+    if (Game.hatchLeft <= 0){
+      World.hatch.open = false;
+      World.hatch.lid.visible = true;
+      if (Game.place === 'lab') returnToYard();      // it closes with you inside
+      Game.breakLeft = CFG.ROUND_BREAK;
+      Game.phase = 'breather';
+      hudBanner('HATCH SEALED', 'Next wave incoming.');
+    }
+  } else if (Game.phase === 'breather'){
+    Game.breakLeft -= dt;
+    if (Game.breakLeft <= 0) startRound(Game.round + 1, rng, scene);
+  }
+}
+
+function descend(){
+  if (!World.hatch.open || Game.place === 'lab') return;
+  Game.place = 'lab';
+  Player.pos.set(World.shaft.x, LAB_Y + CFG.PLAYER_HEIGHT, World.shaft.z + 1.2);
+  Player.vel.set(0,0,0);
+  //  Face away from the ladder. Arriving nose-first into the wall you just
+  //  climbed down reads as a broken teleport.
+  Player.yaw = Math.PI; Player.pitch = 0;
+  hudToast('Down the shaft. The hatch will not wait.');
+}
+
+function returnToYard(){
+  Game.place = 'yard';
+  //  Inside the sandbag ring, not on top of it.
+  Player.pos.set(0, CFG.PLAYER_HEIGHT, 3.0);
+  Player.vel.set(0,0,0);
+  hudToast('Back in the yard.');
+}
+
+//  Finding him is the turn. Everything before this is survival; everything
+//  after is a choice each time something comes at you.
+//
+//  And he keeps working. He said he could make more between waves, so he does —
+//  come back down and he tops you up. Without this the serum was six doses and
+//  then a man standing perfectly still in a freezer for the rest of the night.
+function meetScientist(){
+  const s = World.scientist;
+  if (!s) return;
+
+  if (!s.met){
+    s.met = true;
+    Game.hasSerum = true;
+    Game.doses = CFG.DOSE_CAP;
+    s.madeOn = Game.round;
+    hudBanner('DR VARGA', 'Serum acquired. Hold F on the turned to bring them back.');
+    hudToast(`Six doses. Bring ${CFG.CURE_GOAL} people back and this is over.`);
+    return;
+  }
+
+  if (Game.doses >= CFG.DOSE_CAP){
+    hudToast(VARGA_FULL[Game.cured % VARGA_FULL.length]);
+    return;
+  }
+  //  One batch per round. Come down twice in the same window and the second
+  //  visit is a conversation, not a resupply.
+  if (s.madeOn === Game.round){
+    hudToast('He has not had a wave to work through yet. Come back after the next one.');
+    return;
+  }
+  const made = CFG.DOSE_CAP - Game.doses;
+  Game.doses = CFG.DOSE_CAP;
+  s.madeOn = Game.round;
+  s.batches = (s.batches || 0) + 1;
+  hudBanner('RESUPPLIED', `${made} more ${made === 1 ? 'dose' : 'doses'}. Back to six.`);
+  hudToast(VARGA_LINES[(s.batches - 1) % VARGA_LINES.length]);
+}
+
+const VARGA_LINES = [
+  'He works while you fight. That is the arrangement.',
+  'He asks how many walked away. You tell him. He writes it down.',
+  'He does not ask about the ones you shot.',
+  'He says the freezer holds; that is all he will say about the freezer.',
+  'He has started leaving a batch out for you in case you are quick.',
+];
+const VARGA_FULL = [
+  'He looks at your belt and waves you off. You are carrying all he has.',
+  'Six is what the case holds. Go and use them.',
+  'He will not hand you a seventh. He has tried; it does not keep.',
+];
+
+
+// =============================================================================
+//  RENDERER, INPUT, HUD, AND THE LOOP
+// =============================================================================
+
+const S = { scene: null, camera: null, renderer: null, rng: null, keys: new Set(),
+            locked: false, torch: null, fog: null, dmgNums: [] };
+
+function boot(){
+  initGeo();
+  S.scene = new THREE.Scene();
+  S.scene.background = new THREE.Color(PAL.night);
+  S.scene.fog = new THREE.Fog(PAL.fog, 18, 76);
+
+  S.camera = new THREE.PerspectiveCamera(74, innerWidth/innerHeight, 0.06, 260);
+  S.renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference:'high-performance' });
+  S.renderer.setSize(innerWidth, innerHeight);
+  S.renderer.setPixelRatio(Math.min(devicePixelRatio, 1.6));
+  //  A torch pointed at a white cabinet from two metres is, physically, an
+  //  enormous amount of light, and with no tone curve every pale surface in the
+  //  lab clipped to flat white the moment you walked up to it. ACES rolls the
+  //  highlights off instead of cutting them, which is the whole reason film can
+  //  point a light at a wall.
+  S.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  S.renderer.toneMappingExposure = 1.25;
+  document.body.appendChild(S.renderer.domElement);
+  S.canvas = S.renderer.domElement;
+
+  S.scene.add(new THREE.AmbientLight(0x4a5566, 0.5));
+  const moon = new THREE.DirectionalLight(0x8fa8c8, 0.35);
+  moon.position.set(-20, 40, -14);
+  S.scene.add(moon);
+
+  //  A torch, because half this game is in a corridor.
+  S.torch = new THREE.SpotLight(0xfff0d8, 3.0 * LUX, 34, Math.PI/5.2, 0.45, 1.4);
+  S.torch.position.set(0,0,0);
+  S.scene.add(S.torch);
+  S.scene.add(S.torch.target);
+
+  bindInput();
+  addEventListener('resize', () => {
+    S.camera.aspect = innerWidth/innerHeight;
+    S.camera.updateProjectionMatrix();
+    S.renderer.setSize(innerWidth, innerHeight);
+  });
+  requestAnimationFrame(loop);
+}
+
+function newRun(seedText){
+  const seed = seedText || ('sh-' + Math.random().toString(36).slice(2, 8));
+  S.rng = new RNG(seed);
+  // clear
+  while (S.scene.children.length) S.scene.remove(S.scene.children[0]);
+  S.scene.add(new THREE.AmbientLight(0x4a5566, 0.5));
+  const moon = new THREE.DirectionalLight(0x8fa8c8, 0.35);
+  moon.position.set(-20, 40, -14); S.scene.add(moon);
+  S.scene.add(S.torch); S.scene.add(S.torch.target);
+
+  World.colliders.length = 0; World.lights.length = 0; World.rooms.length = 0;
+  Game.enemies.length = 0; Game.corpses.length = 0; Game.people.length = 0;
+  Game.round = 0; Game.kills = 0; Game.cured = 0; Game.doses = CFG.CURE_DOSES_START;
+  Game.hasSerum = false; Game.place = 'yard'; Game.over = false;
+  World.scientist = null;
+  resetRunState();
+
+  buildCompound(S.scene, S.rng);
+  buildLab(S.scene, S.rng, 1);
+
+  resetLoadout();
+  //  Standing at the south edge of the yard looking in at the hatch, so the
+  //  first thing you see is the thing the whole game is about.
+  Player.pos.set(0, CFG.PLAYER_HEIGHT, 10);
+  Player.yaw = 0; Player.pitch = 0;
+  Game.running = true; Game.seed = seed;
+  Game.phase = 'breather'; Game.breakLeft = 4;
+  hud('start');
+  hudBanner('STILL HUMAN', 'Hold the yard. Find the man in the lab.');
+}
+
+// ─── Input ──────────────────────────────────────────────────────────────────
+function bindInput(){
+  addEventListener('keydown', e => {
+    if (e.repeat) return;
+    S.keys.add(e.code);
+    if (!Game.running) return;
+    if (e.code === 'Digit1') Player.weapon = 'sidearm';
+    if (e.code === 'Digit2') Player.weapon = 'scatter';
+    if (e.code === 'Digit3') Player.weapon = 'lantern';
+    if (e.code === 'KeyR') startReload();
+    if (e.code === 'KeyE') interact();
+    if (e.code === 'Escape') releaseLock();
+  });
+  addEventListener('keyup', e => S.keys.delete(e.code));
+  addEventListener('blur', () => S.keys.clear());
+  document.addEventListener('visibilitychange', () => { if (document.hidden) S.keys.clear(); });
+
+  addEventListener('mousedown', e => { if (e.button === 0) S.firing = true; });
+  addEventListener('mouseup',   e => { if (e.button === 0) S.firing = false; });
+  addEventListener('mousemove', e => {
+    if (!S.locked) return;
+    Player.yaw   -= e.movementX * CFG.MOUSE;
+    Player.pitch -= e.movementY * CFG.MOUSE;
+    Player.pitch = clamp(Player.pitch, -Math.PI/2 + 0.02, Math.PI/2 - 0.02);
+  });
+  document.addEventListener('pointerlockchange', () => {
+    S.locked = document.pointerLockElement === S.canvas;
+    document.body.classList.toggle('locked', S.locked);
+  });
+}
+function grabLock(){ try { S.canvas.requestPointerLock(); } catch (e){} }
+function releaseLock(){ try { document.exitPointerLock(); } catch (e){} }
+
+function interact(){
+  if (Game.place === 'yard'){
+    if (World.hatch.open && Math.hypot(Player.pos.x, Player.pos.z) < 2.6) descend();
+    return;
+  }
+  //  Underground, E does whatever is nearest, in the order you would want it:
+  //  pick the thing up, talk to the man, then leave.
+  if (takeTag(nearestTag())) return;
+  const s = World.scientist;
+  if (s && Math.hypot(Player.pos.x - s.x, Player.pos.z - s.z) < 3.0){ meetScientist(); return; }
+  if (Math.hypot(Player.pos.x - World.shaft.x, Player.pos.z - World.shaft.z) < 2.2) returnToYard();
+}
+
+// ─── Shooting ───────────────────────────────────────────────────────────────
+function startReload(){
+  const w = WEAPONS[Player.weapon];
+  if (Player.reloading > 0) return;
+  if (Player.mag[Player.weapon] >= w.mag) return;
+  if (Player.reserve[Player.weapon] <= 0) return;
+  Player.reloading = 1.35;
+}
+function finishReload(){
+  const k = Player.weapon, w = WEAPONS[k];
+  const need = w.mag - Player.mag[k];
+  const take = Math.min(need, Player.reserve[k]);
+  Player.mag[k] += take; Player.reserve[k] -= take;
+}
+
+function tryFire(){
+  const k = Player.weapon, w = WEAPONS[k];
+  if (Player.cooldown > 0 || Player.reloading > 0) return;
+  if (Player.mag[k] <= 0){ startReload(); return; }
+  Player.mag[k]--;
+  Player.cooldown = 60 / w.rpm;
+  S.recoil = (S.recoil || 0) + 0.035;
+  muzzle();
+
+  const fwd = new THREE.Vector3(0,0,-1).applyEuler(new THREE.Euler(Player.pitch, Player.yaw, 0, 'YXZ'));
+  const origin = Player.pos.clone();
+  for (let p = 0; p < w.pellets; p++){
+    const dir = fwd.clone();
+    if (w.spread){
+      dir.x += (Math.random()-0.5) * w.spread * 2;
+      dir.y += (Math.random()-0.5) * w.spread * 2;
+      dir.z += (Math.random()-0.5) * w.spread * 2;
+      dir.normalize();
+    }
+    let best = null, bestT = Infinity;
+    for (const e of Game.enemies){
+      if (!e.alive) continue;
+      const hit = rayCapsule(origin, dir, e);
+      if (hit && hit.t < bestT && hit.t <= w.range){ best = e; bestT = hit.t; }
+    }
+    if (best){
+      const head = bestT > 0 && (origin.y + dir.y * bestT) > best.baseY + 1.45;
+      const dmg = w.dmg * (head ? 1.8 : 1);
+      const killed = hurtEnemy(best, dmg, w.kind);
+      if (best.kind !== 'ghost' || HURTS_GHOST[w.kind])
+        hudFloat(head ? Math.round(dmg) + '!' : String(Math.round(dmg)), best.x, best.z);
+      if (killed) hudFloat('', best.x, best.z);
+    }
+  }
+}
+
+//  Same capsule test the city game ended up with: the body you can see, not a
+//  point somewhere inside it.
+function rayCapsule(origin, dir, e){
+  const r = e.kind === 'werewolf' ? 0.62 : 0.5;
+  const y0 = e.baseY + 0.1, y1 = e.baseY + (e.kind === 'werewolf' ? 1.7 : 1.95);
+  const ox = origin.x - e.x, oz = origin.z - e.z;
+  const a = dir.x*dir.x + dir.z*dir.z;
+  const t = a < 1e-6 ? 0 : -(ox*dir.x + oz*dir.z) / a;
+  if (t < 0) return null;
+  const px = origin.x + dir.x*t, py = origin.y + dir.y*t, pz = origin.z + dir.z*t;
+  const horiz = Math.hypot(px - e.x, pz - e.z);
+  const vert = py < y0 ? y0 - py : py > y1 ? py - y1 : 0;
+  return Math.hypot(horiz, vert) <= r ? { t } : null;
+}
+
+// ─── Movement ───────────────────────────────────────────────────────────────
+function updatePlayer(dt){
+  const sprint = S.keys.has('ShiftLeft') || S.keys.has('ShiftRight');
+  const speed = sprint ? CFG.SPRINT : CFG.WALK;
+  let ix = 0, iz = 0;
+  if (S.keys.has('KeyW')) iz -= 1;
+  if (S.keys.has('KeyS')) iz += 1;
+  if (S.keys.has('KeyA')) ix -= 1;
+  if (S.keys.has('KeyD')) ix += 1;
+  const len = Math.hypot(ix, iz);
+  if (len > 0){
+    ix /= len; iz /= len;
+    const cy = Math.cos(Player.yaw), sy = Math.sin(Player.yaw);
+    const dx = ix * cy + iz * sy, dz = -ix * sy + iz * cy;
+    slideMove(Player.pos, dx * speed * dt, dz * speed * dt, CFG.PLAYER_RADIUS);
+  }
+  // vertical
+  const floorY = Game.place === 'lab' ? LAB_Y : 0;
+  Player.vel.y -= CFG.GRAVITY * dt;
+  if (S.keys.has('Space') && Player.onGround){ Player.vel.y = CFG.JUMP; Player.onGround = false; }
+  Player.pos.y += Player.vel.y * dt;
+  if (Player.pos.y <= floorY + CFG.PLAYER_HEIGHT){
+    Player.pos.y = floorY + CFG.PLAYER_HEIGHT; Player.vel.y = 0; Player.onGround = true;
+  }
+
+  S.recoil = damp(S.recoil || 0, 0, 12, dt);
+  S.camera.position.copy(Player.pos);
+  S.camera.rotation.set(Player.pitch + (S.recoil || 0), Player.yaw, 0, 'YXZ');
+
+  const fwd = new THREE.Vector3(0,0,-1).applyEuler(S.camera.rotation);
+  S.torch.position.copy(Player.pos);
+  S.torch.target.position.copy(Player.pos.clone().add(fwd.multiplyScalar(12)));
+  S.torch.target.updateMatrixWorld();
+  S.torch.visible = Game.place === 'lab' || Game.round > 0;
+}
+
+// ─── Loop ───────────────────────────────────────────────────────────────────
+let last = performance.now();
+function loop(now){
+  requestAnimationFrame(loop);
+  const dt = Math.min(0.05, (now - last) / 1000);
+  last = now;
+  Game.t += dt;
+
+  if (Game.running && S.locked){
+    updatePlayer(dt);
+    Player.cooldown -= dt;
+    if (Player.reloading > 0){
+      Player.reloading -= dt;
+      if (Player.reloading <= 0) finishReload();
+    }
+    if (S.firing) tryFire();
+    tickCure(dt, S.keys.has('KeyF'));
+    tickTags(dt);
+    updateEnemies(dt);
+    updatePeople(dt);
+    idleScientist(dt);
+    tickRounds(dt, S.rng, S.scene);
+    Player.hurt = Math.max(0, Player.hurt - dt);
+    flickerLights(dt);
+    hudTick(dt);
+  } else if (Game.running){
+    updatePlayer(0);
+  }
+
+  S.renderer.render(S.scene, S.camera);
+}
+
+//  Two different things flicker here and they should not look the same. A fire
+//  breathes and never goes out; a failing strip light holds steady for seconds
+//  and then drops for a beat. Per-frame noise reads as neither.
+//  He is a person, not a prop. Small enough that you would not notice it in a
+//  screenshot and obvious enough that you notice its absence in the room.
+function idleScientist(dt){
+  const s = World.scientist;
+  if (!s || !s.rig) return;
+  const p = s.rig.parts, t = Game.t;
+  if (p.torso){
+    p.torso.rotation.y = Math.sin(t * 0.42) * 0.16;
+    p.torso.position.y = 0.98 + Math.sin(t * 1.25) * 0.012;   // breathing
+  }
+  if (p.head) p.head.rotation.y = Math.sin(t * 0.31 + 1.2) * 0.3;
+  //  Working at the bench: one hand down, one hand moving.
+  if (p.armR) p.armR.rotation.x = -0.62 + Math.sin(t * 1.9) * 0.22;
+  if (p.armL) p.armL.rotation.x = -0.34 + Math.sin(t * 1.9 + 2.1) * 0.08;
+}
+
+function flickerLights(dt){
+  for (const l of World.lights){
+    if (!l.flicker) continue;
+    if (l.mesh){
+      l.ph = (l.ph || 0) + dt * 7.3;
+      const k = 0.84 + Math.sin(l.ph) * 0.10 + Math.sin(l.ph * 2.7) * 0.06;
+      l.light.intensity = l.base * k;
+      l.mesh.scale.y = 0.40 + k * 0.18;
+    } else {
+      l.hold = (l.hold || 0) - dt;
+      if (l.hold <= 0){
+        l.out = !l.out && Math.random() < 0.18;
+        l.hold = l.out ? 0.04 + Math.random() * 0.13 : 0.7 + Math.random() * 3.6;
+      }
+      l.light.intensity = l.base * (l.out ? 0.1 : 1);
+    }
+  }
+}
+
+
+// =============================================================================
+//  HUD
+// -----------------------------------------------------------------------------
+//  Everything you need to make the next decision, and nothing else. The three
+//  things that actually change what you do are: how much is left of the wave,
+//  how long the hatch stays open, and whether you have a dose.
+// =============================================================================
+
+const $ = id => document.getElementById(id);
+
+function hud(mode){
+  $('title').classList.add('hide');
+  $('end').classList.remove('show');
+  $('hud').classList.remove('hide');
+}
+
+function hudTick(dt){
+  const w = WEAPONS[Player.weapon];
+  $('wname').textContent = w.name;
+  $('wammo').textContent = Player.reloading > 0 ? '· · ·'
+    : `${Player.mag[Player.weapon]} / ${Player.reserve[Player.weapon]}`;
+  $('hpfill').style.width = Math.max(0, (Player.hp / Player.hpMax) * 100) + '%';
+  $('hpnum').textContent = Math.max(0, Math.round(Player.hp));
+
+  const alive = Game.enemies.filter(e => e.alive).length;
+  $('rnum').textContent = Game.round || '—';
+  $('rleft').textContent = Game.phase === 'round' ? `${alive} left`
+    : Game.phase === 'between' ? `hatch ${Math.ceil(Game.hatchLeft)}s`
+    : Game.phase === 'breather' ? `next in ${Math.ceil(Game.breakLeft)}s` : '';
+
+  $('doses').textContent = Game.hasSerum ? `${Game.doses}` : '—';
+  $('doserow').classList.toggle('armed', Game.hasSerum && Game.doses > 0);
+  $('backnum').textContent = (Game.hasSerum || Game.tags.length || Game.cured) ? `${Game.cured}/${CFG.CURE_GOAL}` : '—';
+  $('tagrow').classList.toggle('hide', !Game.tags.length);
+  $('tagnum').textContent = Game.tags.length;
+  $('tagname').textContent = Game.tags.length ? Game.tags[0] : '';
+
+  // the hold meter, whichever of the two holds is running
+  const cw = Game.curing  ? Math.min(1, Game.cureT / CFG.CURE_TIME)
+           : Game.resting ? Math.min(1, Game.restT / CFG.REST_TIME) : 0;
+  $('curewrap').classList.toggle('show', cw > 0);
+  $('curewrap').classList.toggle('rest', !!Game.resting && !Game.curing);
+  $('curebar').style.width = (cw * 100) + '%';
+
+  // prompts
+  let prompt = '';
+  if (Game.place === 'yard' && World.hatch.open && Math.hypot(Player.pos.x, Player.pos.z) < 2.6)
+    prompt = 'E · DESCEND';
+  else if (Game.place === 'lab'){
+    const s = World.scientist, tag = nearestTag();
+    if (tag) prompt = 'E · TAKE ' + tag.name;
+    else if (s && Math.hypot(Player.pos.x - s.x, Player.pos.z - s.z) < 3.0)
+      prompt = s.met ? 'E · ASK FOR MORE' : 'E · SPEAK TO DR VARGA';
+    else if (Math.hypot(Player.pos.x - World.shaft.x, Player.pos.z - World.shaft.z) < 2.2) prompt = 'E · CLIMB OUT';
+  }
+  if (!prompt && Game.hasSerum && cureTarget()) prompt = 'HOLD F · REVERT';
+  if (!prompt && restTarget()) prompt = 'HOLD F · GIVE BACK ' + Game.tags[0];
+  $('prompt').textContent = prompt;
+  $('prompt').classList.toggle('show', !!prompt);
+
+  $('where').textContent = Game.place === 'lab' ? labRoomName() : 'THE YARD';
+  //  Capped well below full: this fires while things are still hitting you,
+  //  and a screen washed maroon at the exact moment you need to read it is a
+  //  worse punishment than the damage.
+  $('dmg').style.opacity = Player.hurt > 0 ? Math.min(0.45, Player.hurt) : 0;
+
+  for (let i = S.dmgNums.length - 1; i >= 0; i--){
+    const d = S.dmgNums[i];
+    d.age += dt;
+    if (d.age > 0.85){ d.el.remove(); S.dmgNums.splice(i,1); continue; }
+    const v = new THREE.Vector3(d.x, 1.5, d.z).project(S.camera);
+    if (v.z > 1){ d.el.style.opacity = 0; continue; }
+    d.el.style.left = ((v.x*0.5+0.5) * innerWidth) + 'px';
+    d.el.style.top  = ((-v.y*0.5+0.5) * innerHeight - d.age*40) + 'px';
+    d.el.style.opacity = 1 - d.age / 0.85;
+  }
+}
+
+function labRoomName(){
+  let best = null, bd = 1e9;
+  for (const r of World.rooms){
+    const d = Math.hypot(r.cx - Player.pos.x, r.cz - Player.pos.z);
+    if (d < bd){ bd = d; best = r; }
+  }
+  return best ? best.name : 'THE LAB';
+}
+
+function hudBanner(big, small){
+  const b = $('banner');
+  $('bigline').textContent = big;
+  $('smallline').textContent = small || '';
+  b.classList.remove('show'); void b.offsetWidth; b.classList.add('show');
+  clearTimeout(hudBanner._t);
+  hudBanner._t = setTimeout(() => b.classList.remove('show'), 2600);
+}
+
+function hudToast(msg){
+  const t = $('toast');
+  t.textContent = msg;
+  t.classList.remove('show'); void t.offsetWidth; t.classList.add('show');
+  clearTimeout(hudToast._t);
+  hudToast._t = setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+function hudFloat(text, x, z, colour){
+  if (!text) return;
+  const el = document.createElement('div');
+  el.className = 'dnum';
+  el.textContent = text;
+  if (colour) el.style.color = '#' + colour.toString(16).padStart(6,'0');
+  document.body.appendChild(el);
+  S.dmgNums.push({ el, x, z, age: 0 });
+}
+
+function hudDamage(){
+  $('dmg').style.opacity = 0.45;
+}
+
+function muzzle(){
+  const m = $('muzzle');
+  m.classList.remove('on'); void m.offsetWidth; m.classList.add('on');
+  setTimeout(() => m.classList.remove('on'), 60);
+}
+
+function hudEnd(won){
+  releaseLock();
+  $('end').classList.add('show');
+  $('endtitle').textContent = won ? 'THEY WENT HOME' : 'YOU DID NOT HOLD';
+  $('endtitle').className = won ? 'win' : 'lose';
+  $('endstats').innerHTML =
+    `<div><b>${Game.best}</b><span>rounds held</span></div>` +
+    `<div><b>${Game.kills}</b><span>put down</span></div>` +
+    `<div class="cured"><b>${Game.cured - Game.rested}</b><span>brought back</span></div>` +
+    `<div class="rested"><b>${Game.rested}</b><span>laid to rest</span></div>`;
+  const walked = Game.cured - Game.rested;
+  $('endline').textContent =
+      walked > 0 && Game.rested > 0
+        ? `${walked} walked out of here and ${Game.rested} finally stopped. Both of those took the extra second.`
+    : walked > 0
+        ? `${walked} ${walked === 1 ? 'person' : 'people'} walked out of here because you took the extra second.`
+    : Game.rested > 0
+        ? `${Game.rested} ${Game.rested === 1 ? 'name' : 'names'} said out loud. Nobody walked away, but nobody is nobody either.`
+    : Game.hasSerum
+        ? 'You had the serum and used none of it. That is also an answer.'
+        : 'Dr Varga is still down there, and so is everyone he could have fixed.';
+  saveRun();
+}
+
+async function saveRun(){
+  try {
+    await window.fracture.save('last-run', {
+      type:'survival.run.v1', rounds: Game.best, kills: Game.kills,
+      cured: Game.cured, reverted: Game.cured - Game.rested, rested: Game.rested,
+      foundScientist: !!Game.hasSerum, seed: Game.seed,
+      at: new Date().toISOString(),
+    });
+    const bestPrev = await window.fracture.read('best');
+    if (!bestPrev || Game.best > bestPrev.rounds)
+      await window.fracture.save('best', { rounds: Game.best, cured: Game.cured });
+  } catch (e){}
+}
+
+</script>
+<script>
+/* ── wiring ───────────────────────────────────────────────────────────── */
+(function(){
+  const $$ = id => document.getElementById(id);
+
+  function begin(){
+    $$('paused').classList.add('hide');
+    newRun();
+    grabLock();
+  }
+
+  $$('startbtn').addEventListener('click', begin);
+  $$('againbtn').addEventListener('click', begin);
+  $$('resumebtn').addEventListener('click', () => grabLock());
+
+  //  Clicking the world resumes; the pause screen exists because the browser
+  //  can take the pointer back at any moment and a frozen game with no
+  //  explanation reads as a crash.
+  addEventListener('mousedown', e => {
+    if (!Game.running || S.locked) return;
+    if (e.target.closest('.go')) return;
+    grabLock();
+  });
+
+  function pauseState(){
+    const shouldShow = Game.running && !S.locked && !Game.over;
+    $$('paused').classList.toggle('hide', !shouldShow);
+  }
+  document.addEventListener('pointerlockchange', () => setTimeout(pauseState, 0));
+  setInterval(pauseState, 200);
+
+  //  Weapon slot highlight lives here rather than in hudTick — it changes
+  //  three times a round, not sixty times a second.
+  let lastW = null;
+  setInterval(() => {
+    if (lastW === Player.weapon) return;
+    lastW = Player.weapon;
+    $$('s1').className = Player.weapon === 'sidearm' ? 'on' : '';
+    $$('s2').className = Player.weapon === 'scatter' ? 'on' : '';
+    $$('s3').className = Player.weapon === 'lantern' ? 'on' : '';
+  }, 120);
+
+  boot();
+
+  (async () => {
+    try {
+      const b = await window.fracture.read('best');
+      if (b && b.rounds) $$('bestline').textContent =
+        `best · ${b.rounds} round${b.rounds === 1 ? '' : 's'} held · ${b.cured || 0} brought back`;
+    } catch (e){}
+  })();
+
+  window.STILL = { Game, Player, World, S, newRun, spawnEnemy, buildCreature, KINDS, CFG, WEAPONS };
+})();
+</script>
+</body>
+</html>

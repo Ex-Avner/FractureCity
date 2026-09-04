@@ -1,0 +1,114 @@
+{
+  "slug": "fracture-city-game",
+  "name": "Fracture City // Shift",
+  "version": "0.10.0",
+  "icon": "icon.png",
+  "entry": "index.html",
+  "runtime": "html5",
+  "description": "First-person voxel Fracture City. It opens with a film: the six o'clock bulletin ran nine years without missing a morning, then the network said Newsman Ned was taking a short break to recuperate, the broadcast ended at 06:00, and something happened between the last word and the carrier tone. He has been here ever since, in a city made of blocks where the streets repeat and nothing finishes — and he is still broadcasting, because nobody has told him to stop. Everyone you meet is a version of that sentence: the clerk covering until the backlog clears, the medic filling in until the proper service resumes, the vendor whose fortnight's pitch is in its ninth year, the drifter rehoused temporarily who has stopped asking which spring. Six chapters, seventy written lines across ten archetypes and ten trades, and a menu that knows where you are — BEGIN, CONTINUE with the chapter named, BEGIN AGAIN, or FREE ROAM for a new city with no story running. Greenbelt districts grow instead of building: soil and turf, twelve years of unpruned canopy, drained ponds, half-roofed bandstands, cut chain fence, and gang crews who hold the deep green and will warn you off before they do anything about it. A floodlit municipal rink you genuinely slide across. Combat that connects: the hit test now follows the body you can see rather than a point above its feet, so a thug takes two shots instead of fifteen. Everything you kill drops salvage — ammunition, plate, dressings, and drone cores that come from nowhere else. The Armoury at the crossroads sells rounds and dressings for credits, and three permanent upgrades that cost cores alone. Peaceful mode on P if you would rather just build. Businesses with fitted interiors and customers, an arcade wired to every other Present Palm app, three terminal intrusion games, deep character customisation, and every block still mineable and placeable.",
+  "inputs": [
+    {
+      "type": "person.v1",
+      "description": "The resident's identity — name, handle, bio and look — read from the shell rather than stored here."
+    },
+    {
+      "type": "tot.profile.v1",
+      "description": "Optional Coherence Assessment profile — biases the resident's default confrontation voice."
+    }
+  ],
+  "outputs": [
+    {
+      "type": "game.run.v1",
+      "description": "Game run record — credits earned, tasks completed, districts visited, playtime, blocks mined and placed."
+    },
+    {
+      "type": "shift.day.v1",
+      "description": "Daily Shift record — resident profile, project progress, bricks laid, echo actions, residue left in the shared field."
+    },
+    {
+      "type": "hold.fieldbook.v1",
+      "description": "HOLD field book — seven case decisions, operator axis drift, residue carried forward and language recovered, as a standalone HTML document."
+    },
+    {
+      "type": "inventory.v1",
+      "description": "Material inventory — per-material counts, hotbar assignment and build mode, carried across cities."
+    },
+    {
+      "type": "campaign.progress.v1",
+      "description": "Campaign progress — current chapter, objective completion, stealth log and ending state."
+    },
+    {
+      "type": "story.state.v1",
+      "description": "Story state — chapter, scene beats already played, stealth log and ending."
+    },
+    {
+      "type": "arcade.session.v1",
+      "description": "Arcade cabinet session — which Present Palm app was launched from inside the city, and for how long."
+    }
+  ],
+  "tags": [
+    "game",
+    "voxel",
+    "3d",
+    "first-person",
+    "near-future",
+    "urban",
+    "cyberpunk",
+    "fracture-city",
+    "minigames",
+    "sandbox",
+    "building",
+    "destructible",
+    "shift",
+    "narrative",
+    "hold",
+    "social",
+    "daily",
+    "resident",
+    "echoes",
+    "mining",
+    "inventory",
+    "materials",
+    "crafting",
+    "lighting",
+    "characters",
+    "campaign",
+    "story",
+    "stealth",
+    "line-of-sight",
+    "ai",
+    "street-life",
+    "fires",
+    "dialogue",
+    "apartment",
+    "interiors",
+    "businesses",
+    "shops",
+    "npcs",
+    "cutscene",
+    "arcade",
+    "hub",
+    "character-creator",
+    "customisation",
+    "terminals",
+    "barks",
+    "street-detail",
+    "biomes",
+    "parks",
+    "gangs",
+    "ice-rink",
+    "intro",
+    "cinematic",
+    "greenbelt",
+    "combat",
+    "salvage",
+    "shop",
+    "upgrades",
+    "peaceful-mode",
+    "cars"
+  ],
+  "author": "Avner Media",
+  "license": "personal-use",
+  "window_width": 1440,
+  "window_height": 900
+}

@@ -1,0 +1,131 @@
+{
+  "headline": [
+    {
+      "id": "book",
+      "kind": "book",
+      "title": "The Collapse of Meaning",
+      "subtitle": "Re-embodiment in the Fractured Mirror",
+      "author": "Ex Avner",
+      "blurb": "A mythopoetic descent through the fractured mirror of the modern soul. Thirty-two chapters move from the Light Bearer's fall through the apartments of the modern city, the factory, the tower, the quarry, the bureau, and back to the water — toward a second light. Read by chapter; each one is a fragment of the same mirror.",
+      "palette": ["#e8754a", "#d35a3f", "#6b8c5c", "#f0d8a8", "#2a1810"],
+      "dataUrl": "data/book.json",
+      "primary": true
+    },
+    {
+      "id": "fracture-city-show",
+      "kind": "show",
+      "title": "Fracture City",
+      "subtitle": "An animated series in the cracked mirror",
+      "blurb": "A near-future city where every character is a fragment that doesn't know it's a fragment. The show is generated procedurally from the Coherence framework — characters forged from triadic orientations, scenes composed against the city, episodes stitched into five-act arcs. Episode 1 begins where the book leaves off: the Light Bearer arrives in the apartments.",
+      "palette": ["#5a3a28", "#d4c8a8", "#5cffa0", "#2d1f17"],
+      "links": [
+        { "label": "Character Forge", "appSlug": "character-forge" },
+        { "label": "Scene Composer", "appSlug": "scene-composer" },
+        { "label": "Episode Generator", "appSlug": "episode-generator" },
+        { "label": "Episode Stitcher", "appSlug": "episode-stitcher" }
+      ]
+    },
+    {
+      "id": "fracture-city-game",
+      "kind": "game",
+      "title": "Fracture City — The Game",
+      "subtitle": "First-person voxel city",
+      "blurb": "Walk the rainy streets of Fracture City. Jack into terminals, hot-wire cars, run jobs for credits. WASD + mouselook + jump. No mining — you use the city itself. The game is the body the show inhabits.",
+      "palette": ["#4a7570", "#2d5550", "#c0b890", "#1a2820"],
+      "links": [
+        { "label": "Open in shell", "appSlug": "fracture-city-game" }
+      ]
+    },
+    {
+      "id": "the-visitor",
+      "kind": "ritual",
+      "title": "The Visitor",
+      "subtitle": "Once a day, a stranger arrives",
+      "blurb": "At the same time each day, someone knocks at your apartment door in Fracture City. You have fifteen minutes. Let them in, talk through the door, lie, help, send them away. Your decisions accumulate. The apartment fills with the evidence of who you have been.",
+      "palette": ["#9c5a32", "#d8a878", "#4a2818", "#f0d8a8"],
+      "links": [
+        { "label": "Open in shell", "appSlug": "the-visitor" }
+      ]
+    },
+    {
+      "id": "coherence",
+      "kind": "framework",
+      "title": "The Coherence Framework",
+      "subtitle": "Triadic Orientation Theory",
+      "blurb": "Underneath all of it — book, show, game — is one framework. Three axes: Vertical (Depth), Horizontal (Breath), Temporal (Obligation). Every character, every chapter, every shard is a particular geometry inside the triangle. Take the assessment to find your own.",
+      "palette": ["#3a1a5a", "#a040ff", "#80ffff", "#ffd47a"],
+      "links": [
+        { "label": "Coherence Assessment", "appSlug": "coherence-assessment" },
+        { "label": "Coherence Game", "appSlug": "coherence-game" },
+        { "label": "Profile Library", "appSlug": "profile-library" }
+      ]
+    },
+    {
+      "id": "apparel",
+      "kind": "apparel",
+      "title": "The Wardrobe",
+      "subtitle": "Wearable fragments",
+      "blurb": "Four collections. Each shirt is one line of the book wearable on a Tuesday. The Americana series puts the unsayable thought on a 1950s ad. The Fracture Bloom set treats the cracked surface as a place flowers grow through. The Floral Shatter line lets the broken glass become the petals. The Modern Distress series names the feeling out loud before the day does.",
+      "palette": ["#a85f3a", "#c89a6a", "#3a2418", "#d4c8a8"],
+      "collections": [
+        {
+          "name": "Americana",
+          "blurb": "1950s ad-art, 2026 confession.",
+          "garment": "black tee",
+          "designs": [
+            { "tag": "BREAK THE CYCLE",            "scene": "family-portrait" },
+            { "tag": "I'M TIRED OF PERFORMING",    "scene": "desk-slump" },
+            { "tag": "LIVING IN A SIMULATION",     "scene": "tv-watching" },
+            { "tag": "LATE-STAGE CAPITALISM",      "scene": "convertible-couple" }
+          ]
+        },
+        {
+          "name": "Fracture Bloom",
+          "blurb": "Cracks as the place flowers grow through.",
+          "garment": "rust hoodie / crewneck",
+          "designs": [
+            { "tag": "THE FUTURE IS YOUR FAULT",   "scene": "bloom-fault" },
+            { "tag": "FAULT & FRAY",               "scene": "bloom-fray" },
+            { "tag": "WE BLOOM THROUGH THE BREAK", "scene": "bloom-poster" },
+            { "tag": "CRACKS DON'T LIE",           "scene": "bloom-patch" }
+          ]
+        },
+        {
+          "name": "Floral Shatter",
+          "blurb": "Broken glass becomes the petal.",
+          "garment": "earth-tone tees",
+          "designs": [
+            { "tag": "SHATTER THE NIGHT",   "scene": "shatter-pale" },
+            { "tag": "RISE FROM RUIN",      "scene": "shatter-olive" },
+            { "tag": "THE FRACTURED SUN",   "scene": "shatter-orange" },
+            { "tag": "HEAL THROUGH THE CRACKS", "scene": "shatter-dark" }
+          ]
+        },
+        {
+          "name": "Modern Distress",
+          "blurb": "Name the feeling before the day does.",
+          "garment": "black tee",
+          "designs": [
+            { "tag": "CHOOSE YOUR REALITY",            "scene": "reality-newspaper" },
+            { "tag": "THIS FEELS LIKE A BLACK MIRROR EPISODE", "scene": "bedroom-couple" },
+            { "tag": "MAIN CHARACTER MOMENT",          "scene": "kitchen-coffee" },
+            { "tag": "SOFT LAUNCH OF MY BREAKDOWN",    "scene": "couch-couple" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "corporate-narratives",
+      "kind": "manifesto",
+      "title": "F*ck Corporate Narratives",
+      "subtitle": "The cracked-mirror manifesto",
+      "blurb": "A short standing statement behind all of the work. The mirror they keep selling you is not cracked because it broke. It is cracked because the world it was meant to reflect no longer fits inside the frame. Stop polishing the frame. Read the cracks.",
+      "palette": ["#2a4a44", "#4a7570", "#c0b890", "#1a2820"],
+      "body": [
+        "Every fragment of the screen carries the same instruction: stay coherent inside a frame that no longer reflects anything real.",
+        "The book is the slow read of that instruction. The show is the laugh in the middle of it. The game is the body that refuses it. The visitor is the door that won't let you forget you have one.",
+        "If any of it lands, the work has done what it was for."
+      ]
+    }
+  ]
+}
