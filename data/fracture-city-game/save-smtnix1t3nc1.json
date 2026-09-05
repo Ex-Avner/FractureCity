@@ -1,15 +1,15 @@
 {
-  "seed": "fc-mezk6q",
-  "mode": "freeroam",
+  "seed": "fc-00q2t5",
+  "mode": "campaign",
   "chapter": 0,
   "chapterTitle": "THE EVENING REPORT",
   "finished": false,
-  "updatedAt": 1787973792199,
-  "playTime": 0,
+  "updatedAt": 1788560878783,
+  "playTime": 84,
   "credits": 0,
   "built": 0,
-  "id": "smtdtfjk63sh",
-  "name": "City MEZK6Q",
+  "id": "smtnix1t3nc1",
+  "name": "EVENING REPORT",
   "campaign": {
     "chapter": 0,
     "progress": {},
@@ -19,16 +19,16 @@
     "finished": false,
     "caseDecision": null,
     "caseFiled": false,
-    "active": false
+    "active": true
   },
   "player": {
-    "x": 0,
-    "y": 4.7,
-    "z": 5,
-    "yaw": 0,
-    "pitch": 0,
-    "classKey": "bruiser",
-    "hp": 160
+    "x": 10.2,
+    "y": 5.1000000000000005,
+    "z": 9.4,
+    "yaw": -1.5707963267948966,
+    "pitch": -0.05,
+    "classKey": "operative",
+    "hp": 100
   },
   "dayTime": 1080,
   "hud": {
@@ -36,7 +36,7 @@
     "tasksDone": 0,
     "distanceWalked": 0,
     "distanceDriven": 0,
-    "playTime": 0,
+    "playTime": 83.62019999998817,
     "blocksMined": 0,
     "blocksPlaced": 0
   },

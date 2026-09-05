@@ -25647,7 +25647,7 @@ function shStreamQuiet(){
 // =============================================================================
 
 // ─── The front door ─────────────────────────────────────────────────────────
-const SH_VERSION = '0.26.1';
+const SH_VERSION = '0.26.2';
 
 (function(){
   if (typeof shFrontHome !== 'function') return;
@@ -27178,6 +27178,179 @@ window.shGateNetworkReport = shGateNetworkReport;
   //  paths, so stamp again once when they first appear.
   setTimeout(go, 1200);
   setTimeout(go, 4000);
+})();
+
+
+// =============================================================================
+//  63 · THE MENUS ON A PHONE — it was never the input
+// -----------------------------------------------------------------------------
+//  "MENUS still not working on mobile version", reported for the third time.
+//  The first two passes both went after input: section 56 built a busy-list of
+//  "a panel is up" flags, section 60 found a z-index tie and moved looking onto
+//  the canvas. Both were real faults. Neither was this one, and this one has
+//  been there the whole time.
+//
+//  Measured on a landscape phone, with the menu on screen and working:
+//
+//      viewport                     980 × 453
+//      #menu-overlay content        532px  in a 453px box
+//      overflow-y                   visible          ← the whole bug
+//
+//      front-profile   y=101   on screen
+//      new-campaign    y=177   on screen
+//      new-free        y=271   on screen
+//      shift           y=365   on screen
+//      ALL SAVES       y=476   79px PAST THE BOTTOM OF THE SCREEN
+//
+//  The overlay is `display:flex; align-items:center; justify-content:center`
+//  with no overflow rule. Content taller than the viewport is not scrolled, it
+//  is CLIPPED — and centring clips it at both ends, so the fix is not simply
+//  "add a scrollbar" either. On that phone the player cannot reach their save
+//  list, and on a smaller one they lose the buttons above it too.
+//
+//  Every check written for this in three attempts asked whether a menu was
+//  visible, on top, or receiving pointer events. All of those were true. The
+//  question none of them asked was whether the button was ON THE SCREEN.
+//
+//  Two fixes, because either alone is half of it:
+//
+//    · MAKE IT FIT. A short viewport gets a compact menu — smaller title, no
+//      decorative footer, tighter rows. Scrolling a six-item menu is a fault
+//      to be avoided, not a feature to be added.
+//    · AND MAKE IT SCROLL ANYWAY, for the cases where it still does not fit:
+//      a big font size, a long save name, a phone in portrait, a language
+//      that runs long. `justify-content: safe center` keeps the menu centred
+//      when it fits and stops centring the moment it would clip — and for
+//      engines without `safe`, a measured class does the same job.
+// =============================================================================
+
+//  Every full-screen overlay that stacks a card in the middle of the screen and
+//  can therefore run off the end of one. Named rather than guessed, because a
+//  blanket rule over `position:fixed` would catch the HUD and the touch layer.
+const FIT_OVERLAYS = [
+  '#menu-overlay',      // the front door — the one being reported
+  '#minigame-overlay',
+  '#inv-overlay',
+  '#shift-overlay',
+  '#death-overlay',
+  '#class-select', '.cc-wrap', '.cc-overlay',
+];
+
+(function(){
+  const css = document.createElement('style');
+  css.textContent = `
+    ${FIT_OVERLAYS.join(',')} {
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior: contain;
+      /* Centred while it fits; top-aligned the instant it would clip. An
+         engine that does not know 'safe' drops the declaration and keeps
+         whatever centring it already had — which is why the class below
+         exists as well. */
+      justify-content: safe center;
+      padding-block: 12px;
+    }
+    /* The measured fallback, set by shFitCheck() when content exceeds the
+       viewport. flex-start is never clipped, and the container scrolls. */
+    ${FIT_OVERLAYS.map(s => s + '.sh-overflowing').join(',')} {
+      justify-content: flex-start !important;
+      align-items: center;
+    }
+
+    /* ── Make it fit in the first place ────────────────────────────────────
+       A landscape phone is about 400px tall. The title alone was 68px with
+       22px of letter-spacing, and the footer explains how to lock a mouse
+       pointer to somebody holding a telephone. */
+    @media (max-height: 560px){
+      #menu-overlay .title{ font-size: 30px !important; letter-spacing: 9px !important;
+                            margin-bottom: 2px !important; }
+      #menu-overlay .subtitle{ font-size: 10px !important; margin-bottom: 8px !important; }
+      /* Mouse-lock instructions on a device with no mouse. */
+      #menu-overlay .footer{ display: none !important; }
+      #menu-overlay .menu-btn{ padding: 9px 14px !important; font-size: 12px !important;
+                               margin: 3px 0 !important; }
+      #menu-overlay .hint{ font-size: 9.5px !important; margin: 1px 0 5px !important; }
+      #front-root .who{ margin-bottom: 6px !important; }
+      #front-root{ width: min(560px, 92vw) !important; }
+    }
+    /* Portrait, where there is even less of it. */
+    @media (max-width: 560px){
+      #menu-overlay .title{ font-size: 26px !important; letter-spacing: 6px !important; }
+    }
+  `;
+  document.head.appendChild(css);
+})();
+
+//  Measure, and mark the ones that do not fit. Cheap, and it runs on the events
+//  that can change the answer rather than on a timer.
+function shFitCheck(){
+  let marked = 0, checked = 0;
+  for (const sel of FIT_OVERLAYS){
+    for (const el of document.querySelectorAll(sel)){
+      const cs = getComputedStyle(el);
+      if (cs.display === 'none' || cs.visibility === 'hidden') continue;
+      checked++;
+      //  scrollHeight beyond clientHeight is the only honest test: it accounts
+      //  for margins, wrapped text, and whatever the menu decided to render
+      //  this time.
+      const over = el.scrollHeight > el.clientHeight + 1;
+      el.classList.toggle('sh-overflowing', over);
+      if (over) marked++;
+    }
+  }
+  return { checked, marked };
+}
+window.shFitCheck = shFitCheck;
+
+//  Is every control in a panel actually on the screen? This is the question
+//  three passes of testing failed to ask, so it is worth having as a function
+//  the suite can call rather than a fact somebody has to remember.
+function shFitUnreachable(root){
+  const box = root ? document.querySelector(root) : document;
+  const out = [];
+  if (!box) return out;
+  for (const el of box.querySelectorAll('button, [data-front], .menu-btn, .tc-chip, .lnk')){
+    const cs = getComputedStyle(el);
+    if (cs.display === 'none' || cs.visibility === 'hidden' || cs.pointerEvents === 'none') continue;
+    const r = el.getBoundingClientRect();
+    if (r.width < 1 || r.height < 1) continue;
+    //  Off the screen, and no scrollable ancestor that could bring it back.
+    const below = r.bottom > window.innerHeight + 1;
+    const above = r.top < -1;
+    if (!below && !above) continue;
+    let scrollable = false;
+    for (let a = el.parentElement; a; a = a.parentElement){
+      const acs = getComputedStyle(a);
+      if (/auto|scroll/.test(acs.overflowY) && a.scrollHeight > a.clientHeight + 1){ scrollable = true; break; }
+    }
+    if (!scrollable) out.push({
+      id: el.id || el.dataset.front || (el.textContent || '').trim().slice(0, 24),
+      y: Math.round(r.top + r.height / 2),
+      by: Math.round(below ? r.bottom - window.innerHeight : -r.top),
+    });
+  }
+  return out;
+}
+window.shFitUnreachable = shFitUnreachable;
+
+(function(){
+  const run = () => { try { shFitCheck(); } catch (e){} };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', run);
+  else run();
+  window.addEventListener('resize', run);
+  window.addEventListener('orientationchange', () => setTimeout(run, 250));
+  //  The front menu rewrites its own contents when you move between home and
+  //  the save list, and a longer list is exactly when this matters, so
+  //  re-measure whenever a watched overlay's children change.
+  try {
+    const mo = new MutationObserver(() => run());
+    for (const sel of FIT_OVERLAYS)
+      for (const el of document.querySelectorAll(sel))
+        mo.observe(el, { childList: true, subtree: true, attributes: true, attributeFilter: ['style','class'] });
+  } catch (e){}
+  //  And a few times during boot, because some of these overlays are built
+  //  after the first frame.
+  for (const ms of [400, 1200, 3000]) setTimeout(run, ms);
 })();
 
 (function(){
