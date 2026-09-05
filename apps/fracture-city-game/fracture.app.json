@@ -1,7 +1,7 @@
 {
   "slug": "fracture-city-game",
   "name": "Fracture City // Shift",
-  "version": "0.26.2",
+  "version": "0.27.0",
   "icon": "icon.png",
   "entry": "index.html",
   "runtime": "html5",
@@ -116,7 +116,7 @@
     "minimap",
     "districts"
   ],
-  "author": "Avner Media",
+  "author": "Present Palm",
   "license": "personal-use",
   "window_width": 1440,
   "window_height": 900

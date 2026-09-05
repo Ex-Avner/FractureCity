@@ -18,9 +18,41 @@ const Bus = require('./services/bus');
 // ── Resolve the ecosystem root ───────────────────────────────────────────────
 // In dev: shell/ is inside Fracture City/, root is the parent.
 // In packaged build: extraResources lives under process.resourcesPath.
+//  A packaged build bundles a COPY of apps/ and shared/, taken by
+//  electron-builder at `npm run build` time (see extraResources in
+//  package.json). That is correct for distributing the hub and wrong for the
+//  machine the apps are AUTHORED on: you edit apps/fracture-city-game and the
+//  installed app keeps showing whatever was in the folder the day it was
+//  built, with nothing on screen to say so.
+//
+//  So a packaged build will use a live tree when it is pointed at one:
+//
+//      PRESENT_PALM_ROOT=/path/to/Fracture\ City   (env, wins)
+//      ~/Library/Application Support/Present Palm/root.txt   (a path, one line)
+//
+//  and falls back to the bundled copy when neither is set — which is what a
+//  person who installed the app from a .dmg should get.
+let ROOT_SOURCE = 'dev';
 function resolveRoot() {
-  if (app.isPackaged) return process.resourcesPath;
-  return path.resolve(__dirname, '..');
+  if (!app.isPackaged) return path.resolve(__dirname, '..');
+
+  const candidates = [];
+  if (process.env.PRESENT_PALM_ROOT) candidates.push(process.env.PRESENT_PALM_ROOT.trim());
+  try {
+    const pointer = path.join(app.getPath('userData'), 'root.txt');
+    if (fs.existsSync(pointer)) {
+      const p = fs.readFileSync(pointer, 'utf8').trim();
+      if (p) candidates.push(p);
+    }
+  } catch (e) { /* no pointer, no problem */ }
+
+  for (const c of candidates) {
+    try {
+      if (fs.existsSync(path.join(c, 'apps'))) { ROOT_SOURCE = 'live'; return c; }
+    } catch (e) {}
+  }
+  ROOT_SOURCE = 'bundled';
+  return process.resourcesPath;
 }
 const ROOT = resolveRoot();
 const APPS_DIR   = path.join(ROOT, 'apps');
@@ -125,6 +157,17 @@ function buildMenu() {
 
 // ── IPC handlers ─────────────────────────────────────────────────────────────
 ipcMain.handle('registry:list', () => registry.list());
+
+//  Where the apps are actually being read from. The hub shows this, because
+//  "my edit is not showing up" should be answerable by looking at the window
+//  rather than by reading the packaging config.
+ipcMain.handle('shell:info', () => ({
+  root: ROOT,
+  source: ROOT_SOURCE,              // 'dev' | 'live' | 'bundled'
+  packaged: app.isPackaged,
+  version: app.getVersion(),
+  apps: registry.list().length,
+}));
 ipcMain.handle('registry:rescan', () => { registry.scan(); return registry.list(); });
 
 // ── Centralized provider config (shared across all apps) ─────────────────────
@@ -249,7 +292,7 @@ app.whenReady().then(() => {
   setTimeout(() => { feeds.refresh(false).catch(() => {}); }, 4000);
 });
 
-// ── Cross-app data read (single-user / single-machine — Avner Media use) ──
+// ── Cross-app data read (single-user / single-machine) ──────────────────
 // Lets one app read another's stored data, e.g. Visitor reading
 // the latest tot.profile.v1 produced by Coherence Assessment.
 // Returns null if nothing matches. listKeys returns just filenames.

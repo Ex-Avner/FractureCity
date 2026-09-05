@@ -1,8 +1,13 @@
 {
   "schema": 2,
   "chapter": 0,
-  "progress": {},
-  "done": {},
+  "progress": {
+    "out": 1
+  },
+  "done": {
+    "out": true,
+    "beat:out": true
+  },
   "seenSeconds": 0,
   "districtsSeen": [],
   "finished": false,

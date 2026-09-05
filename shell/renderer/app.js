@@ -566,6 +566,23 @@ async function boot() {
   state.apps = await shellAPI.listApps();
   renderApps();
   setStatus(`Ready. ${state.apps.length} app${state.apps.length===1?'':'s'} installed.`);
+
+  //  Say which apps/ folder these came from. A packaged build carries a copy
+  //  made at build time, so "I edited the game and the hub still shows the old
+  //  version" is a real and completely invisible state — unless the window
+  //  says so. Now it does.
+  try {
+    const info = await shellAPI.info();
+    const sub = document.querySelector('.brand-sub');
+    if (sub && info){
+      const label = info.source === 'dev'     ? 'source'
+                  : info.source === 'live'    ? 'live tree'
+                  : 'bundled copy · rebuild to update';
+      sub.textContent = `hub · v${info.version} · ${label}`;
+      sub.title = info.root;
+      if (info.source === 'bundled') sub.style.color = '#f4bb3d';
+    }
+  } catch (e) { /* an older main process without shell:info */ }
 }
 
 boot();

@@ -4,6 +4,11 @@ Build the Fracture City web beta from the canonical game.
 
     python3 _build/build-beta.py                      # no telemetry, fully offline
     python3 _build/build-beta.py --key phc_xxxxx      # with PostHog reporting
+    FC_POSTHOG_KEY=phc_xxx python3 _build/build-beta.py   # same, from the environment
+
+On Cloudflare Pages, set the build command to `python3 _build/build-beta.py`,
+the output directory to `_build/webbeta-dist`, and FC_POSTHOG_KEY as an
+encrypted variable. Every push then deploys, and the key never enters git.
 
 It does three things to apps/fracture-city-game/index.html and nothing else:
 
@@ -94,6 +99,14 @@ def main():
     ap.add_argument('--host', default='https://us.i.posthog.com', help='PostHog API host')
     args = ap.parse_args()
 
+    #  Fall back to the environment, so a CI build can inject the key without it
+    #  ever being written into the repository. On Cloudflare Pages this is
+    #  Settings -> Variables and Secrets -> FC_POSTHOG_KEY, and the key stays
+    #  out of git entirely; locally, --key still wins if it is given.
+    if not args.key:
+        args.key = os.environ.get('FC_POSTHOG_KEY', '').strip()
+    args.host = args.host or os.environ.get('FC_POSTHOG_HOST', 'https://us.i.posthog.com')
+
     html = open(GAME, encoding='utf-8').read()
 
     version = (re.search(r"SH_VERSION\s*=\s*'([^']+)'", html) or [None, '0.0.0'])[1]
@@ -114,6 +127,11 @@ def main():
         '     analytics script and makes no off-origin request. Players can opt out\n'
         '     at any time with fcTelemetry(false), and Do Not Track is obeyed. */\n'
         f"  window.FC_ANALYTICS = {{ key: '{args.key}', host: '{args.host}' }};\n"
+        '  /* This deploy is one file plus three.js. The other Present Palm apps\n'
+        '     are not in it, so the arcade cabinets must not try to load them by\n'
+        '     relative path — above the site root, _redirects answers with this\n'
+        '     same game and the cabinet fills with a copy of itself. */\n'
+        '  window.FC_STANDALONE = true;\n'
         '</script>\n'
     )
     html = html.replace(anchor, cfg + anchor, 1)
@@ -137,8 +155,16 @@ def main():
         print('! the CDN fallback line was not where it was expected — check it by hand')
 
     # 3. lay out the folder
+    #
+    #    A clean removal first, so a file dropped from a previous version does
+    #    not linger in the deploy. Some sandboxes refuse deletes; the output is
+    #    a fixed set of four files, so overwriting in place is a correct
+    #    fallback rather than a compromise.
     if os.path.isdir(OUT):
-        shutil.rmtree(OUT)
+        try:
+            shutil.rmtree(OUT)
+        except OSError as e:
+            print(f'  (could not clear {OUT}: {e.strerror}; overwriting in place)')
     os.makedirs(os.path.join(OUT, 'shared', 'vendor'), exist_ok=True)
     open(os.path.join(OUT, 'index.html'), 'w', encoding='utf-8').write(html)
     shutil.copy2(VENDOR, os.path.join(OUT, 'shared', 'vendor', 'three.min.js'))

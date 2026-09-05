@@ -1,6 +1,6 @@
 {
   "type": "newswire.v1",
-  "fetchedAt": "2026-09-04T22:26:30.936Z",
+  "fetchedAt": "2026-09-05T09:19:52.839Z",
   "sources": {
     "arxiv": {
       "ok": true,
@@ -13,31 +13,58 @@
   },
   "items": [
     {
+      "id": "hn:49574167",
+      "title": "AI handles incidents, engineers lose touch with their systems",
+      "url": "https://www.sylvainkalache.com/blog/ai-handles-incidents-engineers-lose-touch-with-their-systems",
+      "source": "sylvainkalache.com",
+      "via": "Hacker News",
+      "at": "2026-09-05T07:52:50.000Z",
+      "score": 50
+    },
+    {
+      "id": "hn:49572875",
+      "title": "GPT-6 Astra in code review: Gains, privacy, and cost",
+      "url": "https://www.coderabbit.ai/blog/gpt-6-astra-code-review-evaluation",
+      "source": "coderabbit.ai",
+      "via": "Hacker News",
+      "at": "2026-09-05T03:38:56.000Z",
+      "score": 40
+    },
+    {
+      "id": "hn:49571537",
+      "title": "Show HN: Moadim.io – A scheduler for agents",
+      "url": "https://moadim.io/",
+      "source": "moadim.io",
+      "via": "Hacker News",
+      "at": "2026-09-04T23:50:29.000Z",
+      "score": 25
+    },
+    {
+      "id": "hn:49571465",
+      "title": "Portal by Spotify cut my Claude Code token usage by 90%",
+      "url": "https://engineering.atspotify.com/2026/9/portal-by-spotify-cut-my-claude-code-token-usage-by-90",
+      "source": "engineering.atspotify.com",
+      "via": "Hacker News",
+      "at": "2026-09-04T23:38:50.000Z",
+      "score": 127
+    },
+    {
+      "id": "hn:49571131",
+      "title": "Claude Code skills for advanced context engineering techniques and patterns",
+      "url": "https://github.com/NeoLabHQ/context-engineering-kit",
+      "source": "github.com",
+      "via": "Hacker News",
+      "at": "2026-09-04T22:52:14.000Z",
+      "score": 22
+    },
+    {
       "id": "hn:49570545",
       "title": "GPT-6 Astra on OpenRouter",
       "url": "https://openrouter.ai/openai/gpt-6-astra",
       "source": "openrouter.ai",
       "via": "Hacker News",
       "at": "2026-09-04T21:39:19.000Z",
-      "score": 22
-    },
-    {
-      "id": "hn:49570133",
-      "title": "Fermat's Last Theorem: Anthropic has beaten me to it",
-      "url": "https://xenaproject.wordpress.com/2026/09/04/flt-anthropic-has-beaten-me-to-it/",
-      "source": "xenaproject.wordpress.com",
-      "via": "Hacker News",
-      "at": "2026-09-04T21:00:02.000Z",
-      "score": 25
-    },
-    {
-      "id": "hn:49569707",
-      "title": "GPT-6 Astra Generally Available",
-      "url": "https://twitter.com/OpenAI/status/2095968413646737608",
-      "source": "twitter.com",
-      "via": "Hacker News",
-      "at": "2026-09-04T20:16:50.000Z",
-      "score": 18
+      "score": 217
     },
     {
       "id": "hn:49569366",
@@ -46,25 +73,16 @@
       "source": "eebench.org",
       "via": "Hacker News",
       "at": "2026-09-04T19:48:29.000Z",
-      "score": 98
-    },
-    {
-      "id": "hn:49567357",
-      "title": "Georgi Gerganov on llama.cpp/ggml future after Nvidia acquisition of HuggingFace",
-      "url": "https://twitter.com/ggerganov/status/2095897173376618881",
-      "source": "twitter.com",
-      "via": "Hacker News",
-      "at": "2026-09-04T17:12:22.000Z",
-      "score": 64
+      "score": 257
     },
     {
       "id": "hn:49567310",
-      "title": "\"Next-token predictor\" is the wrong mental model for LLMs",
+      "title": "“Next-token predictor” is the wrong mental model for LLMs",
       "url": "https://gmcgoldr.github.io/2026/09/04/llm-next-token-predictors.html",
       "source": "gmcgoldr.github.io",
       "via": "Hacker News",
       "at": "2026-09-04T17:09:24.000Z",
-      "score": 43
+      "score": 112
     },
     {
       "id": "hn:49566137",
@@ -73,7 +91,7 @@
       "source": "nytimes.com",
       "via": "Hacker News",
       "at": "2026-09-04T15:33:45.000Z",
-      "score": 247
+      "score": 296
     },
     {
       "id": "hn:49563386",
@@ -82,7 +100,7 @@
       "source": "productrise.app",
       "via": "Hacker News",
       "at": "2026-09-04T11:59:15.000Z",
-      "score": 358
+      "score": 381
     },
     {
       "id": "hn:49563355",
@@ -91,7 +109,7 @@
       "source": "collusion.wiki",
       "via": "Hacker News",
       "at": "2026-09-04T11:54:53.000Z",
-      "score": 1377
+      "score": 1700
     },
     {
       "id": "hn:49562219",
@@ -100,16 +118,7 @@
       "source": "github.com",
       "via": "Hacker News",
       "at": "2026-09-04T09:03:00.000Z",
-      "score": 79
-    },
-    {
-      "id": "hn:49557206",
-      "title": "Which tools do Claude, Codex and Cursor choose? We measured 17k runs to find out",
-      "url": "https://armature.tech/blog/which-tools-coding-agents-install",
-      "source": "armature.tech",
-      "via": "Hacker News",
-      "at": "2026-09-03T21:20:34.000Z",
-      "score": 287
+      "score": 128
     },
     {
       "id": "hn:49554643",
@@ -118,7 +127,7 @@
       "source": "openai.com",
       "via": "Hacker News",
       "at": "2026-09-03T18:41:05.000Z",
-      "score": 2142
+      "score": 2172
     },
     {
       "id": "arxiv:2609.04199v1",
@@ -344,15 +353,6 @@
       "via": "arXiv cs.AI",
       "at": "2026-09-03T17:16:13Z",
       "score": 0
-    },
-    {
-      "id": "hn:49526298",
-      "title": "Xanadu was waiting for agents",
-      "url": "https://zed.dev/blog/agentic-xanadu",
-      "source": "zed.dev",
-      "via": "Hacker News",
-      "at": "2026-09-01T18:50:42.000Z",
-      "score": 144
     }
   ]
 }

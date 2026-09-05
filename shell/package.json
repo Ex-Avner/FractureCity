@@ -1,13 +1,13 @@
 {
   "name": "present-palm",
-  "version": "0.1.0",
-  "description": "Present Palm — launcher and integration layer for the Avner Media app ecosystem (Coherence, Fracture City, the show pipeline)",
+  "version": "0.2.0",
+  "description": "Present Palm \u2014 launcher and integration layer for the Coherence, Fracture City and show-pipeline apps",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
     "build": "electron-builder --mac"
   },
-  "author": "Avner Media",
+  "author": "Present Palm",
   "license": "UNLICENSED",
   "private": true,
   "devDependencies": {

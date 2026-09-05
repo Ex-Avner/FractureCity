@@ -74,6 +74,7 @@ contextBridge.exposeInMainWorld('fracture', {
   delete: (key)        => ipcRenderer.invoke('data:delete', slug, key),
 
   // Apps & inter-app launching
+  info:     ()                       => ipcRenderer.invoke('shell:info'),
   listApps: ()                       => ipcRenderer.invoke('registry:list'),
   openApp:  (targetSlug, payload)    => ipcRenderer.invoke('app:open', targetSlug, payload),
 

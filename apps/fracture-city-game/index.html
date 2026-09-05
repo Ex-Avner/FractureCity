@@ -25647,7 +25647,7 @@ function shStreamQuiet(){
 // =============================================================================
 
 // ─── The front door ─────────────────────────────────────────────────────────
-const SH_VERSION = '0.26.2';
+const SH_VERSION = '0.27.0';
 
 (function(){
   if (typeof shFrontHome !== 'function') return;
@@ -27277,6 +27277,39 @@ const FIT_OVERLAYS = [
     @media (max-width: 560px){
       #menu-overlay .title{ font-size: 26px !important; letter-spacing: 6px !important; }
     }
+
+    /* ── The second measurement ────────────────────────────────────────────
+       Shrinking the title and hiding the footer took the front door from
+       532px to 499px, and #front-root is 420px of that on its own — four
+       rows of button-plus-explanation. So on a real landscape phone it still
+       did not fit; it only scrolled:
+
+           innerHeight 526   content 526   fits
+           innerHeight 453   content 499    46px over
+           innerHeight 407   content 499    92px over
+           innerHeight 372   content 499   127px over
+
+       A viewport of 390 is an ordinary landscape phone once the browser's own
+       chrome is taken out, and 372 is one with a fatter bar. The hints are
+       what has to give: they are one line of explanation under every button,
+       and the button says what it does. */
+    @media (max-height: 480px){
+      #menu-overlay .title{ font-size: 22px !important; letter-spacing: 6px !important; }
+      #menu-overlay .subtitle{ font-size: 9px !important; margin-bottom: 5px !important; }
+      #menu-overlay .menu-btn{ padding: 7px 12px !important; margin: 2px 0 !important; }
+      #menu-overlay .hint{ font-size: 8.5px !important; margin: 0 0 3px !important;
+                           line-height: 1.25 !important; }
+      #front-root .who{ margin-bottom: 4px !important; }
+      #front-root .nm{ font-size: 12px !important; }
+      #front-root .hd{ font-size: 9px !important; }
+    }
+    /* Below this, fitting beats explaining. */
+    @media (max-height: 400px){
+      #menu-overlay .title{ font-size: 18px !important; margin-bottom: 0 !important; }
+      #menu-overlay .subtitle{ display: none !important; }
+      #menu-overlay .hint{ display: none !important; }
+    }
+
   `;
   document.head.appendChild(css);
 })();
@@ -27351,6 +27384,267 @@ window.shFitUnreachable = shFitUnreachable;
   //  And a few times during boot, because some of these overlays are built
   //  after the first frame.
   for (const ms of [400, 1200, 3000]) setTimeout(run, ms);
+})();
+
+
+// =============================================================================
+//  64 · THE ARCADE ON THE WEB — the cabinets were loading the game into itself
+// -----------------------------------------------------------------------------
+//  "None of the arcade games work either."
+//
+//  This one is real, it is web-build-only, and no test on the desktop tree
+//  could ever have caught it. `shPlayCabinet` loads the other Present Palm
+//  apps by relative path out of the game's own folder:
+//
+//      frame.src = '../' + slug + '/index.html';
+//
+//  In the shell that resolves to apps/sun-fall/index.html and works. In the
+//  hosted beta the deploy is FLAT — index.html, shared/vendor/three.min.js,
+//  _headers, _redirects, README.txt — and there is no apps/ tree at all. The
+//  path climbs above the site root, and `_redirects` (`/*  /index.html  200`)
+//  answers it with THE GAME ITSELF.
+//
+//  Which is worse than a 404, because of how the existing guard is written:
+//
+//      const loaded = () => !!(frame.contentDocument.body.childElementCount);
+//
+//  A recursive copy of Fracture City has a body full of children, so `loaded()`
+//  says yes, the "could not load" panel never appears, and the player gets a
+//  black box or a nested copy of the game with no explanation. Silent failure
+//  is why this reads as "none of the arcade games work" rather than "the
+//  arcade says it needs the desktop app".
+//
+//  Two fixes:
+//    · The build tells the game what it is. `FC_STANDALONE` is injected by
+//      build-beta.py, and a standalone build never points the frame at a
+//      sibling app it does not have. It says so instead, in the panel that
+//      already exists.
+//    · And independently of that flag, `loaded()` learns to recognise its own
+//      reflection — so anybody self-hosting this without the flag gets an
+//      honest message rather than a hall of mirrors.
+// =============================================================================
+
+function shArcadeStandalone(){
+  try {
+    if (window.FC_STANDALONE === true) return true;
+    //  No shell bridge to open apps through is the other honest signal: the
+    //  desktop build always has one.
+    if (!window.fracture || typeof window.fracture.openApp !== 'function') return true;
+  } catch (e){}
+  return false;
+}
+window.shArcadeStandalone = shArcadeStandalone;
+
+(function(){
+  if (typeof shPlayCabinet !== 'function') return;
+  const orig = shPlayCabinet;
+
+  window.shPlayCabinet = function(slug){
+    if (!shArcadeStandalone()) return orig.apply(this, arguments);
+
+    const roster = (typeof SHIFT_WORLD !== 'undefined' && SHIFT_WORLD.arcadeRoster)
+                 || (typeof ARCADE_ROSTER !== 'undefined' ? ARCADE_ROSTER : []);
+    const game = roster.find(g => g.slug === slug);
+    if (!game) return;
+
+    //  Everything the original does to put the player in front of a cabinet,
+    //  minus the part that cannot work.
+    State.ui.inArcade = true;
+    try { document.exitPointerLock(); } catch (e){}
+    document.body.style.cursor = 'auto';
+
+    const $$ = (id) => document.getElementById(id);
+    if ($$('arcade-title')) $$('arcade-title').textContent = game.title;
+    if ($$('arcade-sub'))   $$('arcade-sub').textContent = game.sub;
+    const card = $$('arcade-card');
+    if (card) card.style.setProperty('--cab', '#' + game.color.toString(16).padStart(6, '0'));
+
+    //  Never point the frame anywhere. A blank frame is honest; a frame full
+    //  of this same game is not.
+    const frame = $$('arcade-frame');
+    if (frame){ frame.onload = null; frame.src = 'about:blank'; }
+    try { clearTimeout(orig._t); } catch (e){}
+
+    //  Rewrite the panel that already exists, because its copy assumes a
+    //  desktop shell that is not here.
+    const fb = $$('arcade-fallback');
+    if (fb){
+      fb.innerHTML =
+        `<div>
+           <p style="font:600 10px/1.5 'SF Mono',monospace;letter-spacing:3px;
+                     text-transform:uppercase;color:#ff60d0;margin-bottom:14px">
+             cabinet powered down</p>
+           <p><strong>${game.title}</strong> is a separate game in the Present Palm
+              collection. It is not part of this web build — the download is one
+              file, and ${game.title} is not in it.</p>
+           <p style="font-size:13px;opacity:.72">The cabinet is real, the city is real,
+              and the machine will switch on in the desktop app. Out here it stays dark.</p>
+         </div>`;
+      fb.classList.add('show');
+    }
+    const open = $$('arcade-open');
+    if (open) open.style.display = 'none';
+
+    if ($$('arcade-overlay')) $$('arcade-overlay').classList.add('show');
+    document.body.classList.add('in-arcade');
+    try { shTel('arcade_standalone', { slug }); } catch (e){}
+  };
+
+  //  Put the launch button back when the cabinet closes, so a desktop session
+  //  that somehow reached this path is not left without it.
+  if (typeof shExitCabinet === 'function'){
+    const origExit = shExitCabinet;
+    window.shExitCabinet = function(){
+      const open = document.getElementById('arcade-open');
+      if (open) open.style.display = '';
+      const fb = document.getElementById('arcade-fallback');
+      if (fb) fb.classList.remove('show');
+      return origExit.apply(this, arguments);
+    };
+  }
+})();
+
+// ─── The mirror test ────────────────────────────────────────────────────────
+//  Independent of the flag: if the frame ends up holding a document whose title
+//  is this game's own, it is the host's SPA fallback answering with index.html,
+//  not the app. Anyone self-hosting the folder without FC_STANDALONE gets a
+//  truthful panel instead of a nested city.
+(function(){
+  const frame = document.getElementById('arcade-frame');
+  if (!frame) return;
+  const ours = document.title;
+  frame.addEventListener('load', () => {
+    try {
+      const doc = frame.contentDocument;
+      if (!doc) return;                       // cross-origin: genuinely something else
+      if (doc.title && doc.title === ours){
+        frame.src = 'about:blank';
+        const fb = document.getElementById('arcade-fallback');
+        if (fb) fb.classList.add('show');
+      }
+    } catch (e){}
+  });
+})();
+
+
+// =============================================================================
+//  65 · A CLEAN FRONT DOOR
+// -----------------------------------------------------------------------------
+//  "Remove the Second Light title from the main menu, and make the main menu
+//  clean — no subheaders."
+//
+//  The front door had accumulated a line of explanation under everything:
+//
+//      FRACTURE CITY
+//      The Second Light · Present Palm · v0.26          ← subtitle
+//      Ex Avner · @handle · resident of Fracture City   ← sub-line
+//      ◈ NEW GAME — THE SECOND LIGHT  ·  start here
+//        Six movements over one night. Ned reads you in…    ← hint
+//      ▶ NEW GAME — FREE ROAM
+//        No story running. The city, the shift…              ← hint
+//      ◷ DAILY SHIFT — TWENTY MINUTES
+//        Twenty minutes, one evening, one unfinished thing…  ← hint
+//      ▣ ALL SAVES
+//      Click a save or START, then click the canvas to…      ← footer
+//
+//  Every one of those lines was written to help, and together they turned the
+//  first thing anybody sees into a page of copy. The title carries the name;
+//  the buttons say what they do.
+//
+//  THE SECOND LIGHT stays everywhere it belongs — it is the campaign's ending,
+//  the twelfth movement, the chapter card, the save metadata. It is the name of
+//  the story, not the name of the front door, and putting a story's ending on
+//  the title screen was giving it away in the first sentence.
+//
+//  Done as a rule rather than an edit, because the menu rewrites itself every
+//  time you move between home and the save list, and section 49 re-dresses the
+//  buttons after each render.
+// =============================================================================
+
+(function(){
+  const css = document.createElement('style');
+  css.textContent = `
+    /* No subheaders. Any of these can come back by deleting one line. */
+    #menu-overlay .subtitle,
+    #menu-overlay .footer,
+    #front-root .hint,
+    #front-root .hd { display: none !important; }
+
+    /* With the copy gone the title can carry the screen again, and the
+       buttons get room to be buttons rather than headings with text under
+       them. */
+    #menu-overlay .title{ margin-bottom: 18px; }
+    #front-root .who{ margin-bottom: 14px !important; }
+    #menu-overlay .menu-btn{ margin: 5px 0; }
+  `;
+  document.head.appendChild(css);
+})();
+
+//  The campaign button names the ending. Take it back to the plain thing.
+const FRONT_LABELS = {
+  'new-campaign': '◈  NEW GAME',
+  'new-free':     '▶  FREE ROAM',
+  'shift':        '◷  DAILY SHIFT',
+  'saves':        '▣  SAVES',
+  'home':         '‹  BACK',
+};
+
+function shMenuClean(){
+  const ov = document.getElementById('menu-overlay');
+  //  Hiding the copy is not the same as removing it. A display:none subtitle
+  //  still says "The Second Light" in the page source and to a screen reader,
+  //  and the legacy button block behind the front door still carries the old
+  //  label. Empty them, scoped strictly to the menu — the chapter cards, the
+  //  save metadata and the twelfth movement keep the name, because that is
+  //  where it belongs.
+  if (ov){
+    for (const sel of ['.subtitle', '.footer']){
+      const el = ov.querySelector(sel);
+      if (el && el.textContent) el.textContent = '';
+    }
+    for (const el of ov.querySelectorAll('.legacy [id^="btn-"]')){
+      if (/second light/i.test(el.textContent)) el.textContent = 'NEW GAME';
+    }
+  }
+
+  const root = document.getElementById('front-root');
+  if (!root) return 0;
+  let n = 0;
+  for (const el of root.querySelectorAll('[data-front]')){
+    const want = FRONT_LABELS[el.dataset.front];
+    //  CONTINUE carries the save's own name, which is information rather than
+    //  decoration, so it is left alone — but its trailing explanation is not.
+    if (!want) continue;
+    if (el.textContent.trim() !== want.trim()){ el.textContent = want; n++; }
+  }
+  //  Section 49 re-dresses the campaign button after every render and stamps
+  //  data-dressed so it only does it once. Clearing the stamp would make it
+  //  redress; leaving it set and rewriting the text afterwards is what keeps
+  //  this stable across both paths.
+  return n;
+}
+window.shMenuClean = shMenuClean;
+
+(function(){
+  //  Run after every path that draws the front door, plus a MutationObserver
+  //  for anything that draws it in a way I have not found.
+  for (const name of ['shFrontMount','shFrontHome','shFrontSaves']){
+    if (typeof window[name] !== 'function') continue;
+    const orig = window[name];
+    window[name] = function(){
+      const r = orig.apply(this, arguments);
+      try { shMenuClean(); } catch (e){}
+      return r;
+    };
+  }
+  const run = () => { try { shMenuClean(); } catch (e){} };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', run);
+  else run();
+  try {
+    const root = document.getElementById('front-root') || document.getElementById('menu-overlay');
+    if (root) new MutationObserver(run).observe(root, { childList: true, subtree: true });
+  } catch (e){}
+  for (const ms of [300, 900, 2500]) setTimeout(run, ms);
 })();
 
 (function(){

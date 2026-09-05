@@ -1,4 +1,4 @@
-FRACTURE CITY — public beta build 0.26.2
+FRACTURE CITY — public beta build 0.27.0
 ========================================
 
 DROP THIS FOLDER ON A HOST. THAT IS THE WHOLE INSTALL.
