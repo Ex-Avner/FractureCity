@@ -25668,7 +25668,7 @@ function shStreamQuiet(){
 // =============================================================================
 
 // ─── The front door ─────────────────────────────────────────────────────────
-const SH_VERSION = '0.30.0';
+const SH_VERSION = '0.31.0';
 
 (function(){
   if (typeof shFrontHome !== 'function') return;
@@ -28481,6 +28481,16 @@ const CITY_SCALE = {
     });
     try { shTel('arcade_local', { slug: SLUG }); } catch (e){}
   };
+
+  //  A cabinet page that cannot reach us directly asks by message. Only acted
+  //  on while a cabinet is actually up, so this is not a standing remote
+  //  control on the city.
+  window.addEventListener('message', (ev) => {
+    const d = ev && ev.data;
+    if (!d || d.type !== 'shw:exit') return;
+    if (!State.ui.inArcade) return;
+    shExitCabinet();
+  });
 
   const prevExit = window.shExitCabinet;
   window.shExitCabinet = function(){

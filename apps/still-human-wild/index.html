@@ -74,9 +74,37 @@
     fail('the engine did not load from <code>still-human-wild.js</code>.');
     return;
   }
-  //  No onExit: as its own app there is nothing behind the game, so Esc goes
-  //  back to the title card rather than leaving a blank window.
-  Promise.resolve(window.SHW_WILD.mount(document.getElementById('stage')))
+
+  //  Escape has to mean the same thing wherever this is running.
+  //
+  //  In the shell, the arcade cabinet loads this page in an iframe, so the key
+  //  goes to THIS document and not to the city behind it. Without this, Esc
+  //  inside a cabinet went back to the game's own title card while Esc in the
+  //  compiled web build left the cabinet: one key, two behaviours, decided by
+  //  something the player cannot see.
+  //
+  //  Tell the city directly if the frames can see each other, and post it a
+  //  message if they cannot. Returning false means neither worked, and the
+  //  engine falls back to its title card rather than blanking the frame.
+  const framed = window.parent && window.parent !== window;
+  const opts = framed ? {
+    exitLabel: 'leave the cabinet',
+    onExit(){
+      try {
+        if (typeof window.parent.shExitCabinet === 'function'){
+          window.parent.shExitCabinet();
+          return true;
+        }
+      } catch (e){ /* cross-origin: fall through to the message */ }
+      try {
+        window.parent.postMessage({ type: 'shw:exit', slug: 'still-human-wild' }, '*');
+        return true;
+      } catch (e){}
+      return false;
+    },
+  } : {};
+
+  Promise.resolve(window.SHW_WILD.mount(document.getElementById('stage'), opts))
     .then(() => boot.classList.add('gone'))
     .catch(e => { console.error(e); fail('this machine could not start it. It needs WebGL.'); });
 })();

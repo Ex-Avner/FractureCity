@@ -27,15 +27,35 @@ if (typeof THREE === 'undefined') return;
 
 // ─── 1 · Tuning ──────────────────────────────────────────────────────────────
 
-const WORLD   = 192;            // world spans -96 .. 96 on both axes
+//  The world is 576m across and does NOT all exist at once. Tiles are built
+//  as the player approaches and thrown away behind them, because the whole
+//  thing meshed at once is 400 draw calls and 460,800 triangles, and this has
+//  to run inside an arcade cabinet in a one-file web page.
+//
+//  The heightfield itself IS fully resident: 481 x 481 floats twice over is
+//  1.85MB, and having it everywhere is what lets the map, the minimap and the
+//  settlement placer ask about ground they have never drawn.
+const WORLD   = 576;            // world spans -288 .. 288 on both axes
 const CELL    = 1.2;            // metres per heightfield cell
-const GRID    = Math.round(WORLD / CELL);       // 128 cells
-const TILE    = 16;             // cells per rebuildable tile
-const TILES   = GRID / TILE;    // 8 x 8 tiles
+const GRID    = Math.round(WORLD / CELL);       // 480 cells
+const TILE    = 24;             // cells per streamed tile — 28.8m square
+const TILES   = GRID / TILE;    // 20 x 20 tiles, 400 in the whole world
 const HALF    = WORLD / 2;
 
+const LOAD_R    = 5;            // tiles: build out to ~144m
+const UNLOAD_R  = 7;            // tiles: keep until ~202m, then let go
+const BUILD_BUDGET = 3;         // tiles meshed per frame, so arriving is smooth
+
+//  One coarse mesh of the entire world, a quarter of the resolution, sitting
+//  1.5m low so the streamed tiles always win where they exist. It costs one
+//  draw call and 28,800 triangles and it is the only reason there is a horizon
+//  at all past the streaming radius.
+const FAR_STEP = 4;             // heightfield cells per backdrop quad
+
 const WATER_Y = 2.4;
-const BASE_R  = 34;             // plateau radius, blended out to the plains
+const BASE_R  = 46;             // plateau radius, blended out to the plains
+const TOWN_PLATEAU = 17;        // flat core under an outlying settlement
+const TOWN_BLEND   = 44;        // and how far its apron reaches
 //  Protected ground: no digging, no removing, no spawning. It GROWS when the
 //  Kiln is upgraded, so it is a function, not a constant. The terrain plateau
 //  underneath is baked once at the widest radius the ring can ever reach, so
@@ -54,7 +74,14 @@ const STEP_FPS = 12;            // stop-motion step for every animation
 
 const MAX_MOBS  = 16;
 const MAX_BLOCKS = 900;
-const SAVE_KEY  = 'stillhuman-wild-v1';
+//  v2. The old format keyed terrain edits by a flat index into a fixed-size
+//  array, so changing the world size moved every edit somewhere else. Edits
+//  are stored as (i, j, delta) now, which is the last time this has to break.
+//  The v1 key is left alone on disk rather than overwritten.
+const SAVE_KEY  = 'stillhuman-wild-v2';
+//  Nothing in the build said which build it was, so a bug report could not
+//  name one. It is on the title card and on window.SHW_WILD.
+const SHW_VERSION = '0.3.0';
 
 // ─── 2 · Palette ─────────────────────────────────────────────────────────────
 //  Saturated, poster-bright. Clay that somebody actually pressed pigment into.
@@ -224,7 +251,7 @@ function clayTexture(){
   t.wrapS = t.wrapT = THREE.RepeatWrapping;
   t.colorSpace = THREE.SRGBColorSpace;
   t.anisotropy = 2;
-  CLAY_TEX = t;
+  CLAY_TEX = markShared(t);
   return t;
 }
 
@@ -238,10 +265,40 @@ function whiteColors(geo){
   return geo;
 }
 
+//  Anything removed from the scene has to give its GPU memory back. Mobs,
+//  spit, loot and rebuilt settlements were all being detached and forgotten:
+//  measured, forty husks killed and cleaned up left fifteen geometries behind,
+//  and every one of them had brought a cloned 256x256 clay texture with it.
+//  Shared assets are marked so the disposer steps over them.
+function markShared(x){ if (x){ x.userData = x.userData || {}; x.userData.shared = true; } return x; }
+
+function disposeTree(root){
+  if (!root) return;
+  root.traverse(o => {
+    if (o.geometry && !(o.geometry.userData && o.geometry.userData.shared)) o.geometry.dispose();
+    if (!o.material) return;
+    const ms = Array.isArray(o.material) ? o.material : [o.material];
+    for (const m of ms){
+      if (m.userData && m.userData.shared) continue;
+      if (m.map && !(m.map.userData && m.map.userData.shared)) m.map.dispose();
+      m.dispose();
+    }
+  });
+}
+
 function clayMat(opts){
-  const t = clayTexture().clone();
-  t.needsUpdate = true;
-  t.repeat.set(opts && opts.rep ? opts.rep : 1, opts && opts.rep ? opts.rep : 1);
+  //  A cloned texture is a separate GPU upload. Anything that repeats needs
+  //  its own; anything at repeat 1 can share the one atlas, which is every
+  //  creature, every dropped weapon and every part of the player.
+  const rep = (opts && opts.rep) || 1;
+  let t;
+  if (rep === 1){
+    t = markShared(clayTexture());
+  } else {
+    t = clayTexture().clone();
+    t.needsUpdate = true;
+    t.repeat.set(rep, rep);
+  }
   const m = new THREE.MeshLambertMaterial(Object.assign({
     map: t, flatShading: true,
   }, opts && opts.mat ? opts.mat : {}));
@@ -289,6 +346,10 @@ const St = {        // live game state
   focus: null,          // the node under the crosshair, if any
   gather: null,         // { node, t, dur } while the button is held
   benchOpen: false,
+  mapOpen: false, mapSpan: 420, mapCx: 0, mapCz: 0,
+  waypoint: null,
+  quest: { i: 0, done: {} },
+  contracts: {}, contractSeed: 1,
   sculptReach: 14,
   buildReach: 9,
   invOpen: false,
@@ -313,7 +374,9 @@ const Cam = { dist: 6.4, height: 1.55, side: 0.95, shakeX: 0, shakeY: 0 };
 // terrain data
 let H = null;           // Float32Array (GRID+1)^2 base heights
 let HD = null;          // Float32Array deltas from sculpting
-let tiles = [];         // {mesh, geo, i, j, dirty}
+let tiles = new Map();  // "ti,tj" -> { ti, tj, mesh, geo }   only what is near
+let tileQueue = [];     // tiles wanted but not yet meshed, nearest first
+let lastTileKey = '';   // player's tile last frame, so the window only moves on change
 let mobs = [];
 let drops = [];
 let blocks = new Map(); // "x,y,z" -> {mat, x, y, z}
@@ -327,36 +390,183 @@ let projectiles = [];
 
 const hIdx = (i, j) => j * (GRID + 1) + i;
 
+//  ─── Settlements ──────────────────────────────────────────────────────────
+//  The Kiln used to be welded to the origin: baseHeight flattened a plateau at
+//  (0,0) and every protection, spawn and regen rule asked hypot(x, z) from
+//  world centre. A world with towns in it needs a list and a nearest-of query
+//  instead, and the terrain has to flatten under all of them.
+
+const TOWN_NAMES = [
+  'Ashfell', 'Low Harrow', 'Cinder Well', 'Marrowgate',
+  'Still Water', 'Thorn Reach', 'Old Bellow', 'Grey Ember',
+];
+
+let settlements = [];
+
+function planSettlements(){
+  const rnd = mulberry(hashStr(SHW.seed) ^ 0x5e7715);
+  settlements = [{
+    id: 'kiln', name: 'The Kiln', kind: 'home', x: 0, z: 0,
+    ring: KEEP_R_BASE, plateau: PLATEAU_R, blend: BASE_R,
+    claimed: true, cleared: true,
+  }];
+
+  //  Six more on a jittered ring, far enough out that reaching one is a walk
+  //  and not a stroll, and never so far that they touch the world's edge wall.
+  const n = 6;
+  const names = TOWN_NAMES.slice();
+  for (let i = 0; i < n; i++){
+    const a = (i / n) * 6.2832 + (rnd() - 0.5) * 0.75;
+    const r = 118 + rnd() * 112;                     // 118m .. 230m out
+    const kind = (i === 0 || i === 3) ? 'town' : 'ruin';
+    const name = names.splice(Math.floor(rnd() * names.length), 1)[0] || ('Waypost ' + i);
+    settlements.push({
+      id: 's' + i, name, kind,
+      x: Math.cos(a) * r, z: Math.sin(a) * r,
+      ring: kind === 'town' ? 15 : 12,
+      plateau: TOWN_PLATEAU, blend: TOWN_BLEND,
+      //  A living town is safe from the start. A ruin is a dead kiln: its ring
+      //  is unlit until you clear it, so it protects nobody.
+      claimed: kind === 'town', cleared: kind === 'town',
+      blight: kind === 'ruin' ? 6 : 0,
+    });
+  }
+}
+
+//  Nearest settlement of any kind, and nearest one that is actually lit.
+function nearestSettlement(x, z, litOnly){
+  let best = null, bd = Infinity;
+  for (const s of settlements){
+    if (litOnly && !s.claimed) continue;
+    const d = Math.hypot(x - s.x, z - s.z);
+    if (d < bd){ bd = d; best = s; }
+  }
+  return { s: best, d: bd };
+}
+
+//  "Am I on protected ground" — the question the sculpt tool, the build tool,
+//  the spawner, the mob push-out and the regen all used to ask about origin.
+function ringAt(s){
+  if (!s) return 0;
+  return s.kind === 'home' ? keepR() : s.ring;
+}
+//  Any settlement's ground, lit or not: a ruin's plateau is still a town site
+//  and digging a pit in it before you relight it helps nobody.
+function siteBlocked(x, z, margin){
+  for (let i = 0; i < settlements.length; i++){
+    const st = settlements[i];
+    if (Math.hypot(x - st.x, z - st.z) < ringAt(st) + (margin || 0)) return st;
+  }
+  return null;
+}
+
+function protectedAt(x, z){
+  const n = nearestSettlement(x, z, true);
+  return n.s && n.d < ringAt(n.s) ? n : null;
+}
+
+// ─── The ground ─────────────────────────────────────────────────────────────
+
+//  A value-noise fBm does not have the same mean on every seed, so a fixed
+//  threshold on it produced worlds anywhere from 30% plains to 93% plains.
+//  Sample the two mask fields once per world and take the thresholds as
+//  PERCENTILES of what this particular seed actually produced. Same coverage
+//  every time, whatever the noise felt like doing.
+function calibrateMasks(){
+  const n = SHW.noise;
+  const ms = [], rs = [];
+  for (let j = 0; j < 64; j++){
+    for (let i = 0; i < 64; i++){
+      const x = -HALF + (i + 0.5) / 64 * WORLD;
+      const z = -HALF + (j + 0.5) / 64 * WORLD;
+      ms.push(fbm(n, x * 0.0031 + 311, z * 0.0031 - 77, 3, 2.0, 0.5));
+      rs.push(fbm(n, x * 0.0018 - 501, z * 0.0018 + 233, 2, 2.0, 0.5));
+    }
+  }
+  ms.sort((a, b) => a - b); rs.sort((a, b) => a - b);
+  const q = (A, p) => A[Math.floor(clamp(p, 0, 0.999) * A.length)];
+  SHW.mt = q(ms, 0.50); SHW.mw = Math.max(0.05, q(ms, 0.68) - q(ms, 0.50));
+  SHW.rt = q(rs, 0.30); SHW.rw = Math.max(0.05, q(rs, 0.72) - q(rs, 0.30));
+}
+
 function baseHeight(wx, wz){
   const n = SHW.noise;
-  const s = 0.010;
-  //  Continent shape: broad rolling plains.
-  let h = fbm(n, wx * s, wz * s, 4, 2.03, 0.5) * 13.0;
-  //  Ridges: an absolute-valued octave makes mountain spines rather than blobs.
-  const r = 1 - Math.abs(fbm(n, wx * 0.0062 + 71, wz * 0.0062 - 40, 3, 2.11, 0.55) * 2 - 1);
-  const ridgeMask = smooth((Math.hypot(wx, wz) - 56) / 40);
-  h += Math.pow(r, 2.6) * 32.0 * ridgeMask;
-  //  Fine lumps: the thumbprints.
+
+  //  Broad plains. Lower frequency than the 192m world used, or nine times the
+  //  area is nine times as many hills and none of them read as a landscape.
+  let h = fbm(n, wx * 0.0042, wz * 0.0042, 4, 2.03, 0.5) * 9.0;
+  h += fbm(n, wx * 0.019, wz * 0.019, 3, 2.0, 0.5) * 2.5;
+
+  //  Mountains are REGIONS, not a ring around the player. A low-frequency
+  //  massif field decides where a range is allowed to be, and ridged noise
+  //  does the shape inside it. The old radial mask put every peak at a fixed
+  //  distance from the origin, which at 576m meant the entire world was
+  //  mountain and the scatter starved: 3,400 boulders and 416 trees.
+  const massif = fbm(n, wx * 0.0031 + 311, wz * 0.0031 - 77, 3, 2.0, 0.5);
+  const region = fbm(n, wx * 0.0018 - 501, wz * 0.0018 + 233, 2, 2.0, 0.5);
+  const mMask = smooth((massif - SHW.mt) / SHW.mw) * smooth((region - SHW.rt) / SHW.rw);
+  const ridge = 1 - Math.abs(fbm(n, wx * 0.0072 + 71, wz * 0.0072 - 40, 4, 2.11, 0.55) * 2 - 1);
+  h += Math.pow(ridge, 2.4) * 38.0 * mMask;
+
+  //  Thumbprints.
   h += fbm(n, wx * 0.14, wz * 0.14, 2, 2.0, 0.5) * 0.55;
-  h += 4.5;
+  h += 3.0;
 
-  //  River cut, a soft valley running north-south with a wander in it.
-  const wander = (fbm(n, wz * 0.012 + 200, 0.5, 3, 2, 0.5) - 0.5) * 44;
-  const dRiver = Math.abs(wx - (-34 + wander));
-  const river = 1 - smooth(dRiver / 11);
-  h = lerp(h, WATER_Y - 1.4, river * 0.88);
+  //  The world has walls, and they are mountains rather than an invisible
+  //  line. Nothing is generated out there and nothing needs to be.
+  const edge = Math.max(Math.abs(wx), Math.abs(wz));
+  h += smooth((edge - HALF * 0.92) / (HALF * 0.08)) * 32;
 
-  //  The plateau the Kiln stands on.
-  const d = Math.hypot(wx, wz);
-  //  Squared falloff: dead flat out to the ring, then a long easy apron into
-//  whatever the land was doing. A short blend makes a quarry pit.
-  const flat = Math.pow(1 - smooth((d - PLATEAU_R) / (BASE_R - PLATEAU_R)), 0.7);
-  h = lerp(h, BASE_Y, flat);
+  //  A river running north to south with a wander in it, cut wider than the
+  //  small world's because it now has to read from a ridge two hundred metres
+  //  away.
+  const wander = (fbm(n, wz * 0.0055 + 200, 0.5, 3, 2, 0.5) - 0.5) * 150;
+  const dRiver = Math.abs(wx - (-60 + wander));
+  const river = 1 - smooth(dRiver / 15);
+  h = lerp(h, WATER_Y - 1.6, river * 0.9);
+
+  //  Flat ground under every settlement, not just the one at the origin.
+  for (let i = 0; i < settlements.length; i++){
+    const st = settlements[i];
+    const d = Math.hypot(wx - st.x, wz - st.z);
+    if (d > st.blend) continue;
+    //  A gentler curve as well as a longer one: pow < 1 pulls the apron flat
+    //  near the town and lets it ease out rather than dropping away.
+    const flat = Math.pow(1 - smooth((d - st.plateau) / (st.blend - st.plateau)), 0.85);
+    h = lerp(h, st.kind === 'home' ? BASE_Y : st.y0, flat);
+  }
 
   return h;
 }
 
+//  A settlement's floor height has to be decided BEFORE the plateau is cut,
+//  or the flatten would be circular. Sample the raw land under it once.
+function settleFloors(){
+  for (const st of settlements){
+    if (st.kind === 'home'){ st.y0 = BASE_Y; continue; }
+    st.y0 = 0;
+    const n = SHW.noise;
+    let h = fbm(n, st.x * 0.0042, st.z * 0.0042, 4, 2.03, 0.5) * 9.0;
+    h += fbm(n, st.x * 0.019, st.z * 0.019, 3, 2.0, 0.5) * 2.5;
+    const massif = fbm(n, st.x * 0.0031 + 311, st.z * 0.0031 - 77, 3, 2.0, 0.5);
+    const region = fbm(n, st.x * 0.0018 - 501, st.z * 0.0018 + 233, 2, 2.0, 0.5);
+    const mMask = smooth((massif - SHW.mt) / SHW.mw) * smooth((region - SHW.rt) / SHW.rw);
+    const ridge = 1 - Math.abs(fbm(n, st.x * 0.0072 + 71, st.z * 0.0072 - 40, 4, 2.11, 0.55) * 2 - 1);
+    h += Math.pow(ridge, 2.4) * 38.0 * mMask;
+    h += 3.0;
+    //  Never underwater, never on a peak: a town you cannot walk out of is
+    //  not a town.
+    st.y0 = clamp(h, WATER_Y + 2.4, 19.5);
+  }
+}
+
 function buildHeights(){
+  //  Order matters: the settlements decide where the plateaus are, and their
+  //  floor heights are sampled from the raw land before any flattening, or
+  //  the flatten would be defined in terms of itself.
+  calibrateMasks();
+  if (!settlements.length) planSettlements();
+  settleFloors();
   H  = new Float32Array((GRID + 1) * (GRID + 1));
   if (!HD) HD = new Float32Array((GRID + 1) * (GRID + 1));
   for (let j = 0; j <= GRID; j++){
@@ -479,29 +689,170 @@ function makeTerrain(){
   const mat = clayMat({ rep: 1, mat: { vertexColors: true } });
   mat.map.repeat.set(1, 1);
   S.terrainMat = mat;
-  tiles = [];
-  for (let tj = 0; tj < TILES; tj++){
-    for (let ti = 0; ti < TILES; ti++){
-      const geo = buildTile(ti, tj);
-      const mesh = new THREE.Mesh(geo, mat);
-      mesh.frustumCulled = true;
-      S.world.add(mesh);
-      tiles.push({ ti, tj, mesh, geo });
+  tiles = new Map();
+  tileQueue = [];
+  lastTileKey = '';
+  makeFarMesh();
+}
+
+const tkey = (ti, tj) => ti + ',' + tj;
+const tileOf = (w) => clamp(Math.floor((w + HALF) / CELL / TILE), 0, TILES - 1);
+
+function addTile(ti, tj){
+  const geo = buildTile(ti, tj);
+  const mesh = new THREE.Mesh(geo, S.terrainMat);
+  S.world.add(mesh);
+  tiles.set(tkey(ti, tj), { ti, tj, mesh, geo });
+}
+
+function dropTile(t){
+  S.world.remove(t.mesh);
+  t.geo.dispose();
+  tiles.delete(tkey(t.ti, t.tj));
+}
+
+//  Called every frame. Cheap when the player has not crossed a tile edge,
+//  which is almost always.
+function updateStream(force){
+  const pi = tileOf(Pl.pos.x), pj = tileOf(Pl.pos.z);
+  const key = tkey(pi, pj);
+  if (key !== lastTileKey || force){
+    lastTileKey = key;
+
+    //  Want: everything inside LOAD_R, nearest first so the ground under your
+    //  feet is never the last thing to arrive.
+    const want = [];
+    for (let j = pj - LOAD_R; j <= pj + LOAD_R; j++){
+      for (let i = pi - LOAD_R; i <= pi + LOAD_R; i++){
+        if (i < 0 || j < 0 || i >= TILES || j >= TILES) continue;
+        const d = Math.hypot(i - pi, j - pj);
+        if (d > LOAD_R + 0.5) continue;
+        if (!tiles.has(tkey(i, j))) want.push({ i, j, d });
+      }
     }
+    want.sort((a, b) => a.d - b.d);
+    tileQueue = want;
+
+    //  Let go of anything well behind, with hysteresis between the two radii
+    //  so walking a boundary does not thrash.
+    for (const t of [...tiles.values()]){
+      if (Math.hypot(t.ti - pi, t.tj - pj) > UNLOAD_R) dropTile(t);
+    }
+    refreshPropWindow(pi, pj);
+  }
+
+  let budget = force ? 999 : BUILD_BUDGET;
+  while (tileQueue.length && budget-- > 0){
+    const t = tileQueue.shift();
+    if (!tiles.has(tkey(t.i, t.j))) addTile(t.i, t.j);
   }
 }
 
-function rebuildTilesAround(wx, wz, r){
-  const i0 = clamp(Math.floor((wx - r + HALF) / CELL / TILE), 0, TILES - 1);
-  const i1 = clamp(Math.floor((wx + r + HALF) / CELL / TILE), 0, TILES - 1);
-  const j0 = clamp(Math.floor((wz - r + HALF) / CELL / TILE), 0, TILES - 1);
-  const j1 = clamp(Math.floor((wz + r + HALF) / CELL / TILE), 0, TILES - 1);
-  for (const t of tiles){
-    if (t.ti < i0 || t.ti > i1 || t.tj < j0 || t.tj > j1) continue;
-    t.geo.dispose();
-    t.geo = buildTile(t.ti, t.tj);
-    t.mesh.geometry = t.geo;
+//  Sculpting edits the heightfield, so whatever tiles are live over that patch
+//  have to be remeshed. Tiles not loaded will pick the change up when built.
+//  A tree's height is sampled once, at generation. Lower the ground under one
+//  and it hangs in the air: measured at 3.22m of daylight under a trunk after
+//  a single dig. Every prop whose ground moved gets re-seated.
+function resettleProps(wx, wz, r){
+  const i0 = tileOf(wx - r - 4), i1 = tileOf(wx + r + 4);
+  const j0 = tileOf(wz - r - 4), j1 = tileOf(wz + r + 4);
+  let touched = false;
+  for (let j = j0; j <= j1; j++){
+    for (let i = i0; i <= i1; i++){
+      const b = propBuckets.get(tkey(i, j));
+      if (!b) continue;
+      for (const list of [b.trees, b.rocks, b.banks, b.bushes]){
+        for (const o of list){
+          if (Math.hypot(o.x - wx, o.z - wz) > r + 3) continue;
+          const y = groundY(o.x, o.z);
+          if (Math.abs(y - o.y) < 0.001) continue;
+          o.y = y;
+          touched = true;
+        }
+      }
+    }
   }
+  if (touched) propsDirty = true;
+}
+
+function rebuildTilesAround(wx, wz, r){
+  const i0 = tileOf(wx - r), i1 = tileOf(wx + r);
+  const j0 = tileOf(wz - r), j1 = tileOf(wz + r);
+  for (let j = j0; j <= j1; j++){
+    for (let i = i0; i <= i1; i++){
+      const t = tiles.get(tkey(i, j));
+      if (!t) continue;
+      t.geo.dispose();
+      t.geo = buildTile(t.ti, t.tj);
+      t.mesh.geometry = t.geo;
+    }
+  }
+  resettleProps(wx, wz, r);
+  farDirty = true;
+}
+
+// ─── The horizon ────────────────────────────────────────────────────────────
+//  A quarter-resolution mesh of the whole world, one draw call, sunk 1.5m so
+//  the real tiles always cover it where they exist. Rebuilt lazily after
+//  sculpting, because nobody can see a 1.5m error at 200 metres.
+let farDirty = false, farTimer = 0;
+
+function buildFarGeometry(){
+  const N = GRID / FAR_STEP;                 // 120 quads a side
+  const pos = new Float32Array(N * N * 6 * 3);
+  const col = new Float32Array(N * N * 6 * 3);
+  const uv  = new Float32Array(N * N * 6 * 2);
+  const rnd = mulberry(hashStr(SHW.seed) ^ 0xfa2);
+  let p = 0, c = 0, u = 0;
+  const S4 = CELL * FAR_STEP;
+  for (let j = 0; j < N; j++){
+    for (let i = 0; i < N; i++){
+      const x0 = -HALF + i * S4, z0 = -HALF + j * S4;
+      const x1 = x0 + S4, z1 = z0 + S4;
+      const y00 = heightAtIdx(i * FAR_STEP, j * FAR_STEP) - 1.5;
+      const y10 = heightAtIdx((i + 1) * FAR_STEP, j * FAR_STEP) - 1.5;
+      const y01 = heightAtIdx(i * FAR_STEP, (j + 1) * FAR_STEP) - 1.5;
+      const y11 = heightAtIdx((i + 1) * FAR_STEP, (j + 1) * FAR_STEP) - 1.5;
+      const tri = [[x0,y00,z0, x0,y01,z1, x1,y10,z0],
+                   [x1,y10,z0, x0,y01,z1, x1,y11,z1]];
+      for (let t = 0; t < 2; t++){
+        const v = tri[t];
+        const cx = (v[0]+v[3]+v[6])/3, cy = (v[1]+v[4]+v[7])/3, cz = (v[2]+v[5]+v[8])/3;
+        const sl = Math.max(Math.abs(v[1]-v[4]), Math.abs(v[4]-v[7])) / S4;
+        const cc = biomeColor(cx, cz, cy + 1.5, sl, rnd());
+        for (let k = 0; k < 3; k++){
+          pos[p++] = v[k*3]; pos[p++] = v[k*3+1]; pos[p++] = v[k*3+2];
+          col[c++] = cc.r; col[c++] = cc.g; col[c++] = cc.b;
+          uv[u++] = v[k*3] * 0.05; uv[u++] = v[k*3+2] * 0.05;
+        }
+      }
+    }
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+  geo.computeVertexNormals();
+  geo.computeBoundingSphere();
+  return geo;
+}
+
+function makeFarMesh(){
+  const geo = buildFarGeometry();
+  S.far = new THREE.Mesh(geo, S.terrainMat);
+  S.far.frustumCulled = false;
+  S.far.renderOrder = -1;
+  S.world.add(S.far);
+}
+
+function tickFar(dt){
+  if (!farDirty) return;
+  farTimer += dt;
+  if (farTimer < 2.5) return;
+  farTimer = 0; farDirty = false;
+  if (!S.far) return;
+  S.far.geometry.dispose();
+  S.far.geometry = buildFarGeometry();
 }
 
 // ─── 8 · Water ───────────────────────────────────────────────────────────────
@@ -536,16 +887,18 @@ function scatterProps(){
   trees = []; rocks = []; banks = [];
   const bushPos = [];
 
-  const TRY = 5400;
+  const TRY = 46000;          // nine times the area, same density
   for (let n = 0; n < TRY; n++){
     const wx = (rnd() - 0.5) * (WORLD - 8);
     const wz = (rnd() - 0.5) * (WORLD - 8);
-    const d = Math.hypot(wx, wz);
-    //  Per kind, not one radius for everything. Trees keep back so the Kiln
-    //  is never buried behind a treeline; boulders and clay come to the edge
-    //  of the ring, because "where is the stone" was the first thing that
-    //  went wrong with this world.
-    const clearFor = { tree: PLATEAU_R + 3, other: PLATEAU_R - 6 };
+    //  Per kind, not one radius for everything. Trees keep back so a
+    //  settlement is never buried behind a treeline; boulders and clay come
+    //  to the edge of the ring, because "where is the stone" was the first
+    //  thing that went wrong with this world.
+    const site = nearestSettlement(wx, wz, false);
+    const pl = site.s ? site.s.plateau : 0;
+    const clearFor = { tree: pl + 3, other: pl - 6 };
+    const d = site.d;
     if (d < clearFor.other) continue;
     const y = groundY(wx, wz);
     if (y < WATER_Y + 0.6) continue;
@@ -553,16 +906,16 @@ function scatterProps(){
     const m = moistAt(wx, wz);
 
     const waterline = y < WATER_Y + 3.0;
-    if (sl < 0.34 && banks.length < 260 &&
-        ((waterline && rnd() < 0.55) || (y < 12.5 && rnd() < 0.08))){
+    if (sl < 0.34 && banks.length < 2300 &&
+        ((waterline && rnd() < 0.55) || (y < 17 && rnd() < 0.08))){
       //  Clay banks. Earth used to come only from lowering terrain in a mode
       //  nobody had opened, so two of the six build materials had no visible
       //  source. They cluster at the river cut and sit thinly through the
       //  plains, which is where the player actually is.
       banks.push({ kind:'bank', x: wx, z: wz, y, s: 0.9 + rnd() * 0.8,
                    rot: rnd() * 6.283, alive: true });
-    } else if (d > clearFor.tree && y < 15 && sl < 0.55 && m > 0.40 && rnd() < (m - 0.34) * 1.9){
-      if (trees.length < 480){
+    } else if (d > clearFor.tree && y < 16 && sl < 0.55 && m > 0.38 && rnd() < (m - 0.32) * 1.9){
+      if (trees.length < 4400){
         const cold = y > 11.5;
         const roll = rnd();
         const leaf = cold ? PAL.leafA
@@ -572,123 +925,155 @@ function scatterProps(){
         trees.push({ kind:'tree', x: wx, z: wz, y, s: 0.8 + rnd() * 0.75, leaf,
                      rot: rnd() * 6.283, alive: true });
       }
-    } else if (sl > 0.35 || y > 16 || rnd() < 0.20){
+    } else if (sl > 0.35 || y > 17.5 || rnd() < 0.20){
       //  Boulders were slope-only, so the nearest one to the Kiln was thirty
       //  metres up a hill and stone looked like it did not exist. They are
       //  scattered through the flats now as well, just more thinly.
-      if (rocks.length < 380 && rnd() < 0.40){
+      if (rocks.length < 3400 && rnd() < 0.40){
         rocks.push({ kind:'rock', x: wx, z: wz, y, s: 0.6 + rnd() * 1.5,
                      rot: rnd() * 6.283, alive: true });
       }
-    } else if (rnd() < 0.10 && bushPos.length < 420){
+    } else if (rnd() < 0.10 && bushPos.length < 3600){
       bushPos.push({ x: wx, z: wz, y, s: 0.5 + rnd() * 0.6, rot: rnd() * 6.283 });
     }
   }
 
-  //  Trunks
+  //  Props are DATA for the whole world and INSTANCES only for what is near.
+  //  Nine times the area means roughly four thousand trees; drawing them all
+  //  is 160,000 triangles that no frustum test can help with, because an
+  //  InstancedMesh is one object as far as culling is concerned. So the arrays
+  //  hold everything and the instance buffers hold a window, rewritten when
+  //  the player crosses a tile edge.
+  propBuckets = new Map();
+  const bucket = (o) => {
+    const k = tkey(tileOf(o.x), tileOf(o.z));
+    let b = propBuckets.get(k);
+    if (!b){ b = { trees: [], rocks: [], banks: [], bushes: [] }; propBuckets.set(k, b); }
+    return b;
+  };
+  for (const t of trees) bucket(t).trees.push(t);
+  for (const r of rocks) bucket(r).rocks.push(r);
+  for (const b of banks) bucket(b).banks.push(b);
+  for (const b of bushPos){ b.alive = true; bucket(b).bushes.push(b); }
+
   const trunkGeo = new THREE.CylinderGeometry(0.20, 0.30, 1, 5, 1);
   trunkGeo.translate(0, 0.5, 0);
   S.trunks = new THREE.InstancedMesh(trunkGeo,
-    clayMat({ rep: 1, mat: { color: PAL.bark } }), Math.max(1, trees.length));
-  S.trunks.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    clayMat({ rep: 1, mat: { color: PAL.bark } }), PROP_CAP.trees);
 
-  //  Canopies: two stacked facets so a tree reads as pinched clay, not a ball.
-  const canGeo = whiteColors(new THREE.IcosahedronGeometry(1, 0));
-  S.canopy = new THREE.InstancedMesh(canGeo,
-    clayMat({ rep: 1, mat: { vertexColors: true } }), Math.max(1, trees.length));
-  S.canopy.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  S.canopy = new THREE.InstancedMesh(whiteColors(new THREE.IcosahedronGeometry(1, 0)),
+    clayMat({ rep: 1, mat: { vertexColors: true } }), PROP_CAP.trees);
   S.canopy.instanceColor = new THREE.InstancedBufferAttribute(
-    new Float32Array(Math.max(1, trees.length) * 3), 3);
+    new Float32Array(PROP_CAP.trees * 3), 3);
 
-  const mx = new THREE.Matrix4(), q = new THREE.Quaternion(),
-        vp = new THREE.Vector3(), vs = new THREE.Vector3();
-  trees.forEach((t, i) => {
-    const hgt = 2.6 * t.s;
-    q.setFromEuler(new THREE.Euler(0, t.rot, 0));
-    vp.set(t.x, t.y, t.z); vs.set(t.s, hgt, t.s);
-    mx.compose(vp, q, vs); S.trunks.setMatrixAt(i, mx);
-    vp.set(t.x, t.y + hgt + 0.55 * t.s, t.z);
-    vs.set(1.35 * t.s, 1.15 * t.s, 1.35 * t.s);
-    q.setFromEuler(new THREE.Euler(t.rot * 0.7, t.rot, t.rot * 0.4));
-    mx.compose(vp, q, vs); S.canopy.setMatrixAt(i, mx);
-    _c.setHex(t.leaf);
-    S.canopy.instanceColor.setXYZ(i, _c.r, _c.g, _c.b);
-    t.i = i;
-  });
+  S.rocks = new THREE.InstancedMesh(new THREE.DodecahedronGeometry(1, 0),
+    clayMat({ rep: 1, mat: { color: PAL.boulder } }), PROP_CAP.rocks);
+
+  S.banks = new THREE.InstancedMesh(new THREE.DodecahedronGeometry(1, 0),
+    clayMat({ rep: 1, mat: { color: 0xb5733f } }), PROP_CAP.banks);
+
+  S.bushes = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1, 0),
+    clayMat({ rep: 1, mat: { color: PAL.bush } }), PROP_CAP.bushes);
+
+  for (const m of [S.trunks, S.canopy, S.rocks, S.banks, S.bushes]){
+    m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    m.count = 0;
+    m.frustumCulled = false;
+    S.world.add(m);
+  }
+  propsDirty = true;
+}
+
+const PROP_CAP = { trees: 2400, rocks: 1400, banks: 800, bushes: 1400 };
+
+//  Tile offsets inside the window, nearest first. If a dense forest overruns
+//  the instance cap, what gets dropped has to be the far side of the window
+//  and not whatever a row-major scan reached last.
+const WINDOW_OFFSETS = (() => {
+  const out = [];
+  for (let j = -LOAD_R; j <= LOAD_R; j++){
+    for (let i = -LOAD_R; i <= LOAD_R; i++){
+      const d = Math.hypot(i, j);
+      if (d <= LOAD_R + 0.5) out.push({ i, j, d });
+    }
+  }
+  out.sort((a, b) => a.d - b.d);
+  return out;
+})();
+let propBuckets = new Map();
+let propsDirty = false;
+
+//  Fill the instance buffers from whatever is inside the streaming window.
+const _pm = new THREE.Matrix4(), _pq = new THREE.Quaternion();
+const _pv = new THREE.Vector3(), _ps = new THREE.Vector3();
+
+function refreshPropWindow(pi, pj){
+  if (!S.trunks) return;
+  if (pi === undefined){ pi = tileOf(Pl.pos.x); pj = tileOf(Pl.pos.z); }
+  propsDirty = false;
+
+  let nt = 0, nr = 0, nb = 0, nu = 0;
+  const cc = S.canopy.instanceColor;
+
+  for (const off of WINDOW_OFFSETS){
+    {
+      const i = pi + off.i, j = pj + off.j;
+      const b = propBuckets.get(tkey(i, j));
+      if (!b) continue;
+
+      for (const t of b.trees){
+        if (!t.alive || nt >= PROP_CAP.trees) continue;
+        const hgt = 2.6 * t.s;
+        _pq.setFromEuler(new THREE.Euler(0, t.rot, 0));
+        _pv.set(t.x, t.y, t.z); _ps.set(t.s, hgt, t.s);
+        _pm.compose(_pv, _pq, _ps); S.trunks.setMatrixAt(nt, _pm);
+        _pv.set(t.x, t.y + hgt + 0.55 * t.s, t.z);
+        _ps.set(1.35 * t.s, 1.15 * t.s, 1.35 * t.s);
+        _pq.setFromEuler(new THREE.Euler(t.rot * 0.7, t.rot, t.rot * 0.4));
+        _pm.compose(_pv, _pq, _ps); S.canopy.setMatrixAt(nt, _pm);
+        _c.setHex(t.leaf); cc.setXYZ(nt, _c.r, _c.g, _c.b);
+        nt++;
+      }
+      for (const r of b.rocks){
+        if (!r.alive || nr >= PROP_CAP.rocks) continue;
+        _pq.setFromEuler(new THREE.Euler(r.rot * 0.5, r.rot, r.rot * 0.3));
+        _pv.set(r.x, r.y + r.s * 0.4, r.z);
+        _ps.set(r.s, r.s * 0.78, r.s * 1.1);
+        _pm.compose(_pv, _pq, _ps); S.rocks.setMatrixAt(nr++, _pm);
+      }
+      for (const k of b.banks){
+        if (!k.alive || nb >= PROP_CAP.banks) continue;
+        _pq.setFromEuler(new THREE.Euler(0.25, k.rot, 0.15));
+        _pv.set(k.x, k.y + k.s * 0.18, k.z);
+        _ps.set(k.s * 1.5, k.s * 0.5, k.s * 1.3);
+        _pm.compose(_pv, _pq, _ps); S.banks.setMatrixAt(nb++, _pm);
+      }
+      for (const u of b.bushes){
+        if (!u.alive || nu >= PROP_CAP.bushes) continue;
+        _pq.setFromEuler(new THREE.Euler(u.rot * 0.4, u.rot, 0));
+        _pv.set(u.x, u.y + u.s * 0.35, u.z);
+        _ps.set(u.s * 1.1, u.s * 0.7, u.s * 1.1);
+        _pm.compose(_pv, _pq, _ps); S.bushes.setMatrixAt(nu++, _pm);
+      }
+    }
+  }
+
+  S.trunks.count = nt; S.canopy.count = nt;
+  S.rocks.count = nr; S.banks.count = nb; S.bushes.count = nu;
   S.trunks.instanceMatrix.needsUpdate = true;
   S.canopy.instanceMatrix.needsUpdate = true;
   S.canopy.instanceColor.needsUpdate = true;
-  S.world.add(S.trunks); S.world.add(S.canopy);
-
-  //  Boulders
-  const rockGeo = new THREE.DodecahedronGeometry(1, 0);
-  S.rocks = new THREE.InstancedMesh(rockGeo,
-    clayMat({ rep: 1, mat: { color: PAL.boulder } }), Math.max(1, rocks.length));
-  S.rocks.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-  rocks.forEach((r, i) => {
-    q.setFromEuler(new THREE.Euler(r.rot * 0.5, r.rot, r.rot * 0.3));
-    vp.set(r.x, r.y + r.s * 0.4, r.z);
-    vs.set(r.s, r.s * 0.78, r.s * 1.1);
-    mx.compose(vp, q, vs); S.rocks.setMatrixAt(i, mx);
-    r.i = i;
-  });
   S.rocks.instanceMatrix.needsUpdate = true;
-  S.world.add(S.rocks);
-
-  //  Clay banks: low wet mounds, half sunk, the colour of wedged clay.
-  const bankGeo = new THREE.DodecahedronGeometry(1, 0);
-  S.banks = new THREE.InstancedMesh(bankGeo,
-    clayMat({ rep: 1, mat: { color: 0xb5733f } }), Math.max(1, banks.length));
-  S.banks.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-  banks.forEach((bk, i) => {
-    q.setFromEuler(new THREE.Euler(0.25, bk.rot, 0.15));
-    vp.set(bk.x, bk.y + bk.s * 0.18, bk.z);
-    vs.set(bk.s * 1.5, bk.s * 0.5, bk.s * 1.3);
-    mx.compose(vp, q, vs); S.banks.setMatrixAt(i, mx);
-    bk.i = i;
-  });
   S.banks.instanceMatrix.needsUpdate = true;
-  S.world.add(S.banks);
-
-  //  Bushes: pure decoration, never removed, so no bookkeeping.
-  const bushGeo = new THREE.IcosahedronGeometry(1, 0);
-  const bm = new THREE.InstancedMesh(bushGeo,
-    clayMat({ rep: 1, mat: { color: PAL.bush } }), Math.max(1, bushPos.length));
-  bushPos.forEach((b, i) => {
-    q.setFromEuler(new THREE.Euler(b.rot * 0.4, b.rot, 0));
-    vp.set(b.x, b.y + b.s * 0.35, b.z);
-    vs.set(b.s * 1.1, b.s * 0.7, b.s * 1.1);
-    mx.compose(vp, q, vs); bm.setMatrixAt(i, mx);
-  });
-  bm.instanceMatrix.needsUpdate = true;
-  S.world.add(bm);
-  S.bushes = bm;
+  S.bushes.instanceMatrix.needsUpdate = true;
 }
 
-const _zero = new THREE.Matrix4().makeScale(0.0001, 0.0001, 0.0001);
-function killTree(t){
-  t.alive = false;
-  const m = new THREE.Matrix4().makeTranslation(t.x, t.y - 40, t.z);
-  S.trunks.setMatrixAt(t.i, m); S.canopy.setMatrixAt(t.i, m);
-  S.trunks.instanceMatrix.needsUpdate = true;
-  S.canopy.instanceMatrix.needsUpdate = true;
-}
-function killRock(r){
-  r.alive = false;
-  const m = new THREE.Matrix4().makeTranslation(r.x, r.y - 40, r.z);
-  S.rocks.setMatrixAt(r.i, m);
-  S.rocks.instanceMatrix.needsUpdate = true;
-}
-function killBank(b){
-  b.alive = false;
-  const m = new THREE.Matrix4().makeTranslation(b.x, b.y - 40, b.z);
-  S.banks.setMatrixAt(b.i, m);
-  S.banks.instanceMatrix.needsUpdate = true;
-}
+function killTree(t){ t.alive = false; propsDirty = true; }
+function killRock(r){ r.alive = false; propsDirty = true; }
+function killBank(b){ b.alive = false; propsDirty = true; }
 function killNode(n){
-  if (n.kind === 'tree') killTree(n);
-  else if (n.kind === 'rock') killRock(n);
-  else killBank(n);
+  n.alive = false;
+  propsDirty = true;
 }
 
 // ─── 10 · The Kiln ───────────────────────────────────────────────────────────
@@ -781,6 +1166,9 @@ function makeBase(){
   bench.rotation.y = 0.5;
   S.bench = new THREE.Vector3(-6.0, BASE_Y + 1.5, 3.6);
 
+  //  The home Kiln, same treatment.
+  settlements[0].solids = [{ x: 0, y: BASE_Y + 4.4, z: 0, r: 6.4 }];
+
   S.world.add(grp);
   S.base = grp;
 }
@@ -831,7 +1219,7 @@ function makePlayer(){
 
 function refreshWeaponMesh(){
   const p = Pl.parts;
-  if (p.weapon){ p.weaponPivot.remove(p.weapon); p.weapon = null; }
+  if (p.weapon){ p.weaponPivot.remove(p.weapon); disposeTree(p.weapon); p.weapon = null; }
   const w = St.gear.weapon;
   if (!w) return;
   const def = WEAPONS.find(x => x.key === w.type) || WEAPONS[0];
@@ -1021,6 +1409,49 @@ function recomputeStats(){
   St.hp = Math.min(St.hp, St.maxHp);
 }
 
+//  Loot used to build a geometry, a material AND a live PointLight per drop.
+//  Twenty pieces on the grass after a bad night is twenty point lights in the
+//  shader on top of the hearth, the towns, the lanterns and the torch, and
+//  twenty geometries the pickup never gave back.
+const DROP_GEO = {};
+const DROP_MAT = {};
+function dropAssets(kind, rarity){
+  if (!DROP_GEO.weapon){
+    DROP_GEO.weapon = markShared(new THREE.OctahedronGeometry(0.34, 0));
+    DROP_GEO.armour = markShared(new THREE.BoxGeometry(0.52, 0.52, 0.52));
+  }
+  const key = rarity;
+  if (!DROP_MAT[key]){
+    const r = RARITY.find(x => x.key === rarity) || RARITY[0];
+    DROP_MAT[key] = markShared(new THREE.MeshBasicMaterial({ color: r.hex }));
+  }
+  return { geo: DROP_GEO[kind === 'weapon' ? 'weapon' : 'armour'], mat: DROP_MAT[key] };
+}
+
+//  Four halos, handed to whichever drops are nearest, the same way the
+//  lanterns are lit.
+function refreshDropLights(){
+  if (!S.dropLights){
+    S.dropLights = [];
+    for (let i = 0; i < 4; i++){
+      const l = new THREE.PointLight(0xffffff, 0, 7, 2);
+      l.visible = false;
+      S.world.add(l);
+      S.dropLights.push(l);
+    }
+  }
+  const near = drops.slice().sort((a, c) =>
+    a.mesh.position.distanceToSquared(Pl.pos) - c.mesh.position.distanceToSquared(Pl.pos));
+  S.dropLights.forEach((l, i) => {
+    const d = near[i];
+    if (!d || d.mesh.position.distanceTo(Pl.pos) > 26){ l.visible = false; return; }
+    l.visible = true;
+    l.color.setHex(d.hex);
+    l.intensity = 1.4 + Math.sin(St.step * 5 + i) * 0.5;
+    l.position.copy(d.mesh.position);
+  });
+}
+
 function dropLoot(x, y, z, tier){
   const rnd = Math.random;
   //  Every single one of them leaves something. That is the deal the game
@@ -1028,16 +1459,12 @@ function dropLoot(x, y, z, tier){
   const lift = (St.day - 1) * 0.09 + (tier - 1) * 0.5;
   const it = rollItem(rnd, lift);
   const rar = RARITY.find(r => r.key === it.rarity) || RARITY[0];
-  const geo = it.kind === 'weapon'
-    ? new THREE.OctahedronGeometry(0.34, 0)
-    : new THREE.BoxGeometry(0.52, 0.52, 0.52);
-  const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: rar.hex }));
+  const A = dropAssets(it.kind, it.rarity);
+  const mesh = new THREE.Mesh(A.geo, A.mat);
   mesh.position.set(x, y + 0.9, z);
   S.world.add(mesh);
-  const halo = new THREE.PointLight(rar.hex, 1.6, 6, 2);
-  halo.position.copy(mesh.position);
-  S.world.add(halo);
-  drops.push({ it, mesh, halo, t: 0 });
+  drops.push({ it, mesh, hex: rar.hex, t: 0 });
+  refreshDropLights();
   return it;
 }
 
@@ -1099,39 +1526,64 @@ function tickParticles(dt){
 
 // ─── 15 · Monsters ───────────────────────────────────────────────────────────
 
+//  Every mob used to build nine fresh BoxGeometries. They are per KIND now,
+//  built once and marked shared, so spawning is allocation-free and the
+//  disposer leaves them alone when the corpse is cleaned up.
+const MOB_KIT = {};
+function mobKit(kind){
+  if (MOB_KIT[kind]) return MOB_KIT[kind];
+  const def = MOBS[kind];
+  const G = (w, h, d) => markShared(new THREE.BoxGeometry(w, h, d));
+  const k = {
+    torso: G(def.r * 1.9, def.h * 0.5, def.r * 1.3),
+    head:  G(def.r * 1.25, def.r * 1.1, def.r * 1.2),
+    eye:   G(def.r * 0.26, def.r * 0.20, 0.06),
+    arm:   G(def.r * 0.5, def.h * 0.46, def.r * 0.5),
+    leg:   G(def.r * 0.6, def.h * 0.40, def.r * 0.62),
+    seam:  G(def.r * 0.22, def.h * 0.42, 0.05),
+  };
+  //  The pivots the walk cycle needs, baked into the shared geometry.
+  k.arm.translate(0, -def.h * 0.23, 0);
+  k.leg.translate(0, -def.h * 0.20, 0);
+  MOB_KIT[kind] = k;
+  return k;
+}
+
 function makeMob(kind, x, z){
   const def = MOBS[kind];
+  const K = mobKit(kind);
   const g = new THREE.Group();
+  //  Body and eye materials stay per mob, because the hurt flash writes to
+  //  emissive and a shared material would flash every husk in the valley.
   const body = clayMat({ rep: 1, mat: { color: def.col } });
   const eye = new THREE.MeshBasicMaterial({ color: def.eye });
-  const B = (w, h, d, mat) => new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+  const B = (geo, mat) => new THREE.Mesh(geo, mat);
 
-  const scale = def.h / 1.9;
-  const torso = B(def.r * 1.9, def.h * 0.5, def.r * 1.3, body);
+  const torso = B(K.torso, body);
   torso.position.y = def.h * 0.58; g.add(torso);
-  const head = B(def.r * 1.25, def.r * 1.1, def.r * 1.2, body);
+  const head = B(K.head, body);
   head.position.y = def.h * 0.95; g.add(head);
 
-  const e1 = B(def.r * 0.26, def.r * 0.20, 0.06, eye);
+  const e1 = B(K.eye, eye);
   e1.position.set(-def.r * 0.3, def.h * 0.97, def.r * 0.62); g.add(e1);
-  const e2 = e1.clone(); e2.position.x = def.r * 0.3; g.add(e2);
+  const e2 = B(K.eye, eye); e2.position.copy(e1.position); e2.position.x = def.r * 0.3; g.add(e2);
 
-  const armL = B(def.r * 0.5, def.h * 0.46, def.r * 0.5, body);
-  armL.geometry.translate(0, -def.h * 0.23, 0);
+  const armL = B(K.arm, body);
   armL.position.set(-def.r * 1.15, def.h * 0.78, 0); g.add(armL);
-  const armR = armL.clone(); armR.position.x = def.r * 1.15; g.add(armR);
+  const armR = B(K.arm, body);
+  armR.position.set(def.r * 1.15, def.h * 0.78, 0); g.add(armR);
 
   let legL = null, legR = null;
   if (!def.flies){
-    legL = B(def.r * 0.6, def.h * 0.40, def.r * 0.62, body);
-    legL.geometry.translate(0, -def.h * 0.20, 0);
+    legL = B(K.leg, body);
     legL.position.set(-def.r * 0.5, def.h * 0.40, 0); g.add(legL);
-    legR = legL.clone(); legR.position.x = def.r * 0.5; g.add(legR);
+    legR = B(K.leg, body);
+    legR.position.set(def.r * 0.5, def.h * 0.40, 0); g.add(legR);
   }
 
-  //  A cracked-glaze seam that glows: reads at distance in the dark.
-  const seam = new THREE.Mesh(new THREE.BoxGeometry(def.r * 0.22, def.h * 0.42, 0.05),
-                              new THREE.MeshBasicMaterial({ color: def.eye }));
+  //  A cracked-glaze seam that glows: reads at distance in the dark. Its own
+  //  material, because a blighted one is recoloured rather than replaced.
+  const seam = new THREE.Mesh(K.seam, new THREE.MeshBasicMaterial({ color: def.eye }));
   seam.position.set(0, def.h * 0.58, def.r * 0.68);
   g.add(seam);
 
@@ -1161,7 +1613,13 @@ function spawnWave(){
     const x = Pl.pos.x + Math.cos(a) * d;
     const z = Pl.pos.z + Math.sin(a) * d;
     if (Math.abs(x) > HALF - 6 || Math.abs(z) > HALF - 6) continue;
-    if (Math.hypot(x, z) < keepR() + 8 + St.kiln.brazier * 5) continue;  // the ring holds
+    //  Every lit ring holds, not just the Kiln's. An unclaimed ruin holds
+    //  nothing, which is the whole reason to go and relight it.
+    const near = nearestSettlement(x, z, true);
+    if (near.s){
+      const bonus = near.s.kind === 'home' ? St.kiln.brazier * 5 : 0;
+      if (near.d < ringAt(near.s) + 8 + bonus) continue;
+    }
     if (nearLantern(x, z, 9)) continue;                 // lanterns hold too
     if (groundY(x, z) < WATER_Y + 0.3) continue;
 
@@ -1200,6 +1658,16 @@ function hurtMob(m, dmg, kx, kz){
 function killMob(m){
   m.dead = true; m.deadT = 0.9;
   St.kills++;
+  //  A blighted thing was holding a ruin. One fewer.
+  if (m.ruin && m.ruin.blight > 0){
+    m.ruin.blight--;
+    if (m.ruin.blight === 0){
+      toast(`${m.ruin.name} is clear. Light it at the mouth.`, '#7dffb3');
+      banner(m.ruin.name, 'cleared');
+    }
+    St.dirty = true;
+  }
+  questEvent('kill');
   St.combo++; St.comboT = 3.2;
   St.xp += 12 * m.def.tier;
   burst(m.g.position.x, m.g.position.y + m.def.h * 0.5, m.g.position.z,
@@ -1228,12 +1696,13 @@ function tickMobs(dt){
       m.g.rotation.z = lerp(m.g.rotation.z, Math.PI / 2, dt * 6);
       m.g.position.y -= dt * 1.2;
       m.g.scale.setScalar(Math.max(0.01, m.deadT / 0.9));
-      if (m.deadT <= 0){ S.world.remove(m.g); mobs.splice(i, 1); }
+      if (m.deadT <= 0){ S.world.remove(m.g); disposeTree(m.g); mobs.splice(i, 1); }
       continue;
     }
 
-    //  Daylight is lethal to them. They do not merely stop spawning.
-    if (!St.night){
+    //  Daylight is lethal to them, unless they are what is holding a ruin:
+    //  a blight you can only fight at night is a blight you cannot schedule.
+    if (!St.night && !m.ruin){
       m.hp -= dt * 34;
       m.hurt = 0.1;
       if (Math.random() < dt * 6) burst(m.g.position.x, m.g.position.y + 1, m.g.position.z, 1, 0xffd47a, 3);
@@ -1247,10 +1716,11 @@ function tickMobs(dt){
     if (m.stun > 0){ m.stun -= dt; }
     else {
       //  The ring pushes them out, so the base is always a real refuge.
-      const dc = Math.hypot(m.x, m.z);
       let mvx = dx / d, mvz = dz / d;
-      if (dc < keepR() + 1.5){
-        mvx = m.x / (dc || 1); mvz = m.z / (dc || 1);
+      const push = nearestSettlement(m.x, m.z, true);
+      if (push.s && push.d < ringAt(push.s) + 1.5){
+        const ox = m.x - push.s.x, oz = m.z - push.s.z, od = Math.hypot(ox, oz) || 1;
+        mvx = ox / od; mvz = oz / od;
       }
       const speed = m.def.spd * (St.night ? 1 : 1.5);
       if (d > (m.def.ranged ? 11 : m.def.r + 1.2)){
@@ -1317,7 +1787,7 @@ function tickProjectiles(dt){
     if (hit) hurtPlayer(p.dmg);
     if (hit || p.life <= 0 || p.mesh.position.y < gy){
       burst(p.mesh.position.x, p.mesh.position.y, p.mesh.position.z, 4, 0xff9a3d, 4);
-      S.world.remove(p.mesh); projectiles.splice(i, 1);
+      S.world.remove(p.mesh); disposeTree(p.mesh); projectiles.splice(i, 1);
     }
   }
 }
@@ -1428,8 +1898,11 @@ function updateSky(dt){
   S.amb.color.copy(new THREE.Color(m.amb));
   S.amb.intensity = m.ambI;
   SHW.scene.fog.color.copy(new THREE.Color(m.fog));
-  SHW.scene.fog.near = St.night ? 34 : 62;
-  SHW.scene.fog.far  = St.night ? 128 : 200;
+  //  Day sight goes well past the 144m streaming radius on purpose: what you
+  //  see out there is the coarse backdrop, and the point of a bigger world is
+  //  being able to see somewhere before you walk to it.
+  SHW.scene.fog.near = St.night ? 36 : 110;
+  SHW.scene.fog.far  = St.night ? 150 : 420;
   SHW.renderer.setClearColor(new THREE.Color(m.bot));
 
   //  Sun arc. Noon overhead, and the low angles do the work on the clay.
@@ -1456,6 +1929,30 @@ function updateSky(dt){
     b.scale.setScalar(0.85 + Math.sin(St.step * 6 + b.position.x) * 0.2);
     b.visible = true;
   }
+  //  And every other lit kiln with it. The home hearth flickered and dimmed
+  //  with the hour while the towns sat at a flat 2.6 with a fire that never
+  //  moved, which reads as two different games in one valley.
+  for (let i = 1; i < settlements.length; i++){
+    const st = settlements[i];
+    if (!st.claimed) continue;
+    if (st.fire){
+      st.fire.scale.setScalar(f * (St.night ? 1.2 : 0.95));
+      st.fire.rotation.y = St.step * 2.0 + i;
+    }
+    if (st.light) st.light.intensity = (St.night ? 3.4 : 1.6) * f;
+    if (st.bowls){
+      for (const b of st.bowls){
+        b.scale.setScalar(0.85 + Math.sin(St.step * 6 + b.position.x + i) * 0.2);
+      }
+    }
+    if (st.ringMesh) st.ringMesh.material.opacity = St.night ? 0.58 : 0.24;
+  }
+  //  An unlit ruin's ring pulses red at night, so you can find one in the dark.
+  for (const st of settlements){
+    if (st.claimed || !st.ringMesh) continue;
+    st.ringMesh.material.opacity = St.night
+      ? 0.30 + Math.sin(St.step * 3) * 0.14 : 0.22;
+  }
   if (S.ring) S.ring.material.opacity = St.night ? 0.62 : 0.22;
 
   //  Torch the player carries, so night is navigable without being bright.
@@ -1472,6 +1969,7 @@ function advanceClock(dt){
     St.cycle -= CYCLE;
     St.day++;
     St.nightsSurvived++;
+    questEvent('night');
     toast(`Day ${St.day}. You kept it.`, '#7dffb3');
     St.hp = Math.min(St.maxHp, St.hp + 30);
     save();
@@ -1588,9 +2086,12 @@ function updatePlayer(dt){
   if (Pl.hurtT > 0) Pl.hurtT -= dt;
 
   //  Regeneration near the Kiln: the reason to come home.
-  const dBase = Math.hypot(Pl.pos.x, Pl.pos.z);
-  if (dBase < keepR() && St.hp < St.maxHp){
-    St.hp = Math.min(St.maxHp, St.hp + dt * benchRegen());
+  //  Any lit ring mends you. The Kiln mends fastest, because you paid to
+  //  raise it.
+  const safe = protectedAt(Pl.pos.x, Pl.pos.z);
+  if (safe && St.hp < St.maxHp){
+    const rate = safe.s.kind === 'home' ? benchRegen() : 7;
+    St.hp = Math.min(St.maxHp, St.hp + dt * rate);
   }
 
   //  Puppet pose, snapped to the stop-motion step.
@@ -1686,6 +2187,16 @@ function camBlocked(p){
     const dx = p.x - r.x, dy = p.y - (r.y + r.s * 0.4), dz = p.z - r.z;
     const rr = r.s * 1.15;
     if (dx * dx + dy * dy + dz * dz < rr * rr) return true;
+  }
+  for (let i = 0; i < settlements.length; i++){
+    const st = settlements[i];
+    if (!st.solids) continue;
+    if (Math.abs(st.x - p.x) > 40 || Math.abs(st.z - p.z) > 40) continue;
+    for (let k = 0; k < st.solids.length; k++){
+      const b = st.solids[k];
+      const dx = p.x - b.x, dy = p.y - b.y, dz = p.z - b.z;
+      if (dx * dx + dz * dz < b.r * b.r && Math.abs(dy) < 3.2) return true;
+    }
   }
   if (solidAt(p.x, p.y, p.z)) return true;
   return false;
@@ -1815,8 +2326,9 @@ function sculpt(sign){
   const a = aimPoint(St.sculptReach + 8);
   if (!a.hit) return;
   const { x, z } = a.hit;
-  if (Math.hypot(x, z) < keepR() + 1){
-    toast('The Kiln ground will not move.', '#ff5268');
+  const blockSite = siteBlocked(x, z, 1);
+  if (blockSite){
+    toast(`${blockSite.name}'s ground will not move.`, '#ff5268');
     return;
   }
   const r = St.brush;
@@ -1829,7 +2341,7 @@ function sculpt(sign){
       const gi = ci + i, gj = cj + j;
       if (gi < 0 || gi > GRID || gj < 0 || gj > GRID) continue;
       const wx = -HALF + gi * CELL, wz = -HALF + gj * CELL;
-      if (Math.hypot(wx, wz) < keepR()) continue;
+      if (siteBlocked(wx, wz, 0)) continue;
       const d = Math.hypot(i * CELL, j * CELL);
       if (d > r) continue;
       const fall = Math.pow(1 - d / r, 1.6);
@@ -1864,8 +2376,9 @@ function buildTarget(){
 function placeBlock(){
   const t = buildTarget();
   if (!t) return;
-  if (Math.hypot(t.x + 0.5, t.z + 0.5) < keepR() - 4){
-    toast('Too close to the Kiln to build.', '#ff5268');
+  const nearSite = siteBlocked(t.x + 0.5, t.z + 0.5, -4);
+  if (nearSite){
+    toast(`Too close to ${nearSite.name} to build.`, '#ff5268');
     return;
   }
   if (blocks.size >= MAX_BLOCKS){ toast('Build limit reached.', '#ff5268'); return; }
@@ -1934,7 +2447,7 @@ function updateGhost(){
   if (buildMode){
     const t = buildTarget();
     if (t){
-      const ok = Math.hypot(t.x + 0.5, t.z + 0.5) >= keepR() - 4;
+      const ok = !siteBlocked(t.x + 0.5, t.z + 0.5, -4);
       S.ghost.position.set(t.x + 0.5, t.y + 0.5, t.z + 0.5);
       S.ghostEdge.position.copy(S.ghost.position);
       _c.setHex(ok ? MATS[St.matIdx].col : 0xff3050);
@@ -1945,7 +2458,7 @@ function updateGhost(){
   } else if (sculptMode){
     const a = aimPoint(St.sculptReach + 8);
     if (a.hit){
-      const ok = Math.hypot(a.hit.x, a.hit.z) >= keepR() + 1;
+      const ok = !siteBlocked(a.hit.x, a.hit.z, 1);
       S.brushRing.position.set(a.hit.x, groundY(a.hit.x, a.hit.z) + 0.12, a.hit.z);
       S.brushRing.scale.setScalar(St.brush);
       S.brushRing.material.color.setHex(ok ? 0x7fdcff : 0xff3050);
@@ -1956,7 +2469,10 @@ function updateGhost(){
 
 // ─── 22 · Drops on the ground ────────────────────────────────────────────────
 
+let lightsDirty = false, dropLightT = 0;
 function tickDrops(dt){
+  dropLightT += dt;
+  if (lightsDirty || dropLightT > 0.25){ lightsDirty = false; dropLightT = 0; refreshDropLights(); }
   for (let i = drops.length - 1; i >= 0; i--){
     const d = drops[i];
     d.t += dt;
@@ -1964,17 +2480,14 @@ function tickDrops(dt){
     d.mesh.position.y = gy + 0.95 + Math.sin(St.step * 3 + i) * 0.14;
     d.mesh.rotation.y = St.step * 1.6;
     d.mesh.rotation.x = Math.sin(St.step * 1.1) * 0.3;
-    d.halo.position.copy(d.mesh.position);
-    d.halo.intensity = 1.4 + Math.sin(St.step * 5 + i) * 0.5;
-
     const dist = Math.hypot(d.mesh.position.x - Pl.pos.x, d.mesh.position.z - Pl.pos.z);
     if (dist < 2.0){
       pickUp(d.it);
-      S.world.remove(d.mesh); S.world.remove(d.halo);
-      drops.splice(i, 1);
+      S.world.remove(d.mesh); disposeTree(d.mesh);
+      drops.splice(i, 1); lightsDirty = true;
     } else if (d.t > 150){
-      S.world.remove(d.mesh); S.world.remove(d.halo);
-      drops.splice(i, 1);
+      S.world.remove(d.mesh); disposeTree(d.mesh);
+      drops.splice(i, 1); lightsDirty = true;
     }
   }
 }
@@ -2127,6 +2640,62 @@ const CSS = `
 #shw-cross::before{left:50%;top:0;width:1.5px;height:100%;margin-left:-.75px;}
 #shw-cross::after{top:50%;left:0;height:1.5px;width:100%;margin-top:-.75px;}
 
+/* ── compass strip ── */
+#shw-compass{position:absolute;left:50%;top:6px;transform:translateX(-50%);
+  width:min(62%,660px);height:30px;pointer-events:none;
+  border-bottom:1px solid rgba(255,255,255,.13);}
+#shw-compass i{position:absolute;top:0;transform:translateX(-50%);text-align:center;
+  font-style:normal;white-space:nowrap;}
+#shw-compass i::after{content:'';display:block;width:1px;height:7px;margin:2px auto 0;
+  background:currentColor;}
+#shw-compass u{display:block;text-decoration:none;font-size:8.5px;letter-spacing:2px;
+  text-transform:uppercase;text-shadow:0 1px 3px #000;}
+#shw-compass em{display:block;font-size:7.5px;letter-spacing:1px;opacity:.6;font-style:normal;}
+#shw-compass i.home{color:#ffb03d;}
+#shw-compass i.lit{color:#7dffb3;}
+#shw-compass i.dead{color:#ff6f84;}
+#shw-compass i.way{color:#7fdcff;}
+
+/* ── the work panel ── */
+#shw-quest{position:absolute;left:18px;top:104px;width:246px;
+  background:linear-gradient(150deg,rgba(10,6,20,.86),rgba(16,8,26,.7));
+  border-left:2px solid #7fdcff;padding:9px 12px;}
+#shw-quest p{font-size:8px;letter-spacing:3.6px;color:#7fdcff;text-transform:uppercase;
+  margin-bottom:7px;}
+#shw-quest ul{list-style:none;display:grid;gap:7px;}
+#shw-quest li b{display:block;font-size:10.5px;letter-spacing:.4px;color:#e7e2ff;}
+#shw-quest li span{display:block;margin-top:2px;font:11px/1.35 Georgia,serif;color:#9c93c6;}
+#shw-quest li.main b{color:#ffd9a0;}
+#shw-quest li.done b{color:#7dffb3;}
+
+/* ── the map screen ── */
+#shw-mapscreen{position:absolute;inset:0;display:none;pointer-events:auto;
+  background:rgba(4,2,10,.93);}
+#shw-mapscreen.show{display:grid;grid-template-columns:1fr 280px;}
+#shw-mapwrap{display:grid;place-items:center;padding:18px;min-width:0;}
+#shw-bigmap{border:1.5px solid rgba(255,176,61,.4);cursor:grab;max-width:100%;max-height:100%;}
+#shw-bigmap:active{cursor:grabbing;}
+#shw-mapside{border-left:1px solid rgba(255,255,255,.12);padding:18px 16px;
+  overflow:auto;display:flex;flex-direction:column;gap:7px;}
+#shw-mapside h3{font:700 13px/1 'SF Mono',monospace;letter-spacing:4px;text-transform:uppercase;
+  color:#ffd9a0;margin-bottom:4px;}
+#shw-mapside p{font-size:9px;letter-spacing:1.6px;color:#7a6f9c;text-transform:uppercase;
+  margin-bottom:8px;}
+.shw-site{display:grid;grid-template-columns:1fr auto;gap:2px 8px;text-align:left;
+  padding:9px 11px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.13);
+  color:inherit;font-family:inherit;cursor:pointer;}
+.shw-site:hover{border-color:#7fdcff;background:rgba(127,220,255,.1);}
+.shw-site b{font-size:11px;letter-spacing:1px;color:#ffd9a0;}
+.shw-site.dead b{color:#ff8fa0;}
+.shw-site span{grid-column:1;font:11px/1.3 Georgia,serif;color:#9c93c6;}
+.shw-site em{grid-row:1;font-style:normal;font-size:10px;color:#7fdcff;}
+.shw-site.clear{text-align:center;display:block;color:#9c93c6;font-size:10px;letter-spacing:2px;
+  text-transform:uppercase;}
+@media (max-width:820px){
+  #shw-mapscreen.show{grid-template-columns:1fr;grid-template-rows:1fr auto;}
+  #shw-mapside{border-left:0;border-top:1px solid rgba(255,255,255,.12);max-height:38%;}
+}
+
 /* ── what the crosshair is resting on, and the hold ring ── */
 #shw-focus{position:absolute;left:50%;top:calc(50% + 104px);transform:translateX(-50%);
   text-align:center;opacity:0;transition:opacity .12s;white-space:nowrap;
@@ -2239,6 +2808,8 @@ const CSS = `
   text-transform:uppercase;cursor:pointer;transition:transform .12s,box-shadow .12s;}
 #shw-title button:hover{transform:translate(-2px,-2px);box-shadow:5px 5px 0 #7fdcff;}
 #shw-title button.ghost{background:transparent;color:#c3bcd8;border:1px solid rgba(255,255,255,.3);}
+#shw-title .ver{margin-top:14px;font:600 9px/1 'SF Mono',monospace;letter-spacing:3px;
+  color:#8a7f6a;}
 #shw-title .keys{margin-top:26px;font-size:10px;letter-spacing:1.5px;color:#7a6f9c;line-height:1.9;}
 #shw-title .keys kbd{background:rgba(255,255,255,.1);padding:1px 6px;border-radius:2px;
   font-family:inherit;color:#e7e2ff;}
@@ -2295,6 +2866,8 @@ function buildHUD(host){
         <div id="shw-res"></div>
       </div>
 
+      <div id="shw-compass"></div>
+      <div id="shw-quest"></div>
       <div id="shw-toasts"></div>
       <div id="shw-banner"><b></b><span></span></div>
       <div id="shw-combo"><b>0</b><span>chain</span></div>
@@ -2317,7 +2890,7 @@ function buildHUD(host){
       </div>
 
       <div id="shw-right">
-        <canvas id="shw-map" width="84" height="84"></canvas>
+        <canvas id="shw-map" width="168" height="168"></canvas>
         <div id="shw-stats">
           <div><div class="k">Kills</div><div class="v" id="shw-kills">0</div></div>
           <div><div class="k">Nights</div><div class="v" id="shw-nights">0</div></div>
@@ -2333,6 +2906,14 @@ function buildHUD(host){
           </div>
           <div id="shw-benchbody"></div>
           <div id="shw-benchfoot">E or Esc closes · tools make gathering faster · ember comes off the things you kill</div>
+        </div>
+      </div>
+
+      <div id="shw-mapscreen">
+        <div id="shw-mapwrap"><canvas id="shw-bigmap" width="600" height="600"></canvas></div>
+        <div id="shw-mapside">
+          <h3>The Valley</h3><p>click a name to set a marker · drag and scroll the map · M closes</p>
+          <div id="shw-maplist"></div>
         </div>
       </div>
 
@@ -2355,16 +2936,17 @@ function buildHUD(host){
     <div id="shw-title">
       <div class="in">
         <h1>STILL HUMAN<em>WILD</em></h1>
-        <p>The arena had walls. This does not. One Kiln at the centre of a hundred
-           and ninety metres of plains, ridge and snow line, and nothing that comes
-           out at night leaves without giving you something.</p>
+        <p>The arena had walls. This does not. Five hundred
+           and seventy-six metres of plains, river and snow line, with seven kilns
+           in it and four of them dead. Relight them and the safe ground is yours.</p>
+        <div class="ver">v` + SHW_VERSION + `</div>
         <div class="btns">
           <button id="shw-new">New ground</button>
           <button id="shw-cont" class="ghost">Continue</button>
         </div>
         <div class="keys">
           <kbd>W A S D</kbd> move &nbsp; <kbd>Shift</kbd> run &nbsp; <kbd>Space</kbd> jump &nbsp; <kbd>Mouse</kbd> look<br>
-          <kbd>1</kbd> fight &nbsp; <kbd>2</kbd> build &nbsp; <kbd>3</kbd> sculpt &nbsp; <kbd>Tab</kbd> kit &nbsp; <kbd>E</kbd> bench &nbsp; <kbd>F</kbd> torch<br>
+          <kbd>1</kbd> fight &nbsp; <kbd>2</kbd> build &nbsp; <kbd>3</kbd> sculpt &nbsp; <kbd>Tab</kbd> kit &nbsp; <kbd>M</kbd> map &nbsp; <kbd>E</kbd> bench &nbsp; <kbd>F</kbd> torch<br>
           <b style="color:#ffd9a0">look at a tree, boulder or clay bank and HOLD <kbd>LMB</kbd> to take it</b><br>
           fight: <kbd>LMB</kbd> swing &nbsp; build: <kbd>LMB</kbd> place <kbd>RMB</kbd> take &nbsp; sculpt: <kbd>LMB</kbd> raise <kbd>RMB</kbd> lower<br>
           <kbd>Q</kbd><kbd>E</kbd> pick material &nbsp; <kbd>[</kbd><kbd>]</kbd> brush &nbsp; <kbd>Esc</kbd> <span id="shw-exitlabel">back to the title</span>
@@ -2400,6 +2982,11 @@ function buildHUD(host){
   hud.banner = root.querySelector('#shw-banner');
   hud.flash = root.querySelector('#shw-flash');
   hud.dead = root.querySelector('#shw-dead');
+  hud.compass = root.querySelector('#shw-compass');
+  hud.quest = root.querySelector('#shw-quest');
+  hud.mapScreen = root.querySelector('#shw-mapscreen');
+  hud.bigMap = root.querySelector('#shw-bigmap');
+  hud.mapList = root.querySelector('#shw-maplist');
   hud.focus = root.querySelector('#shw-focus');
   hud.focusName = root.querySelector('#shw-focus b');
   hud.focusYield = root.querySelector('#shw-focus i');
@@ -2575,11 +3162,245 @@ function updateHUD(){
   } else hud.combo.classList.remove('on');
 }
 
+
+// ─── 33 · WORK — a spine to follow and a board to ignore it for ──────────────
+//  There was no objective system of any kind in this file. A bigger world
+//  without one is just further to walk before you are bored, so: a chain that
+//  names the next thing and puts a marker on the map, and a contract board at
+//  every lit settlement for when you would rather not advance it.
+
+let spine = [];
+
+function planQuests(){
+  const towns = settlements.filter(s => s.kind === 'town');
+  const ruins = settlements.filter(s => s.kind === 'ruin');
+  const T = (i) => towns[i % towns.length];
+  const R = (i) => ruins[i % ruins.length];
+
+  spine = [
+    { id:'night1', kind:'nights', n:1,
+      title:'Live through the first night',
+      hint:'Stay inside the ring when the light goes. Nothing crosses it.' },
+    { id:'axe', kind:'tool', tool:'axe',
+      title:'Make an axe at the bench',
+      hint:'Hold on trees and boulders for timber and stone, then press E at the bench.' },
+    { id:'reach0', kind:'reach', target:T(0).id, r:22,
+      title:`Walk to ${T(0).name}`,
+      hint:'Open the map with M. The compass along the top points at it.' },
+    { id:'ruin0', kind:'claim', target:R(0).id,
+      title:`Relight ${R(0).name}`,
+      hint:'Something blighted holds it, and daylight will not shift them. Clear it, then relight it at the mouth.' },
+    { id:'ring1', kind:'kiln', key:'ring', n:1,
+      title:"Widen the Kiln's ring",
+      hint:'At the Kiln bench. Stone and earth.' },
+    { id:'reach1', kind:'reach', target:T(1).id, r:22,
+      title:`Walk to ${T(1).name}`,
+      hint:'Further out. Take a torch and something to swing.' },
+    { id:'ruin1', kind:'claim', target:R(1).id,
+      title:`Relight ${R(1).name}`,
+      hint:'Two down.' },
+    { id:'day6', kind:'day', n:6,
+      title:'Reach the sixth day',
+      hint:'The nights get worse. Build something that holds.' },
+    { id:'all', kind:'claimAll',
+      title:'Relight every kiln in the valley',
+      hint:'Every ring lit, and the dark has nowhere left to sit.' },
+  ];
+}
+
+function questStep(){
+  if (!St.quest) return null;
+  return spine[St.quest.i] || null;
+}
+
+function questTargetSite(q){
+  if (!q || !q.target) return null;
+  return settlements.find(s => s.id === q.target) || null;
+}
+
+//  Where the marker goes: a hand-placed waypoint always wins, because a player
+//  who set one is answering the question themselves.
+function questWaypoint(){
+  if (St.waypoint) return St.waypoint;
+  const q = questStep();
+  const site = questTargetSite(q);
+  if (site) return { x: site.x, z: site.z, name: site.name };
+  if (q && (q.kind === 'claimAll')){
+    const next = settlements.find(s => !s.claimed);
+    if (next) return { x: next.x, z: next.z, name: next.name };
+  }
+  return null;
+}
+
+function questProgress(){
+  const q = questStep();
+  if (!q) return null;
+  switch (q.kind){
+    case 'nights':   return { have: St.nightsSurvived, need: q.n };
+    case 'day':      return { have: St.day, need: q.n };
+    case 'tool':     return { have: St.tools[q.tool] ? 1 : 0, need: 1 };
+    case 'kiln':     return { have: St.kiln[q.key] || 0, need: q.n };
+    case 'claimAll': return { have: settlements.filter(s => s.claimed).length,
+                              need: settlements.length };
+    case 'reach': {
+      const s = questTargetSite(q);
+      if (!s) return { have: 0, need: 1 };
+      return { have: 0, need: 1, dist: Math.hypot(Pl.pos.x - s.x, Pl.pos.z - s.z) };
+    }
+    case 'claim': {
+      const s = questTargetSite(q);
+      if (!s) return { have: 0, need: 1 };
+      return { have: s.claimed ? 1 : 0, need: 1, blight: s.blight };
+    }
+  }
+  return null;
+}
+
+function questSatisfied(){
+  const q = questStep();
+  if (!q) return false;
+  const p = questProgress();
+  if (q.kind === 'reach') return p.dist !== undefined && p.dist < q.r;
+  if (q.kind === 'claimAll') return p.have >= p.need;
+  return p && p.have >= p.need;
+}
+
+const QUEST_REWARD = { ember: 10, timber: 30, stone: 30, earth: 30 };
+
+function advanceQuest(){
+  const q = questStep();
+  if (!q) return;
+  St.quest.done[q.id] = true;
+  St.quest.i++;
+  for (const k in QUEST_REWARD) St.res[k] += QUEST_REWARD[k];
+  const next = questStep();
+  banner(next ? 'Done' : 'The valley is lit', q.title);
+  toast(next ? `Next: ${next.title}` : 'Every kiln in the valley is burning.', '#7dffb3');
+  St.dirty = true;
+  renderQuestHUD();
+  drawMap();
+}
+
+//  Discrete events. Continuous ones are checked on the tick.
+function questEvent(kind, arg){
+  const q = questStep();
+  if (q && ((kind === 'claim' && q.kind === 'claim' && q.target === arg) ||
+            (kind === 'tool'  && q.kind === 'tool'  && q.tool === arg) ||
+            (kind === 'kiln'  && q.kind === 'kiln'  && q.key === arg))){
+    if (questSatisfied()) advanceQuest();
+  }
+  contractEvent(kind, arg);
+}
+
+let questTimer = 0;
+function questTick(dt){
+  questTimer += dt;
+  if (questTimer < 0.4) return;
+  questTimer = 0;
+  if (questSatisfied()) advanceQuest();
+  renderQuestHUD();
+}
+
+// ─── Contracts ──────────────────────────────────────────────────────────────
+
+const CONTRACT_KINDS = [
+  { kind:'gather', res:'timber', verb:'Cut' },
+  { kind:'gather', res:'stone',  verb:'Quarry' },
+  { kind:'gather', res:'earth',  verb:'Dig' },
+  { kind:'hunt',   verb:'Put down' },
+  { kind:'hold',   verb:'Hold' },
+];
+
+function rollContract(st, seed){
+  const rnd = mulberry(hashStr(st.id + ':' + seed + SHW.seed));
+  const spec = CONTRACT_KINDS[Math.floor(rnd() * CONTRACT_KINDS.length)];
+  const scale = 1 + (St.day - 1) * 0.12;
+  const c = {
+    id: st.id + ':' + seed, site: st.id, kind: spec.kind, have: 0, taken: false,
+  };
+  if (spec.kind === 'gather'){
+    c.res = spec.res;
+    c.need = Math.round((28 + rnd() * 34) * scale);
+    c.text = `${spec.verb} ${c.need} ${c.res}`;
+  } else if (spec.kind === 'hunt'){
+    c.need = Math.round((5 + rnd() * 7) * scale);
+    c.text = `Put down ${c.need} after dark`;
+  } else {
+    c.need = 1;
+    c.text = `Hold a night through without going down`;
+  }
+  const t = c.kind === 'gather' ? 1 : 1.5;
+  c.reward = {
+    ember: Math.round((6 + rnd() * 8) * t * scale),
+    stone: Math.round((10 + rnd() * 20) * scale),
+    timber: Math.round((10 + rnd() * 20) * scale),
+  };
+  return c;
+}
+
+function contractsFor(st){
+  if (!St.contracts[st.id] || St.contracts[st.id].length < 3){
+    St.contracts[st.id] = [0, 1, 2].map(i =>
+      (St.contracts[st.id] && St.contracts[st.id][i]) || rollContract(st, St.contractSeed + i));
+  }
+  return St.contracts[st.id];
+}
+
+function takeContract(c){
+  const active = Object.values(St.contracts).flat().filter(x => x.taken && !x.done).length;
+  if (c.taken){ toast('Already taken.', '#9c93c6'); return; }
+  if (active >= 3){ toast('Three at a time is the limit.', '#ff5268'); return; }
+  c.taken = true; c.have = 0;
+  toast(`Took: ${c.text}`, '#7fdcff');
+  St.dirty = true;
+  renderBench(); renderQuestHUD();
+}
+
+function turnInContract(c){
+  if (!c.taken || c.have < c.need){ toast('Not finished.', '#ff5268'); return; }
+  for (const k in c.reward) St.res[k] += c.reward[k];
+  //  Half the time the board pays in kit rather than material.
+  if (Math.random() < 0.5) dropLoot(Pl.pos.x + 1.1, Pl.pos.y, Pl.pos.z, 2);
+  const site = settlements.find(s => s.id === c.site);
+  const list = St.contracts[c.site];
+  const i = list.indexOf(c);
+  St.contractSeed++;
+  list[i] = rollContract(site, St.contractSeed + i);
+  toast(`Paid: ${costLine(c.reward)}`, '#7dffb3');
+  St.dirty = true;
+  renderBench(); renderQuestHUD();
+}
+
+function contractEvent(kind, arg){
+  let touched = false;
+  for (const list of Object.values(St.contracts)){
+    for (const c of list){
+      if (!c.taken || c.have >= c.need) continue;
+      if (kind === 'gather' && c.kind === 'gather' && c.res === arg.res){
+        c.have = Math.min(c.need, c.have + arg.n); touched = true;
+      } else if (kind === 'kill' && c.kind === 'hunt' && St.night){
+        c.have = Math.min(c.need, c.have + 1); touched = true;
+      } else if (kind === 'night' && c.kind === 'hold'){
+        c.have = 1; touched = true;
+      }
+      if (touched && c.have >= c.need) toast(`Finished: ${c.text}`, '#7dffb3');
+    }
+  }
+  if (touched){ St.dirty = true; renderQuestHUD(); }
+}
+
+function activeContracts(){
+  return Object.values(St.contracts).flat().filter(c => c.taken);
+}
+
 // ─── 24 · Minimap ────────────────────────────────────────────────────────────
 
 let mapBase = null;
+const MAP_N = 240;                 // baked world image, 2.4m per pixel
+const MINI_SPAN = 190;             // metres the corner minimap shows
+
 function bakeMap(){
-  const N = 84;
+  const N = MAP_N;
   const c = document.createElement('canvas');
   c.width = c.height = N;
   const g = c.getContext('2d');
@@ -2592,53 +3413,264 @@ function bakeMap(){
       const sl = slopeAt(wx, wz);
       const col = biomeColor(wx, wz, h, sl, 0.5);
       const k = (j * N + i) * 4;
-      const shade = clamp(0.55 + h / 34, 0.4, 1.25);
+      const shade = clamp(0.5 + h / 46, 0.34, 1.3);
       img.data[k]   = clamp(col.r * 255 * shade, 0, 255);
       img.data[k+1] = clamp(col.g * 255 * shade, 0, 255);
       img.data[k+2] = clamp(col.b * 255 * shade, 0, 255);
       img.data[k+3] = 255;
-      if (h < WATER_Y){
-        img.data[k] = 40; img.data[k+1] = 120; img.data[k+2] = 170;
-      }
+      if (h < WATER_Y){ img.data[k] = 40; img.data[k+1] = 120; img.data[k+2] = 170; }
     }
   }
   g.putImageData(img, 0, 0);
   mapBase = c;
 }
 
+//  World metres -> baked image pixels.
+const mapPx = (v) => (v + HALF) / WORLD * MAP_N;
+
+//  Shared by the corner minimap and the full map screen. `span` is how many
+//  metres across the view shows; `cx, cz` is what sits at the centre.
+function paintMap(g, W, H, cx, cz, span, opts){
+  opts = opts || {};
+  const scale = W / span;
+  const toX = (wx) => (wx - cx) * scale + W / 2;
+  const toY = (wz) => (wz - cz) * scale + H / 2;
+
+  g.save();
+  g.clearRect(0, 0, W, H);
+  g.fillStyle = '#0a0713';
+  g.fillRect(0, 0, W, H);
+
+  if (mapBase){
+    const srcSpan = span / WORLD * MAP_N;
+    g.imageSmoothingEnabled = span > 320;
+    const sx = mapPx(cx) - srcSpan / 2, sy = mapPx(cz) - srcSpan / 2;
+    //  Clip to the baked image rather than letting drawImage stretch the edge
+    //  pixels into a grey band wherever the window overhangs the world.
+    const x0 = Math.max(0, sx), y0 = Math.max(0, sy);
+    const x1 = Math.min(MAP_N, sx + srcSpan), y1 = Math.min(MAP_N, sy + srcSpan);
+    if (x1 > x0 && y1 > y0){
+      const k = W / srcSpan;
+      g.drawImage(mapBase, x0, y0, x1 - x0, y1 - y0,
+                  (x0 - sx) * k, (y0 - sy) * k, (x1 - x0) * k, (y1 - y0) * k);
+    }
+  }
+
+  //  Player-placed blocks, so a house you built is findable.
+  g.fillStyle = 'rgba(127,220,255,.9)';
+  const bs = Math.max(1, scale * 0.9);
+  for (const b of blocks.values()){
+    const x = toX(b.x), y = toY(b.z);
+    if (x < -4 || y < -4 || x > W + 4 || y > H + 4) continue;
+    g.fillRect(x, y, bs, bs);
+  }
+
+  //  Settlements. A lit one is amber, a ruin is a hollow red ring, and both
+  //  are labelled on the big map because names are how you plan a route.
+  for (const st of settlements){
+    const x = toX(st.x), y = toY(st.z);
+    if (x < -30 || y < -30 || x > W + 30 || y > H + 30) continue;
+    const R = ringAt(st) * scale;
+    g.lineWidth = 1.5;
+    if (st.claimed){
+      g.strokeStyle = 'rgba(255,176,61,.55)';
+      g.beginPath(); g.arc(x, y, R, 0, 6.2832); g.stroke();
+      g.fillStyle = st.kind === 'home' ? '#ffb03d' : '#7dffb3';
+    } else {
+      g.strokeStyle = 'rgba(255,82,104,.6)';
+      g.setLineDash([3, 3]);
+      g.beginPath(); g.arc(x, y, R, 0, 6.2832); g.stroke();
+      g.setLineDash([]);
+      g.fillStyle = '#ff5268';
+    }
+    const s2 = st.kind === 'home' ? 5 : 4;
+    g.fillRect(x - s2 / 2, y - s2 / 2, s2, s2);
+    if (opts.labels){
+      g.font = '600 10px "SF Mono", Menlo, monospace';
+      g.fillStyle = st.claimed ? '#ffd9a0' : '#ff8fa0';
+      g.textAlign = 'center';
+      g.fillText(st.name, x, y - 9);
+      if (!st.claimed){
+        g.fillStyle = 'rgba(255,143,160,.75)';
+        g.font = '600 8px "SF Mono", Menlo, monospace';
+        g.fillText('unlit', x, y + 15);
+      }
+    }
+  }
+
+  //  The live things, only on the corner map where they matter.
+  if (opts.live){
+    g.fillStyle = '#ff3050';
+    for (const m of mobs){ if (!m.dead) g.fillRect(toX(m.x) - 2, toY(m.z) - 2, 4, 4); }
+    g.fillStyle = '#c08bff';
+    for (const d of drops) g.fillRect(toX(d.mesh.position.x) - 2, toY(d.mesh.position.z) - 2, 4, 4);
+  }
+
+  //  An active objective's marker, so the map answers "where now".
+  const wp = questWaypoint();
+  if (wp){
+    const x = toX(wp.x), y = toY(wp.z);
+    g.strokeStyle = '#7fdcff'; g.lineWidth = 2;
+    g.beginPath(); g.arc(x, y, 7 + Math.sin(St.step * 4) * 2, 0, 6.2832); g.stroke();
+  }
+
+  //  You, and which way you are facing.
+  const px = toX(cx === Pl.pos.x ? Pl.pos.x : Pl.pos.x);
+  const py = toY(Pl.pos.z);
+  if (px > -10 && py > -10 && px < W + 10 && py < H + 10){
+    g.fillStyle = '#ffffff';
+    g.beginPath(); g.arc(px, py, 3, 0, 6.2832); g.fill();
+    g.strokeStyle = '#ffffff'; g.lineWidth = 1.5;
+    const yaw = Pl.group ? Pl.group.rotation.y : 0;
+    g.beginPath(); g.moveTo(px, py);
+    g.lineTo(px + Math.sin(yaw) * 9, py + Math.cos(yaw) * 9);
+    g.stroke();
+  }
+  g.restore();
+}
+
 function drawMap(){
-  if (!mapBase) return;
-  const g = hud.mapCtx, N = 84;
-  g.clearRect(0, 0, N, N);
-  g.drawImage(mapBase, 0, 0);
-  const px = v => clamp((v + HALF) / WORLD * N, 0, N);
+  if (!hud.mapCtx) return;
+  paintMap(hud.mapCtx, hud.map.width, hud.map.height,
+           Pl.pos.x, Pl.pos.z, MINI_SPAN, { live: true });
+}
 
-  //  The Kiln
-  g.fillStyle = '#ffb03d';
-  g.fillRect(px(0) - 2, px(0) - 2, 4, 4);
-  g.strokeStyle = 'rgba(255,176,61,.5)';
-  g.beginPath(); g.arc(px(0), px(0), keepR() / WORLD * N, 0, 6.2832); g.stroke();
 
-  //  Placed blocks
-  g.fillStyle = '#7fdcff';
-  for (const b of blocks.values()) g.fillRect(px(b.x), px(b.z), 1, 1);
+// ─── 34 · KNOWING WHERE YOU ARE ─────────────────────────────────────────────
+//  At 192m you could see the Kiln from anywhere and wayfinding was a luxury.
+//  At 576m it is the difference between a world and a field. A compass strip
+//  along the top, a full map on M, and a marker that follows the objective.
 
-  //  Monsters
-  g.fillStyle = '#ff3050';
-  for (const m of mobs){ if (!m.dead) g.fillRect(px(m.x) - 1, px(m.z) - 1, 2, 2); }
+function renderQuestHUD(){
+  if (!hud.quest) return;
+  const q = questStep();
+  const p = questProgress();
+  const rows = [];
 
-  //  Loot
-  g.fillStyle = '#c08bff';
-  for (const d of drops) g.fillRect(px(d.mesh.position.x) - 1, px(d.mesh.position.z) - 1, 2, 2);
+  if (q){
+    let sub = q.hint || '';
+    if (p){
+      if (q.kind === 'reach' && p.dist !== undefined) sub = `${Math.round(p.dist)}m away`;
+      else if (q.kind === 'claim' && p.blight > 0) sub = `${p.blight} still holding it`;
+      else if (p.need > 1) sub = `${Math.min(p.have, p.need)} of ${p.need}`;
+    }
+    rows.push(`<li class="main"><b>${q.title}</b><span>${sub}</span></li>`);
+  } else {
+    rows.push('<li class="main"><b>The valley is lit</b><span>Every kiln burning.</span></li>');
+  }
 
-  //  The player, with a facing wedge
-  const x = px(Pl.pos.x), y = px(Pl.pos.z);
-  g.fillStyle = '#ffffff';
-  g.beginPath(); g.arc(x, y, 2.2, 0, 6.2832); g.fill();
-  g.strokeStyle = '#ffffff';
-  g.beginPath(); g.moveTo(x, y);
-  g.lineTo(x + Math.sin(Pl.group.rotation.y) * 7, y + Math.cos(Pl.group.rotation.y) * 7);
-  g.stroke();
+  for (const c of activeContracts()){
+    const done = c.have >= c.need;
+    rows.push(`<li class="${done ? 'done' : ''}"><b>${c.text}</b>` +
+              `<span>${done ? 'take it back to the board' : c.have + ' of ' + c.need}</span></li>`);
+  }
+  hud.quest.innerHTML = `<p>Work</p><ul>${rows.join('')}</ul>`;
+}
+
+//  Compass. Everything the player might want to steer at, projected onto a
+//  strip by bearing relative to where the camera is looking.
+const _cw = new THREE.Vector3();
+function updateCompass(){
+  if (!hud.compass) return;
+  SHW.camera.getWorldDirection(_cw);
+  const camYaw = Math.atan2(_cw.x, _cw.z);
+  const FOV = 1.9;                       // radians of bearing the strip covers
+
+  const marks = [];
+  for (const st of settlements){
+    marks.push({ x: st.x, z: st.z, label: st.name,
+                 cls: st.claimed ? (st.kind === 'home' ? 'home' : 'lit') : 'dead' });
+  }
+  const wp = questWaypoint();
+  if (wp) marks.push({ x: wp.x, z: wp.z, label: wp.name || 'marker', cls: 'way' });
+
+  //  Everything in front of you at once turns the strip into a single
+  //  unreadable word. Five nearest, and the marker always survives the cut.
+  const vis = [];
+  for (const m of marks){
+    const dx = m.x - Pl.pos.x, dz = m.z - Pl.pos.z;
+    const d = Math.hypot(dx, dz);
+    let rel = Math.atan2(dx, dz) - camYaw;
+    while (rel > Math.PI) rel -= 6.2832;
+    while (rel < -Math.PI) rel += 6.2832;
+    if (Math.abs(rel) > FOV / 2) continue;
+    vis.push({ m, d, pct: (rel / FOV + 0.5) * 100 });
+  }
+  vis.sort((a, b) => (a.m.cls === 'way' ? -1 : b.m.cls === 'way' ? 1 : a.d - b.d));
+  const keep = vis.slice(0, 5).sort((a, b) => a.pct - b.pct);
+
+  //  And nudge any two that would still sit on top of each other.
+  for (let i = 1; i < keep.length; i++){
+    if (keep[i].pct - keep[i - 1].pct < 13) keep[i].pct = keep[i - 1].pct + 13;
+  }
+
+  let html = '';
+  for (const k of keep){
+    const name = k.m.label.length > 13 ? k.m.label.slice(0, 12) + '…' : k.m.label;
+    html += `<i class="${k.m.cls}" style="left:${clamp(k.pct, 2, 98).toFixed(2)}%">` +
+            `<u>${name}</u><em>${Math.round(k.d)}m</em></i>`;
+  }
+  hud.compass.innerHTML = html;
+}
+
+// ─── The map screen ─────────────────────────────────────────────────────────
+
+function openMap(force){
+  const want = force === undefined ? !St.mapOpen : !!force;
+  St.mapOpen = want;
+  hud.mapScreen.classList.toggle('show', want);
+  hud.lock.classList.toggle('hide', want || locked || St.phase !== 'play');
+  if (want){
+    cancelGather();
+    document.exitPointerLock();
+    St.mapSpan = St.mapSpan || 420;
+    //  Keep the frame inside the world. Opening the map next to the eastern
+    //  ridge should not spend half the screen on the void beyond it.
+    St.mapCx = mapClamp(Pl.pos.x); St.mapCz = mapClamp(Pl.pos.z);
+    paintBigMap();
+    renderMapList();
+  }
+}
+
+function mapClamp(v){
+  const half = Math.min(St.mapSpan, WORLD) / 2;
+  if (St.mapSpan >= WORLD) return 0;
+  return clamp(v, -HALF + half, HALF - half);
+}
+
+function paintBigMap(){
+  const cv = hud.bigMap;
+  const r = cv.parentElement.getBoundingClientRect();
+  const size = Math.max(240, Math.min(r.width, r.height) - 8);
+  if (cv.width !== Math.round(size)){ cv.width = cv.height = Math.round(size); }
+  paintMap(cv.getContext('2d'), cv.width, cv.height,
+           St.mapCx, St.mapCz, St.mapSpan, { labels: true });
+}
+
+function renderMapList(){
+  const rows = settlements.map(st => {
+    const d = Math.round(Math.hypot(Pl.pos.x - st.x, Pl.pos.z - st.z));
+    const state = st.kind === 'home' ? 'home'
+                : st.claimed ? 'lit'
+                : st.blight > 0 ? `${st.blight} holding it` : 'cleared, unlit';
+    return `<button class="shw-site ${st.claimed ? '' : 'dead'}" data-site="${st.id}">
+      <b>${st.name}</b><span>${state}</span><em>${d}m</em></button>`;
+  }).join('');
+  hud.mapList.innerHTML = rows +
+    `<button class="shw-site clear" data-site="">Clear the marker</button>`;
+  hud.mapList.querySelectorAll('.shw-site').forEach(el => {
+    el.onclick = () => {
+      const id = el.dataset.site;
+      if (!id){ St.waypoint = null; toast('Marker cleared.', '#9c93c6'); }
+      else {
+        const st = settlements.find(s => s.id === id);
+        St.waypoint = { x: st.x, z: st.z, name: st.name };
+        St.mapCx = mapClamp(st.x); St.mapCz = mapClamp(st.z);
+        toast(`Marker on ${st.name}.`, '#7fdcff');
+      }
+      paintBigMap(); renderMapList();
+    };
+  });
 }
 
 // ─── 25 · Input ──────────────────────────────────────────────────────────────
@@ -2662,7 +3694,7 @@ function offAll(){
 }
 
 const GAME_KEYS = new Set(['w','a','s','d',' ','shift','q','e','f','tab','1','2','3','4','5','6',
-                           '[',']','escape','r','g','p','c']);
+                           '[',']','escape','r','g','p','c','m','j']);
 
 function bindInput(){
   const cv = hud.canvas;
@@ -2679,6 +3711,7 @@ function bindInput(){
 
     if (k === 'escape'){
       ev.stopPropagation();
+      if (St.mapOpen){ openMap(false); return; }
       if (St.benchOpen){ toggleBench(false); return; }
       if (St.invOpen){ toggleInv(); return; }
       if (locked){ document.exitPointerLock(); return; }
@@ -2688,10 +3721,15 @@ function bindInput(){
     if (St.phase !== 'play') return;
 
     keys.add(k);
-    if (k === 'tab'){ if (St.benchOpen) toggleBench(false); toggleInv(); return; }
+    if (k === 'm'){ if (St.benchOpen) toggleBench(false); openMap(); return; }
+    if (k === 'tab'){ if (St.benchOpen) toggleBench(false); if (St.mapOpen) openMap(false);
+                      toggleInv(); return; }
     //  E is the bench everywhere except build mode, where it cycles material.
     if (k === 'e' && St.mode !== 'build'){
-      if (St.benchOpen || nearBench()) toggleBench();
+      if (St.benchOpen){ toggleBench(false); return; }
+      const here = hereSettlement();
+      if (here) toggleBench(true, here);
+      else toast('Nothing here to work at.', '#9c93c6');
       return;
     }
     if (k === '1') setMode('fight');
@@ -2703,7 +3741,10 @@ function bindInput(){
     if (k === '[') { St.brush = clamp(St.brush - 0.5, 1, 9); }
     if (k === ']') { St.brush = clamp(St.brush + 0.5, 1, 9); }
     if (k === 'g'){ rest(); }
-    if (k === 'c'){ if (St.benchOpen || nearBench()) toggleBench(); }
+    if (k === 'c'){
+      if (St.benchOpen) toggleBench(false);
+      else { const h = hereSettlement(); if (h) toggleBench(true, h); }
+    }
     if (k === 'p'){ save(); toast('Saved.', '#7dffb3'); }
   }, true);
 
@@ -2749,7 +3790,7 @@ function bindInput(){
   on(document, 'pointerlockchange', () => {
     locked = document.pointerLockElement === cv;
     hud.lock.classList.toggle('hide',
-      locked || St.phase !== 'play' || St.invOpen || St.benchOpen);
+      locked || St.phase !== 'play' || St.invOpen || St.benchOpen || St.mapOpen);
     if (!locked) keys.clear();
   });
 
@@ -2759,6 +3800,27 @@ function bindInput(){
     Pl.pitch -= ev.movementY * 0.0020;
     Pl.pitch = clamp(Pl.pitch, -0.95, 0.72);
   });
+
+  //  The map pans by dragging and zooms on the wheel, because a 576m world
+  //  read through a fixed frame is a picture, not a map.
+  const bm = hud.bigMap;
+  let drag = null;
+  on(bm, 'mousedown', ev => { drag = { x: ev.clientX, y: ev.clientY,
+                                       cx: St.mapCx, cz: St.mapCz }; ev.preventDefault(); });
+  on(window, 'mousemove', ev => {
+    if (!drag) return;
+    const k = St.mapSpan / bm.width;
+    St.mapCx = mapClamp(drag.cx - (ev.clientX - drag.x) * k);
+    St.mapCz = mapClamp(drag.cz - (ev.clientY - drag.y) * k);
+    paintBigMap();
+  });
+  on(window, 'mouseup', () => { drag = null; });
+  on(bm, 'wheel', ev => {
+    ev.preventDefault();
+    St.mapSpan = clamp(St.mapSpan * (ev.deltaY > 0 ? 1.18 : 0.85), 90, WORLD);
+    St.mapCx = mapClamp(St.mapCx); St.mapCz = mapClamp(St.mapCz);
+    paintBigMap();
+  }, { passive: false });
 
   hud.lock.onclick = () => cv.requestPointerLock();
   hud.root.querySelector('#shw-new').onclick  = () => start(true);
@@ -2800,21 +3862,29 @@ function store(){
 }
 
 function packEdits(){
-  //  Sparse: only cells the player actually moved.
+  //  Sparse, and keyed by cell coordinates rather than a flat index, so a
+  //  save survives the world changing size.
   const out = [];
-  for (let i = 0; i < HD.length; i++){
-    if (Math.abs(HD[i]) > 0.001) out.push(i, Math.round(HD[i] * 100) / 100);
+  for (let j = 0; j <= GRID; j++){
+    for (let i = 0; i <= GRID; i++){
+      const k = hIdx(i, j);
+      if (Math.abs(HD[k]) > 0.001) out.push(i, j, Math.round(HD[k] * 100) / 100);
+    }
   }
   return out;
 }
 
 function save(){
   const data = {
-    v: 1, seed: SHW.seed,
+    v: 2, seed: SHW.seed, grid: GRID, world: WORLD,
     day: St.day, cycle: St.cycle,
     hp: St.hp, xp: St.xp, level: St.level,
     res: St.res, kills: St.kills, nights: St.nightsSurvived,
     kiln: St.kiln, tools: St.tools,
+    sites: settlements.map(st => ({ id: st.id, claimed: st.claimed,
+                                    cleared: st.cleared, blight: st.blight })),
+    quest: St.quest, contracts: St.contracts, contractSeed: St.contractSeed,
+    waypoint: St.waypoint,
     pos: [Pl.pos.x, Pl.pos.y, Pl.pos.z], yaw: Pl.yaw,
     gear: St.gear, inv: St.inv.slice(0, 40),
     blocks: [...blocks.values()].map(b => [b.x, b.y, b.z, b.mat]),
@@ -2833,15 +3903,31 @@ function loadSave(){
 }
 
 function applySave(d){
-  if (!d || d.v !== 1) return false;
+  if (!d || d.v !== 2) return false;
   SHW.seed = d.seed || SHW.seed;
   SHW.noise = makeNoise(hashStr(SHW.seed));
   SHW.moist = makeNoise(hashStr(SHW.seed + '-m'));
+  settlements = [];                 // replanned from the saved seed
   buildHeights();
   HD = new Float32Array((GRID + 1) * (GRID + 1));
   if (Array.isArray(d.edits)){
-    for (let i = 0; i < d.edits.length; i += 2) HD[d.edits[i]] = d.edits[i + 1];
+    for (let i = 0; i + 2 < d.edits.length; i += 3){
+      const gi = d.edits[i], gj = d.edits[i + 1];
+      if (gi <= GRID && gj <= GRID) HD[hIdx(gi, gj)] = d.edits[i + 2];
+    }
   }
+  //  Which kilns were lit, and what is still holding the rest.
+  for (const rec of (d.sites || [])){
+    const st = settlements.find(x => x.id === rec.id);
+    if (!st) continue;
+    st.claimed = !!rec.claimed; st.cleared = !!rec.cleared;
+    st.blight = rec.blight != null ? rec.blight : st.blight;
+  }
+  planQuests();
+  St.quest = d.quest || { i: 0, done: {} };
+  St.contracts = d.contracts || {};
+  St.contractSeed = d.contractSeed || 1;
+  St.waypoint = d.waypoint || null;
   St.day = d.day || 1;
   St.cycle = d.cycle || 0;
   St.night = St.cycle >= DAY_LEN;
@@ -2872,6 +3958,7 @@ function buildWorld(){
   makeWater();
   scatterProps();
   makeBase();
+  makeSettlements();
   makeBlockMeshes();
   makeParticles();
   makeGhost();
@@ -2901,7 +3988,8 @@ function clearWorld(){
   if (S.sunDisc) SHW.scene.remove(S.sunDisc);
   if (S.moonDisc) SHW.scene.remove(S.moonDisc);
   for (const k in S) delete S[k];
-  mobs = []; drops = []; projectiles = []; parts = []; tiles = [];
+  mobs = []; drops = []; projectiles = []; parts = [];
+  tiles = new Map(); tileQueue = []; lastTileKey = ''; farDirty = false;
   banks = []; St.focus = null; St.gather = null;
 }
 
@@ -2914,7 +4002,9 @@ function start(fresh){
     SHW.noise = makeNoise(hashStr(SHW.seed));
     SHW.moist = makeNoise(hashStr(SHW.seed + '-m'));
     HD = null;
+    settlements = [];
     buildHeights();
+    planQuests();
     Object.assign(St, {
       day: 1, cycle: DAY_LEN * 0.26, night: false, hp: 100, maxHp: 100, stam: 100,
       xp: 0, level: 1, kills: 0, nightsSurvived: 0, combo: 0,
@@ -2922,6 +4012,7 @@ function start(fresh){
       res: { earth: 40, timber: 24, stone: 18, ember: 4 },
       kiln: { ring: 0, brazier: 0, height: 0, bench: 0 },
       tools: { axe: 0, pick: 0 },
+      quest: { i: 0, done: {} }, contracts: {}, contractSeed: 1, waypoint: null,
       dead: false,
     });
     blocks = new Map();
@@ -2946,6 +4037,8 @@ function start(fresh){
   recomputeStats();
   refreshHot();
   applyKiln();
+  if (!spine.length) planQuests();
+  renderQuestHUD();
   setMode('fight');
 
   if (St.savedPos){
@@ -2958,6 +4051,10 @@ function start(fresh){
     Pl.yaw = 0;
   }
   Pl.vel.set(0, 0, 0);
+  //  Mesh the whole window up front, so the first frame is standing on ground
+  //  rather than watching it arrive.
+  updateStream(true);
+  refreshPropWindow();
   hud.root.classList.toggle('night', St.night);
   hud.dead.classList.remove('show');
   hud.lock.classList.remove('hide');
@@ -2986,7 +4083,7 @@ function frame(){
     //  the cheapest thing in the file and it does most of the work.
     if (St.hitStop > 0){ St.hitStop -= dt; dt = 0; }
 
-    if (!St.invOpen && !St.benchOpen){
+    if (!St.invOpen && !St.benchOpen && !St.mapOpen){
       advanceClock(dt);
       updatePlayer(dt);
       tickMobs(dt);
@@ -2998,6 +4095,11 @@ function frame(){
         if (St.sculptCd <= 0){ St.sculptCd = 0.09; sculpt(St.sculpting); }
       }
       if (St.comboT > 0){ St.comboT -= dt; if (St.comboT <= 0) St.combo = 0; }
+      updateStream(false);
+      if (propsDirty) refreshPropWindow();
+      tickFar(dt);
+      tickRuins(dt);
+      questTick(dt);
       updateFocus(dt);
       tickGather(dt);
       updateGhost();
@@ -3024,6 +4126,7 @@ function frame(){
       if (refreshBlockLights._t > 0.6){ refreshBlockLights._t = 0; refreshBlockLights(); }
     }
 
+    updateCompass();
     hudAccum += dt;
     if (hudAccum > 0.1){ hudAccum = 0; updateHUD(); }
     mapAccum += dt;
@@ -3039,6 +4142,7 @@ function frame(){
     SHW.camera.position.set(Math.cos(a) * 34, BASE_Y + 15 + Math.sin(a * 0.7) * 4, Math.sin(a) * 34);
     SHW.camera.lookAt(0, BASE_Y + 6, 0);
     if (S.sky) S.sky.position.set(SHW.camera.position.x, 0, SHW.camera.position.z);
+    updateStream(false);
     updateSky(dt);
     tickParticles(dt);
   }
@@ -3108,6 +4212,8 @@ async function mount(host, opts){
   applyKiln();
   Pl.pos.set(0, groundY(0, 16) + 1, 16);
   Pl.yaw = Math.PI;
+  updateStream(true);
+  refreshPropWindow();
   SHW.camera.position.set(14, BASE_Y + 12, 26);
   SHW.camera.lookAt(0, BASE_Y + 5, 0);
   St.phase = 'title';
@@ -3164,12 +4270,15 @@ function backToTitle(){
 //  Esc means "give me back the thing that opened this". Inside the city that
 //  is the cabinet; as its own Present Palm app there is nothing behind the
 //  game, so it is the title card.
+//  The host gets first refusal, and may decline by returning false — which is
+//  what a cabinet page does when it cannot reach the city that framed it.
+//  Unmounting first and asking afterwards left a blank frame in that case.
 function leave(){
   const f = SHW.opts && SHW.opts.onExit;
   if (typeof f === 'function'){
-    unmount();
-    try { f(); } catch (e){}
-    return;
+    let handled = true;
+    try { handled = f() !== false; } catch (e){ handled = false; }
+    if (handled){ unmount(); return; }
   }
   backToTitle();
 }
@@ -3269,10 +4378,13 @@ function updateFocus(dt){
     hud.ring.classList.remove('on');
     //  Nothing under the crosshair, but the bench is the other thing the
     //  player has to be told about exactly once, at the moment it is usable.
-    if (nearBench() && !St.benchOpen){
+    const here = St.benchOpen ? null : hereSettlement();
+    if (here){
       hud.focus.classList.add('on');
-      hud.focusName.textContent = 'The Bench';
-      hud.focusYield.textContent = 'tools · gear · the kiln';
+      hud.focusName.textContent = here.name;
+      hud.focusYield.textContent = !here.claimed
+        ? (here.blight > 0 ? `${here.blight} holding it` : 'cleared · ready to light')
+        : here.kind === 'home' ? 'tools · gear · the kiln · work' : 'tools · gear · work';
       hud.focusHint.textContent = 'press E';
     } else {
       hud.focus.classList.remove('on');
@@ -3351,6 +4463,7 @@ function tickGather(dt){
   const n = g.node, plan = g.plan;
   const y = groundY(n.x, n.z);
   St.res[plan.spec.res] += plan.yield;
+  questEvent('gather', { res: plan.spec.res, n: plan.yield });
   killNode(n);
   burst(n.x, y + 1.2, n.z, 16, plan.spec.hex, 7);
   if (n.kind === 'tree') burst(n.x, y + 2.4, n.z, 10, n.leaf, 6);
@@ -3360,6 +4473,246 @@ function tickGather(dt){
   St.shake = Math.max(St.shake, 0.14);
   St.dirty = true;
   cancelGather();
+}
+
+
+// ─── 32 · SETTLEMENTS — six more kilns, four of them dead ────────────────────
+//  A town is one solid mesh and one glowing mesh, merged at build time. Six
+//  settlements of fifteen separate boxes each would be ninety draw calls
+//  before a single tree, and the whole reason the world can be nine times
+//  bigger is that the draw call budget is spent carefully.
+
+function mergeParts(parts){
+  let total = 0;
+  const conv = [];
+  for (const p of parts){
+    const g = (p.g.index ? p.g.toNonIndexed() : p.g.clone());
+    g.applyMatrix4(p.m);
+    g.computeVertexNormals();
+    total += g.attributes.position.count;
+    conv.push({ g, c: p.c });
+  }
+  const pos = new Float32Array(total * 3), nor = new Float32Array(total * 3),
+        col = new Float32Array(total * 3), uv = new Float32Array(total * 2);
+  let o = 0, o2 = 0;
+  for (const { g, c } of conv){
+    const P = g.attributes.position.array, N = g.attributes.normal.array;
+    const U = g.attributes.uv;
+    for (let i = 0; i < g.attributes.position.count; i++){
+      pos[o] = P[i*3]; pos[o+1] = P[i*3+1]; pos[o+2] = P[i*3+2];
+      nor[o] = N[i*3]; nor[o+1] = N[i*3+1]; nor[o+2] = N[i*3+2];
+      col[o] = c.r; col[o+1] = c.g; col[o+2] = c.b;
+      uv[o2] = U ? U.array[i*2] : 0; uv[o2+1] = U ? U.array[i*2+1] : 0;
+      o += 3; o2 += 2;
+    }
+    g.dispose();
+  }
+  const out = new THREE.BufferGeometry();
+  out.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  out.setAttribute('normal',   new THREE.BufferAttribute(nor, 3));
+  out.setAttribute('color',    new THREE.BufferAttribute(col, 3));
+  out.setAttribute('uv',       new THREE.BufferAttribute(uv, 2));
+  out.computeBoundingSphere();
+  return out;
+}
+
+const _mm = new THREE.Matrix4(), _me = new THREE.Euler(), _mq = new THREE.Quaternion();
+function partAt(g, x, y, z, ry, sx, sy, sz, hex, into){
+  _me.set(0, ry || 0, 0); _mq.setFromEuler(_me);
+  _mm.compose(new THREE.Vector3(x, y, z), _mq,
+              new THREE.Vector3(sx || 1, sy || 1, sz || 1));
+  into.push({ g, m: _mm.clone(), c: new THREE.Color(hex) });
+}
+
+function buildSettlementMeshes(st){
+  //  Throw away whatever was there: relighting rebuilds the place.
+  if (st.group){
+    S.world.remove(st.group);
+    disposeTree(st.group);
+  }
+  const grp = new THREE.Group();
+  const solid = [], glow = [];
+  const lit = st.claimed;
+  const y0 = st.y0;
+  //  Rough bounding blobs, kept so the third-person camera does not park
+  //  itself inside a hut. Trees and boulders were handled; buildings were
+  //  not, and a town is the one place you are guaranteed to be surrounded.
+  st.solids = [{ x: st.x, y: y0 + 4.0, z: st.z, r: 4.6 }];
+
+  const BOX = new THREE.BoxGeometry(1, 1, 1);
+  const CYL = new THREE.CylinderGeometry(1, 1, 1, 8);
+  const CONE = new THREE.ConeGeometry(1, 1, 8);
+
+  const wall  = lit ? 0xb5603c : 0x8d6a5c;
+  const trim  = lit ? 0xe0e4ec : 0xa8a5ac;
+  const roof  = lit ? 0x3f4a6b : 0x4a4f60;
+  const thatch= lit ? 0xd9b455 : 0x8f8066;
+
+  //  The town's own kiln: smaller than home's, same silhouette, so the shape
+  //  reads as "one of these" from a ridge two hundred metres away.
+  partAt(CYL,  st.x, y0 + 0.4, st.z, 0, 6.4, 0.9, 6.4, wall, solid);
+  partAt(CYL,  st.x, y0 + 3.0, st.z, 0, 3.6, 5.0, 3.6, wall, solid);
+  partAt(CYL,  st.x, y0 + 4.6, st.z, 0, 3.8, 0.4, 3.8, trim, solid);
+  partAt(CONE, st.x, y0 + 7.2, st.z, 0, 4.4, 3.4, 4.4, roof, solid);
+  partAt(CYL,  st.x, y0 + 9.4, st.z, 0, 0.5, 1.8, 0.5, trim, solid);
+  //  The mouth, and the fire in it if it is lit.
+  partAt(BOX,  st.x, y0 + 1.8, st.z + 3.4, 0, 2.0, 2.0, 0.6, roof, solid);
+  if (lit){
+    const fire = new THREE.Mesh(new THREE.IcosahedronGeometry(0.8, 0),
+      new THREE.MeshBasicMaterial({ color: 0xffc65a }));
+    fire.position.set(st.x, y0 + 1.5, st.z + 3.0);
+    grp.add(fire);
+    st.fire = fire;
+    const l = new THREE.PointLight(0xffa83d, 2.6, 34, 1.6);
+    l.position.set(st.x, y0 + 2.4, st.z + 2.6);
+    grp.add(l);
+    st.light = l;
+  } else {
+    st.fire = null; st.light = null;
+    //  A cold kiln leans. Rubble around the mouth, and a crack up the drum.
+    partAt(BOX, st.x + 2.2, y0 + 0.4, st.z + 3.6, 0.6, 1.6, 0.8, 1.4, wall, solid);
+    partAt(BOX, st.x - 2.6, y0 + 0.3, st.z + 2.8, 1.2, 1.2, 0.6, 1.8, wall, solid);
+  }
+
+  //  Huts around it. A town has more and they are whole; a ruin has fewer and
+  //  they are open to the sky.
+  const rnd = mulberry(hashStr(st.id + SHW.seed));
+  const huts = st.kind === 'town' ? 6 : 3;
+  for (let i = 0; i < huts; i++){
+    const a = (i / huts) * 6.2832 + rnd() * 0.5;
+    const r = 8.5 + rnd() * 3.5;
+    const hx = st.x + Math.cos(a) * r, hz = st.z + Math.sin(a) * r;
+    const w = 2.6 + rnd() * 1.4, dp = 2.4 + rnd() * 1.2, hh = 2.2 + rnd() * 0.8;
+    partAt(BOX, hx, y0 + hh / 2, hz, -a, w, hh, dp, wall, solid);
+    st.solids.push({ x: hx, y: y0 + hh / 2, z: hz, r: Math.max(w, dp) * 0.62 });
+    if (lit){
+      partAt(CONE, hx, y0 + hh + 0.8, hz, -a, w * 0.85, 1.6, dp * 0.85, thatch, solid);
+      partAt(BOX, hx + Math.cos(a) * w * 0.5, y0 + 0.9, hz + Math.sin(a) * dp * 0.5,
+             -a, 0.7, 1.5, 0.12, roof, solid);
+    } else {
+      //  Half a roof, fallen in.
+      partAt(BOX, hx - 0.4, y0 + hh + 0.2, hz, -a + 0.4, w * 0.7, 0.25, dp * 0.6, thatch, solid);
+    }
+  }
+
+  //  Braziers on the ring. Lit ones glow; a ruin's are cold stumps.
+  st.bowls = [];
+  const bn = 6;
+  for (let i = 0; i < bn; i++){
+    const a = (i / bn) * 6.2832;
+    const bx = st.x + Math.cos(a) * (st.ring - 1.4);
+    const bz = st.z + Math.sin(a) * (st.ring - 1.4);
+    partAt(BOX, bx, y0 + 1.0, bz, 0, 0.5, 2.0, 0.5, trim, solid);
+    if (lit){
+      const bowl = new THREE.Mesh(new THREE.IcosahedronGeometry(0.44, 0),
+        new THREE.MeshBasicMaterial({ color: 0xffc65a }));
+      bowl.position.set(bx, y0 + 2.2, bz);
+      grp.add(bowl); st.bowls.push(bowl);
+    }
+  }
+
+  //  The bench, which is what E talks to.
+  partAt(BOX, st.x - 5.4, y0 + 0.5, st.z + 3.0, 0.5, 2.4, 1.0, 1.1, trim, solid);
+  st.bench = new THREE.Vector3(st.x - 5.4, y0 + 0.5, st.z + 3.0);
+
+  const g = mergeParts(solid);
+  grp.add(new THREE.Mesh(g, clayMat({ rep: 2, mat: { vertexColors: true } })));
+
+  //  The protected-ground ring, dashed and red while the place is dead.
+  const ring = new THREE.Mesh(
+    new THREE.RingGeometry(st.ring - 0.35, st.ring, 64),
+    new THREE.MeshBasicMaterial({
+      color: lit ? 0xffc65a : 0xff5268, transparent: true,
+      opacity: lit ? 0.45 : 0.28, side: THREE.DoubleSide, depthWrite: false }));
+  ring.rotation.x = -Math.PI / 2;
+  ring.position.set(st.x, y0 + 0.08, st.z);
+  grp.add(ring);
+  st.ringMesh = ring;
+
+  S.world.add(grp);
+  st.group = grp;
+}
+
+function makeSettlements(){
+  for (const st of settlements){
+    if (st.kind === 'home') continue;     // the home Kiln has its own builder
+    buildSettlementMeshes(st);
+  }
+}
+
+//  Ruins hold a blight: monsters that do not burn at dawn, so a ruin can be
+//  cleared in daylight rather than only being a night problem you cannot
+//  schedule.
+function spawnAtRuin(st){
+  const a = Math.random() * 6.2832;
+  const r = st.ring * 0.55 + Math.random() * st.ring * 0.5;
+  const x = st.x + Math.cos(a) * r, z = st.z + Math.sin(a) * r;
+  const roll = Math.random();
+  const kind = roll < 0.42 ? 'husk' : roll < 0.72 ? 'stalker'
+             : roll < 0.90 ? 'lumber' : 'molder';
+  const m = makeMob(kind, x, z);
+  m.ruin = st;
+  //  Blighted things are marked, so the player can tell what is holding the
+  //  ruin from what merely wandered in.
+  //  Recoloured, not replaced: swapping the material orphaned the old one.
+  m.seam.material.color.setHex(0x9d4bff);
+  return m;
+}
+
+function tickRuins(dt){
+  for (const st of settlements){
+    if (st.claimed) continue;
+    const d = Math.hypot(Pl.pos.x - st.x, Pl.pos.z - st.z);
+    if (d > 75) continue;
+    const alive = mobs.reduce((n, m) => n + (!m.dead && m.ruin === st ? 1 : 0), 0);
+    st.spawnT = (st.spawnT || 0) - dt;
+    if (st.blight > 0 && alive < 4 && st.spawnT <= 0){
+      st.spawnT = 2.6;
+      spawnAtRuin(st);
+    }
+  }
+}
+
+function relightCost(st){
+  return { ember: 18, timber: 45, stone: 45 };
+}
+
+function tryRelight(st){
+  if (st.claimed) return;
+  if (st.blight > 0){
+    toast(`${st.name} is still held. ${st.blight} left.`, '#ff5268');
+    return;
+  }
+  const cost = relightCost(st);
+  if (!canAfford(cost)){
+    toast(`Relighting ${st.name} needs ${costLine(cost)}.`, '#ff5268');
+    return;
+  }
+  spend(cost);
+  st.claimed = true; st.cleared = true;
+  buildSettlementMeshes(st);
+  banner(st.name, 'lit');
+  toast(`${st.name} is yours. Its ring holds now.`, '#7dffb3');
+  St.shake = Math.max(St.shake, 0.4);
+  burst(st.x, st.y0 + 2, st.z + 3, 26, 0xffc65a, 9);
+  St.dirty = true;
+  questEvent('claim', st.id);
+  drawMap();
+}
+
+//  Standing at a settlement: which one, and what can be done here.
+function hereSettlement(){
+  for (const st of settlements){
+    const b = st.kind === 'home' ? S.bench : st.bench;
+    if (!b) continue;
+    if (Math.hypot(Pl.pos.x - b.x, Pl.pos.z - b.z) < 4.6) return st;
+  }
+  //  At a dead kiln you stand at the mouth, not at a bench.
+  for (const st of settlements){
+    if (st.claimed) continue;
+    if (Math.hypot(Pl.pos.x - st.x, Pl.pos.z - st.z) < st.ring * 0.9) return st;
+  }
+  return null;
 }
 
 // ─── 31 · THE BENCH — where resources finally mean something ────────────────
@@ -3410,9 +4763,13 @@ function costLine(cost){
   return Object.keys(cost).map(k => `${cost[k]} ${k}`).join(' · ');
 }
 
-function toggleBench(force){
+function toggleBench(force, site){
   const want = force === undefined ? !St.benchOpen : !!force;
-  if (want && !nearBench()){ toast('Stand at the bench.', '#9c93c6'); return; }
+  if (want){
+    const st = site || hereSettlement();
+    if (!st){ toast('Stand at a bench.', '#9c93c6'); return; }
+    St.benchSite = st;
+  }
   St.benchOpen = want;
   hud.bench.classList.toggle('show', want);
   hud.lock.classList.toggle('hide', want || locked || St.phase !== 'play');
@@ -3428,6 +4785,7 @@ function craftTool(which){
   if (!canAfford(next.cost)){ toast('Not enough for that.', '#ff5268'); return; }
   spend(next.cost);
   St.tools[which] = next.lvl;
+  questEvent('tool', which);
   toast(`Made a ${next.name}.`, '#7dffb3');
   renderBench(); updateHUD();
 }
@@ -3466,6 +4824,7 @@ function upgradeKiln(key){
   if (!canAfford(cost)){ toast('Not enough for that.', '#ff5268'); return; }
   spend(cost);
   St.kiln[key] = lvl + 1;
+  questEvent('kiln', key);
   applyKiln();
   banner(def.name, 'the kiln takes it');
   St.shake = Math.max(St.shake, 0.3);
@@ -3552,14 +4911,58 @@ function renderBench(){
                 'kiln:' + key, !canAfford(cost));
   }
 
-  hud.benchBody.innerHTML = `
-    <section><h4>Tools</h4>${tools}</section>
-    <section><h4>Gear</h4>${gear}
+  const site = St.benchSite || settlements[0];
+  const head = hud.benchBody.parentElement.querySelector('#shw-benchhead h3');
+  if (head) head.textContent = site.name;
+  const sub = hud.benchBody.parentElement.querySelector('#shw-benchhead p');
+  if (sub) sub.textContent = site.kind === 'home' ? 'the kiln'
+          : site.claimed ? 'a lit settlement' : 'cold';
+
+  //  A dead kiln has one thing to offer and it is not a shopping list.
+  if (!site.claimed){
+    const cost = relightCost(site);
+    const held = site.blight > 0;
+    hud.benchBody.innerHTML = `<section><h4>${site.name}</h4>
+      <button class="shw-craft${held || !canAfford(cost) ? ' off' : ''}" data-do="relight">
+        <b>Relight the kiln</b>
+        <span>${held
+          ? `Something blighted is still holding it. ${site.blight} left, and daylight will not shift them.`
+          : 'Cleared. Feed it and the ring is yours: safe ground, a bench, and somewhere to wake up.'}</span>
+        ${chip(cost)}</button>
+      </section>`;
+    hud.benchRes.textContent =
+      `${Math.floor(res.earth)} earth · ${Math.floor(res.timber)} timber · ` +
+      `${Math.floor(res.stone)} stone · ${Math.floor(res.ember)} ember`;
+    hud.benchBody.querySelectorAll('.shw-craft').forEach(el => {
+      el.onclick = () => { tryRelight(site); if (site.claimed) renderBench(); };
+    });
+    return;
+  }
+
+  //  Contracts, at any lit settlement including home.
+  let work = '';
+  for (const c of contractsFor(site)){
+    const done = c.taken && c.have >= c.need;
+    work += `<button class="shw-craft" data-do="${done ? 'turn' : 'take'}:${c.id}">
+      <b>${c.text}</b>
+      <span>${!c.taken ? 'Open. Take it and it tracks itself.'
+              : done ? 'Finished. Take it back for the pay.'
+              : `${c.have} of ${c.need} so far.`}</span>
+      <em class="${done ? '' : 'no'}">${costLine(c.reward)}</em>
+      ${c.taken && !done ? '<u>in hand</u>' : ''}</button>`;
+  }
+
+  hud.benchBody.innerHTML =
+    `<section><h4>Tools</h4>${tools}</section>` +
+    `<section><h4>Gear</h4>${gear}
       <button class="shw-craft" data-do="scrap"><b>Scrap spares</b>
         <span>Everything not worn, melted down for ember.</span>
         <em>${St.inv.length} spare</em></button>
-    </section>
-    <section><h4>The Kiln</h4>${kiln}</section>`;
+    </section>` +
+    (site.kind === 'home'
+      ? `<section><h4>The Kiln</h4>${kiln}</section>`
+      : `<section><h4>Work</h4>${work}</section>`) +
+    (site.kind === 'home' ? `<section><h4>Work</h4>${work}</section>` : '');
 
   hud.benchRes.textContent =
     `${Math.floor(res.earth)} earth · ${Math.floor(res.timber)} timber · ` +
@@ -3570,10 +4973,15 @@ function renderBench(){
       const d = el.dataset.do;
       if (!d) return;
       if (d === 'scrap'){ scrapAll(); renderBench(); return; }
-      const [what, arg] = d.split(':');
+      const i = d.indexOf(':');
+      const what = d.slice(0, i), arg = d.slice(i + 1);
       if (what === 'tool') craftTool(arg);
       else if (what === 'gear') upgradeGear(arg);
       else if (what === 'kiln') upgradeKiln(arg);
+      else if (what === 'take' || what === 'turn'){
+        const c = Object.values(St.contracts).flat().find(x => x.id === arg);
+        if (c) (what === 'take' ? takeContract : turnInContract)(c);
+      }
     };
   });
 }
@@ -3593,6 +5001,26 @@ window.SHW_WILD = {
     wave(){ spawnWave(); },
     trees: () => trees, rocks: () => rocks, banks: () => banks,
     bench(){ Pl.pos.set(S.bench.x, groundY(S.bench.x, S.bench.z) + 0.2, S.bench.z); },
+    sites: () => settlements, quest: () => (questStep()||{}).title || 'done',
+    groundY: (x,z) => groundY(x,z), seed: () => SHW.seed,
+    renderer: () => SHW.renderer, tick: (dt) => { tickMobs(dt); tickDrops(dt); tickProjectiles(dt); },
+    collect(){ for (const d of drops.slice()){ d.mesh.position.set(Pl.pos.x,Pl.pos.y,Pl.pos.z); } },
+    lights(){ let n=0; S.world.traverse(o=>{ if(o.isLight && o.visible) n++; }); return n; },
+    dropsN: () => drops.length,
+    spawnOne(){ const a=Math.random()*6.283, r=14+Math.random()*8;
+                return makeMob('husk', Pl.pos.x+Math.cos(a)*r, Pl.pos.z+Math.sin(a)*r); },
+    dig(x, z, rad, amt){
+      const ci=Math.round((x+HALF)/CELL), cj=Math.round((z+HALF)/CELL);
+      const rc=Math.ceil(rad/CELL);
+      for(let j=-rc;j<=rc;j++) for(let i=-rc;i<=rc;i++){
+        const gi=ci+i, gj=cj+j; if(gi<0||gj<0||gi>GRID||gj>GRID) continue;
+        const dd=Math.hypot(i*CELL,j*CELL); if(dd>rad) continue;
+        HD[hIdx(gi,gj)] += amt*Math.pow(1-dd/rad,1.6);
+      }
+      rebuildTilesAround(x,z,rad+CELL*2);
+    },
+    hurt(m, n){ hurtMob(m, n, 0, 0); },
+    relight(st){ tryRelight(st); },
     focus(){ return St.focus; },
     //  Drives one full hold without waiting on wall clock, for tests.
     hold(){ if (!beginGather()) return null;
