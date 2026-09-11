@@ -1,15 +1,15 @@
 {
-  "seed": "fc-q83n0x",
-  "mode": "campaign",
+  "seed": "fc-5tltuk",
+  "mode": "freeroam",
   "chapter": 0,
   "chapterTitle": "THE EVENING REPORT",
   "finished": false,
-  "updatedAt": 1788426201329,
+  "updatedAt": 1789090559516,
   "playTime": 0,
   "credits": 0,
   "built": 0,
-  "id": "smtlarmcjx30",
-  "name": "EVENING REPORT",
+  "id": "smtwabqqkh9c",
+  "name": "City 5TLTUK",
   "campaign": {
     "chapter": 0,
     "progress": {},
@@ -19,16 +19,16 @@
     "finished": false,
     "caseDecision": null,
     "caseFiled": false,
-    "active": true
+    "active": false
   },
   "player": {
-    "x": 10.2,
-    "y": 5.1000000000000005,
-    "z": 9.4,
-    "yaw": -1.5707963267948966,
-    "pitch": -0.05,
-    "classKey": "operative",
-    "hp": 100
+    "x": 0,
+    "y": 4.7,
+    "z": 5,
+    "yaw": 0,
+    "pitch": 0,
+    "classKey": "bruiser",
+    "hp": 160
   },
   "dayTime": 1080,
   "hud": {
@@ -36,7 +36,7 @@
     "tasksDone": 0,
     "distanceWalked": 0,
     "distanceDriven": 0,
-    "playTime": 0.1,
+    "playTime": 0,
     "blocksMined": 0,
     "blocksPlaced": 0
   },

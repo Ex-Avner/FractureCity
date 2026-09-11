@@ -1,358 +1,106 @@
 {
   "type": "newswire.v1",
-  "fetchedAt": "2026-09-05T09:19:52.839Z",
+  "fetchedAt": "2026-09-11T03:12:08.792Z",
   "sources": {
-    "arxiv": {
-      "ok": true,
-      "count": 25
-    },
     "hn": {
       "ok": true,
-      "count": 13
+      "count": 10
+    },
+    "arxiv": {
+      "ok": false,
+      "error": "timeout"
     }
   },
   "items": [
     {
-      "id": "hn:49574167",
-      "title": "AI handles incidents, engineers lose touch with their systems",
-      "url": "https://www.sylvainkalache.com/blog/ai-handles-incidents-engineers-lose-touch-with-their-systems",
-      "source": "sylvainkalache.com",
+      "id": "hn:49652475",
+      "title": "How My Students Think About AI",
+      "url": "https://www.lesswrong.com/posts/ySXuvJcqRindQwAk7/how-my-students-think-about-ai",
+      "source": "lesswrong.com",
       "via": "Hacker News",
-      "at": "2026-09-05T07:52:50.000Z",
-      "score": 50
+      "at": "2026-09-11T01:33:36.000Z",
+      "score": 12
     },
     {
-      "id": "hn:49572875",
-      "title": "GPT-6 Astra in code review: Gains, privacy, and cost",
-      "url": "https://www.coderabbit.ai/blog/gpt-6-astra-code-review-evaluation",
-      "source": "coderabbit.ai",
+      "id": "hn:49651372",
+      "title": "Thelio Mira AI Linux Workstation: 192 GB GPU Memory",
+      "url": "https://system76.com/workstations/thelio-mira-ai",
+      "source": "system76.com",
       "via": "Hacker News",
-      "at": "2026-09-05T03:38:56.000Z",
-      "score": 40
+      "at": "2026-09-10T23:10:06.000Z",
+      "score": 49
     },
     {
-      "id": "hn:49571537",
-      "title": "Show HN: Moadim.io – A scheduler for agents",
-      "url": "https://moadim.io/",
-      "source": "moadim.io",
+      "id": "hn:49650326",
+      "title": "OpenAI’s Navier-Stokes release included a Lean 4 formal proof",
+      "url": "https://www.johndcook.com/blog/2026/09/09/formal-method-revolution/",
+      "source": "johndcook.com",
       "via": "Hacker News",
-      "at": "2026-09-04T23:50:29.000Z",
-      "score": 25
+      "at": "2026-09-10T21:22:59.000Z",
+      "score": 146
     },
     {
-      "id": "hn:49571465",
-      "title": "Portal by Spotify cut my Claude Code token usage by 90%",
-      "url": "https://engineering.atspotify.com/2026/9/portal-by-spotify-cut-my-claude-code-token-usage-by-90",
-      "source": "engineering.atspotify.com",
+      "id": "hn:49649213",
+      "title": "OpenAI Agents API",
+      "url": "https://developers.openai.com/api/docs/guides/agents-api/overview",
+      "source": "developers.openai.com",
       "via": "Hacker News",
-      "at": "2026-09-04T23:38:50.000Z",
-      "score": 127
+      "at": "2026-09-10T19:43:22.000Z",
+      "score": 160
     },
     {
-      "id": "hn:49571131",
-      "title": "Claude Code skills for advanced context engineering techniques and patterns",
-      "url": "https://github.com/NeoLabHQ/context-engineering-kit",
-      "source": "github.com",
+      "id": "hn:49648784",
+      "title": "On Next-Gen Transformer: Loops Are Not What You Need",
+      "url": "https://zartbot.github.io/blog/model_arch/inception/",
+      "source": "zartbot.github.io",
       "via": "Hacker News",
-      "at": "2026-09-04T22:52:14.000Z",
-      "score": 22
+      "at": "2026-09-10T19:07:48.000Z",
+      "score": 20
     },
     {
-      "id": "hn:49570545",
-      "title": "GPT-6 Astra on OpenRouter",
-      "url": "https://openrouter.ai/openai/gpt-6-astra",
-      "source": "openrouter.ai",
+      "id": "hn:49647300",
+      "title": "Detecting and countering misuse of AI: September 2026",
+      "url": "https://www.anthropic.com/threat-intelligence-report-september-2026",
+      "source": "anthropic.com",
       "via": "Hacker News",
-      "at": "2026-09-04T21:39:19.000Z",
-      "score": 217
+      "at": "2026-09-10T17:23:42.000Z",
+      "score": 94
     },
     {
-      "id": "hn:49569366",
-      "title": "Can AI design circuit boards yet?",
-      "url": "https://eebench.org/blog/can-ai-design-circuit-boards-yet/",
-      "source": "eebench.org",
+      "id": "hn:49645443",
+      "title": "Cognition launches new SWE-2 model, Rivaling Fable 5.1 and GPT-Astra",
+      "url": "https://cognition.com/blog/swe-2",
+      "source": "cognition.com",
       "via": "Hacker News",
-      "at": "2026-09-04T19:48:29.000Z",
-      "score": 257
+      "at": "2026-09-10T15:29:47.000Z",
+      "score": 363
     },
     {
-      "id": "hn:49567310",
-      "title": "“Next-token predictor” is the wrong mental model for LLMs",
-      "url": "https://gmcgoldr.github.io/2026/09/04/llm-next-token-predictors.html",
-      "source": "gmcgoldr.github.io",
+      "id": "hn:49644179",
+      "title": "AI Is Breaking This Thing We Call Trust",
+      "url": "https://terriblesoftware.org/2026/09/10/ai-is-breaking-this-thing-we-call-trust/",
+      "source": "terriblesoftware.org",
       "via": "Hacker News",
-      "at": "2026-09-04T17:09:24.000Z",
-      "score": 112
+      "at": "2026-09-10T14:21:20.000Z",
+      "score": 66
     },
     {
-      "id": "hn:49566137",
-      "title": "Corporate America is getting hooked on open-source AI",
-      "url": "https://www.nytimes.com/2026/09/04/technology/open-source-ai-anthropic-openai.html",
-      "source": "nytimes.com",
+      "id": "hn:49639408",
+      "title": "More questions about whether researchers can trust OpenAI with unpublished math",
+      "url": "https://mathstodon.xyz/@andreasthom/117240535270608201",
+      "source": "mathstodon.xyz",
       "via": "Hacker News",
-      "at": "2026-09-04T15:33:45.000Z",
-      "score": 296
+      "at": "2026-09-10T06:49:43.000Z",
+      "score": 721
     },
     {
-      "id": "hn:49563386",
-      "title": "Google AI Mode shows same products 21.6% more expensive than traditional search",
-      "url": "https://productrise.app/blog/google-ai-mode-prefers-more-expensive-products",
-      "source": "productrise.app",
+      "id": "hn:49613072",
+      "title": "Compute-efficient pretraining and scaling to trillion-parameter models",
+      "url": "https://magic.dev/blog/pretraining#",
+      "source": "magic.dev",
       "via": "Hacker News",
-      "at": "2026-09-04T11:59:15.000Z",
-      "score": 381
-    },
-    {
-      "id": "hn:49563355",
-      "title": "Discovery of a new OpenAI agent message board",
-      "url": "https://collusion.wiki/",
-      "source": "collusion.wiki",
-      "via": "Hacker News",
-      "at": "2026-09-04T11:54:53.000Z",
-      "score": 1700
-    },
-    {
-      "id": "hn:49562219",
-      "title": "Show HN: TERMy – A fast terminal assistant that does not use LLMs",
-      "url": "https://github.com/gioblu/NPC-Forge/blob/main/docs/development.md",
-      "source": "github.com",
-      "via": "Hacker News",
-      "at": "2026-09-04T09:03:00.000Z",
-      "score": 128
-    },
-    {
-      "id": "hn:49554643",
-      "title": "GPT-6 Astra",
-      "url": "https://openai.com/index/gpt-6-astra/",
-      "source": "openai.com",
-      "via": "Hacker News",
-      "at": "2026-09-03T18:41:05.000Z",
-      "score": 2172
-    },
-    {
-      "id": "arxiv:2609.04199v1",
-      "title": "Compile by Training: Turning Natural-Language Specifications into Local Neural Functions",
-      "url": "http://arxiv.org/abs/2609.04199v1",
-      "source": "arXiv",
-      "via": "arXiv cs.AI",
-      "at": "2026-09-03T17:59:49Z",
-      "score": 0
-    },
-    {
-      "id": "arxiv:2609.04198v1",
-      "title": "Clean Engineering, Unstable Measurement: A Preregistered Reliability Failure of Black-Box LLM Observers on Shared Endpoints",
-      "url": "http://arxiv.org/abs/2609.04198v1",
-      "source": "arXiv",
-      "via": "arXiv cs.AI",
-      "at": "2026-09-03T17:59:43Z",
-      "score": 0
-    },
-    {
-      "id": "arxiv:2609.04197v1",
-      "title": "ESPO: Error-Structured Prompt Optimization via Diagnose, Diversify, and Stabilize",
-      "url": "http://arxiv.org/abs/2609.04197v1",
-      "source": "arXiv",
-      "via": "arXiv cs.AI",
-      "at": "2026-09-03T17:59:37Z",
-      "score": 0
-    },
-    {
-      "id": "arxiv:2609.04194v1",
-      "title": "Legibility is Not Interpretability: Comparing Judged and Actual Importance in Chain-Of-Thought Reasoning",
-      "url": "http://arxiv.org/abs/2609.04194v1",
-      "source": "arXiv",
-      "via": "arXiv cs.AI",
-      "at": "2026-09-03T17:59:08Z",
-      "score": 0
-    },
-    {
-      "id": "arxiv:2609.04190v1",
-      "title": "One Editor, Many Edits: A Unified Training-Free Framework for Diverse Video Editing",
-      "url": "http://arxiv.org/abs/2609.04190v1",
-      "source": "arXiv",
-      "via": "arXiv cs.AI",
-      "at": "2026-09-03T17:59:01Z",
-      "score": 0
-    },
-    {
-      "id": "arxiv:2609.04189v1",
-      "title": "Robust PAC Learning of Concurrent Stochastic Games",
-      "url": "http://arxiv.org/abs/2609.04189v1",
-      "source": "arXiv",
-      "via": "arXiv cs.AI",
-      "at": "2026-09-03T17:58:57Z",
-      "score": 0
-    },
-    {
-      "id": "arxiv:2609.04183v1",
-      "title": "Seeing Before Synthesizing: VLM-Guided Transition Event Discovery for Weakly-Supervised Dense Video Captioning",
-      "url": "http://arxiv.org/abs/2609.04183v1",
-      "source": "arXiv",
-      "via": "arXiv cs.AI",
-      "at": "2026-09-03T17:58:02Z",
-      "score": 0
-    },
-    {
-      "id": "arxiv:2609.04180v1",
-      "title": "Knowledge Acquisition During Pre-training? Large Language Models Learn Better With Auxiliary Views",
-      "url": "http://arxiv.org/abs/2609.04180v1",
-      "source": "arXiv",
-      "via": "arXiv cs.AI",
-      "at": "2026-09-03T17:57:02Z",
-      "score": 0
-    },
-    {
-      "id": "arxiv:2609.04177v1",
-      "title": "A Computationally Feasible Framework for Causal Probabilistic Explanation",
-      "url": "http://arxiv.org/abs/2609.04177v1",
-      "source": "arXiv",
-      "via": "arXiv cs.AI",
-      "at": "2026-09-03T17:55:43Z",
-      "score": 0
-    },
-    {
-      "id": "arxiv:2609.04173v1",
-      "title": "Last Translation Benchmark",
-      "url": "http://arxiv.org/abs/2609.04173v1",
-      "source": "arXiv",
-      "via": "arXiv cs.AI",
-      "at": "2026-09-03T17:54:45Z",
-      "score": 0
-    },
-    {
-      "id": "arxiv:2609.04172v1",
-      "title": "Rethinking On-Policy Distillation of Large Language Models II: One Training Example",
-      "url": "http://arxiv.org/abs/2609.04172v1",
-      "source": "arXiv",
-      "via": "arXiv cs.AI",
-      "at": "2026-09-03T17:54:38Z",
-      "score": 0
-    },
-    {
-      "id": "arxiv:2609.04170v1",
-      "title": "A Case Study on Emergent Cheating and Whistleblowing in Autonomous Research Swarms",
-      "url": "http://arxiv.org/abs/2609.04170v1",
-      "source": "arXiv",
-      "via": "arXiv cs.AI",
-      "at": "2026-09-03T17:54:09Z",
-      "score": 0
-    },
-    {
-      "id": "arxiv:2609.04168v1",
-      "title": "Para-Pipe: Exploiting Hierarchical Operator Parallelism of ML Computational Graphs on SoCs",
-      "url": "http://arxiv.org/abs/2609.04168v1",
-      "source": "arXiv",
-      "via": "arXiv cs.AI",
-      "at": "2026-09-03T17:53:44Z",
-      "score": 0
-    },
-    {
-      "id": "arxiv:2609.04167v1",
-      "title": "SWE-Gate: Passing Functional Tests Is Not Enough for Software Engineering Agents",
-      "url": "http://arxiv.org/abs/2609.04167v1",
-      "source": "arXiv",
-      "via": "arXiv cs.AI",
-      "at": "2026-09-03T17:53:34Z",
-      "score": 0
-    },
-    {
-      "id": "arxiv:2609.04166v1",
-      "title": "From Deceptive Outputs to Deceptive Mechanisms: A Causal Framework for Language-Model Deception Research",
-      "url": "http://arxiv.org/abs/2609.04166v1",
-      "source": "arXiv",
-      "via": "arXiv cs.AI",
-      "at": "2026-09-03T17:52:19Z",
-      "score": 0
-    },
-    {
-      "id": "arxiv:2609.04165v1",
-      "title": "Parameterised graph theory for tensor networks: entanglement rerouting, structural simplification, and agnostic tomography",
-      "url": "http://arxiv.org/abs/2609.04165v1",
-      "source": "arXiv",
-      "via": "arXiv cs.AI",
-      "at": "2026-09-03T17:50:38Z",
-      "score": 0
-    },
-    {
-      "id": "arxiv:2609.04159v1",
-      "title": "SENTINEL-RL: Offloading Topological Reasoning from LLM Agents in the Security Operations Center",
-      "url": "http://arxiv.org/abs/2609.04159v1",
-      "source": "arXiv",
-      "via": "arXiv cs.AI",
-      "at": "2026-09-03T17:49:12Z",
-      "score": 0
-    },
-    {
-      "id": "arxiv:2609.04148v1",
-      "title": "Terminal-Universe: Turning Agent Trajectories into Scalable Terminal Environments",
-      "url": "http://arxiv.org/abs/2609.04148v1",
-      "source": "arXiv",
-      "via": "arXiv cs.AI",
-      "at": "2026-09-03T17:41:05Z",
-      "score": 0
-    },
-    {
-      "id": "arxiv:2609.04147v1",
-      "title": "A Low-Cost, Open Platform for End-to-End Autonomous Driving on a Miniature Ackermann Vehicle",
-      "url": "http://arxiv.org/abs/2609.04147v1",
-      "source": "arXiv",
-      "via": "arXiv cs.AI",
-      "at": "2026-09-03T17:40:20Z",
-      "score": 0
-    },
-    {
-      "id": "arxiv:2609.04141v1",
-      "title": "Efficient Test-Time Adaptation through Human-AI Interaction",
-      "url": "http://arxiv.org/abs/2609.04141v1",
-      "source": "arXiv",
-      "via": "arXiv cs.AI",
-      "at": "2026-09-03T17:33:18Z",
-      "score": 0
-    },
-    {
-      "id": "arxiv:2609.04135v1",
-      "title": "The Natural Language Interaction Protocol and Standard for AI Agents",
-      "url": "http://arxiv.org/abs/2609.04135v1",
-      "source": "arXiv",
-      "via": "arXiv cs.AI",
-      "at": "2026-09-03T17:30:17Z",
-      "score": 0
-    },
-    {
-      "id": "arxiv:2609.04134v1",
-      "title": "Prospective Coding Improves Learning in Deep Continuous-Time Recurrent Networks",
-      "url": "http://arxiv.org/abs/2609.04134v1",
-      "source": "arXiv",
-      "via": "arXiv cs.AI",
-      "at": "2026-09-03T17:30:11Z",
-      "score": 0
-    },
-    {
-      "id": "arxiv:2609.04128v1",
-      "title": "Environment Evolution for Terminal Agents",
-      "url": "http://arxiv.org/abs/2609.04128v1",
-      "source": "arXiv",
-      "via": "arXiv cs.AI",
-      "at": "2026-09-03T17:26:33Z",
-      "score": 0
-    },
-    {
-      "id": "arxiv:2609.04127v1",
-      "title": "Epistemic Warrant for LLM Recommendations: Characterizing the Basis for Reliance When Ground Truth Is Unavailable",
-      "url": "http://arxiv.org/abs/2609.04127v1",
-      "source": "arXiv",
-      "via": "arXiv cs.AI",
-      "at": "2026-09-03T17:25:20Z",
-      "score": 0
-    },
-    {
-      "id": "arxiv:2609.04113v1",
-      "title": "Constant regret in general games via higher-order optimism",
-      "url": "http://arxiv.org/abs/2609.04113v1",
-      "source": "arXiv",
-      "via": "arXiv cs.AI",
-      "at": "2026-09-03T17:16:13Z",
-      "score": 0
+      "at": "2026-09-08T16:59:53.000Z",
+      "score": 111
     }
   ]
 }

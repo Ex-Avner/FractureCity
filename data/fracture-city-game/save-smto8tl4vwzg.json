@@ -1,15 +1,15 @@
 {
-  "seed": "fc-e6ctqa",
-  "mode": "campaign",
+  "seed": "fc-r7tdel",
+  "mode": "freeroam",
   "chapter": 0,
   "chapterTitle": "THE EVENING REPORT",
   "finished": false,
-  "updatedAt": 1788273054520,
+  "updatedAt": 1788604303423,
   "playTime": 0,
   "credits": 0,
   "built": 0,
-  "id": "smtirl41ivzh",
-  "name": "EVENING REPORT",
+  "id": "smto8tl4vwzg",
+  "name": "City R7TDEL",
   "campaign": {
     "chapter": 0,
     "progress": {},
@@ -19,14 +19,14 @@
     "finished": false,
     "caseDecision": null,
     "caseFiled": false,
-    "active": true
+    "active": false
   },
   "player": {
-    "x": 10.2,
-    "y": 5.1000000000000005,
-    "z": 9.4,
-    "yaw": -1.5707963267948966,
-    "pitch": -0.05,
+    "x": 0,
+    "y": 4.7,
+    "z": 5,
+    "yaw": 0,
+    "pitch": 0,
     "classKey": "operative",
     "hp": 100
   },
@@ -36,7 +36,7 @@
     "tasksDone": 0,
     "distanceWalked": 0,
     "distanceDriven": 0,
-    "playTime": 0.1,
+    "playTime": 0,
     "blocksMined": 0,
     "blocksPlaced": 0
   },
@@ -52,5 +52,5 @@
     2,
     12
   ],
-  "peaceful": true
+  "peaceful": false
 }
