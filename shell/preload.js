@@ -140,6 +140,6 @@ contextBridge.exposeInMainWorld('fracture', {
   // ── Cross-app data read ──
   // Read another app's stored data. Single-user trust: Visitor can read the
   // latest tot.profile.v1 written by Coherence Assessment, etc.
-  listFrom: (otherSlug)       => ipcRenderer.invoke('data:listKeys', otherSlug),
+  listFrom: (otherSlug)       => ipcRenderer.invoke('data:listFrom', otherSlug),
   readFrom: (otherSlug, key)  => ipcRenderer.invoke('data:readFrom', otherSlug, key),
 });

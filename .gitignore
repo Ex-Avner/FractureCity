@@ -28,3 +28,6 @@ Claude outputs/
 
 # Derived: build-beta.py regenerates this from apps/ + shared/ on demand.
 _build/webbeta-dist/
+
+# Backups the patch scripts write beside anything they edit.
+*.bak

@@ -156,6 +156,21 @@ function buildMenu() {
 }
 
 // ── IPC handlers ─────────────────────────────────────────────────────────────
+//  List another app's data keys. readFrom could already READ one, but nothing
+//  could enumerate them — so the game had no way to find the twelve character
+//  seeds Character Forge had written. Same guard as readFrom: a slug, and only
+//  under DATA_DIR.
+ipcMain.handle('data:listFrom', (e, otherSlug) => {
+  try {
+    if (!/^[a-z0-9-]+$/.test(String(otherSlug || ''))) return [];
+    const dir = path.join(DATA_DIR, otherSlug);
+    if (!fs.existsSync(dir)) return [];
+    return fs.readdirSync(dir)
+      .filter(f => f.endsWith('.json'))
+      .map(f => f.slice(0, -5));
+  } catch (e){ return []; }
+});
+
 ipcMain.handle('registry:list', () => registry.list());
 
 //  Where the apps are actually being read from. The hub shows this, because

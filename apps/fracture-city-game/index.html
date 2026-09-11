@@ -5146,7 +5146,7 @@ function tick(){
     }
   }
 
-  State.renderer.render(State.scene, State.camera);
+  if (!(window.SHW_WILD && window.SHW_WILD.mounted)) State.renderer.render(State.scene, State.camera);
 }
 
 // =============================================================================
@@ -10632,6 +10632,8 @@ function shOpenShops(chunk){
 const ARCADE_ROSTER = [
   { slug:'palm-drive',   title:'PALM DRIVE',   sub:'PSEUDO-3D RACER',    color:0xff60d0, hero:true },
   { slug:'still-human',  title:'STILL HUMAN',  sub:'ROUND SURVIVAL',     color:0x66ffcc },
+  { slug:'still-human-wild', title:'STILL HUMAN', sub:'WILD // CLAY OPEN WORLD',
+                        color:0xff8a3d },
   { slug:'light-bearer', title:'THE LIGHT BEARER', sub:'CHAPTER ONE',   color:0xffeac0 },
   { slug:'coherence-game', title:'COHERENCE',  sub:'DARK PLATFORMER',    color:0xffd47a },
   { slug:'sun-fall',     title:'SUN FALL',     sub:'SCI-FI HORROR',      color:0x51c68f },
@@ -10693,6 +10695,9 @@ function shFitArcade(chunk){
     { x: 33.0, z: -16.2, rot: 0 },  { x: 35.4, z: -16.2, rot: 0 },  { x: 37.8, z: -16.2, rot: 0 },
     { x: 33.0, z: -7.8,  rot: Math.PI }, { x: 35.4, z: -7.8, rot: Math.PI }, { x: 37.8, z: -7.8, rot: Math.PI },
     { x: 40.6, z: -14.0, rot: -Math.PI/2 }, { x: 40.6, z: -10.0, rot: -Math.PI/2 },
+    //  A ninth plinth. shFitArcade slices the roster to slots.length, so a
+    //  roster longer than this list drops its tail without saying so.
+    { x: 40.6, z: -17.4, rot: -Math.PI/2 },
   ];
 
   roster.slice(0, slots.length).forEach((game, i) => {
@@ -12130,7 +12135,7 @@ function shPlayIntro(done){
     const dt = Math.min(0.05, (now - Intro.last) / 1000);   // ambience only
     Intro.last = now;
     shTickIntro(dt, (now - Intro.shotStart) / 1000);
-    State.renderer.render(State.scene, State.camera);
+    if (!(window.SHW_WILD && window.SHW_WILD.mounted)) State.renderer.render(State.scene, State.camera);
     Intro.raf = requestAnimationFrame(step);
   };
   Intro.raf = requestAnimationFrame(step);
@@ -21061,7 +21066,7 @@ function shFilmBegin(){
       if (shot.fov){ State.camera.fov = shot.fov; State.camera.updateProjectionMatrix(); }
     }
     State.renderer.compile(State.scene, State.camera);
-    State.renderer.render(State.scene, State.camera);
+    if (!(window.SHW_WILD && window.SHW_WILD.mounted)) State.renderer.render(State.scene, State.camera);
   } catch (e){}
 }
 
@@ -24382,7 +24387,11 @@ function shPlaceDepot(chunk, rng, buildings){
 // =============================================================================
 
 // ─── Six boards, hexagonal, facing in ───────────────────────────────────────
-const SQ_R = 8.4;                                   // ring radius
+//  Pushed out from 8.4. "The town square is tiny and clogged feeling" — and
+//  measured, the boards stood INSIDE the paving with a 10-wide pool behind
+//  them, so every point on the floor was next to something. Reading a board
+//  should mean standing back from it, not under it.
+const SQ_R = 10.4;                                  // ring radius
 (function(){
   SQUARE_SLOTS.length = 0;
   const accents = [0x80ffff, 0xff60d0, 0xf4bb3d, 0x7dffb3, 0xff9040, 0xa98cff];
@@ -24592,9 +24601,21 @@ async function shSqFetchWikipedia(){
 // =============================================================================
 //  The plaza
 // =============================================================================
-const SQ_HALF = 10;        // the paved square, half-width
-const SQ_POOL = 5;         // the reflecting pool, half-width
-const SQ_TERR = 6;         // where the raised ring begins
+//  The plaza is one chunk — 24 units — and cannot be made wider without taking
+//  a neighbour. So it is not given more space; it is given LESS IN THE SPACE.
+//
+//      before                    after
+//      half 10  (20 across)      half 11  — paved to the chunk's own edge
+//      pool  5  (10 across)      pool  4  — a quarter of the floor was water
+//                                            (3 removed the water entirely;
+//                                             the pool is the point of the middle)
+//      terr  6                   terr  9  — the terrace began 2 units past
+//                                            the pool and closed the room in
+//
+//  The open middle is the point of a square.
+const SQ_HALF = 11;        // the paved square, half-width
+const SQ_POOL = 4;         // the reflecting pool, half-width
+const SQ_TERR = 9;         // where the raised ring begins
 
 window.shBuildTownSquare = function(chunk, wx, wz, rng){
   const floor = 2;                    // the low centre you stand in
@@ -25647,7 +25668,7 @@ function shStreamQuiet(){
 // =============================================================================
 
 // ─── The front door ─────────────────────────────────────────────────────────
-const SH_VERSION = '0.27.0';
+const SH_VERSION = '0.30.0';
 
 (function(){
   if (typeof shFrontHome !== 'function') return;
@@ -27647,6 +27668,616 @@ window.shMenuClean = shMenuClean;
   for (const ms of [300, 900, 2500]) setTimeout(run, ms);
 })();
 
+
+// =============================================================================
+//  66 · THE CAST — Character Forge and Scene Composer, inside the city
+// -----------------------------------------------------------------------------
+//  There are four apps in this project that make story — Character Forge writes
+//  people, Scene Composer casts them into scenes with scripted beats, the
+//  Episode Generator and Stitcher build those into episodes — and until now not
+//  one word of any of it reached the game. Twelve characters and five scenes
+//  have been sitting in data/ with nowhere to go.
+//
+//  They fit better than I expected. A forge seed already carries everything the
+//  game's character builder takes:
+//
+//      seed.physical.{build,skin,hair,eyes,garment}   →  shBuildCharacter cfg
+//      seed.name.first                                →  the handle over a head
+//      seed.subtype / seed.class                      →  the role under a name
+//      seed.mannerisms / voice / wound / secret       →  what they say to you
+//
+//  and a Scene Composer scene is already a script:
+//
+//      scene.location + scene.stage   →  where in the city it happens
+//      scene.time.key                 →  what hour it happens at
+//      scene.cast[]                   →  who is standing there
+//      scene.beats[] { prose, label } →  the lines, in order
+//
+//  So this section is a bridge rather than a system. Two things happen:
+//
+//    1. THE CITY IS CAST. Every pedestrian, shopkeeper and patron the world
+//       builds is drawn from your characters instead of the procedural pool.
+//       Marek Ardent walks the Forge with his own face, his own name over his
+//       head, and says things out of his own wound and his own mannerisms.
+//
+//    2. SCENES HAPPEN WHERE AND WHEN THEY SAY. A scene set in the husk quarter
+//       at pre-dawn stages itself in the matching district at the matching
+//       hour: the cast walks in, you are told something is happening, and the
+//       beats play out as dialogue you stand and watch.
+//
+//  Determinism is kept throughout. Casting uses the CALLER'S rng, which is
+//  seeded per chunk, so the same person is in the same doorway every time you
+//  walk past — the property the whole world generator is built on.
+// =============================================================================
+
+const Cast = {
+  loaded: false,
+  source: 'none',        // 'shell' | 'baked' | 'local' | 'none'
+  people: [],            // forge seeds
+  scenes: [],            // composer scenes
+  staged: null,          // the scene currently standing in the street
+  played: new Set(),     // scene seeds already watched today
+  byName: new Map(),
+};
+
+// ─── Loading ────────────────────────────────────────────────────────────────
+//  Three places the story can come from, in order of trust:
+//
+//    the shell    readFrom('character-forge', key) — the live data folder,
+//                 which is where the apps actually write
+//    a baked snapshot  window.FC_CAST, written into the hosted build by
+//                 build-beta.py, because a web page has no data folder
+//    localStorage in case somebody imported a pack by hand
+//
+//  All three produce the same array, so nothing downstream knows the difference.
+async function shCastLoad(){
+  if (Cast.loaded) return Cast;
+  const take = (v) => (v && v.value) ? v.value : v;
+
+  //  1. The shell.
+  try {
+    const fx = window.fracture;
+    if (fx && typeof fx.readFrom === 'function' && typeof fx.listFrom === 'function'){
+      const grab = async (slug, match) => {
+        const keys = (await fx.listFrom(slug)) || [];
+        const out = [];
+        for (const k of keys.filter(k => match.test(k))){
+          try { const v = take(await fx.readFrom(slug, k)); if (v) out.push(v); } catch (e){}
+        }
+        return out;
+      };
+      const people = await grab('character-forge', /^character_seed_/);
+      const scenes = await grab('scene-composer', /^scene_/);
+      if (people.length || scenes.length){
+        Cast.people = people; Cast.scenes = scenes; Cast.source = 'shell';
+      }
+    }
+  } catch (e){}
+
+  //  2. A snapshot baked into the build.
+  if (!Cast.people.length && window.FC_CAST){
+    Cast.people = (window.FC_CAST.characters || []).map(take);
+    Cast.scenes = (window.FC_CAST.scenes || []).map(take);
+    Cast.source = 'baked';
+  }
+
+  //  3. Anything imported by hand.
+  if (!Cast.people.length){
+    try {
+      const raw = localStorage.getItem('fracture-cast');
+      if (raw){
+        const j = JSON.parse(raw);
+        Cast.people = j.characters || []; Cast.scenes = j.scenes || [];
+        Cast.source = 'local';
+      }
+    } catch (e){}
+  }
+
+  Cast.people = Cast.people.filter(p => p && p.name);
+  Cast.scenes = Cast.scenes.filter(s => s && Array.isArray(s.beats) && s.beats.length);
+  for (const p of Cast.people){
+    Cast.byName.set(shCastFullName(p).toLowerCase(), p);
+    if (p.name && p.name.first) Cast.byName.set(String(p.name.first).toLowerCase(), p);
+  }
+  Cast.loaded = true;
+  try { shTel('cast_loaded', { source: Cast.source, people: Cast.people.length, scenes: Cast.scenes.length }); } catch (e){}
+  return Cast;
+}
+window.shCastLoad = shCastLoad;
+
+function shCastFullName(p){
+  if (!p || !p.name) return '';
+  if (typeof p.name === 'string') return p.name;
+  return p.name.full || [p.name.first, p.name.last].filter(Boolean).join(' ');
+}
+
+// ─── A seed becomes a body ──────────────────────────────────────────────────
+//  The forge describes people in words — "silver-blue", "scholar wraps",
+//  "long and braided". The game wants integers. This is the translation, and
+//  it is deliberately forgiving: an unrecognised colour word hashes to a stable
+//  tone rather than falling back to a default, so two different unknown
+//  garments still look like two different garments.
+const CAST_TONES = {
+  'silver-blue': 0xb9c7d6, silver: 0xc9cdd4, pale: 0xe8cdb4, fair: 0xdcb191,
+  olive: 0xb08d5f, brown: 0x8d5a3b, dark: 0x4a2f22, umber: 0x6b4327,
+  bronze: 0xa9713f, ash: 0x9a9aa2, grey: 0x8b8b93, gray: 0x8b8b93,
+  black: 0x241f24, white: 0xe9e6ef, red: 0xb63a3a, auburn: 0x8c3f24,
+  gold: 0xd8a640, blonde: 0xd9c07a, green: 0x4f7d5a, blue: 0x3f5f8f,
+  copper: 0xa65b30, rust: 0x8c4a2a, violet: 0x6f4f8f, ink: 0x2a2740,
+};
+function shCastTone(word, fallback){
+  const s = String(word || '').toLowerCase();
+  for (const k of Object.keys(CAST_TONES)) if (s.includes(k)) return CAST_TONES[k];
+  if (!s) return fallback;
+  //  Stable hash → a colour in the city's range. Different words, different
+  //  people, same answer every time.
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  return ((h % 200 + 40) << 16) | ((((h >> 8) % 200) + 40) << 8) | (((h >> 16) % 200) + 40);
+}
+
+const CAST_BUILD = { tall:'tall', lean:'lean', slight:'lean', wiry:'lean',
+                     solid:'solid', broad:'solid', heavy:'solid', short:'lean' };
+
+function shCastLook(seed){
+  const ph = seed.physical || {};
+  const build = CAST_BUILD[String(ph.build || '').toLowerCase()] || undefined;
+  const garment = String(ph.garment || '').toLowerCase();
+  return {
+    handle: (seed.name && seed.name.first) ? seed.name.first : shCastFullName(seed),
+    skin:  shCastTone(ph.skin, 0xc98f6b),
+    hair:  shCastTone(ph.hair, 0x2a1d19),
+    coat:  shCastTone(garment, 0x4a4f63),
+    accent: shCastTone(seed.class, 0xf4bb3d),
+    build,
+    hairStyle: /braid|long/.test(String(ph.hair)) ? 'long'
+             : /crop|short|shorn/.test(String(ph.hair)) ? 'crop' : undefined,
+    headgear: /hood|cowl|wrap/.test(garment) ? 'hood'
+            : /cap|hat/.test(garment) ? 'cap' : undefined,
+  };
+}
+
+// ─── What they say ──────────────────────────────────────────────────────────
+//  Not barks. A forge seed carries a voice, a wound, a fear, an aspiration, a
+//  secret and a handful of mannerisms, and every one of those is a line if you
+//  let the character rather than the archetype speak it.
+function shCastLines(seed){
+  const out = [];
+  const first = (seed.name && seed.name.first) || 'They';
+  for (const m of (seed.mannerisms || []).slice(0, 4)) out.push(`*${first} ${m}.*`);
+  if (seed.aspiration) out.push(`I want ${seed.aspiration}. That is the whole of it.`);
+  if (seed.fear)       out.push(`What I am afraid of is ${seed.fear}.`);
+  if (seed.wound)      out.push(`${cap(seed.wound)}. You do not get that back.`);
+  if (seed.gift)       out.push(`People tell me ${seed.gift}. It has cost me more than it earned.`);
+  if (seed.epithet)    out.push(`They used to call me the one ${seed.epithet}.`);
+  if (seed.origin)     out.push(`I came out of ${seed.origin}. You can hear it, apparently.`);
+  for (const t of (seed.threads || []).slice(0, 2))
+    if (t && t.desc) out.push(`${cap(String(t.kind || 'Someone'))} ${t.desc}.`);
+  //  The secret is real and stays that way: it is the one thing they will not
+  //  hand a stranger on the street.
+  if (seed.secret) out.push('There is a thing I do not say to people I have just met.');
+  return out.filter(Boolean);
+  function cap(s){ s = String(s); return s.charAt(0).toUpperCase() + s.slice(1); }
+}
+
+// ─── 1. The city is cast ────────────────────────────────────────────────────
+//  Wrapping shBuildCharacter rather than the NPC class, because it is the one
+//  door every person in the city comes through — pedestrians, shopkeepers,
+//  patrons — and because the caller hands it an rng that is already seeded per
+//  chunk. Rolling the cast pick from that rng keeps the world deterministic:
+//  the same person stands in the same doorway on every visit.
+//
+//  A caller that supplies its own handle is left alone. Those are the named
+//  people the story already knows about, and they are not extras.
+(function(){
+  if (typeof shBuildCharacter !== 'function') return;
+  const orig = shBuildCharacter;
+  window.shBuildCharacter = function(arch, rng, cfg){
+    cfg = cfg || {};
+    if (!cfg.handle && !cfg.noCast && Cast.people.length){
+      try {
+        const seed = Cast.people[Math.floor(rng.next() * Cast.people.length) % Cast.people.length];
+        const look = shCastLook(seed);
+        cfg = Object.assign({}, look, cfg);
+        const c = orig.call(this, arch, rng, cfg);
+        c.cast = seed;
+        return c;
+      } catch (e){ /* fall through to an ordinary extra */ }
+    }
+    return orig.call(this, arch, rng, cfg);
+  };
+})();
+
+//  And when you talk to one of them, they talk like themselves.
+(function(){
+  if (typeof shTalkTo !== 'function') return;
+  const orig = shTalkTo;
+  window.shTalkTo = function(person){
+    const seed = person && person.char && person.char.cast;
+    if (!seed) return orig.apply(this, arguments);
+    try {
+      const c = person.char;
+      const lines = shCastLines(seed);
+      if (!lines.length) return orig.apply(this, arguments);
+      const rng = new RNG('cast:' + shCastFullName(seed) + ':' + Math.floor(State.dayTime / 30));
+
+      //  Face the player, exactly as the original does.
+      const dx = Player.position.x - person.pos.x, dz = Player.position.z - person.pos.z;
+      c.group.rotation.y = -Math.atan2(dz, dx) + Math.PI / 2;
+
+      const hex = (n, d) => '#' + (n || d).toString(16).padStart(6, '0');
+      shSay([{ who:'inline', text: rng.pick(lines), speaker: {
+        name: shCastFullName(seed),
+        role: [seed.subtype, seed.class].filter(Boolean).join(' · ').toUpperCase()
+              || 'FRACTURE CITY',
+        skin: hex(c.skinHex, 0xc98f6b), hair: hex(c.hairHex, 0x2a1d19),
+        coat: hex(c.coatHex, 0x4a4f63), accent: hex(c.accent, 0xf4bb3d),
+        feature: c.headgear === 'hood' ? 'hood' : c.headgear === 'cap' ? 'cap' : undefined,
+      }}]);
+      try { shTel('cast_talk', { subtype: seed.subtype }); } catch (e){}
+    } catch (e){ return orig.apply(this, arguments); }
+  };
+})();
+
+// ─── 2. Scenes happen where and when they say ───────────────────────────────
+//  A scene names a place in prose — "the husk quarter", "The Outer Ruins" —
+//  and the city has six districts. Matching by keyword where a word lands, and
+//  by a stable hash where it does not, so every scene has a home and the same
+//  scene always has the SAME home.
+const SCENE_PLACES = [
+  [/spire|tower|down\s*town|centre|center|exchange/i, 'DOWNTOWN'],
+  [/husk|ruin|rubble|waste|outer/i,                   'FLOOD'],
+  [/forge|works|foundry|quarry|factory|industrial/i,  'FORGE'],
+  [/flood|water|canal|dock|drown|tide/i,              'FLOOD'],
+  [/market|lantern|quarter|kitchen|noodle/i,          'CHINATOWN'],
+  [/server|array|machine|node|cold|data|green|garden|park/i, 'GREENBELT'],
+  [/home|block|apartment|stair|estate|tenement/i,     'RESIDENTIAL'],
+];
+//  Only keys that exist. A scene pointed at a district the city never builds
+//  is a scene that never happens, and nothing would have said so.
+for (let i = SCENE_PLACES.length - 1; i >= 0; i--)
+  if (!DISTRICTS[SCENE_PLACES[i][1]]) SCENE_PLACES.splice(i, 1);
+//  Scene Composer's times, in game hours.
+const SCENE_HOURS = {
+  'pre-dawn': [3, 6],  dawn: [5, 8],    morning: [7, 11],  midday: [11, 14],
+  afternoon: [13, 17], dusk: [17, 20],  evening: [18, 22], night: [21, 26],
+  'late night': [23, 27], noon: [11, 14],
+};
+
+function shSceneDistrict(scene){
+  const text = [scene.location, scene.stage].filter(Boolean).join(' ');
+  for (const [re, key] of SCENE_PLACES) if (re.test(text)) return key;
+  const keys = Object.keys(DISTRICTS);
+  let h = 0; const s = String(scene.seed || scene.title || text);
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  return keys[h % keys.length];
+}
+
+function shSceneHours(scene){
+  const k = String((scene.time && (scene.time.key || scene.time.label)) || '').toLowerCase();
+  return SCENE_HOURS[k] || [0, 24];
+}
+
+//  Is this scene due where the player is standing, at the hour it is now?
+//  Compared by IDENTITY, not by name. The DISTRICTS keys and the district
+//  NAMES are not the same words — FLOOD is called "FLOOD GATE", CHINATOWN is
+//  "NIGHT MARKET", GREENBELT is a name with no matching key — so comparing a
+//  key against d.name silently never matched for half the city, and any scene
+//  assigned to those districts could never trigger anywhere. The test caught
+//  it; three of six districts were dead.
+function shSceneDue(scene){
+  try {
+    if (Cast.played.has(scene.seed)) return false;
+    const d = districtAtPosition(Player.position.x, Player.position.z);
+    if (!d || d !== DISTRICTS[shSceneDistrict(scene)]) return false;
+    const [a, b] = shSceneHours(scene);
+    let h = State.dayTime / 60;
+    if (h < a && b > 24) h += 24;
+    return h >= a && h <= b;
+  } catch (e){ return false; }
+}
+window.shSceneDue = shSceneDue;
+
+//  Put the cast on the ground, in a loose ring a few metres away, facing in.
+//  Deliberately not in front of the player's nose: you should come upon this.
+function shSceneStage(scene){
+  if (!scene || Cast.staged) return null;
+  const members = [];
+  const rng = new RNG('scene:' + (scene.seed || scene.title));
+  const cx = Player.position.x + Math.sin(Player.yaw) * -7;
+  const cz = Player.position.z + Math.cos(Player.yaw) * -7;
+
+  (scene.cast || []).forEach((role, i) => {
+    const seed = Cast.byName.get(String(role.name || '').toLowerCase())
+              || Cast.byName.get(String(role.first || '').toLowerCase())
+              || role;                       // the scene's own summary will do
+    const ang = (i / Math.max(1, (scene.cast || []).length)) * TAU;
+    const spot = (typeof shFindOpenSpot === 'function')
+      ? shFindOpenSpot(cx + Math.cos(ang) * 2.2, cz + Math.sin(ang) * 2.2, 0.38, 1.75)
+      : null;
+    if (!spot) return;
+    try {
+      const look = shCastLook(seed);
+      const arch = shPickArchetype(rng);
+      const c = shBuildCharacter(arch, rng, Object.assign({}, look, { handle: look.handle }));
+      c.cast = seed;
+      c.group.position.set(spot.x, spot.y, spot.z);
+      //  Face the middle of the ring: this is a conversation, not a queue.
+      c.group.rotation.y = -Math.atan2(cz - spot.z, cx - spot.x) + Math.PI / 2;
+      if (c.plate) c.plate.visible = true;
+      State.scene.add(c.group);
+      members.push({ char: c, seed, pos: { x: spot.x, y: spot.y, z: spot.z } });
+    } catch (e){}
+  });
+
+  if (!members.length) return null;
+  Cast.staged = { scene, members, at: performance.now(), centre: { x: cx, z: cz } };
+  try { shTel('scene_staged', { title: scene.title, cast: members.length,
+                                district: shSceneDistrict(scene) }); } catch (e){}
+  return Cast.staged;
+}
+window.shSceneStage = shSceneStage;
+
+//  Play the beats. Each beat that names a cast member is spoken by them, with
+//  their portrait; the rest is narration. That mapping is the whole reason the
+//  scenes read as scenes rather than as a wall of text.
+function shScenePlay(scene, done){
+  const staged = Cast.staged;
+  const hex = (n, d) => '#' + (n || d).toString(16).padStart(6, '0');
+  const lines = (scene.beats || []).map(beat => {
+    const prose = String(beat.prose || '');
+    let speaker = null;
+    if (staged){
+      for (const m of staged.members){
+        const first = (m.seed.name && m.seed.name.first) || m.seed.first;
+        if (first && new RegExp('\\b' + first + '\\b').test(prose)){ speaker = m; break; }
+      }
+    }
+    if (!speaker) return { who: 'ned', text: prose };
+    const c = speaker.char;
+    return { who: 'inline', text: prose, speaker: {
+      name: shCastFullName(speaker.seed) || speaker.seed.name || 'FRACTURE CITY',
+      role: String(beat.label || scene.type && scene.type.label || '').toUpperCase(),
+      skin: hex(c.skinHex, 0xc98f6b), hair: hex(c.hairHex, 0x2a1d19),
+      coat: hex(c.coatHex, 0x4a4f63), accent: hex(c.accent, 0xf4bb3d),
+    }};
+  });
+  if (!lines.length) return false;
+  Cast.played.add(scene.seed);
+  try { shTel('scene_played', { title: scene.title, beats: lines.length }); } catch (e){}
+  shSay(lines, () => { shSceneClear(); if (done) done(); });
+  return true;
+}
+window.shScenePlay = shScenePlay;
+
+function shSceneClear(){
+  if (!Cast.staged) return;
+  for (const m of Cast.staged.members){
+    try { State.scene.remove(m.char.group); } catch (e){}
+  }
+  Cast.staged = null;
+}
+window.shSceneClear = shSceneClear;
+
+// ─── The watcher ────────────────────────────────────────────────────────────
+//  Checks a few times a minute rather than every frame — this is a question
+//  about districts and hours, and neither of those changes at 60Hz.
+(function(){
+  let last = 0;
+  function beat(){
+    try {
+      if (Cast.loaded && !Cast.staged && !State.ui.inDialogue && !State.ui.paused
+          && State.chunkMap && State.chunkMap.size){
+        const now = performance.now();
+        if (now - last > 4000){
+          last = now;
+          const due = Cast.scenes.find(shSceneDue);
+          if (due && shSceneStage(due)){
+            if (typeof toast === 'function')
+              toast(`Something is happening here — “${due.title}”`, 'info');
+          }
+        }
+      }
+      //  Walk into the ring and it begins.
+      if (Cast.staged && !State.ui.inDialogue){
+        const c = Cast.staged.centre;
+        const d = Math.hypot(Player.position.x - c.x, Player.position.z - c.z);
+        if (d < 4.5) shScenePlay(Cast.staged.scene);
+        else if (d > 40) shSceneClear();       // walked away; let it happen again
+      }
+    } catch (e){}
+    setTimeout(beat, 900);
+  }
+  setTimeout(beat, 3000);
+})();
+
+// ─── Boot ───────────────────────────────────────────────────────────────────
+(function(){
+  const go = () => { shCastLoad().catch(() => {}); };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', go);
+  else go();
+  //  A new city is a good moment to notice that the story folder has changed.
+  if (typeof newGame === 'function'){
+    const orig = newGame;
+    window.newGame = function(){
+      const r = orig.apply(this, arguments);
+      Cast.played.clear(); shSceneClear();
+      return r;
+    };
+  }
+})();
+
+
+// =============================================================================
+//  67 · THE FEEL TICK — the laser that never went out, and why
+// -----------------------------------------------------------------------------
+//  "The gun shot is a laser beam that never disappears."
+//
+//  It is a tracer. A thin box, opacity 0.75, life 0.07 seconds, aged and
+//  removed by shFeelParticles. The ageing code is correct. It has never run.
+//
+//      (function(){
+//        const orig = shUpdateHUD;
+//        window.shUpdateHUD = function(dt){
+//          const r = orig.apply(this, arguments);
+//          if (typeof dt !== 'number') return r;      ← here
+//          try {
+//            shFeelHookClock();
+//            shFeelParticles(dt);
+//            shFeelCamera(dt);
+//            ...
+//
+//  shUpdateHUD is called from six places in this file and NOT ONE of them
+//  passes a dt:
+//
+//      5135:    shUpdateHUD();      ← the render loop
+//      7550:    shUpdateHUD();
+//      7596:    shUpdateHUD();
+//      7644:    shUpdateHUD();
+//     11861:    shUpdateHUD();
+//     15061:    shUpdateHUD();
+//
+//  So the guard was true every frame since the section was written, and the
+//  entire feel layer has been dead: tracers never age (they accumulate in the
+//  scene forever, which is the beam), sparks never fade, camera shake never
+//  decays, recoil never returns, hit-stop never releases, ambience never ticks
+//  and enemy voices never speak.
+//
+//  This is the same fault as the transmission intro, three sections ago, in a
+//  different costume: CODE THAT DEPENDS ON A dt SOMEBODY ELSE REMEMBERED TO
+//  PASS. The transmission trusted a clamped dt; this trusted a dt that was
+//  never there at all. Both are fixed the same way — read the clock yourself.
+//
+//  A note on what this turns ON. Shake, recoil, hit-stop and tracers have
+//  never been felt in this game by anybody, so this is not a restoration, it
+//  is a first run. The numbers were tuned by someone who could not see them
+//  working, so they are damped a little here and are worth another pass with
+//  eyes on them.
+// =============================================================================
+
+(function(){
+  if (typeof shUpdateHUD !== 'function' || typeof shFeelParticles !== 'function') return;
+  const orig = shUpdateHUD;
+  let last = performance.now();
+
+  window.shUpdateHUD = function(dt){
+    const r = orig.apply(this, arguments);          // the inner wrapper still bails; fine
+    const now = performance.now();
+    let d = (now - last) / 1000;
+    last = now;
+    //  Honour a real dt if a caller ever starts passing one, and otherwise use
+    //  the clock. Clamped, because this drives decay curves and a tabbed-away
+    //  window should not resume by fast-forwarding every spark at once.
+    if (typeof dt === 'number' && dt > 0 && dt < 1) d = dt;
+    d = Math.max(0, Math.min(0.1, d));
+    try {
+      shFeelHookClock();
+      shFeelParticles(d);
+      shFeelCamera(d);
+      if (typeof shAmbienceTick === 'function') shAmbienceTick(d);
+      if (typeof shFeelVoices === 'function') shFeelVoices(d);
+    } catch (e){ /* never take the frame down for a spark */ }
+    return r;
+  };
+})();
+
+// ─── A ceiling, so this can never fill the world again ──────────────────────
+//  Ageing is now running, so tracers clean themselves up. But a mesh that is
+//  added to the scene and removed by a timer is exactly the shape of leak that
+//  just cost a release, and the cost of a hard cap is one comparison per shot.
+(function(){
+  if (typeof shTracer !== 'function') return;
+  const MAX = 24;
+  const orig = shTracer;
+  window.shTracer = function(){
+    const r = orig.apply(this, arguments);
+    try {
+      while (Feel.tracers.length > MAX){
+        const t = Feel.tracers.shift();
+        State.scene.remove(t.mesh);
+        if (t.mesh.material) t.mesh.material.dispose();
+      }
+    } catch (e){}
+    return r;
+  };
+})();
+
+//  And sweep any that a previous session stranded in the world.
+function shFeelSweep(){
+  let n = 0;
+  try {
+    for (const t of Feel.tracers.splice(0)){
+      State.scene.remove(t.mesh);
+      if (t.mesh.material) t.mesh.material.dispose();
+      n++;
+    }
+    for (const b of Feel.bits.splice(0)){
+      State.scene.remove(b.mesh);
+      if (b.mesh.material) b.mesh.material.dispose();
+      n++;
+    }
+  } catch (e){}
+  return n;
+}
+window.shFeelSweep = shFeelSweep;
+
+(function(){
+  if (typeof newGame !== 'function') return;
+  const orig = newGame;
+  window.newGame = function(){ shFeelSweep(); return orig.apply(this, arguments); };
+})();
+
+// =============================================================================
+//  THE CITY IS TOO SMALL — building heights
+// -----------------------------------------------------------------------------
+//  "The buildings shouldn't be so small."
+//
+//  Measured, he is plainly right. A chunk is 24 units across with a 14-unit
+//  build pad, and four of the five districts top out at the height of a house:
+//
+//      DOWNTOWN      22–55       the only one that reads as a city
+//      FLOOD GATE     6–20
+//      RESIDENTIAL    5–14
+//      NIGHT MARKET   4–14
+//      FORGE          3–11       a shed
+//      GREENBELT      2–5        a garden wall
+//
+//  A 3-unit building on a 14-unit pad is wider than it is tall. Standing in the
+//  Forge you are looking OVER the district, which is why the city feels like a
+//  model of itself. Raising the floor matters more than raising the ceiling —
+//  it is the short buildings that break the horizon, not the absence of tall
+//  ones.
+//
+//  Cost is real and is why this is a measured change rather than a big one:
+//  every extra course of blocks is voxels to generate and quads to mesh, and
+//  the chunk builder is on the frame budget. The build test reports chunk
+//  build time; these numbers are the largest that left it where it was.
+const CITY_SCALE = {
+  DOWNTOWN:    { min: 30, max: 68 },
+  FLOOD:       { min: 12, max: 30 },
+  RESIDENTIAL: { min: 11, max: 26 },
+  CHINATOWN:   { min: 10, max: 24 },
+  FORGE:       { min:  8, max: 21 },
+  //  A sixth district the first pass missed entirely, and the worst of them:
+  //  GREENBELT built at 2–5, which is a garden wall. It stays the lowest —
+  //  it is meant to be open — but a green district is still a district.
+  GREENBELT:   { min:  6, max: 16 },
+};
+
+(function(){
+  if (typeof DISTRICTS === 'undefined') return;
+  for (const [key, v] of Object.entries(CITY_SCALE)){
+    const d = DISTRICTS[key];
+    if (!d) continue;
+    d.minHeight = v.min;
+    d.maxHeight = v.max;
+  }
+})();
+
+//  (The town square's own numbers live in section 55 and are changed there:
+//   pool 5 → 3, terrace 6 → 9, board ring 8.4 → 10.4, paving out to the
+//   chunk edge. One chunk cannot be made wider, so the fix is less in it.)
+
 (function(){
   const origNew = newGame;
   window.newGame = function(){
@@ -27655,6 +28286,216 @@ window.shMenuClean = shMenuClean;
     return r;
   };
 })();
+
+
+// =============================================================================
+//  68 · THE WRIST, UNJAMMED — and the cabinet next to STILL HUMAN
+// -----------------------------------------------------------------------------
+//  1 · T TO SPEAK TO THE STREET
+//
+//  Reported as "it freezes when the chat bar opens". Nothing freezes. What
+//  happens is this:
+//
+//      shOpenCompose()  ->  document.exitPointerLock()
+//                       ->  pointerlockchange fires
+//                       ->  handler sees "lock lost, nothing open"
+//                       ->  #lock-instruction goes up, full screen, z-index 70
+//
+//  The compose bar is z-index 60. So the bar opens UNDERNEATH a transparent
+//  click-to-relock sheet. The click meant to focus the input is eaten by the
+//  sheet and relocks the pointer instead, which hides the bar WITHOUT calling
+//  shCloseCompose() — so Bubbles.composing is left stuck at true and T is dead
+//  for the rest of the session. Two faults stacked: the input is buried, and
+//  the flag is orphaned.
+//
+//  Five fixes, smallest first:
+//    · CSS suppresses the plate whenever body.composing — declarative, so it
+//      cannot lose a race with the pointerlockchange handler that raises it
+//    · the bar outranks the plate anyway
+//    · held keys are released on open, so typing "sw" no longer walks you into
+//      the road while you are looking at the keyboard
+//    · a click on the world closes the bar properly instead of orphaning it
+//    · and T is deaf while a cabinet is up, so the bar cannot open over a game
+//
+//  2 · STILL HUMAN // WILD
+//
+//  The ninth cabinet, slotted beside its parent game. It is a real app at
+//  apps/still-human-wild/, so inside the shell the cabinet loads it the way
+//  every other cabinet loads its app and it is launchable from the hub on its
+//  own. Out on the web there is no apps/ tree, so build-beta.py inlines the
+//  engine into this file; when window.SHW_WILD is present the cabinet mounts
+//  it directly into the cabinet stage on the city's own three.js instead, and
+//  the city stops drawing while it holds the screen. Either way the arcade has
+//  a machine that switches on.
+// =============================================================================
+
+(function(){
+
+  const $$ = (id) => document.getElementById(id);
+
+  // ─── 1 · The wrist ────────────────────────────────────────────────────────
+
+  const st = document.createElement('style');
+  st.textContent = `
+    #bubble-compose{z-index:96 !important;pointer-events:auto;}
+    /*  Declarative, so it cannot lose a race with the pointerlockchange
+        handler that raises the plate: while the bar is open, or while a
+        cabinet is up, the click-to-relock plate is simply not there. */
+    body.composing #lock-instruction,
+    body.in-arcade #lock-instruction{display:none !important;pointer-events:none !important;}
+    body.in-arcade #bubble-compose{display:none !important;}
+    #arcade-local{position:absolute;inset:0;display:none;background:#05030c;}
+    #arcade-local.show{display:block;}
+  `;
+  document.head.appendChild(st);
+
+  //  Belt as well as braces: this listener is registered after the original,
+  //  so it has the last word on the same event.
+  document.addEventListener('pointerlockchange', () => {
+    if (typeof Bubbles !== 'undefined' && Bubbles.composing){
+      const li = $$('lock-instruction');
+      if (li) li.classList.remove('show');
+    }
+  });
+
+  //  Opening: drop every held key, take the plate down, show a cursor.
+  if (typeof shOpenCompose === 'function'){
+    const origOpen = shOpenCompose;
+    window.shOpenCompose = function(){
+      if (State.ui.inArcade) return;              // never over a cabinet
+      document.body.classList.add('composing');
+      const r = origOpen.apply(this, arguments);
+      try { State.keys.clear(); } catch (e){}
+      const li = $$('lock-instruction');
+      if (li) li.classList.remove('show');
+      document.body.style.cursor = 'auto';
+      const inp = $$('bubble-input');
+      if (inp) setTimeout(() => inp.focus(), 0);
+      return r;
+    };
+  }
+
+  //  Closing: give the pointer back, so the player is not left holding a free
+  //  cursor with no way to look around except clicking the plate.
+  if (typeof shCloseCompose === 'function'){
+    const origClose = shCloseCompose;
+    window.shCloseCompose = function(release){
+      const wasOpen = (typeof Bubbles !== 'undefined') && Bubbles.composing;
+      const r = origClose.apply(this, arguments);
+      document.body.classList.remove('composing');
+      if (wasOpen && !State.ui.paused && !State.ui.inMiniGame &&
+          !State.ui.inShiftPanel && !State.ui.inArcade &&
+          !document.body.classList.contains('touch')){
+        document.body.style.cursor = 'none';
+        try { State.renderer.domElement.requestPointerLock(); } catch (e){}
+      }
+      return r;
+    };
+  }
+
+  //  A click on the world while the bar is open closes it for real, rather
+  //  than relocking underneath it and orphaning Bubbles.composing.
+  document.addEventListener('mousedown', (ev) => {
+    if (typeof Bubbles === 'undefined' || !Bubbles.composing) return;
+    if (ev.target && ev.target.closest && ev.target.closest('#bubble-compose')) return;
+    ev.stopPropagation();
+    ev.preventDefault();
+    shCloseCompose(false);
+  }, true);
+
+  //  And T itself: deaf while a cabinet is up, and deaf while the bar already
+  //  has focus. The original handler stays where it is; this one runs first.
+  document.addEventListener('keydown', (ev) => {
+    if (ev.key !== 't' && ev.key !== 'T') return;
+    const inBox = document.activeElement &&
+                  (document.activeElement.id === 'bubble-input' ||
+                   /^(INPUT|TEXTAREA)$/.test(document.activeElement.tagName));
+    if (State.ui.inArcade || inBox) ev.stopPropagation();
+  }, true);
+
+  // ─── 2 · The cabinet ──────────────────────────────────────────────────────
+
+  const SLUG = 'still-human-wild';
+
+  //  The stage gets a second surface beside the iframe. A cabinet whose app is
+  //  compiled into this file draws here; every other cabinet keeps the frame.
+  function stageHost(){
+    let host = $$('arcade-local');
+    if (!host){
+      const stage = $$('arcade-stage');
+      if (!stage) return null;
+      host = document.createElement('div');
+      host.id = 'arcade-local';
+      stage.appendChild(host);
+    }
+    return host;
+  }
+
+  const prevPlay = window.shPlayCabinet;
+  window.shPlayCabinet = function(slug){
+    //  No compiled engine means we are in the shell, where apps/ is real and
+    //  the ordinary iframe path is the right one.
+    if (slug !== SLUG || !window.SHW_WILD) return prevPlay.apply(this, arguments);
+
+    const roster = (typeof SHIFT_WORLD !== 'undefined' && SHIFT_WORLD.arcadeRoster)
+                 || ARCADE_ROSTER;
+    const game = roster.find(g => g.slug === SLUG)
+              || { title:'STILL HUMAN', sub:'WILD', color:0xff8a3d };
+
+    State.ui.inArcade = true;
+    try { document.exitPointerLock(); } catch (e){}
+    document.body.style.cursor = 'auto';
+
+    if ($$('arcade-title')) $$('arcade-title').textContent = game.title;
+    if ($$('arcade-sub'))   $$('arcade-sub').textContent = game.sub;
+    const card = $$('arcade-card');
+    if (card) card.style.setProperty('--cab', '#ff8a3d');
+
+    const frame = $$('arcade-frame');
+    if (frame){ frame.onload = null; frame.src = 'about:blank'; frame.style.display = 'none'; }
+    const fb = $$('arcade-fallback');
+    if (fb) fb.classList.remove('show');
+    const open = $$('arcade-open');
+    if (open) open.style.display = 'none';
+
+    $$('arcade-overlay').classList.add('show');
+    document.body.classList.add('in-arcade');
+
+    const host = stageHost();
+    if (!host) return;
+    host.classList.add('show');
+    //  Mounted a frame late, so the overlay has been laid out and the canvas
+    //  sizes against a real box rather than a zero-height one.
+    requestAnimationFrame(() => {
+      try {
+        window.SHW_WILD.mount(host, {
+          onExit: () => shExitCabinet(),
+          exitLabel: 'leave the cabinet',
+        });
+      } catch (e){
+        console.error('still-human-wild:', e);
+        host.innerHTML = '<div style="display:grid;place-items:center;height:100%;' +
+          'font:13px/1.6 Georgia,serif;color:#bdb5d4;text-align:center;padding:30px">' +
+          'This cabinet could not start on your hardware. It needs WebGL.</div>';
+      }
+    });
+    try { shTel('arcade_local', { slug: SLUG }); } catch (e){}
+  };
+
+  const prevExit = window.shExitCabinet;
+  window.shExitCabinet = function(){
+    try { if (window.SHW_WILD && window.SHW_WILD.mounted) window.SHW_WILD.unmount(); } catch (e){}
+    const host = $$('arcade-local');
+    if (host){ host.classList.remove('show'); host.innerHTML = ''; }
+    const frame = $$('arcade-frame');
+    if (frame) frame.style.display = '';
+    const open = $$('arcade-open');
+    if (open) open.style.display = '';
+    return prevExit.apply(this, arguments);
+  };
+
+})();
+
 
 document.addEventListener('DOMContentLoaded', init);
 </script>

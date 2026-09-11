@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Still Human // Wild</title>
+<script>
+/* ---------------------------------------------------------------------------
+   Present Palm bridge. Inside the shell, window.fracture already exists and
+   this does nothing. Opened as a loose file — or inside a Fracture City arcade
+   cabinet running from a folder without the shell — it stands in with
+   localStorage, so the ground you sculpted is still there tomorrow.
+--------------------------------------------------------------------------- */
+(function(){
+  if (window.fracture && window.fracture.shell) return;
+  const prefix = 'fracture::still-human-wild::';
+  window.fracture = {
+    shell:false, appSlug:'still-human-wild', received:null,
+    save(k,v){ try{ localStorage.setItem(prefix+k, JSON.stringify(v)); }catch(e){} return Promise.resolve(true); },
+    read(k){ try{ const r=localStorage.getItem(prefix+k); return Promise.resolve(r==null?null:JSON.parse(r)); }catch(e){ return Promise.resolve(null); } },
+    list(){ const o=[]; for(let i=0;i<localStorage.length;i++){ const k=localStorage.key(i); if(k&&k.startsWith(prefix)) o.push(k.slice(prefix.length)); } return Promise.resolve(o); },
+    delete(k){ localStorage.removeItem(prefix+k); return Promise.resolve(true); },
+    listApps(){ return Promise.resolve([]); },
+    openApp(){ return Promise.resolve({ok:false,error:'standalone'}); },
+    emit(){ return Promise.resolve(true); },
+    subscribe(){ return ()=>{}; },
+    onPayload(){},
+    me(){
+      try { const r = localStorage.getItem('pp:person'); if (r) return Promise.resolve(JSON.parse(r)); } catch(e){}
+      const now = new Date().toISOString();
+      const p = { type:'person.v1', id:'p_'+Math.random().toString(36).slice(2,10),
+                  username:'resident', displayName:'', bio:'', avatar:null,
+                  created:now, updated:now, holds:{} };
+      try { localStorage.setItem('pp:person', JSON.stringify(p)); } catch(e){}
+      return Promise.resolve(p);
+    },
+  };
+})();
+</script>
+<style>
+  html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;background:#05030c;}
+  /* The engine draws into whatever box it is handed. As its own app that box
+     is the window; inside a cabinet it is the cabinet stage. */
+  #stage{position:fixed;inset:0;}
+  #boot{position:fixed;inset:0;display:grid;place-items:center;text-align:center;
+        background:radial-gradient(ellipse at 50% 42%,#2b1330,#05030c 72%);
+        color:#c3bcd8;font:14px/1.7 Georgia,serif;padding:30px;z-index:5;}
+  #boot b{display:block;font:800 34px/1 Georgia,serif;letter-spacing:-1px;color:#ffd9a0;
+          margin-bottom:14px;text-shadow:0 4px 0 #8a3a12;}
+  #boot.gone{display:none;}
+  #boot code{font:12px/1.6 ui-monospace,Menlo,monospace;color:#ff8a3d;}
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<div id="boot"><div><b>STILL HUMAN // WILD</b>warming the kiln…</div></div>
+
+<!-- Vendored three.js, shared with the rest of the hub. No CDN, no network. -->
+<script src="../../shared/vendor/three.min.js"></script>
+<script src="still-human-wild.js"></script>
+<script>
+(function(){
+  const boot = document.getElementById('boot');
+  function fail(msg){
+    boot.classList.remove('gone');
+    boot.innerHTML = '<div><b>STILL HUMAN // WILD</b>' + msg + '</div>';
+  }
+  if (typeof THREE === 'undefined'){
+    fail('three.js did not load from <code>../../shared/vendor/three.min.js</code>. ' +
+         'Run this from inside the Present Palm folder, or drop a copy of three.min.js beside it.');
+    return;
+  }
+  if (!window.SHW_WILD){
+    fail('the engine did not load from <code>still-human-wild.js</code>.');
+    return;
+  }
+  //  No onExit: as its own app there is nothing behind the game, so Esc goes
+  //  back to the title card rather than leaving a blank window.
+  Promise.resolve(window.SHW_WILD.mount(document.getElementById('stage')))
+    .then(() => boot.classList.add('gone'))
+    .catch(e => { console.error(e); fail('this machine could not start it. It needs WebGL.'); });
+})();
+</script>
+</body>
+</html>
