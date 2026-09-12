@@ -1,0 +1,124 @@
+{
+  "v": 2,
+  "seed": "wild-iw2fkh",
+  "grid": 480,
+  "world": 576,
+  "day": 1,
+  "cycle": 65.68659999996407,
+  "hp": 93,
+  "xp": 12,
+  "level": 1,
+  "res": {
+    "earth": 40,
+    "timber": 24,
+    "stone": 18,
+    "ember": 5
+  },
+  "kills": 1,
+  "nights": 0,
+  "kiln": {
+    "ring": 0,
+    "brazier": 0,
+    "height": 0,
+    "bench": 0
+  },
+  "tools": {
+    "axe": 0,
+    "pick": 0
+  },
+  "sites": [
+    {
+      "id": "kiln",
+      "claimed": true,
+      "cleared": true
+    },
+    {
+      "id": "s0",
+      "claimed": true,
+      "cleared": true,
+      "blight": 0
+    },
+    {
+      "id": "s1",
+      "claimed": false,
+      "cleared": false,
+      "blight": 5
+    },
+    {
+      "id": "s2",
+      "claimed": false,
+      "cleared": false,
+      "blight": 6
+    },
+    {
+      "id": "s3",
+      "claimed": true,
+      "cleared": true,
+      "blight": 0
+    },
+    {
+      "id": "s4",
+      "claimed": false,
+      "cleared": false,
+      "blight": 6
+    },
+    {
+      "id": "s5",
+      "claimed": false,
+      "cleared": false,
+      "blight": 6
+    }
+  ],
+  "quest": {
+    "i": 0,
+    "done": {}
+  },
+  "contracts": {},
+  "contractSeed": 1,
+  "waypoint": null,
+  "pos": [
+    69.9030500716155,
+    8.273614478392144,
+    116.73351968523437
+  ],
+  "yaw": -2.597400000000003,
+  "gear": {
+    "weapon": {
+      "id": 2,
+      "kind": "weapon",
+      "type": "spear",
+      "rarity": "sturdy",
+      "name": "Sturdy Wedged Lance",
+      "dmg": 26,
+      "spd": 0.567008,
+      "reach": 3.9,
+      "arc": 0.62,
+      "col": 13213802
+    },
+    "head": null,
+    "chest": null,
+    "legs": null
+  },
+  "inv": [
+    {
+      "id": 1,
+      "kind": "weapon",
+      "type": "club",
+      "rarity": "common",
+      "name": "Rough Thumbed Cudgel",
+      "dmg": 15,
+      "spd": 0.508352,
+      "reach": 2.5,
+      "arc": 1.25,
+      "col": 9067060
+    }
+  ],
+  "blocks": [],
+  "edits": [],
+  "fell": {
+    "trees": [],
+    "rocks": [],
+    "banks": []
+  },
+  "at": 1789170933029
+}

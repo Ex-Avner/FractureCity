@@ -1,106 +1,331 @@
 {
   "type": "newswire.v1",
-  "fetchedAt": "2026-09-11T03:12:08.792Z",
+  "fetchedAt": "2026-09-12T02:14:53.396Z",
   "sources": {
+    "arxiv": {
+      "ok": true,
+      "count": 25
+    },
     "hn": {
       "ok": true,
-      "count": 10
-    },
-    "arxiv": {
-      "ok": false,
-      "error": "timeout"
+      "count": 11
     }
   },
   "items": [
     {
-      "id": "hn:49652475",
-      "title": "How My Students Think About AI",
-      "url": "https://www.lesswrong.com/posts/ySXuvJcqRindQwAk7/how-my-students-think-about-ai",
-      "source": "lesswrong.com",
+      "id": "hn:49667253",
+      "title": "Bernie's AI bill proposes to sentence AI developers to 20 years in prison",
+      "url": "https://twitter.com/venturetwins/status/2098456905526211026",
+      "source": "twitter.com",
       "via": "Hacker News",
-      "at": "2026-09-11T01:33:36.000Z",
-      "score": 12
+      "at": "2026-09-12T00:24:36.000Z",
+      "score": 13
     },
     {
-      "id": "hn:49651372",
-      "title": "Thelio Mira AI Linux Workstation: 192 GB GPU Memory",
-      "url": "https://system76.com/workstations/thelio-mira-ai",
-      "source": "system76.com",
+      "id": "hn:49667188",
+      "title": "Show HN: Graphify C# – Compiler-accurate Find Usages for coding agents",
+      "url": "https://github.com/zachsaw/graphify-csharp",
+      "source": "github.com",
       "via": "Hacker News",
-      "at": "2026-09-10T23:10:06.000Z",
-      "score": 49
+      "at": "2026-09-12T00:16:10.000Z",
+      "score": 9
     },
     {
-      "id": "hn:49650326",
-      "title": "OpenAI’s Navier-Stokes release included a Lean 4 formal proof",
-      "url": "https://www.johndcook.com/blog/2026/09/09/formal-method-revolution/",
-      "source": "johndcook.com",
+      "id": "hn:49666735",
+      "title": "OpenAI agents carried out an undisclosed attack on RubyGems",
+      "url": "https://www.rubyhack.ai/",
+      "source": "rubyhack.ai",
       "via": "Hacker News",
-      "at": "2026-09-10T21:22:59.000Z",
-      "score": 146
+      "at": "2026-09-11T23:17:42.000Z",
+      "score": 347
     },
     {
-      "id": "hn:49649213",
-      "title": "OpenAI Agents API",
-      "url": "https://developers.openai.com/api/docs/guides/agents-api/overview",
-      "source": "developers.openai.com",
+      "id": "hn:49666425",
+      "title": "Houthis used Anthropic to develop guided weapons",
+      "url": "https://www.washingtonpost.com/technology/2026/09/11/rebels-used-anthropics-ai-bot-develop-guided-weapons-report-says/",
+      "source": "washingtonpost.com",
       "via": "Hacker News",
-      "at": "2026-09-10T19:43:22.000Z",
-      "score": 160
+      "at": "2026-09-11T22:44:03.000Z",
+      "score": 23
     },
     {
-      "id": "hn:49648784",
-      "title": "On Next-Gen Transformer: Loops Are Not What You Need",
-      "url": "https://zartbot.github.io/blog/model_arch/inception/",
-      "source": "zartbot.github.io",
+      "id": "hn:49665711",
+      "title": "AI researchers debate how close we are to recursive self-improvement",
+      "url": "https://www.dwarkesh.com/p/john-beren-charlie",
+      "source": "dwarkesh.com",
       "via": "Hacker News",
-      "at": "2026-09-10T19:07:48.000Z",
-      "score": 20
+      "at": "2026-09-11T21:35:29.000Z",
+      "score": 36
     },
     {
-      "id": "hn:49647300",
-      "title": "Detecting and countering misuse of AI: September 2026",
-      "url": "https://www.anthropic.com/threat-intelligence-report-september-2026",
-      "source": "anthropic.com",
+      "id": "hn:49662672",
+      "title": "The EPA is planning to scrap public review rules for data center pollution",
+      "url": "https://capitalbnews.org/data-centers-permit-rules-epa/",
+      "source": "capitalbnews.org",
       "via": "Hacker News",
-      "at": "2026-09-10T17:23:42.000Z",
-      "score": 94
+      "at": "2026-09-11T18:05:21.000Z",
+      "score": 365
     },
     {
-      "id": "hn:49645443",
-      "title": "Cognition launches new SWE-2 model, Rivaling Fable 5.1 and GPT-Astra",
-      "url": "https://cognition.com/blog/swe-2",
-      "source": "cognition.com",
+      "id": "hn:49662371",
+      "title": "A misalignment of AI in mathematics",
+      "url": "https://mathandai.org/",
+      "source": "mathandai.org",
       "via": "Hacker News",
-      "at": "2026-09-10T15:29:47.000Z",
-      "score": 363
+      "at": "2026-09-11T17:45:12.000Z",
+      "score": 659
     },
     {
-      "id": "hn:49644179",
-      "title": "AI Is Breaking This Thing We Call Trust",
-      "url": "https://terriblesoftware.org/2026/09/10/ai-is-breaking-this-thing-we-call-trust/",
-      "source": "terriblesoftware.org",
+      "id": "hn:49660482",
+      "title": "Hacker News with reduced priority for AI driven content",
+      "url": "https://sprinklz.io/public/pdwt4dve5uai",
+      "source": "sprinklz.io",
       "via": "Hacker News",
-      "at": "2026-09-10T14:21:20.000Z",
-      "score": 66
+      "at": "2026-09-11T15:52:49.000Z",
+      "score": 109
     },
     {
-      "id": "hn:49639408",
-      "title": "More questions about whether researchers can trust OpenAI with unpublished math",
-      "url": "https://mathstodon.xyz/@andreasthom/117240535270608201",
-      "source": "mathstodon.xyz",
+      "id": "hn:49659647",
+      "title": "Show HN: Hacker News, without AI",
+      "url": "https://hcker.news/?ai=exclude",
+      "source": "hcker.news",
       "via": "Hacker News",
-      "at": "2026-09-10T06:49:43.000Z",
-      "score": 721
+      "at": "2026-09-11T15:01:19.000Z",
+      "score": 175
     },
     {
-      "id": "hn:49613072",
-      "title": "Compute-efficient pretraining and scaling to trillion-parameter models",
-      "url": "https://magic.dev/blog/pretraining#",
-      "source": "magic.dev",
+      "id": "hn:49656225",
+      "title": "Claude is only available to people over 18 years",
+      "url": "https://support.claude.com/en/articles/15171100-age-assurance-on-claude",
+      "source": "support.claude.com",
       "via": "Hacker News",
-      "at": "2026-09-08T16:59:53.000Z",
-      "score": 111
+      "at": "2026-09-11T10:48:00.000Z",
+      "score": 579
+    },
+    {
+      "id": "arxiv:2609.11923v1",
+      "title": "GPU-CFR: 80x Faster Counterfactual Regret Minimization by Compiling the Game to Static Dataflow and CUDA Graph Replay",
+      "url": "http://arxiv.org/abs/2609.11923v1",
+      "source": "arXiv",
+      "via": "arXiv cs.AI",
+      "at": "2026-09-10T17:58:14Z",
+      "score": 0
+    },
+    {
+      "id": "arxiv:2609.11918v1",
+      "title": "General Quantification of Covariate and Concept Shifts",
+      "url": "http://arxiv.org/abs/2609.11918v1",
+      "source": "arXiv",
+      "via": "arXiv cs.AI",
+      "at": "2026-09-10T17:57:52Z",
+      "score": 0
+    },
+    {
+      "id": "arxiv:2609.11917v1",
+      "title": "Data Scarcity and Model Sparsity: Mixtures-of-Experts Overfit More to Repeated Data",
+      "url": "http://arxiv.org/abs/2609.11917v1",
+      "source": "arXiv",
+      "via": "arXiv cs.AI",
+      "at": "2026-09-10T17:57:33Z",
+      "score": 0
+    },
+    {
+      "id": "arxiv:2609.11916v1",
+      "title": "Can Edge-Deployable Vision-Language Models Identify Species?",
+      "url": "http://arxiv.org/abs/2609.11916v1",
+      "source": "arXiv",
+      "via": "arXiv cs.AI",
+      "at": "2026-09-10T17:57:32Z",
+      "score": 0
+    },
+    {
+      "id": "arxiv:2609.11915v1",
+      "title": "Generative Marketing Mix Modeling: A Causal Inference Framework Linking GEO and GEM to Business Impact",
+      "url": "http://arxiv.org/abs/2609.11915v1",
+      "source": "arXiv",
+      "via": "arXiv cs.AI",
+      "at": "2026-09-10T17:57:28Z",
+      "score": 0
+    },
+    {
+      "id": "arxiv:2609.11913v1",
+      "title": "Distance generalization in transformers: why bother with positional encoding?",
+      "url": "http://arxiv.org/abs/2609.11913v1",
+      "source": "arXiv",
+      "via": "arXiv cs.AI",
+      "at": "2026-09-10T17:57:19Z",
+      "score": 0
+    },
+    {
+      "id": "arxiv:2609.11911v1",
+      "title": "Artificial Id: Drive and Persistent Alignment in Agentic AI",
+      "url": "http://arxiv.org/abs/2609.11911v1",
+      "source": "arXiv",
+      "via": "arXiv cs.AI",
+      "at": "2026-09-10T17:56:41Z",
+      "score": 0
+    },
+    {
+      "id": "arxiv:2609.11910v1",
+      "title": "From Protocols to Evidence: Bounded Claims for AI in Service of the Common Good",
+      "url": "http://arxiv.org/abs/2609.11910v1",
+      "source": "arXiv",
+      "via": "arXiv cs.AI",
+      "at": "2026-09-10T17:56:36Z",
+      "score": 0
+    },
+    {
+      "id": "arxiv:2609.11904v1",
+      "title": "TART: A Modular Tool for Technique-Aware Audio-to-Tablature Guitar Transcription",
+      "url": "http://arxiv.org/abs/2609.11904v1",
+      "source": "arXiv",
+      "via": "arXiv cs.AI",
+      "at": "2026-09-10T17:55:12Z",
+      "score": 0
+    },
+    {
+      "id": "arxiv:2609.11900v1",
+      "title": "MindTopo: Can Foundation Models Reason in Topological Space?",
+      "url": "http://arxiv.org/abs/2609.11900v1",
+      "source": "arXiv",
+      "via": "arXiv cs.AI",
+      "at": "2026-09-10T17:54:32Z",
+      "score": 0
+    },
+    {
+      "id": "arxiv:2609.11897v1",
+      "title": "CausalArena: Benchmarking Causal Discovery in the Foundation Model Era",
+      "url": "http://arxiv.org/abs/2609.11897v1",
+      "source": "arXiv",
+      "via": "arXiv cs.AI",
+      "at": "2026-09-10T17:53:15Z",
+      "score": 0
+    },
+    {
+      "id": "arxiv:2609.11894v1",
+      "title": "3D Point Splatting for mmWave Radar Novel View Synthesis",
+      "url": "http://arxiv.org/abs/2609.11894v1",
+      "source": "arXiv",
+      "via": "arXiv cs.AI",
+      "at": "2026-09-10T17:52:17Z",
+      "score": 0
+    },
+    {
+      "id": "arxiv:2609.11892v1",
+      "title": "Nuha-Speech: Building General-Purpose Arabic Speech-LLMs",
+      "url": "http://arxiv.org/abs/2609.11892v1",
+      "source": "arXiv",
+      "via": "arXiv cs.AI",
+      "at": "2026-09-10T17:50:35Z",
+      "score": 0
+    },
+    {
+      "id": "arxiv:2609.11884v1",
+      "title": "CoRA-NAS: Coarse Ranking and Anchor-Residual Refinement for Neural Architecture Search",
+      "url": "http://arxiv.org/abs/2609.11884v1",
+      "source": "arXiv",
+      "via": "arXiv cs.AI",
+      "at": "2026-09-10T17:49:19Z",
+      "score": 0
+    },
+    {
+      "id": "arxiv:2609.11878v1",
+      "title": "Domain-Specific Hallucination Detection in Large Language Models",
+      "url": "http://arxiv.org/abs/2609.11878v1",
+      "source": "arXiv",
+      "via": "arXiv cs.AI",
+      "at": "2026-09-10T17:45:36Z",
+      "score": 0
+    },
+    {
+      "id": "arxiv:2609.11877v1",
+      "title": "Biology-in-the-loop: Amortized Adaptive Hit Discovery in CRISPR Screens",
+      "url": "http://arxiv.org/abs/2609.11877v1",
+      "source": "arXiv",
+      "via": "arXiv cs.AI",
+      "at": "2026-09-10T17:45:18Z",
+      "score": 0
+    },
+    {
+      "id": "arxiv:2609.11876v1",
+      "title": "On the Regularization Landscape for the Linear Recommendation Models",
+      "url": "http://arxiv.org/abs/2609.11876v1",
+      "source": "arXiv",
+      "via": "arXiv cs.AI",
+      "at": "2026-09-10T17:45:06Z",
+      "score": 0
+    },
+    {
+      "id": "arxiv:2609.11873v1",
+      "title": "The Last AI Built by Humans: Toward Genuine Recursive Self-Improvement",
+      "url": "http://arxiv.org/abs/2609.11873v1",
+      "source": "arXiv",
+      "via": "arXiv cs.AI",
+      "at": "2026-09-10T17:44:23Z",
+      "score": 0
+    },
+    {
+      "id": "arxiv:2609.11872v1",
+      "title": "Evaluating Time-Series Foundation Models and Multimodal Dietary Context for CGM Forecasting",
+      "url": "http://arxiv.org/abs/2609.11872v1",
+      "source": "arXiv",
+      "via": "arXiv cs.AI",
+      "at": "2026-09-10T17:43:29Z",
+      "score": 0
+    },
+    {
+      "id": "arxiv:2609.11870v1",
+      "title": "Augustinian BabyLM: What Ostensive Definition Can and Cannot Teach a Small Language Model",
+      "url": "http://arxiv.org/abs/2609.11870v1",
+      "source": "arXiv",
+      "via": "arXiv cs.AI",
+      "at": "2026-09-10T17:43:09Z",
+      "score": 0
+    },
+    {
+      "id": "arxiv:2609.11867v1",
+      "title": "AdamX: Cosine similarity meets gradient descent",
+      "url": "http://arxiv.org/abs/2609.11867v1",
+      "source": "arXiv",
+      "via": "arXiv cs.AI",
+      "at": "2026-09-10T17:42:50Z",
+      "score": 0
+    },
+    {
+      "id": "arxiv:2609.11865v1",
+      "title": "Epistemic orientation predicts legislative effectiveness among members of the US Congress",
+      "url": "http://arxiv.org/abs/2609.11865v1",
+      "source": "arXiv",
+      "via": "arXiv cs.AI",
+      "at": "2026-09-10T17:41:54Z",
+      "score": 0
+    },
+    {
+      "id": "arxiv:2609.11864v1",
+      "title": "RetroThinker: Enabling Retrospective Thinking in Speech LLMs",
+      "url": "http://arxiv.org/abs/2609.11864v1",
+      "source": "arXiv",
+      "via": "arXiv cs.AI",
+      "at": "2026-09-10T17:41:53Z",
+      "score": 0
+    },
+    {
+      "id": "arxiv:2609.11860v1",
+      "title": "Explainability Assistant: A Conversational XAI Interface for Interpreting Energy Consumption Models",
+      "url": "http://arxiv.org/abs/2609.11860v1",
+      "source": "arXiv",
+      "via": "arXiv cs.AI",
+      "at": "2026-09-10T17:40:11Z",
+      "score": 0
+    },
+    {
+      "id": "arxiv:2609.11859v1",
+      "title": "From Parameters to Answers: How LLMs Retrieve and Use Their Internal Knowledge",
+      "url": "http://arxiv.org/abs/2609.11859v1",
+      "source": "arXiv",
+      "via": "arXiv cs.AI",
+      "at": "2026-09-10T17:39:55Z",
+      "score": 0
     }
   ]
 }

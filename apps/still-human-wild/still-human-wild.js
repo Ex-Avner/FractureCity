@@ -135,12 +135,23 @@ const MATS = [
   { key:'lantern', name:'Lantern',    col:0xffc65a, res:'ember',  cost:1, solid:true, light:true },
 ];
 
+//  col is the flesh. It is deliberately drab — a corpse that comes out of the
+//  ground the same purple as a nightclub reads as a plastic figurine, not as
+//  something that used to be a person. All the colour in these things lives in
+//  two places instead: the bruising, and the light coming out of them. spark is
+//  the hit-and-death spray, which can be as loud as the rest of the arcade.
 const MOBS = {
-  husk:    { name:'Husk',     hp:34,  spd:2.3, dmg:9,  r:0.62, h:1.9, col:0x7b5ea8, eye:0xff4f6d, tier:1 },
-  stalker: { name:'Stalker',  hp:22,  spd:4.5, dmg:7,  r:0.48, h:1.6, col:0xd8496a, eye:0xffe14f, tier:1 },
-  lumber:  { name:'Lumberer', hp:96,  spd:1.7, dmg:22, r:0.95, h:2.9, col:0x3f6f8f, eye:0xff9a3d, tier:2 },
-  wisp:    { name:'Emberwisp',hp:30,  spd:2.9, dmg:11, r:0.55, h:1.4, col:0xff9a3d, eye:0xfff3c0, tier:2, flies:true, ranged:true },
-  molder:  { name:'Molder',   hp:180, spd:1.5, dmg:31, r:1.25, h:3.6, col:0x2f2a44, eye:0xff2f4f, tier:3 },
+  husk:    { name:'Husk',     hp:34,  spd:2.3, dmg:9,  r:0.62, h:1.9,
+             col:0x8b9377, bruise:0x5e3f5a, eye:0xff4f6d, spark:0x9a6fd8, tier:1 },
+  stalker: { name:'Stalker',  hp:22,  spd:4.5, dmg:7,  r:0.48, h:1.6,
+             col:0xa39177, bruise:0x7a3346, eye:0xffe14f, spark:0xd8496a, tier:1 },
+  lumber:  { name:'Lumberer', hp:96,  spd:1.7, dmg:22, r:0.95, h:2.9,
+             col:0x6f8083, bruise:0x39516b, eye:0xff9a3d, spark:0x4f8fc0, tier:2 },
+  wisp:    { name:'Emberwisp',hp:30,  spd:2.9, dmg:11, r:0.55, h:1.4,
+             col:0x9c8d72, bruise:0x7a4526, eye:0xfff3c0, spark:0xff9a3d, tier:2,
+             flies:true, ranged:true },
+  molder:  { name:'Molder',   hp:180, spd:1.5, dmg:31, r:1.25, h:3.6,
+             col:0x69735a, bruise:0x4a2a3c, eye:0xff2f4f, spark:0xff2f4f, tier:3 },
 };
 
 // ─── 3 · Seeded noise ────────────────────────────────────────────────────────
@@ -302,7 +313,7 @@ function clayMat(opts){
   const m = new THREE.MeshLambertMaterial(Object.assign({
     map: t, flatShading: true,
   }, opts && opts.mat ? opts.mat : {}));
-  return m;
+  return withRim(m);
 }
 
 // ─── 5 · The game object ─────────────────────────────────────────────────────
@@ -701,6 +712,7 @@ const tileOf = (w) => clamp(Math.floor((w + HALF) / CELL / TILE), 0, TILES - 1);
 function addTile(ti, tj){
   const geo = buildTile(ti, tj);
   const mesh = new THREE.Mesh(geo, S.terrainMat);
+  mesh.castShadow = true; mesh.receiveShadow = true;
   S.world.add(mesh);
   tiles.set(tkey(ti, tj), { ti, tj, mesh, geo });
 }
@@ -840,6 +852,9 @@ function buildFarGeometry(){
 function makeFarMesh(){
   const geo = buildFarGeometry();
   S.far = new THREE.Mesh(geo, S.terrainMat);
+  //  The backdrop receives but never casts: it is a stand-in for ground that
+  //  is not loaded, and its shadow would fight the real tiles' shadows.
+  S.far.receiveShadow = true;
   S.far.frustumCulled = false;
   S.far.renderOrder = -1;
   S.world.add(S.far);
@@ -961,13 +976,40 @@ function scatterProps(){
   S.trunks = new THREE.InstancedMesh(trunkGeo,
     clayMat({ rep: 1, mat: { color: PAL.bark } }), PROP_CAP.trees);
 
-  S.canopy = new THREE.InstancedMesh(whiteColors(new THREE.IcosahedronGeometry(1, 0)),
-    clayMat({ rep: 1, mat: { vertexColors: true } }), PROP_CAP.trees);
-  S.canopy.instanceColor = new THREE.InstancedBufferAttribute(
-    new Float32Array(PROP_CAP.trees * 3), 3);
+  //  A tree used to be one blob on a stick. It is now three lumps: a broad
+  //  skirt, the main mass, and a smaller crown set off to one side, each a
+  //  different value of the same leaf colour. It costs two more draw calls for
+  //  the entire forest — instancing does not care how many trees there are,
+  //  only how many kinds of part — and it is the difference between a lollipop
+  //  and something that grew.
+  function canopyLayer(){
+    const im = new THREE.InstancedMesh(whiteColors(new THREE.IcosahedronGeometry(1, 0)),
+      clayMat({ rep: 1, mat: { vertexColors: true } }), PROP_CAP.trees);
+    im.instanceColor = new THREE.InstancedBufferAttribute(
+      new Float32Array(PROP_CAP.trees * 3), 3);
+    return im;
+  }
+  S.canopy  = canopyLayer();
+  S.canopyB = canopyLayer();
+  S.canopyC = canopyLayer();
+
+  //  Boughs: one fork crossing the trunk, so the silhouette has an elbow in it
+  //  where the canopy meets the stem instead of a clean butt joint.
+  const boughGeo = new THREE.CylinderGeometry(0.055, 0.10, 1, 4, 1);
+  boughGeo.translate(0, 0.5, 0);
+  S.boughs = new THREE.InstancedMesh(boughGeo,
+    clayMat({ rep: 1, mat: { color: PAL.bark } }), PROP_CAP.trees);
 
   S.rocks = new THREE.InstancedMesh(new THREE.DodecahedronGeometry(1, 0),
     clayMat({ rep: 1, mat: { color: PAL.boulder } }), PROP_CAP.rocks);
+
+  //  A moss cap sitting on the weather side of every boulder. Flattened, a
+  //  shade under the boulder so it never floats off it, and tinted per stone
+  //  so a field of them is not one colour.
+  S.moss = new THREE.InstancedMesh(whiteColors(new THREE.DodecahedronGeometry(1, 0)),
+    clayMat({ rep: 1, mat: { vertexColors: true } }), PROP_CAP.rocks);
+  S.moss.instanceColor = new THREE.InstancedBufferAttribute(
+    new Float32Array(PROP_CAP.rocks * 3), 3);
 
   S.banks = new THREE.InstancedMesh(new THREE.DodecahedronGeometry(1, 0),
     clayMat({ rep: 1, mat: { color: 0xb5733f } }), PROP_CAP.banks);
@@ -975,16 +1017,48 @@ function scatterProps(){
   S.bushes = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1, 0),
     clayMat({ rep: 1, mat: { color: PAL.bush } }), PROP_CAP.bushes);
 
-  for (const m of [S.trunks, S.canopy, S.rocks, S.banks, S.bushes]){
+  //  Ground cover. Three leaning blades merged into one tuft, instanced in a
+  //  ring around the player and re-scattered when they cross a tile. It is the
+  //  cheapest detail in the game per unit of effect: at ground level the plain
+  //  stops being a painted surface and starts having something growing out of
+  //  it. First thing dropped when the frame rate says so.
+  {
+    const blades = [];
+    for (let i = 0; i < 3; i++){
+      //  Open-ended: a blade is never seen from its own cap, and the caps
+      //  were half the triangles in the entire meadow.
+      const bg = new THREE.CylinderGeometry(0.012, 0.075, 1, 3, 1, true);
+      bg.translate(0, 0.5, 0);
+      const mtx = new THREE.Matrix4().compose(
+        new THREE.Vector3((i - 1) * 0.06, 0, (i % 2 ? 0.05 : -0.05)),
+        new THREE.Quaternion().setFromEuler(
+          new THREE.Euler((i - 1) * 0.30, i * 2.1, (1 - i) * 0.26)),
+        new THREE.Vector3(1, 0.8 + i * 0.22, 1));
+      bg.applyMatrix4(mtx);
+      blades.push({ g: bg, m: new THREE.Matrix4(), c: new THREE.Color(0xffffff) });
+    }
+    S.grass = new THREE.InstancedMesh(whiteColors(mergeParts(blades)),
+      clayMat({ rep: 1, mat: { vertexColors: true } }), GRASS_CAP);
+    S.grass.instanceColor = new THREE.InstancedBufferAttribute(
+      new Float32Array(GRASS_CAP * 3), 3);
+    S.grass.castShadow = false;      // a shadow per blade is not worth one frame
+    S.grass.receiveShadow = true;
+  }
+
+  for (const m of [S.trunks, S.boughs, S.canopy, S.canopyB, S.canopyC,
+                   S.rocks, S.moss, S.banks, S.bushes, S.grass]){
     m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     m.count = 0;
     m.frustumCulled = false;
+    m.castShadow = true; m.receiveShadow = true;
     S.world.add(m);
   }
   propsDirty = true;
 }
 
 const PROP_CAP = { trees: 2400, rocks: 1400, banks: 800, bushes: 1400 };
+const GRASS_CAP = 3600;      // tufts in the ring around the player
+const GRASS_R   = 22;        // metres out it reaches
 
 //  Tile offsets inside the window, nearest first. If a dense forest overruns
 //  the instance cap, what gets dropped has to be the far side of the window
@@ -1005,6 +1079,8 @@ let propsDirty = false;
 
 //  Fill the instance buffers from whatever is inside the streaming window.
 const _pm = new THREE.Matrix4(), _pq = new THREE.Quaternion();
+const _WHITE = new THREE.Color(0xffffff), _MOSS_ALT = new THREE.Color(0x6b8636);
+const _LICHEN = new THREE.Color(0xa8ad96);
 const _pv = new THREE.Vector3(), _ps = new THREE.Vector3();
 
 function refreshPropWindow(pi, pj){
@@ -1024,14 +1100,43 @@ function refreshPropWindow(pi, pj){
       for (const t of b.trees){
         if (!t.alive || nt >= PROP_CAP.trees) continue;
         const hgt = 2.6 * t.s;
+        //  rot is the only per-tree number stored, so every asymmetry below is
+        //  driven off it — same tree, same shape, every time it streams in.
+        const wob = Math.sin(t.rot * 3.1), wob2 = Math.cos(t.rot * 2.3);
         _pq.setFromEuler(new THREE.Euler(0, t.rot, 0));
         _pv.set(t.x, t.y, t.z); _ps.set(t.s, hgt, t.s);
         _pm.compose(_pv, _pq, _ps); S.trunks.setMatrixAt(nt, _pm);
-        _pv.set(t.x, t.y + hgt + 0.55 * t.s, t.z);
-        _ps.set(1.35 * t.s, 1.15 * t.s, 1.35 * t.s);
+
+        //  One bough, leaning out of the trunk under the canopy.
+        _pq.setFromEuler(new THREE.Euler(wob * 0.5, t.rot * 1.7, 0.75 * (wob2 < 0 ? -1 : 1)));
+        _pv.set(t.x, t.y + hgt * 0.62, t.z);
+        _ps.set(t.s, 0.95 * t.s, t.s);
+        _pm.compose(_pv, _pq, _ps); S.boughs.setMatrixAt(nt, _pm);
+
+        //  Main mass.
+        _pv.set(t.x, t.y + hgt + 0.52 * t.s, t.z);
+        _ps.set(1.30 * t.s, 1.12 * t.s, 1.30 * t.s);
         _pq.setFromEuler(new THREE.Euler(t.rot * 0.7, t.rot, t.rot * 0.4));
         _pm.compose(_pv, _pq, _ps); S.canopy.setMatrixAt(nt, _pm);
         _c.setHex(t.leaf); cc.setXYZ(nt, _c.r, _c.g, _c.b);
+
+        //  Skirt: wider, flatter, sitting lower, and darker — this is what
+        //  gives the canopy an underside instead of a horizon line.
+        _pv.set(t.x + wob * 0.16 * t.s, t.y + hgt + 0.10 * t.s, t.z + wob2 * 0.16 * t.s);
+        _ps.set(1.50 * t.s, 0.66 * t.s, 1.46 * t.s);
+        _pq.setFromEuler(new THREE.Euler(t.rot * 0.3, -t.rot * 1.4, t.rot * 0.2));
+        _pm.compose(_pv, _pq, _ps); S.canopyB.setMatrixAt(nt, _pm);
+        _c.setHex(t.leaf).multiplyScalar(0.66);
+        S.canopyB.instanceColor.setXYZ(nt, _c.r, _c.g, _c.b);
+
+        //  Crown: small, high, off to one side, and lit — the light side of
+        //  the tree, which is what stops it reading as a flat cut-out.
+        _pv.set(t.x + wob2 * 0.42 * t.s, t.y + hgt + 1.26 * t.s, t.z - wob * 0.42 * t.s);
+        _ps.set(0.86 * t.s, 0.82 * t.s, 0.86 * t.s);
+        _pq.setFromEuler(new THREE.Euler(-t.rot * 0.5, t.rot * 2.2, t.rot * 0.6));
+        _pm.compose(_pv, _pq, _ps); S.canopyC.setMatrixAt(nt, _pm);
+        _c.setHex(t.leaf).lerp(_WHITE, 0.26);
+        S.canopyC.instanceColor.setXYZ(nt, _c.r, _c.g, _c.b);
         nt++;
       }
       for (const r of b.rocks){
@@ -1039,7 +1144,21 @@ function refreshPropWindow(pi, pj){
         _pq.setFromEuler(new THREE.Euler(r.rot * 0.5, r.rot, r.rot * 0.3));
         _pv.set(r.x, r.y + r.s * 0.4, r.z);
         _ps.set(r.s, r.s * 0.78, r.s * 1.1);
-        _pm.compose(_pv, _pq, _ps); S.rocks.setMatrixAt(nr++, _pm);
+        _pm.compose(_pv, _pq, _ps); S.rocks.setMatrixAt(nr, _pm);
+        //  Moss, pressed onto the top and slid off-centre so it reads as
+        //  having grown on one side rather than been painted on.
+        const mw = Math.sin(r.rot * 2.7), mw2 = Math.cos(r.rot * 1.9);
+        _pq.setFromEuler(new THREE.Euler(r.rot * 0.5 + 0.12, r.rot * 1.3, r.rot * 0.3));
+        _pv.set(r.x + mw * r.s * 0.16, r.y + r.s * 0.66, r.z + mw2 * r.s * 0.16);
+        _ps.set(r.s * 0.86, r.s * 0.30, r.s * 0.94);
+        _pm.compose(_pv, _pq, _ps); S.moss.setMatrixAt(nr, _pm);
+        //  Moss is a lowland thing. Above the scree line the same cap is
+        //  tinted to pale lichen instead, so the snowfields do not sprout a
+        //  green rash.
+        const high = clamp((r.y - 30) / 14, 0, 1);
+        _c.setHex(0x51702f).lerp(_MOSS_ALT, (mw + 1) * 0.5).lerp(_LICHEN, high);
+        S.moss.instanceColor.setXYZ(nr, _c.r, _c.g, _c.b);
+        nr++;
       }
       for (const k of b.banks){
         if (!k.alive || nb >= PROP_CAP.banks) continue;
@@ -1058,14 +1177,66 @@ function refreshPropWindow(pi, pj){
     }
   }
 
-  S.trunks.count = nt; S.canopy.count = nt;
-  S.rocks.count = nr; S.banks.count = nb; S.bushes.count = nu;
+  S.trunks.count = nt; S.boughs.count = nt;
+  S.canopy.count = nt; S.canopyB.count = nt; S.canopyC.count = nt;
+  S.rocks.count = nr; S.moss.count = nr;
+  S.banks.count = nb; S.bushes.count = nu;
   S.trunks.instanceMatrix.needsUpdate = true;
-  S.canopy.instanceMatrix.needsUpdate = true;
-  S.canopy.instanceColor.needsUpdate = true;
+  S.boughs.instanceMatrix.needsUpdate = true;
+  for (const cl of [S.canopy, S.canopyB, S.canopyC]){
+    cl.instanceMatrix.needsUpdate = true;
+    cl.instanceColor.needsUpdate = true;
+  }
+  S.moss.instanceMatrix.needsUpdate = true;
+  S.moss.instanceColor.needsUpdate = true;
   S.rocks.instanceMatrix.needsUpdate = true;
   S.banks.instanceMatrix.needsUpdate = true;
   S.bushes.instanceMatrix.needsUpdate = true;
+  scatterGrass();
+}
+
+//  Tufts are placed on a jittered lattice around the player rather than at
+//  random, because random scatter clumps and leaves bald patches, and because a
+//  lattice keyed to world position puts the same tuft in the same place every
+//  time the ring is rebuilt — so walking back and forth does not make the
+//  meadow crawl.
+let grassAt = null;
+function scatterGrass(){
+  if (!S.grass) return;
+  const px = Pl.pos.x, pz = Pl.pos.z;
+  grassAt = { x: px, z: pz };
+  const STEP = 0.72;
+  const i0 = Math.floor((px - GRASS_R) / STEP), i1 = Math.ceil((px + GRASS_R) / STEP);
+  const j0 = Math.floor((pz - GRASS_R) / STEP), j1 = Math.ceil((pz + GRASS_R) / STEP);
+  const gc = S.grass.instanceColor;
+  let n = 0;
+  for (let j = j0; j <= j1 && n < GRASS_CAP; j++){
+    for (let i = i0; i <= i1 && n < GRASS_CAP; i++){
+      //  One hash per lattice point drives position, height, lean and tone.
+      const h1 = ((Math.imul(i, 374761393) ^ Math.imul(j, 668265263)) >>> 0) / 4294967296;
+      const h2 = ((Math.imul(i ^ 0x9e37, 2246822519) ^ Math.imul(j, 3266489917)) >>> 0) / 4294967296;
+      if (h1 > 0.80) continue;                        // thinned, so it is not a lawn
+      const x = i * STEP + (h1 - 0.5) * STEP * 0.9;
+      const z = j * STEP + (h2 - 0.5) * STEP * 0.9;
+      const dx = x - px, dz = z - pz;
+      if (dx * dx + dz * dz > GRASS_R * GRASS_R) continue;
+      if (Math.abs(x) > HALF - 2 || Math.abs(z) > HALF - 2) continue;
+      const gy = groundY(x, z);
+      if (gy < WATER_Y + 0.6 || gy > 15.5) continue;  // not on sand, rock or snow
+      if (slopeAt(x, z) > 0.62) continue;             // not on a cliff face
+      const s2 = 0.15 + h2 * 0.17;
+      _pq.setFromEuler(new THREE.Euler((h2 - 0.5) * 0.34, h1 * 6.283, (h1 - 0.5) * 0.34));
+      _pv.set(x, gy - 0.04, z);
+      _ps.set(1.15 + h1 * 0.7, s2, 1.15 + h2 * 0.7);
+      _pm.compose(_pv, _pq, _ps); S.grass.setMatrixAt(n, _pm);
+      _c.setHex(PAL.grass[Math.floor(h1 * 3) % 3]).multiplyScalar(1.02 + h2 * 0.30);
+      gc.setXYZ(n, _c.r, _c.g, _c.b);
+      n++;
+    }
+  }
+  S.grass.count = n;
+  S.grass.instanceMatrix.needsUpdate = true;
+  gc.needsUpdate = true;
 }
 
 function killTree(t){ t.alive = false; propsDirty = true; }
@@ -1169,6 +1340,7 @@ function makeBase(){
   //  The home Kiln, same treatment.
   settlements[0].solids = [{ x: 0, y: BASE_Y + 4.4, z: 0, r: 6.4 }];
 
+  shadowize(grp);
   S.world.add(grp);
   S.base = grp;
 }
@@ -1205,11 +1377,70 @@ function makePlayer(){
   greave.position.set(-0.19, 0.56, 0); greave.visible = false; g.add(greave);
   const greave2 = greave.clone(); greave2.position.x = 0.19; g.add(greave2);
 
+  //  Trim. The corpses got faces and hands, and next to them the resident was
+  //  seven plain boxes — so the same treatment, parented to the limb it rides
+  //  on so every piece of it animates for free. Added after the clones above,
+  //  or the clones would carry a second copy of all of it.
+  const hairMat  = clayMat({ rep:1, mat:{ color:0x2a1d19 } });
+  const leather  = clayMat({ rep:1, mat:{ color:0x6b4a30 } });
+  const dark     = clayMat({ rep:1, mat:{ color:0x2a2430 } });
+  const linen    = clayMat({ rep:1, mat:{ color:0xd8cdb4 } });
+  const buckle   = clayMat({ rep:1, mat:{ color:0xd8b45a } });
+  //  attach(parent, w,h,d, x,y,z, mat, rz) — local to the parent's own box.
+  const at = (p, w, h, d, x, y, z, mat, rz, ry) => {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+    m.position.set(x, y, z);
+    if (rz) m.rotation.z = rz;
+    if (ry) m.rotation.y = ry;
+    p.add(m); return m;
+  };
+
+  //  Face: brow, nose, two eyes and a pair of ears. Small, but it is the
+  //  difference between a person and a mannequin at over-the-shoulder range.
+  at(head, 0.42, 0.055, 0.05, 0, 0.09, 0.26, hairMat);
+  at(head, 0.09, 0.12, 0.07, 0, 0.00, 0.27, skin);
+  at(head, 0.085, 0.055, 0.03, -0.13, 0.03, 0.26, dark);
+  at(head, 0.085, 0.055, 0.03,  0.13, 0.03, 0.26, dark);
+  at(head, 0.05, 0.14, 0.11, -0.27, 0.00, 0, skin);
+  at(head, 0.05, 0.14, 0.11,  0.27, 0.00, 0, skin);
+  //  Fringe hanging out from under the hair.
+  at(hair, 0.44, 0.13, 0.05, 0, -0.10, 0.26, hairMat);
+  at(hair, 0.17, 0.20, 0.05, -0.16, -0.14, 0.25, hairMat, 0.2);
+
+  //  Torso: a collar, a strap across the chest, a laced seam, a belt with a
+  //  buckle, and a pouch hung off the hip.
+  at(torso, 0.78, 0.13, 0.50, 0, 0.42, 0, leather);
+  at(torso, 0.15, 0.96, 0.05, -0.10, 0.02, 0.235, leather, 0.30);
+  at(torso, 0.07, 0.62, 0.04, 0.14, 0.02, 0.235, linen);
+  for (let i = 0; i < 4; i++)
+    at(torso, 0.19, 0.035, 0.035, 0.14, 0.22 - i * 0.145, 0.245, linen, (i % 2 ? 0.4 : -0.4));
+  at(torso, 0.80, 0.14, 0.48, 0, -0.40, 0, leather);
+  at(torso, 0.13, 0.13, 0.05, 0, -0.40, 0.245, buckle);
+  at(torso, 0.20, 0.22, 0.14, -0.34, -0.44, 0.14, leather, 0.12);
+  //  Shoulder caps, one larger, so the outline is not a straight-sided crate.
+  at(torso, 0.22, 0.20, 0.40, -0.42, 0.34, 0, leather, 0.22);
+  at(torso, 0.18, 0.16, 0.36,  0.42, 0.32, 0, leather, -0.18);
+
+  //  Sleeves and wrist wraps.
+  for (const a2 of [armL, armR]){
+    at(a2, 0.235, 0.30, 0.255, 0, -0.13, 0, cloth);
+    at(a2, 0.225, 0.10, 0.245, 0, -0.60, 0, linen);
+    at(a2, 0.21, 0.16, 0.22, 0, -0.75, 0.02, skin);
+  }
+  //  Boot cuffs and knee patches.
+  for (const l of [legL, legR]){
+    at(l, 0.29, 0.12, 0.31, 0, -0.10, 0, leather);
+    at(l, 0.27, 0.13, 0.10, 0, -0.40, 0.11, leather);
+    at(l, 0.30, 0.12, 0.34, 0, -0.70, 0.02, dark);
+    at(l, 0.28, 0.10, 0.14, 0, -0.78, 0.14, dark);
+  }
+
   //  Weapon in the right hand, swapped by shape when the gear changes.
   const weaponPivot = new THREE.Group();
   weaponPivot.position.set(0.47, 1.62, 0);
   g.add(weaponPivot);
 
+  shadowize(g);
   Pl.group = g;
   Pl.parts = { torso, head, hair, armL, armR, legL, legR,
                helm, plate, greave, greave2, weaponPivot, weapon: null };
@@ -1267,6 +1498,7 @@ function makeBlockMeshes(){
     im.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     im.count = 0;
     im.frustumCulled = false;
+    im.castShadow = !m.light; im.receiveShadow = true;
     S.world.add(im);
     return im;
   });
@@ -1526,66 +1758,389 @@ function tickParticles(dt){
 
 // ─── 15 · Monsters ───────────────────────────────────────────────────────────
 
-//  Every mob used to build nine fresh BoxGeometries. They are per KIND now,
-//  built once and marked shared, so spawning is allocation-free and the
-//  disposer leaves them alone when the corpse is cleaned up.
-const MOB_KIT = {};
-function mobKit(kind){
-  if (MOB_KIT[kind]) return MOB_KIT[kind];
-  const def = MOBS[kind];
-  const G = (w, h, d) => markShared(new THREE.BoxGeometry(w, h, d));
-  const k = {
-    torso: G(def.r * 1.9, def.h * 0.5, def.r * 1.3),
-    head:  G(def.r * 1.25, def.r * 1.1, def.r * 1.2),
-    eye:   G(def.r * 0.26, def.r * 0.20, 0.06),
-    arm:   G(def.r * 0.5, def.h * 0.46, def.r * 0.5),
-    leg:   G(def.r * 0.6, def.h * 0.40, def.r * 0.62),
-    seam:  G(def.r * 0.22, def.h * 0.42, 0.05),
-  };
-  //  The pivots the walk cycle needs, baked into the shared geometry.
-  k.arm.translate(0, -def.h * 0.23, 0);
-  k.leg.translate(0, -def.h * 0.20, 0);
-  MOB_KIT[kind] = k;
-  return k;
+// ─── 36 · THE DEAD — bodies instead of boxes ────────────────────────────────
+//  What was here: a torso box, a head box, two eye dots, two arm boxes, two
+//  leg boxes. Symmetrical, upright, evenly proportioned. It read as a robot,
+//  or as nothing. None of the five types were distinguishable at ten metres.
+//
+//  What makes a shape read as undead, in rough order of how much it buys:
+//
+//    1 · posture. Upright is alive. Everything here leans, and leans WRONG:
+//        spine pitched forward, head hung off the end of it, shoulders at
+//        different heights.
+//    2 · asymmetry. One arm longer, one leg stiff, a limp in the walk. A
+//        mirror-symmetric walk cycle is the single loudest tell of a rig.
+//    3 · gauntness with bulk in the wrong places. Ribs showing over a hollow
+//        middle, and then a shoulder swollen out of proportion.
+//    4 · the face. A dark recess with a light in it, and a jaw that hangs.
+//    5 · rags. Things that hang off a silhouette and move a beat behind it.
+//
+//  All five types are built from the same armature with different numbers, so
+//  a husk and a lumberer are recognisably the same kind of wrong.
+
+const GEO_CACHE = new Map();
+function boxGeo(w, h, d){
+  const k = w.toFixed(3) + ',' + h.toFixed(3) + ',' + d.toFixed(3);
+  let g = GEO_CACHE.get(k);
+  if (!g){ g = markShared(new THREE.BoxGeometry(w, h, d)); GEO_CACHE.set(k, g); }
+  return g;
 }
+
+//  A limb is a group pivoted at its top with the mesh hung below, so rotating
+//  the group swings from the shoulder or the hip instead of the middle. The
+//  old code baked the offset into the geometry, which is why every limb needed
+//  its own copy of it.
+function limb(w, h, d, mat, cast){
+  const g = new THREE.Group();
+  const m = new THREE.Mesh(boxGeo(w, h, d), mat);
+  m.position.y = -h / 2;
+  m.castShadow = cast !== false; m.receiveShadow = true;
+  g.add(m);
+  g.userData.len = h;
+  return g;
+}
+
+function slab(w, h, d, mat, x, y, z, rx, ry, rz){
+  const m = new THREE.Mesh(boxGeo(w, h, d), mat);
+  m.position.set(x || 0, y || 0, z || 0);
+  m.rotation.set(rx || 0, ry || 0, rz || 0);
+  m.castShadow = true; m.receiveShadow = true;
+  return m;
+}
+
+//  Proportions per kind. One armature, five sets of numbers.
+const BODY = {
+  husk:    { scale:1.00, lean:0.40, neck:0.26, armL:1.32, armR:1.10, skull:0.86,
+             chest:[0.50,0.72,0.27], hip:[0.42,0.26,0.26], ribs:5, rags:5,
+             headTilt:0.15, jaw:0.20, shoulderSwell:1.30, gait:1.00, drag:0.55 },
+  stalker: { scale:0.90, lean:1.05, neck:0.40, armL:1.52, armR:1.44, skull:0.80,
+             chest:[0.42,0.56,0.32], hip:[0.36,0.22,0.26], ribs:6, rags:3,
+             headTilt:-0.40, jaw:0.34, shoulderSwell:1.00, gait:1.90, drag:0.15 },
+  lumber:  { scale:1.55, lean:0.26, neck:0.08, armL:1.62, armR:1.66, skull:0.70,
+             chest:[0.80,0.84,0.50], hip:[0.60,0.32,0.42], ribs:4, rags:4,
+             headTilt:0.22, jaw:0.12, shoulderSwell:1.90, gait:0.62, drag:0.80 },
+  wisp:    { scale:0.92, lean:0.16, neck:0.40, armL:1.42, armR:1.34, skull:0.78,
+             chest:[0.34,0.58,0.22], hip:[0.26,0.14,0.20], ribs:7, rags:10,
+             headTilt:-0.18, jaw:0.40, shoulderSwell:0.80, gait:0.80, drag:0 },
+  molder:  { scale:1.95, lean:0.34, neck:0.14, armL:1.74, armR:1.60, skull:0.78,
+             chest:[0.88,0.94,0.54], hip:[0.66,0.36,0.44], ribs:5, rags:6,
+             headTilt:0.13, jaw:0.30, shoulderSwell:2.00, gait:0.52, drag:0.70 },
+};
+
+//  Each body was 49 draw calls: thirty-odd little boxes, each its own mesh and
+//  its own material. Sixteen of them on screen cost 992 calls against 204 for
+//  the entire rest of the world. So every part that never moves relative to
+//  its bone is merged into that bone, with the colour baked per vertex and one
+//  clay material for the whole body. Ten calls a corpse instead of forty-nine.
+
+function partList(){
+  const L = [];
+  L.box = function(w, h, d, x, y, z, rx, ry, rz, hex){
+    _me.set(rx || 0, ry || 0, rz || 0); _mq.setFromEuler(_me);
+    _mm.compose(new THREE.Vector3(x || 0, y || 0, z || 0), _mq, new THREE.Vector3(1, 1, 1));
+    L.push({ g: boxGeo(w, h, d), m: _mm.clone(), c: new THREE.Color(hex) });
+    return L;
+  };
+  return L;
+}
+
+//  One bone: a group at the joint, with everything on it merged into a single
+//  mesh. Rotating the group swings the whole limb from its top.
+function bone(parts, mat, parent, x, y, z){
+  const g = new THREE.Group();
+  g.position.set(x || 0, y || 0, z || 0);
+  const mesh = new THREE.Mesh(mergeParts(parts), mat);
+  mesh.castShadow = true; mesh.receiveShadow = true;
+  g.add(mesh);
+  if (parent) parent.add(g);
+  return g;
+}
+
+const BONE_HEX = 0xcfc4ae;
 
 function makeMob(kind, x, z){
   const def = MOBS[kind];
-  const K = mobKit(kind);
+  const B = BODY[kind] || BODY.husk;
+  const S0 = B.scale;
+  const wisp = kind === 'wisp';
+  const big = kind === 'lumber' || kind === 'molder';
+
+  //  One clay material for the whole body, tinted per vertex. The hurt flash
+  //  writes emissive to this and the body flashes as one thing.
+  const skin = clayMat({ rep: 1, mat: { vertexColors: true } });
+  const glow = new THREE.MeshBasicMaterial({ color: def.eye });
+  //  The eyes can be as hot as they like — they are two specks under a brow.
+  //  The chest seam is a hand-sized panel, and at full strength in daylight it
+  //  stops reading as light coming out of a body and starts reading as pink
+  //  paint. Its own material, banked toward the flesh, and lit back up at
+  //  night by poseMob where it belongs.
+  const emberBase = new THREE.Color(def.eye).lerp(new THREE.Color(def.col), 0.62);
+  const ember = new THREE.MeshBasicMaterial({ color: emberBase.clone() });
+
+  //  Six tones off one flesh colour. Everything that reads as "dead" on these
+  //  bodies is a value relationship, not a hue: bone is the lightest thing on
+  //  the model, the sockets and the open belly are the darkest, and the bruise
+  //  is the only saturated note apart from the light inside them.
+  const _f = new THREE.Color(def.col);
+  const C_BODY   = def.col;
+  const C_PALE   = _f.clone().lerp(new THREE.Color(0xe8e2cf), 0.28).getHex();
+  const C_ROT    = _f.clone().lerp(new THREE.Color(0x2e2119), 0.50).getHex();
+  const C_DEEP   = _f.clone().lerp(new THREE.Color(0x0d0b10), 0.80).getHex();
+  const C_BRUISE = _f.clone().lerp(new THREE.Color(def.bruise || 0x5e3f5a), 0.72).getHex();
+  const C_CLOTH  = new THREE.Color(0x4b4438).lerp(_f, 0.18)
+                     .lerp(new THREE.Color(0x14121a), 0.30).getHex();
+
+  //  A per-corpse scatter, seeded off where it stood up, so two husks in the
+  //  same wave are not the same husk twice.
+  const rnd = mulberry(hashStr(kind + x.toFixed(1) + z.toFixed(1)));
+  const jit = (a) => (rnd() - 0.5) * 2 * a;
+
   const g = new THREE.Group();
-  //  Body and eye materials stay per mob, because the hurt flash writes to
-  //  emissive and a shared material would flash every husk in the valley.
-  const body = clayMat({ rep: 1, mat: { color: def.col } });
-  const eye = new THREE.MeshBasicMaterial({ color: def.eye });
-  const B = (geo, mat) => new THREE.Mesh(geo, mat);
 
-  const torso = B(K.torso, body);
-  torso.position.y = def.h * 0.58; g.add(torso);
-  const head = B(K.head, body);
-  head.position.y = def.h * 0.95; g.add(head);
+  // ── hips: pelvis, a hip bone standing proud on one side, a torn waistband ──
+  const hipP = partList();
+  const hw = B.hip[0] * S0, hh = B.hip[1] * S0, hd2 = B.hip[2] * S0;
+  hipP.box(hw, hh, hd2, 0, 0, 0, 0, 0, 0, C_CLOTH);
+  hipP.box(hw * 1.04, hh * 0.30, hd2 * 1.04, 0, hh * 0.42, 0, 0, 0, 0, C_ROT);
+  //  One iliac crest showing through the skin. Only one — symmetry is what
+  //  makes a body read as manufactured.
+  hipP.box(hw * 0.26, hh * 0.46, hd2 * 0.30,
+           -hw * 0.40, hh * 0.30, hd2 * 0.18, 0, 0, -0.20, BONE_HEX);
+  const hips = bone(hipP, skin, g, 0, def.h * 0.52 * (wisp ? 1.25 : 1), 0);
 
-  const e1 = B(K.eye, eye);
-  e1.position.set(-def.r * 0.3, def.h * 0.97, def.r * 0.62); g.add(e1);
-  const e2 = B(K.eye, eye); e2.position.copy(e1.position); e2.position.x = def.r * 0.3; g.add(e2);
+  // ── spine ────────────────────────────────────────────────────────────────
+  //  Not a box. A wide, hunched upper chest over a wasted waist, so the
+  //  silhouette narrows where a living one would not, with the cage standing
+  //  over a hollow and the backbone showing through from behind.
+  const sp = partList();
+  const cw = B.chest[0] * S0, chh = B.chest[1] * S0, cd = B.chest[2] * S0;
+  const waistW = cw * 0.66, waistH = chh * 0.34;
 
-  const armL = B(K.arm, body);
-  armL.position.set(-def.r * 1.15, def.h * 0.78, 0); g.add(armL);
-  const armR = B(K.arm, body);
-  armR.position.set(def.r * 1.15, def.h * 0.78, 0); g.add(armR);
-
-  let legL = null, legR = null;
-  if (!def.flies){
-    legL = B(K.leg, body);
-    legL.position.set(-def.r * 0.5, def.h * 0.40, 0); g.add(legL);
-    legR = B(K.leg, body);
-    legR.position.set(def.r * 0.5, def.h * 0.40, 0); g.add(legR);
+  //  Wasted waist first, so the cage sits on top of something thinner.
+  sp.box(waistW, waistH, cd * 0.82, 0, waistH * 0.48, 0, 0, 0, 0, C_ROT);
+  //  Upper chest, canted so one shoulder carries lower than the other.
+  sp.box(cw, chh * 0.74, cd, 0, chh * 0.62, 0, 0, 0, 0.035, C_BODY);
+  //  The hump: a corpse walks with its back rounded over. This is the single
+  //  biggest posture cue at distance, more than the head or the arms.
+  sp.box(cw * 0.86, chh * 0.42, cd * 0.50,
+         0, chh * 0.82, -cd * 0.46, 0.22, 0, 0, C_ROT);
+  //  Shoulder blades, one lifted.
+  sp.box(cw * 0.30, chh * 0.34, 0.045 * S0, -cw * 0.26, chh * 0.70, -cd * 0.52, 0, 0, 0.14, C_PALE);
+  sp.box(cw * 0.26, chh * 0.28, 0.04 * S0,   cw * 0.27, chh * 0.62, -cd * 0.52, 0, 0, -0.10, C_PALE);
+  //  Backbone: knuckles of it up the spine, catching the rim light.
+  for (let i = 0; i < 5; i++){
+    sp.box(0.055 * S0, 0.05 * S0, 0.05 * S0, 0,
+           chh * (0.34 + i * 0.15), -cd * 0.50 - 0.01 * S0, 0, 0, 0, BONE_HEX);
   }
 
-  //  A cracked-glaze seam that glows: reads at distance in the dark. Its own
-  //  material, because a blighted one is recoloured rather than replaced.
-  const seam = new THREE.Mesh(K.seam, new THREE.MeshBasicMaterial({ color: def.eye }));
-  seam.position.set(0, def.h * 0.58, def.r * 0.68);
-  g.add(seam);
+  //  The hollow the ribs stand over — a dark plate recessed into the front, so
+  //  the cage has a void behind it instead of sitting on solid chest.
+  sp.box(cw * 0.74, chh * 0.40, 0.03, 0, chh * 0.44, cd * 0.5 - 0.008, 0, 0, 0, C_DEEP);
+  //  The cage. Each rib narrows and drops as it goes down, and alternate ribs
+  //  tilt the other way, which is what stops it reading as a ladder.
+  for (let i = 0; i < B.ribs; i++){
+    const t = i / Math.max(1, B.ribs - 1);
+    const s2 = (i % 2 ? 1 : -1);
+    sp.box(cw * (0.92 - t * 0.40), 0.052 * S0, 0.06 * S0,
+           s2 * 0.02 * S0, chh * (0.86 - t * 0.44), cd * 0.5 + 0.016,
+           0, 0, s2 * (0.07 + t * 0.05), BONE_HEX);
+  }
+  //  Sternum, and the collarbone ridge across the top of the chest.
+  sp.box(0.05 * S0, chh * 0.34, 0.05 * S0, 0, chh * 0.72, cd * 0.5 + 0.02, 0, 0, 0, C_PALE);
+  sp.box(cw * 0.88, 0.055 * S0, 0.07 * S0, 0, chh * 1.00, cd * 0.42, 0, 0, 0.06, BONE_HEX);
+
+  //  A wound. Torn-open flesh, with the bruise spreading out around it.
+  sp.box(cw * 0.30, chh * 0.24, 0.035, cw * 0.26, chh * 0.60, cd * 0.5 + 0.024,
+         0, 0, 0.45, C_DEEP);
+  sp.box(cw * 0.42, chh * 0.34, 0.03, cw * 0.24, chh * 0.58, cd * 0.5 + 0.012,
+         0, 0, 0.45, C_BRUISE);
+  //  Mottling: dead skin does not hold one tone. Three or four patches, each
+  //  where the scatter put it, on the front, the flank and the back.
+  for (let i = 0; i < 4; i++){
+    const face = i % 2;
+    const w2 = (0.12 + rnd() * 0.22) * cw, h2 = (0.10 + rnd() * 0.20) * chh;
+    if (face === 0){
+      sp.box(w2, h2, 0.02, jit(cw * 0.34), chh * (0.30 + rnd() * 0.70), cd * 0.5 + 0.006,
+             0, 0, jit(0.5), i < 2 ? C_BRUISE : C_ROT);
+    } else {
+      sp.box(0.02, h2, w2, (rnd() < 0.5 ? -1 : 1) * cw * 0.5 - 0.004,
+             chh * (0.30 + rnd() * 0.70), jit(cd * 0.28), 0, 0, jit(0.4), C_ROT);
+    }
+  }
+
+  //  Shoulders: one swollen, one fallen away to the bone underneath.
+  const shY = chh * 0.96, shX = cw * 0.52;
+  sp.box(0.30 * S0 * B.shoulderSwell, 0.28 * S0 * B.shoulderSwell, 0.30 * S0 * B.shoulderSwell,
+         -shX, shY, 0, 0, 0, 0, C_BODY);
+  sp.box(0.24 * S0, 0.20 * S0, 0.25 * S0, shX, shY * 0.90, 0, 0, 0, 0, C_ROT);
+  sp.box(0.11 * S0, 0.26 * S0, 0.11 * S0, -shX, shY + 0.13 * S0, 0, 0, 0, 0.35, BONE_HEX);
+  sp.box(0.13 * S0, 0.10 * S0, 0.13 * S0, shX, shY * 0.90 + 0.11 * S0, 0, 0, 0, -0.2, C_PALE);
+
+  const spine = bone(sp, skin, hips, 0, 0, 0);
+  spine.rotation.x = B.lean;
+
+  // ── head ─────────────────────────────────────────────────────────────────
+  //  Everything here is in service of one thing: a brow that overhangs far
+  //  enough to put the eyes in shadow, so the glow reads as coming out of a
+  //  hole rather than being painted on the front of a box. The jaw is baked
+  //  open rather than hinged — one more bone is one more draw call on every
+  //  corpse, and a jaw that just hangs reads the same.
+  const sk = B.skull;
+  const skullW = 0.30 * S0 * sk, skullH = 0.30 * S0 * sk, skullD = 0.34 * S0 * sk;
+  const hd = partList();
+  //  Neck: a thin stalk with two vertebrae showing at the back.
+  hd.box(0.115 * S0, B.neck * S0, 0.115 * S0, 0, -B.neck * S0 * 0.30, 0, 0, 0, 0, C_ROT);
+  hd.box(0.06 * S0, 0.05 * S0, 0.05 * S0, 0, -B.neck * S0 * 0.16, -0.06 * S0, 0, 0, 0, BONE_HEX);
+  hd.box(0.06 * S0, 0.05 * S0, 0.05 * S0, 0, -B.neck * S0 * 0.48, -0.055 * S0, 0, 0, 0, BONE_HEX);
+  //  Cranium, narrower at the jaw than at the temples.
+  hd.box(skullW, skullH * 0.78, skullD, 0, skullH * 0.62, 0, 0, 0, 0, C_BODY);
+  hd.box(skullW * 0.84, skullH * 0.30, skullD * 0.88, 0, skullH * 0.26, skullD * 0.04, 0, 0, 0, C_ROT);
+  //  Temple hollows, one each side, sunk into the skull.
+  for (const sx2 of [-1, 1]){
+    hd.box(0.03 * S0, skullH * 0.26, skullD * 0.34,
+           sx2 * (skullW * 0.5 - 0.012), skullH * 0.66, skullD * 0.06, 0, 0, 0, C_DEEP);
+  }
+  //  The face is built front-to-back in three layers and the order matters,
+  //  because the first pass had the brow a full 0.15 deep at z=0.46·skullD,
+  //  which swallowed the eye lamps whole — at night the head was an empty box.
+  //    · the socket, a dark plate just proud of the skull front
+  //    · the eye lamps, a shade in front of that
+  //    · the brow, further forward again and set higher, so it hangs over
+  //      them without covering them
+  const faceZ = skullD * 0.50;
+  hd.box(skullW * 0.92, 0.16 * S0, 0.03 * S0, 0, skullH * 0.60, faceZ + 0.004, 0, 0, 0, C_DEEP);
+  //  Brow: proud of the face by a real distance, and heavy. Sits above the
+  //  lamps and juts past them, which is what casts the shadow across them.
+  hd.box(skullW * 1.12, 0.080 * S0, 0.075 * S0,
+         0, skullH * 0.84, faceZ + 0.022 * S0, -0.16, 0, 0, C_PALE);
+  //  A second, smaller lip under the brow on one side only — a heavier
+  //  overhang over one eye than the other, which is most of why these read
+  //  as faces rather than as dials.
+  hd.box(skullW * 0.46, 0.05 * S0, 0.055 * S0,
+         -skullW * 0.26, skullH * 0.73, faceZ + 0.026 * S0, -0.3, 0, 0.10, C_BODY);
+  //  Cheekbones under the sockets, and hollows under those.
+  for (const sx2 of [-1, 1]){
+    hd.box(0.08 * S0 * sk, 0.07 * S0, 0.07 * S0,
+           sx2 * skullW * 0.34, skullH * 0.48, skullD * 0.46, 0, 0, sx2 * 0.2, C_PALE);
+    hd.box(0.10 * S0 * sk, 0.09 * S0, 0.035 * S0,
+           sx2 * skullW * 0.30, skullH * 0.36, skullD * 0.50, 0, 0, 0, C_ROT);
+  }
+  //  Nose gone, leaving the aperture.
+  hd.box(0.06 * S0, 0.08 * S0, 0.04 * S0, 0, skullH * 0.46, skullD * 0.51, 0, 0, 0, C_DEEP);
+  //  The jaw, hung open and swung a little off true.
+  hd.box(skullW * 0.72, 0.13 * S0, skullD * 0.60,
+         jit(0.012 * S0), skullH * 0.12, skullD * 0.26, B.jaw, jit(0.12), 0.06, C_ROT);
+  hd.box(skullW * 0.56, 0.035 * S0, 0.03 * S0,
+         0, skullH * 0.21, skullD * 0.54, B.jaw, 0, 0, BONE_HEX);
+  //  Upper teeth, so the open mouth has something in it from above too.
+  hd.box(skullW * 0.52, 0.03 * S0, 0.03 * S0,
+         0, skullH * 0.32, skullD * 0.50, 0, 0, 0, BONE_HEX);
+  //  The crown is broken open on one side, showing the bone under the scalp.
+  hd.box(skullW * 0.44, 0.045 * S0, skullD * 0.40,
+         skullW * 0.22, skullH * 0.98, -skullD * 0.10, 0.12, 0, 0.16, BONE_HEX);
+  const neck = bone(hd, skin, spine, 0, chh * 1.02 + B.neck * S0 * 0.4, 0);
+  neck.rotation.x = B.headTilt;
+
+  //  Eyes: one small glowing mesh, both sockets in it, sunk back under the
+  //  brow rather than sitting on the face.
+  const eyeP = partList();
+  for (const sx of [-1, 1]){
+    //  Uneven: one lamp bigger and lower than the other. A matched pair reads
+    //  as a robot's sensors; a mismatched pair reads as something wrong.
+    const big2 = sx < 0 ? 1.18 : 0.84;
+    eyeP.box(0.070 * S0 * big2, 0.058 * S0 * big2, 0.026 * S0,
+             sx * skullW * 0.24, skullH * (sx < 0 ? 0.585 : 0.615),
+             faceZ + 0.016 * S0, 0, 0, sx * 0.12, 0xffffff);
+  }
+  const eyes = new THREE.Mesh(mergeParts(eyeP), glow);
+  eyes.castShadow = false; eyes.receiveShadow = false;
+  neck.add(eyes);
+
+  // ── arms ─────────────────────────────────────────────────────────────────
+  //  One rigid bend baked in rather than an elbow joint: a stiff arm is what a
+  //  corpse has. Fingers are worth their triangles — a hand that splays is the
+  //  difference between a thing reaching for you and a plank swinging.
+  function arm(len, thick, sx){
+    const P = partList();
+    const up = len * 0.52, fo = len * 0.48;
+    P.box(thick, up, thick, 0, -up * 0.5, 0, 0, 0, 0, C_BODY);
+    //  Bruising down the upper arm, and the elbow knob at the bend.
+    P.box(thick * 1.02, up * 0.32, thick * 0.3,
+          0, -up * (0.30 + rnd() * 0.3), thick * 0.5, 0, 0, jit(0.3), C_BRUISE);
+    P.box(thick * 1.20, thick * 0.9, thick * 1.20, 0, -up, 0, 0, 0, 0, C_PALE);
+    //  Forearm swung forward from the elbow, in geometry.
+    const eb = -up, fy = -fo * 0.46, fz = fo * 0.40;
+    P.box(thick * 0.82, fo, thick * 0.82, 0, eb + fy, fz * 0.5, -0.72, 0, 0, C_ROT);
+    //  The ulna showing through where the flesh has gone off the forearm.
+    P.box(thick * 0.26, fo * 0.68, thick * 0.26,
+          thick * 0.30, eb + fy, fz * 0.5, -0.72, 0, 0, BONE_HEX);
+    //  Hand: a flat palm with four fingers splayed off the end of it, and a
+    //  thumb out to the side.
+    const hx = 0, hy = eb + fy * 2 + 0.02, hz = fz * 1.05;
+    P.box(thick * 1.45, thick * 0.70, thick * 1.30, hx, hy, hz, -0.72, 0, 0, C_ROT);
+    for (let f = 0; f < 4; f++){
+      const off = (f - 1.5) * thick * 0.36;
+      const curl = -0.72 - 0.30 - rnd() * 0.45;
+      const fl = thick * (1.5 + rnd() * 0.9);
+      P.box(thick * 0.22, thick * 0.22, fl,
+            hx + off, hy - thick * 0.30 - fl * 0.24, hz + fl * 0.40,
+            curl, jit(0.1), 0, f % 2 ? C_PALE : C_ROT);
+    }
+    P.box(thick * 0.26, thick * 0.24, thick * 1.1,
+          hx - sx * thick * 0.62, hy - thick * 0.1, hz + thick * 0.3, -0.5, sx * 0.5, 0, C_ROT);
+    return bone(P, skin, spine, sx * (shX + 0.05 * S0), sx < 0 ? shY : shY * 0.90, 0);
+  }
+  const armL = arm(B.armL * S0, 0.135 * S0, -1);
+  const armR = arm(B.armR * S0, 0.115 * S0, 1);
+
+  // ── legs, one bone each, knee and foot baked in ──────────────────────────
+  let legL = null, legR = null;
+  function leg(sx){
+    const P = partList();
+    const th = def.h * 0.25, sh = def.h * 0.25;
+    //  Thigh still has trouser on it; the shin does not.
+    P.box(0.155 * S0, th, 0.165 * S0, 0, -th * 0.5, 0, 0, 0, 0, C_CLOTH);
+    //  Torn hem where the cloth gives out above the knee.
+    P.box(0.17 * S0, 0.06 * S0, 0.18 * S0, 0, -th * 0.94, 0, 0, jit(0.2), jit(0.12), C_ROT);
+    P.box(0.13 * S0, 0.11 * S0, 0.13 * S0, 0, -th - 0.02, 0.01 * S0, 0, 0, 0, C_PALE);
+    P.box(0.115 * S0, sh, 0.125 * S0, 0, -th - sh * 0.5, 0.03 * S0, 0.12, 0, 0, C_BODY);
+    //  Shin bone down the front of it — the light catches this on every step.
+    P.box(0.04 * S0, sh * 0.76, 0.03 * S0,
+          0, -th - sh * 0.48, 0.03 * S0 + 0.065 * S0, 0.12, 0, 0, BONE_HEX);
+    P.box(0.10 * S0, sh * 0.30, 0.02 * S0,
+          sx * 0.03 * S0, -th - sh * (0.3 + rnd() * 0.4), 0.03 * S0 + 0.064 * S0,
+          0.12, 0, jit(0.4), C_BRUISE);
+    //  Foot, turned out at an angle no living ankle would hold.
+    P.box(0.19 * S0, 0.085 * S0, 0.30 * S0,
+          0, -th - sh - 0.02, 0.09 * S0, 0, sx * 0.16, 0, C_ROT);
+    P.box(0.16 * S0, 0.05 * S0, 0.06 * S0,
+          0, -th - sh - 0.04, 0.22 * S0, 0, sx * 0.16, 0, C_PALE);
+    return bone(P, skin, hips, sx * B.hip[0] * S0 * 0.46, -B.hip[1] * S0 * 0.4, 0);
+  }
+  if (!wisp){ legL = leg(-1); legR = leg(1); }
+
+  // ── rags: one merged cluster that sways as a whole ──
+  const rp = partList();
+  const nRags = B.rags || 5;
+  for (let i = 0; i < nRags; i++){
+    const a = (i / nRags) * 6.2832 + rnd() * 0.5;
+    const len = (0.26 + rnd() * 0.50) * S0 * (wisp ? 2.2 : 1);
+    rp.box(0.09 * S0 + rnd() * 0.10 * S0, len, 0.028,
+           Math.cos(a) * B.hip[0] * S0 * 0.52, -len * 0.5 - B.hip[1] * S0 * 0.2,
+           Math.sin(a) * B.hip[2] * S0 * 0.52,
+           (rnd() - 0.5) * 0.4, a, (rnd() - 0.5) * 0.5,
+           rnd() < 0.3 ? C_ROT : C_CLOTH);
+  }
+  const rags = bone(rp, skin, hips, 0, 0, 0);
+
+  //  The crack the light comes out of.
+  const seamP = partList();
+  const seamW = big ? 0.22 * S0 : 0.045 * S0;
+  seamP.box(seamW, chh * (big ? 0.46 : 0.34), 0.03,
+            -cw * 0.24, chh * 0.50, cd * 0.5 + 0.03, 0, 0, 0.18, 0xffffff);
+  const seam = new THREE.Mesh(mergeParts(seamP), ember);
+  seam.castShadow = false; seam.receiveShadow = false;
+  spine.add(seam);
 
   const y = groundY(x, z);
   g.position.set(x, y, z);
@@ -1593,14 +2148,73 @@ function makeMob(kind, x, z){
 
   const hpMul = 1 + (St.day - 1) * 0.17;
   const m = {
-    kind, def, g, torso, head, armL, armR, legL, legR, seam,
+    kind, def, B, g, hips, spine, neck, rags, seam, eyes, ember, emberBase, glow,
+    armL, armR, legL, legR,
+    mats: [skin],
     hp: def.hp * hpMul, maxHp: def.hp * hpMul,
     x, z, y, vy: 0, yaw: 0, cd: 0, phase: Math.random() * 6.28,
     hurt: 0, dead: false, deadT: 0, stun: 0, bob: Math.random() * 6.28,
+    twitch: 0,
   };
   mobs.push(m);
   return m;
 }
+
+//  The walk. Stepped to twelve frames a second like everything else, and
+//  deliberately lopsided: one leg swings, the other drags.
+function poseMob(m, dt){
+  const B = m.B, def = m.def;
+  const ph = St.step * (def.spd * 1.5 * B.gait) + m.phase;
+  const sw = Math.sin(ph);
+  const sw2 = Math.sin(ph * 2);
+
+  //  A twitch now and then, because a body that only ever does the loop reads
+  //  as a machine.
+  m.twitch -= dt;
+  if (m.twitch <= 0 && Math.random() < dt * 0.5) m.twitch = 0.34;
+  const tw = m.twitch > 0 ? Math.sin(m.twitch * 60) * 0.16 : 0;
+
+  m.spine.rotation.x = B.lean + sw2 * 0.05;
+  m.spine.rotation.z = sw * 0.07 + tw * 0.4;
+  m.neck.rotation.x = B.headTilt + sw2 * 0.10 + tw;
+  m.neck.rotation.z = -sw * 0.12;
+
+  //  Arms never in phase with each other.
+  m.armL.rotation.x = -0.50 - sw * 0.40;
+  m.armL.rotation.z = 0.16;
+  m.armR.rotation.x = -0.14 + sw * 0.30;
+  m.armR.rotation.z = -0.10;
+
+  if (m.legL){
+    m.legL.rotation.x = sw * 0.62;
+    m.legR.rotation.x = -sw * 0.62 * (1 - B.drag);
+    m.legL.rotation.z = 0.05; m.legR.rotation.z = -0.09;
+    //  Weight drops on the good leg only, so the bob is uneven.
+    m.hips.position.y = def.h * 0.52 + Math.max(0, sw) * 0.055 * B.scale - 0.03;
+  }
+
+  m.rags.rotation.x = Math.sin(ph * 1.3) * 0.16;
+  m.rags.rotation.z = Math.sin(ph * 0.9) * 0.14;
+
+  //  The flicker is in the colour, not the size. Scaling the lamp mesh also
+  //  scales the offsets baked into its vertices, so a pulse down to 0.44 was
+  //  quietly dragging both eyes back inside the skull — which is why the heads
+  //  read as empty boxes after dark no matter how deep the sockets got.
+  const pulse = 0.72 + Math.sin(St.step * 5 + m.phase) * 0.28;
+  if (m.glow) m.glow.color.copy(_EYE_DIM.setHex(m.def.eye))
+                          .multiplyScalar(0.45 + pulse * 0.55);
+  //  The furnace inside comes up after dark and banks down in daylight, so the
+  //  same body is a dull grey thing at noon and lit from within at midnight.
+  if (m.ember){
+    const heat = (St.night ? 1 : 0.18) *
+                 (0.80 + Math.sin(St.step * 2.1 + m.phase) * 0.20);
+    m.ember.color.copy(m.emberBase).lerp(_EMBER_HOT.setHex(m.def.eye), heat);
+  }
+}
+
+//  Scratch, so the breath above allocates nothing per corpse per frame.
+const _EMBER_HOT = new THREE.Color();
+const _EYE_DIM = new THREE.Color();
 
 function spawnWave(){
   const want = Math.min(MAX_MOBS, 3 + Math.floor(St.day * 1.25));
@@ -1650,7 +2264,7 @@ function hurtMob(m, dmg, kx, kz){
   m.stun = 0.10;
   m.x += kx; m.z += kz;
   burst(m.g.position.x, m.g.position.y + m.def.h * 0.6, m.g.position.z,
-        5, m.def.col, 4.5);
+        5, m.def.spark, 4.5);
   dmgNumber(m.g.position.x, m.g.position.y + m.def.h * 0.9, m.g.position.z, Math.round(dmg));
   if (m.hp <= 0) killMob(m);
 }
@@ -1671,7 +2285,7 @@ function killMob(m){
   St.combo++; St.comboT = 3.2;
   St.xp += 12 * m.def.tier;
   burst(m.g.position.x, m.g.position.y + m.def.h * 0.5, m.g.position.z,
-        16, m.def.col, 8);
+        16, m.def.spark, 8);
   burst(m.g.position.x, m.g.position.y + m.def.h * 0.5, m.g.position.z,
         6, m.def.eye, 9);
   St.res.ember += m.def.tier;
@@ -1738,19 +2352,15 @@ function tickMobs(dt){
     m.g.position.set(m.x, m.y, m.z);
     m.g.rotation.y = m.yaw;
 
-    //  Stop-motion walk: pose snaps on the 12fps step, never between.
-    const ph = St.step * (m.def.spd * 1.6) + m.phase;
-    const sw = Math.sin(ph) * 0.8;
-    if (m.legL){ m.legL.rotation.x = sw; m.legR.rotation.x = -sw; }
-    m.armL.rotation.x = -sw * 0.8;
-    m.armR.rotation.x = sw * 0.8;
-    m.g.position.y += Math.abs(Math.sin(ph * 2)) * 0.06;
+    poseMob(m, dt);
 
     if (m.hurt > 0){
       m.hurt -= dt;
       const f = m.hurt > 0 ? 1 : 0;
-      m.torso.material.emissive = m.torso.material.emissive || new THREE.Color();
-      m.torso.material.emissive.setRGB(f, f * 0.3, f * 0.3);
+      for (const mat of m.mats){
+        mat.emissive = mat.emissive || new THREE.Color();
+        mat.emissive.setRGB(f, f * 0.28, f * 0.28);
+      }
     }
 
     //  Attack
@@ -1762,7 +2372,9 @@ function tickMobs(dt){
       } else if (d < m.def.r + 1.6){
         m.cd = 1.35;
         hurtPlayer(m.def.dmg * (1 + (St.day - 1) * 0.10));
-        m.armR.rotation.x = -2.2;
+        //  The long arm comes over the top, and the body follows it.
+        m.armL.rotation.x = -2.5;
+        m.spine.rotation.x = m.B.lean - 0.3;
       }
     }
   }
@@ -1772,6 +2384,7 @@ function spit(m){
   const geo = new THREE.IcosahedronGeometry(0.22, 0);
   const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: m.def.eye }));
   mesh.position.set(m.x, m.y + m.def.h * 0.8, m.z);
+  mesh.castShadow = false;
   S.world.add(mesh);
   const dir = new THREE.Vector3(Pl.pos.x - m.x, (Pl.pos.y + 1.2) - (m.y + m.def.h * 0.8), Pl.pos.z - m.z).normalize();
   projectiles.push({ mesh, dir, spd: 16, life: 2.4, dmg: m.def.dmg * 0.8 });
@@ -1813,9 +2426,9 @@ function hurtPlayer(raw){
 // ─── 17 · Sky, sun, and the clock everything obeys ───────────────────────────
 
 const SKY = {
-  dawn:  { top:0xff9a5c, bot:0xffd9a0, fog:0xffc08a, sun:0xfff0c0, amb:0x6a5540, sunI:1.5, ambI:0.75 },
-  day:   { top:0x3fa9f5, bot:0xbfe8ff, fog:0xbfe4ff, sun:0xfff6e0, amb:0x88a0c0, sunI:2.2, ambI:0.95 },
-  dusk:  { top:0x7b3f9a, bot:0xff7a5c, fog:0xd07a7a, sun:0xffb06a, amb:0x5a4460, sunI:1.2, ambI:0.62 },
+  dawn:  { top:0xff9a5c, bot:0xffd9a0, fog:0xffc08a, sun:0xfff0c0, amb:0x6a5540, sunI:2.1, ambI:0.52 },
+  day:   { top:0x3fa9f5, bot:0xbfe8ff, fog:0xbfe4ff, sun:0xfff6e0, amb:0x88a0c0, sunI:2.9, ambI:0.62 },
+  dusk:  { top:0x7b3f9a, bot:0xff7a5c, fog:0xd07a7a, sun:0xffb06a, amb:0x5a4460, sunI:1.7, ambI:0.46 },
   night: { top:0x0a1130, bot:0x1d2c56, fog:0x141d3c, sun:0x9dc0ff, amb:0x41588a, sunI:0.62, ambI:0.60 },
 };
 
@@ -1866,6 +2479,7 @@ function makeSky(){
   SHW.scene.add(S.moonDisc);
 
   SHW.scene.fog = new THREE.Fog(0xbfe4ff, 60, 190);
+  initShadows();
 }
 
 function lerpSky(a, b, t){
@@ -1904,6 +2518,9 @@ function updateSky(dt){
   SHW.scene.fog.near = St.night ? 36 : 110;
   SHW.scene.fog.far  = St.night ? 150 : 420;
   SHW.renderer.setClearColor(new THREE.Color(m.bot));
+  //  Rim colour tracks the sky, so a silhouette at dusk is edged in dusk.
+  RIM.color.copy(new THREE.Color(m.top)).lerp(new THREE.Color(0xffffff), 0.35);
+  RIM.strength = St.night ? 0.34 : 0.17;
 
   //  Sun arc. Noon overhead, and the low angles do the work on the clay.
   const ang = (St.cycle / DAY_LEN) * Math.PI;
@@ -2204,6 +2821,14 @@ function camBlocked(p){
 
 function updateCamera(dt){
   const c = SHW.camera;
+  //  Inspection camera: used to photograph a model without the player's head
+  //  in front of it. Never engaged in normal play.
+  if (SHW.freeCam){
+    const f = SHW.freeCam;
+    c.position.set(f.px, f.py, f.pz);
+    c.lookAt(f.tx, f.ty, f.tz);
+    return;
+  }
   const tgt = new THREE.Vector3(Pl.pos.x, Pl.pos.y + 1.55, Pl.pos.z);
 
   //  Over the shoulder: behind, up, and offset to the right.
@@ -2537,6 +3162,8 @@ const CSS = `
 #shw-root *{box-sizing:border-box;}
 
 /* Grain + vignette: the film the puppets were shot on */
+#shw-root.haspost #shw-grain{display:none;}
+#shw-root.haspost #shw-vig{display:none;}
 #shw-grain{position:absolute;inset:0;pointer-events:none;opacity:.06;mix-blend-mode:overlay;
   background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='150' height='150'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
   animation:shw-grain .45s steps(3) infinite;}
@@ -3694,7 +4321,7 @@ function offAll(){
 }
 
 const GAME_KEYS = new Set(['w','a','s','d',' ','shift','q','e','f','tab','1','2','3','4','5','6',
-                           '[',']','escape','r','g','p','c','m','j']);
+                           '[',']','escape','r','g','p','c','m','j','o']);
 
 function bindInput(){
   const cv = hud.canvas;
@@ -3741,6 +4368,7 @@ function bindInput(){
     if (k === '[') { St.brush = clamp(St.brush - 0.5, 1, 9); }
     if (k === ']') { St.brush = clamp(St.brush + 0.5, 1, 9); }
     if (k === 'g'){ rest(); }
+    if (k === 'o'){ cycleQuality(); }
     if (k === 'c'){
       if (St.benchOpen) toggleBench(false);
       else { const h = hereSettlement(); if (h) toggleBench(true, h); }
@@ -3970,6 +4598,7 @@ function buildWorld(){
   S.world.add(S.torch);
 
   bakeMap();
+  applyQuality(QUALITY.level);
 }
 
 function clearWorld(){
@@ -4097,6 +4726,12 @@ function frame(){
       if (St.comboT > 0){ St.comboT -= dt; if (St.comboT <= 0) St.combo = 0; }
       updateStream(false);
       if (propsDirty) refreshPropWindow();
+      //  Props re-window on a tile edge, twenty-four metres apart. The tuft
+      //  ring is thirty metres across, so on that schedule the far edge would
+      //  go bald before it was refilled — it follows the player instead.
+      else if (S.grass && QUALITY.grass && (!grassAt ||
+               (Pl.pos.x - grassAt.x) ** 2 + (Pl.pos.z - grassAt.z) ** 2 > 20))
+        scatterGrass();
       tickFar(dt);
       tickRuins(dt);
       questTick(dt);
@@ -4147,7 +4782,8 @@ function frame(){
     tickParticles(dt);
   }
 
-  SHW.renderer.render(SHW.scene, SHW.camera);
+  autoQuality(dt);
+  renderFrame();
 }
 
 // ─── 29 · Mount / unmount ────────────────────────────────────────────────────
@@ -4159,6 +4795,7 @@ function sizeTo(){
   SHW.renderer.setSize(w, h, false);
   SHW.camera.aspect = w / h;
   SHW.camera.updateProjectionMatrix();
+  resizePost();
 }
 
 async function mount(host, opts){
@@ -4172,8 +4809,10 @@ async function mount(host, opts){
     canvas: hud.canvas, antialias: true, powerPreference: 'high-performance' });
   SHW.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
   SHW.renderer.outputColorSpace = THREE.SRGBColorSpace;
-  SHW.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  SHW.renderer.toneMappingExposure = 1.24;
+  //  Tone mapping happens in the lens, not here.
+  SHW.renderer.toneMapping = THREE.NoToneMapping;
+  SHW.renderer.shadowMap.enabled = true;
+  SHW.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
   SHW.scene = new THREE.Scene();
   SHW.camera = new THREE.PerspectiveCamera(62, 16 / 9, 0.1, 700);
@@ -4186,6 +4825,9 @@ async function mount(host, opts){
 
   const xl = hud.root.querySelector('#shw-exitlabel');
   if (xl && SHW.opts.exitLabel) xl.textContent = SHW.opts.exitLabel;
+
+  try { initPost(); } catch (e){ console.warn('post off:', e); SHW.post = null; }
+  applyQuality('high');
 
   bindInput();
   setMode('fight');
@@ -4629,6 +5271,7 @@ function buildSettlementMeshes(st){
   grp.add(ring);
   st.ringMesh = ring;
 
+  shadowize(grp);
   S.world.add(grp);
   st.group = grp;
 }
@@ -4986,6 +5629,321 @@ function renderBench(){
   });
 }
 
+
+// ─── 35 · THE PICTURE — light, shadow, and a lens to look through it ─────────
+//  Everything up to here was flat-shaded clay with no shadows, no specular, no
+//  post. That reads as a toy: a shape lit evenly from nowhere has no weight and
+//  no time of day. Three things fix it, none of which need an asset file.
+//
+//    · a sun that actually casts, on a tight box that follows the player
+//    · a rim light injected into the clay shader, so every silhouette separates
+//      from whatever is behind it
+//    · and a lens: the scene renders into a buffer, the bright parts bloom, and
+//      a filmic curve, a grade, a vignette and grain are applied in one pass
+//
+//  All of it scales off one quality flag, because this has to run in an arcade
+//  cabinet inside a web page as well as on a real machine.
+
+const QUALITY = { level: 'high', shadows: true, bloom: true, grass: true, shadowSize: 2048 };
+
+function applyQuality(level){
+  QUALITY.level = level;
+  QUALITY.shadows = level === 'high';
+  QUALITY.bloom   = level !== 'low';
+  QUALITY.grass   = level === 'high';
+  QUALITY.shadowSize = level === 'high' ? 2048 : 1024;
+
+  if (SHW.renderer){
+    SHW.renderer.shadowMap.enabled = QUALITY.shadows;
+    SHW.renderer.shadowMap.needsUpdate = true;
+  }
+  if (S.sun) S.sun.castShadow = QUALITY.shadows;
+  if (S.grass) S.grass.visible = QUALITY.grass;
+  if (hud.root) hud.root.classList.toggle('lowfx', level === 'low');
+  //  The film grain and vignette are done in the lens now; the old CSS layers
+  //  would double them.
+  if (hud.root) hud.root.classList.toggle('haspost', !!SHW.post);
+}
+
+//  Anything unlit (a fire, a ring on the ground, a marker) must not cast: a
+//  flame throwing a shadow is the single most obvious tell that a renderer is
+//  being naive.
+function shadowize(root, castToo){
+  if (!root) return root;
+  root.traverse(o => {
+    if (!o.isMesh && !o.isInstancedMesh) return;
+    const m = o.material;
+    const unlit = m && (m.isMeshBasicMaterial || m.transparent && m.opacity < 0.9);
+    o.castShadow = castToo !== false && !unlit;
+    o.receiveShadow = !unlit;
+  });
+  return root;
+}
+
+function initShadows(){
+  const r = SHW.renderer;
+  r.shadowMap.enabled = QUALITY.shadows;
+  r.shadowMap.type = THREE.PCFSoftShadowMap;
+  if (!S.sun) return;
+  S.sun.castShadow = QUALITY.shadows;
+  const sh = S.sun.shadow;
+  sh.mapSize.set(QUALITY.shadowSize, QUALITY.shadowSize);
+  //  A tight box around the player rather than the whole 576m world: at 2048
+  //  across 180m that is nine centimetres a texel, which is enough to see the
+  //  shadow of a fence post.
+  const d = 88;
+  sh.camera.left = -d; sh.camera.right = d;
+  sh.camera.top = d;   sh.camera.bottom = -d;
+  sh.camera.near = 1;  sh.camera.far = 420;
+  sh.bias = -0.0006;
+  sh.normalBias = 0.55;
+  sh.camera.updateProjectionMatrix();
+}
+
+//  Rim light, injected into the clay shader. One shared program for every clay
+//  material, or each of the forty-odd would compile its own.
+const RIM = { color: new THREE.Color(0x9ec4ff), power: 3.4, strength: 0.20 };
+function withRim(mat){
+  mat.onBeforeCompile = (sh) => {
+    sh.uniforms.rimColor = { value: RIM.color };
+    sh.uniforms.rimPower = { value: RIM.power };
+    sh.uniforms.rimStrength = { value: RIM.strength };
+    mat.userData.sh = sh;
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>',
+        '#include <common>\nuniform vec3 rimColor;uniform float rimPower;uniform float rimStrength;')
+      .replace('#include <dithering_fragment>', `
+        #include <dithering_fragment>
+        {
+          vec3 vd = normalize( vViewPosition );
+          float rimF = pow( 1.0 - clamp( dot( normal, vd ), 0.0, 1.0 ), rimPower );
+          gl_FragColor.rgb += rimColor * rimF * rimStrength;
+        }`);
+  };
+  mat.customProgramCacheKey = () => 'clay-rim';
+  return mat;
+}
+
+// ─── The lens ───────────────────────────────────────────────────────────────
+
+const POST_VERT = `
+  varying vec2 vUv;
+  void main(){ vUv = uv; gl_Position = vec4( position.xy, 0.0, 1.0 ); }
+`;
+
+const BRIGHT_FRAG = `
+  uniform sampler2D tScene; uniform float threshold; varying vec2 vUv;
+  void main(){
+    vec3 c = texture2D( tScene, vUv ).rgb;
+    float l = dot( c, vec3( 0.2126, 0.7152, 0.0722 ) );
+    float k = max( 0.0, l - threshold ) / max( l, 0.0001 );
+    gl_FragColor = vec4( c * k, 1.0 );
+  }
+`;
+
+const BLUR_FRAG = `
+  uniform sampler2D tIn; uniform vec2 dir; varying vec2 vUv;
+  void main(){
+    vec4 s = texture2D( tIn, vUv ) * 0.2270270270;
+    s += texture2D( tIn, vUv + dir * 1.3846153846 ) * 0.3162162162;
+    s += texture2D( tIn, vUv - dir * 1.3846153846 ) * 0.3162162162;
+    s += texture2D( tIn, vUv + dir * 3.2307692308 ) * 0.0702702703;
+    s += texture2D( tIn, vUv - dir * 3.2307692308 ) * 0.0702702703;
+    gl_FragColor = s;
+  }
+`;
+
+//  Composite, tone map, grade, vignette, grain, and a touch of lens colour at
+//  the edges. This is the whole "artistic" pass in one shader.
+const FINAL_FRAG = `
+  uniform sampler2D tScene, tBloom;
+  uniform float bloomAmt, exposure, time, grain, vignette, aberration, night;
+  varying vec2 vUv;
+
+  vec3 aces( vec3 x ){
+    const float a = 2.51, b = 0.03, c = 2.43, d = 0.59, e = 0.14;
+    return clamp( ( x * ( a * x + b ) ) / ( x * ( c * x + d ) + e ), 0.0, 1.0 );
+  }
+  float hash( vec2 p ){ return fract( sin( dot( p, vec2( 12.9898, 78.233 ) ) ) * 43758.5453 ); }
+
+  void main(){
+    vec2 uv = vUv;
+    vec2 off = ( uv - 0.5 );
+    float r2 = dot( off, off );
+
+    //  Chromatic aberration: the lens is not perfect, and the corners say so.
+    float ab = aberration * r2;
+    vec3 col;
+    col.r = texture2D( tScene, uv - off * ab ).r;
+    col.g = texture2D( tScene, uv ).g;
+    col.b = texture2D( tScene, uv + off * ab ).b;
+
+    col += texture2D( tBloom, uv ).rgb * bloomAmt;
+    col *= exposure;
+    col = aces( col );
+
+    //  Grade: cool the shadows, warm the highlights, and lift a little at
+    //  night so the dark reads as blue rather than as nothing.
+    float l = dot( col, vec3( 0.2126, 0.7152, 0.0722 ) );
+    vec3 shadowTint = mix( vec3( 0.86, 0.92, 1.10 ), vec3( 0.80, 0.88, 1.22 ), night );
+    vec3 highTint   = vec3( 1.06, 1.01, 0.94 );
+    col *= mix( shadowTint, highTint, smoothstep( 0.12, 0.75, l ) );
+    col += vec3( 0.010, 0.016, 0.036 ) * night;
+
+    //  Slight saturation push, because clay wants colour.
+    float g = dot( col, vec3( 0.2126, 0.7152, 0.0722 ) );
+    col = mix( vec3( g ), col, 1.14 );
+
+    col = clamp( col, 0.0, 1.0 );
+
+    //  A raw ShaderMaterial does not get three's colour-space conversion, so
+    //  this encodes to sRGB itself. Without it the whole picture is linear
+    //  values shown as if they were sRGB, which reads dark and muddy.
+    col = mix( col * 12.92,
+               1.055 * pow( max( col, vec3( 0.0031308 ) ), vec3( 1.0 / 2.4 ) ) - 0.055,
+               step( vec3( 0.0031308 ), col ) );
+
+    //  Vignette and grain belong AFTER the encode, in display space. Applied
+    //  in linear they crush the shadows and the noise swamps everything dark,
+    //  which is what the first pass did.
+    col *= 1.0 - vignette * r2 * 1.45;
+    float n = hash( uv * 1024.0 + floor( time * 12.0 ) * 37.0 ) - 0.5;
+    col += n * grain;
+
+    gl_FragColor = vec4( clamp( col, 0.0, 1.0 ), 1.0 );
+  }
+`;
+
+function initPost(){
+  const r = SHW.renderer;
+  const half = THREE.HalfFloatType;
+  const opts = { type: half, depthBuffer: true, stencilBuffer: false };
+  const size = new THREE.Vector2();
+  r.getDrawingBufferSize(size);
+
+  const P = {};
+  P.scene  = new THREE.WebGLRenderTarget(size.x, size.y, opts);
+  P.bright = new THREE.WebGLRenderTarget(size.x >> 1, size.y >> 1, { type: half, depthBuffer: false });
+  P.blurA  = new THREE.WebGLRenderTarget(size.x >> 1, size.y >> 1, { type: half, depthBuffer: false });
+  P.blurB  = new THREE.WebGLRenderTarget(size.x >> 1, size.y >> 1, { type: half, depthBuffer: false });
+
+  P.cam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+  P.quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), null);
+  P.stage = new THREE.Scene();
+  P.stage.add(P.quad);
+
+  P.mBright = new THREE.ShaderMaterial({
+    vertexShader: POST_VERT, fragmentShader: BRIGHT_FRAG,
+    //  Only what is genuinely brighter than the scene should bloom: a low
+    //  threshold turns the whole frame into haze, which is what it did.
+    uniforms: { tScene: { value: null }, threshold: { value: 1.05 } },
+  });
+  P.mBlur = new THREE.ShaderMaterial({
+    vertexShader: POST_VERT, fragmentShader: BLUR_FRAG,
+    uniforms: { tIn: { value: null }, dir: { value: new THREE.Vector2() } },
+  });
+  P.mFinal = new THREE.ShaderMaterial({
+    vertexShader: POST_VERT, fragmentShader: FINAL_FRAG,
+    uniforms: {
+      tScene: { value: null }, tBloom: { value: null },
+      bloomAmt: { value: 0.40 }, exposure: { value: 1.45 },
+      time: { value: 0 }, grain: { value: 0.026 },
+      vignette: { value: 0.36 }, aberration: { value: 0.0030 },
+      night: { value: 0 },
+    },
+  });
+
+  //  Deliberately NOT on S: clearWorld() empties that object every time the
+  //  world is rebuilt, which took the lens with it.
+  SHW.post = P;
+  //  The lens does the tone mapping, so the renderer must not do it twice.
+  r.toneMapping = THREE.NoToneMapping;
+  return P;
+}
+
+function resizePost(){
+  const P = SHW.post;
+  if (!P) return;
+  const size = new THREE.Vector2();
+  SHW.renderer.getDrawingBufferSize(size);
+  P.scene.setSize(size.x, size.y);
+  P.bright.setSize(size.x >> 1, size.y >> 1);
+  P.blurA.setSize(size.x >> 1, size.y >> 1);
+  P.blurB.setSize(size.x >> 1, size.y >> 1);
+}
+
+function blit(mat, target){
+  const P = SHW.post;
+  P.quad.material = mat;
+  SHW.renderer.setRenderTarget(target || null);
+  SHW.renderer.render(P.stage, P.cam);
+}
+
+function renderFrame(){
+  const r = SHW.renderer, P = SHW.post;
+  if (!P){ r.render(SHW.scene, SHW.camera); return; }
+
+  //  The shadow box rides with the player, or the sun would be lighting the
+  //  middle of the map while you stand at the edge of it.
+  if (QUALITY.shadows && S.sun && S.sun.shadow){
+    S.sun.target.position.set(Pl.pos.x, 0, Pl.pos.z);
+    S.sun.target.updateMatrixWorld();
+  }
+
+  r.setRenderTarget(P.scene);
+  r.clear();
+  r.render(SHW.scene, SHW.camera);
+
+  if (QUALITY.bloom){
+    P.mBright.uniforms.tScene.value = P.scene.texture;
+    blit(P.mBright, P.bright);
+    const w = P.blurA.width, h = P.blurA.height;
+    P.mBlur.uniforms.tIn.value = P.bright.texture;
+    P.mBlur.uniforms.dir.value.set(1 / w, 0);
+    blit(P.mBlur, P.blurA);
+    P.mBlur.uniforms.tIn.value = P.blurA.texture;
+    P.mBlur.uniforms.dir.value.set(0, 1 / h);
+    blit(P.mBlur, P.blurB);
+  }
+
+  const u = P.mFinal.uniforms;
+  u.tScene.value = P.scene.texture;
+  u.tBloom.value = QUALITY.bloom ? P.blurB.texture : null;
+  u.bloomAmt.value = QUALITY.bloom ? (St.night ? 0.70 : 0.34) : 0;
+  u.time.value = St.t;
+  u.night.value = St.night ? 1 : 0;
+  u.exposure.value = St.night ? 1.62 : 1.45;
+  blit(P.mFinal, null);
+  r.setRenderTarget(null);
+}
+
+//  Shadows are decided once, from what the machine actually manages, and the
+//  player can override it. Nobody should have to know what a shadow map is.
+let fpsSamples = [], fpsDecided = false;
+function autoQuality(dt){
+  if (fpsDecided || St.phase !== 'play') return;
+  fpsSamples.push(dt);
+  if (fpsSamples.length < 90) return;
+  fpsDecided = true;
+  const sorted = fpsSamples.slice().sort((a, b) => a - b);
+  const median = sorted[Math.floor(sorted.length / 2)];
+  if (median > 0.040){
+    applyQuality('low');
+    toast('Effects turned down to keep it smooth. O to change.', '#9c93c6');
+  } else if (median > 0.024){
+    applyQuality('medium');
+  }
+}
+
+function cycleQuality(){
+  const order = ['low', 'medium', 'high'];
+  const i = order.indexOf(QUALITY.level);
+  const next = order[(i + 1) % order.length];
+  fpsDecided = true;
+  applyQuality(next);
+  toast('Effects: ' + next, '#7fdcff');
+}
+
 window.SHW_WILD = {
   mount, unmount,
   get mounted(){ return SHW.mounted; },
@@ -5003,10 +5961,21 @@ window.SHW_WILD = {
     bench(){ Pl.pos.set(S.bench.x, groundY(S.bench.x, S.bench.z) + 0.2, S.bench.z); },
     sites: () => settlements, quest: () => (questStep()||{}).title || 'done',
     groundY: (x,z) => groundY(x,z), seed: () => SHW.seed,
-    renderer: () => SHW.renderer, tick: (dt) => { tickMobs(dt); tickDrops(dt); tickProjectiles(dt); },
+    renderer: () => SHW.renderer, post: () => SHW.post, quality: () => QUALITY, tick: (dt) => { tickMobs(dt); tickDrops(dt); tickProjectiles(dt); },
     collect(){ for (const d of drops.slice()){ d.mesh.position.set(Pl.pos.x,Pl.pos.y,Pl.pos.z); } },
     lights(){ let n=0; S.world.traverse(o=>{ if(o.isLight && o.visible) n++; }); return n; },
     dropsN: () => drops.length,
+    spawnKind(k,x,z){ return makeMob(k,x,z); },
+    cam: () => Cam,
+    sceneRoot: () => SHW.scene, camera: () => SHW.camera,
+    look(tx, ty, tz, dist, height, ang){
+      const a2 = ang === undefined ? 0 : ang;
+      SHW.freeCam = { tx, ty, tz,
+        px: tx + Math.sin(a2) * dist, py: ty + (height || 0.6), pz: tz + Math.cos(a2) * dist };
+      if (Pl.group) Pl.group.visible = false;
+    },
+    freeCamOff(){ SHW.freeCam = null; if (Pl.group) Pl.group.visible = true; },
+    holdNight(){ St.night = true; St.cycle = DAY_LEN + 20; },
     spawnOne(){ const a=Math.random()*6.283, r=14+Math.random()*8;
                 return makeMob('husk', Pl.pos.x+Math.cos(a)*r, Pl.pos.z+Math.sin(a)*r); },
     dig(x, z, rad, amt){
