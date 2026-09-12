@@ -18,11 +18,12 @@
     "widthScale": 0.8
   },
   "created": "2026-08-24T04:52:08.335Z",
-  "updated": "2026-09-04T10:19:23.233Z",
+  "updated": "2026-09-12T02:53:37.799Z",
   "holds": {
     "essay.v1": [
       "essays/essay_mt6u5qwz_z5h2",
-      "essays/essay_mtmrk6a3_cpqm"
+      "essays/essay_mtmrk6a3_cpqm",
+      "essays/essay_mtxsjfr8_jh5d"
     ],
     "character.identity.v1": [
       "character-forge/character_seed_mpxfplx3_iqz",

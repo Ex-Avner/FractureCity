@@ -10,5 +10,8 @@
   "bail": true,
   "combo": true,
   "flood": true,
-  "returned": true
+  "returned": true,
+  "downtown": true,
+  "fast": true,
+  "low": true
 }

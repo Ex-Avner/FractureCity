@@ -81,7 +81,7 @@ const MAX_BLOCKS = 900;
 const SAVE_KEY  = 'stillhuman-wild-v2';
 //  Nothing in the build said which build it was, so a bug report could not
 //  name one. It is on the title card and on window.SHW_WILD.
-const SHW_VERSION = '0.3.0';
+const SHW_VERSION = '0.4.0';
 
 // ─── 2 · Palette ─────────────────────────────────────────────────────────────
 //  Saturated, poster-bright. Clay that somebody actually pressed pigment into.
@@ -152,6 +152,17 @@ const MOBS = {
              flies:true, ranged:true },
   molder:  { name:'Molder',   hp:180, spd:1.5, dmg:31, r:1.25, h:3.6,
              col:0x69735a, bruise:0x4a2a3c, eye:0xff2f4f, spark:0xff2f4f, tier:3 },
+  //  A ghost. Floats, never touches the ground, and is half there — the body
+  //  is drawn see-through, so at night it reads as a shape the moonlight goes
+  //  straight through. It fights like everything else; the difference is in
+  //  the eye and in what it looks like coming at you.
+  wraith:  { name:'Wraith',   hp:44,  spd:3.4, dmg:14, r:0.55, h:2.0,
+             col:0xb8c4cc, bruise:0x5d6f88, eye:0x9ff0ff, spark:0xbfe9ff, tier:2,
+             flies:true, ghost:true },
+  //  A werewolf. Fast, low, and all shoulder — the one thing out there that
+  //  closes the distance before you have finished deciding what to do.
+  wolf:    { name:'Werewolf', hp:78,  spd:5.6, dmg:19, r:0.72, h:2.2,
+             col:0x8b7458, bruise:0x5b3327, eye:0xffd23d, spark:0xffb23d, tier:3 },
 };
 
 // ─── 3 · Seeded noise ────────────────────────────────────────────────────────
@@ -349,6 +360,9 @@ const St = {        // live game state
   brush: 3,
   combo: 0, comboT: 0,
   kills: 0, nightsSurvived: 0,
+  //  The spine of ten. bossIdx is how many are down, so it doubles as the
+  //  index of the next one; bossCalled stops one night calling two.
+  bossIdx: 0, bossCalled: false, keystones: 0, won: false, wonOnDay: 0,
   hitStop: 0, shake: 0,
   torch: true,
   //  Kiln upgrade levels, tool levels, and what the crosshair is resting on.
@@ -1825,6 +1839,17 @@ const BODY = {
   molder:  { scale:1.95, lean:0.34, neck:0.14, armL:1.74, armR:1.60, skull:0.78,
              chest:[0.88,0.94,0.54], hip:[0.66,0.36,0.44], ribs:5, rags:6,
              headTilt:0.13, jaw:0.30, shoulderSwell:2.00, gait:0.52, drag:0.70 },
+  //  No legs, a long shroud instead, and almost no bone showing: the whole
+  //  point of the thing is that there is not much of it.
+  wraith:  { scale:1.05, lean:0.06, neck:0.44, armL:1.62, armR:1.50, skull:0.82,
+             chest:[0.38,0.62,0.22], hip:[0.28,0.16,0.20], ribs:4, rags:12,
+             headTilt:-0.10, jaw:0.44, shoulderSwell:0.70, gait:0.55, drag:0,
+             legless:true },
+  //  Pitched forward onto enormous arms, with a muzzle instead of a skull.
+  wolf:    { scale:1.18, lean:1.15, neck:0.30, armL:1.50, armR:1.46, skull:0.92,
+             chest:[0.66,0.70,0.50], hip:[0.50,0.30,0.36], ribs:4, rags:2,
+             headTilt:-0.55, jaw:0.30, shoulderSwell:1.70, gait:2.10, drag:0.05,
+             beast:true },
 };
 
 //  Each body was 49 draw calls: thirty-odd little boxes, each its own mesh and
@@ -1858,16 +1883,30 @@ function bone(parts, mat, parent, x, y, z){
 
 const BONE_HEX = 0xcfc4ae;
 
-function makeMob(kind, x, z){
-  const def = MOBS[kind];
-  const B = BODY[kind] || BODY.husk;
+function makeMob(kind, x, z, over){
+  //  `over` is how a boss is made: the same armature and the same code path,
+  //  with its own numbers laid over the kind's. Copied rather than mutated,
+  //  because MOBS[kind] is shared by every ordinary corpse on the field.
+  const def = over ? Object.assign({}, MOBS[kind], over.def) : MOBS[kind];
+  const B = over && over.B ? Object.assign({}, BODY[kind] || BODY.husk, over.B)
+                           : (BODY[kind] || BODY.husk);
   const S0 = B.scale;
-  const wisp = kind === 'wisp';
+  //  Two things have no legs and trail a shroud where they should be: the
+  //  emberwisp and the wraith. One flag, so the armature does not have to
+  //  know which is which.
+  const wisp = kind === 'wisp' || !!B.legless;
   const big = kind === 'lumber' || kind === 'molder';
 
   //  One clay material for the whole body, tinted per vertex. The hurt flash
   //  writes emissive to this and the body flashes as one thing.
   const skin = clayMat({ rep: 1, mat: { vertexColors: true } });
+  //  A ghost is drawn half there. depthWrite stays on so the body does not
+  //  turn into a pile of overlapping panes from the inside; the effect wanted
+  //  is moonlight coming through a shape, not an x-ray.
+  if (def.ghost){
+    skin.transparent = true; skin.opacity = 0.46;
+    skin.emissive = new THREE.Color(0x1a2a38);
+  }
   const glow = new THREE.MeshBasicMaterial({ color: def.eye });
   //  The eyes can be as hot as they like — they are two specks under a brow.
   //  The chest seam is a hand-sized panel, and at full strength in daylight it
@@ -1906,6 +1945,16 @@ function makeMob(kind, x, z){
   //  makes a body read as manufactured.
   hipP.box(hw * 0.26, hh * 0.46, hd2 * 0.30,
            -hw * 0.40, hh * 0.30, hd2 * 0.18, 0, 0, -0.20, BONE_HEX);
+  //  Tail. Four tapering segments curling up and away, added before the hip
+  //  bone is merged so it rides the hips and sways with them.
+  if (B.beast){
+    for (let i = 0; i < 4; i++){
+      hipP.box((0.13 - i * 0.022) * S0, (0.13 - i * 0.02) * S0, 0.30 * S0,
+               0, hh * 0.34 + i * 0.06 * S0,
+               -hd2 * 0.50 - (0.16 + i * 0.26) * S0,
+               -0.40 + i * 0.26, 0, 0, i % 2 ? C_ROT : C_BODY);
+    }
+  }
   const hips = bone(hipP, skin, g, 0, def.h * 0.52 * (wisp ? 1.25 : 1), 0);
 
   // ── spine ────────────────────────────────────────────────────────────────
@@ -2038,6 +2087,38 @@ function makeMob(kind, x, z){
   //  The crown is broken open on one side, showing the bone under the scalp.
   hd.box(skullW * 0.44, 0.045 * S0, skullD * 0.40,
          skullW * 0.22, skullH * 0.98, -skullD * 0.10, 0.12, 0, 0.16, BONE_HEX);
+  //  A werewolf is the same armature with the face pulled out into a muzzle.
+  //  Everything below is additive, and it is deliberately big: the snout, the
+  //  ears and the ruff are the whole silhouette at the distance you actually
+  //  see one, which is briefly, while it is closing.
+  if (B.beast){
+    const mz = faceZ + skullD * 0.46;
+    hd.box(skullW * 0.54, 0.17 * S0, skullD * 1.10, 0, skullH * 0.46, mz, -0.05, 0, 0, C_BODY);
+    hd.box(skullW * 0.46, 0.11 * S0, skullD * 0.96, 0, skullH * 0.26, mz - skullD * 0.04,
+           B.jaw + 0.22, 0, 0, C_ROT);
+    hd.box(skullW * 0.30, 0.10 * S0, 0.10 * S0, 0, skullH * 0.52,
+           mz + skullD * 0.52, 0, 0, 0, C_DEEP);
+    for (const sx2 of [-1, 1]){
+      //  Fangs, top and bottom, long enough to show with the mouth shut.
+      hd.box(0.040 * S0, 0.13 * S0, 0.040 * S0, sx2 * skullW * 0.17, skullH * 0.36,
+             mz + skullD * 0.16, 0.24, 0, 0, BONE_HEX);
+      hd.box(0.034 * S0, 0.10 * S0, 0.034 * S0, sx2 * skullW * 0.17, skullH * 0.24,
+             mz + skullD * 0.10, -0.24, 0, 0, BONE_HEX);
+      //  Ears, upright, and the left one torn shorter than the right.
+      hd.box(0.10 * S0, 0.28 * S0 * (sx2 < 0 ? 1 : 0.74), 0.055 * S0,
+             sx2 * skullW * 0.44, skullH * 1.02, -skullD * 0.08, 0.10, 0, sx2 * 0.32, C_BODY);
+      hd.box(0.055 * S0, 0.16 * S0 * (sx2 < 0 ? 1 : 0.74), 0.03 * S0,
+             sx2 * skullW * 0.44, skullH * 1.00, -skullD * 0.05, 0.10, 0, sx2 * 0.32, C_ROT);
+    }
+    //  Ruff: a collar of fur at the base of the neck, which is what makes the
+    //  head read as sitting low between the shoulders.
+    for (let i = 0; i < 8; i++){
+      const a2 = (i / 8) * 6.2832;
+      hd.box(0.10 * S0, 0.26 * S0, 0.055 * S0,
+             Math.cos(a2) * 0.17 * S0, -B.neck * S0 * 0.34, Math.sin(a2) * 0.17 * S0,
+             0.34, a2, 0, i % 2 ? C_ROT : C_BODY);
+    }
+  }
   const neck = bone(hd, skin, spine, 0, chh * 1.02 + B.neck * S0 * 0.4, 0);
   neck.rotation.x = B.headTilt;
 
@@ -2142,11 +2223,15 @@ function makeMob(kind, x, z){
   seam.castShadow = false; seam.receiveShadow = false;
   spine.add(seam);
 
+  //  A ghost throws no shadow. It is the one thing in the game that the sun
+  //  does not have an opinion about.
+  if (def.ghost) g.traverse(o => { if (o.isMesh) o.castShadow = false; });
+
   const y = groundY(x, z);
   g.position.set(x, y, z);
   S.world.add(g);
 
-  const hpMul = 1 + (St.day - 1) * 0.17;
+  const hpMul = over ? 1 : 1 + (St.day - 1) * 0.17;
   const m = {
     kind, def, B, g, hips, spine, neck, rags, seam, eyes, ember, emberBase, glow,
     armL, armR, legL, legR,
@@ -2239,10 +2324,12 @@ function spawnWave(){
 
     const r = Math.random();
     let kind = 'husk';
-    if (St.day >= 2 && r < 0.30) kind = 'stalker';
-    else if (St.day >= 3 && r < 0.46) kind = 'lumber';
-    else if (St.day >= 4 && r < 0.62) kind = 'wisp';
-    else if (St.day >= 6 && r < 0.70) kind = 'molder';
+    if (St.day >= 2 && r < 0.26) kind = 'stalker';
+    else if (St.day >= 3 && r < 0.40) kind = 'wraith';
+    else if (St.day >= 3 && r < 0.52) kind = 'lumber';
+    else if (St.day >= 4 && r < 0.64) kind = 'wisp';
+    else if (St.day >= 5 && r < 0.76) kind = 'wolf';
+    else if (St.day >= 6 && r < 0.83) kind = 'molder';
     else if (r < 0.30) kind = 'stalker';
     makeMob(kind, x, z);
     toSpawn--;
@@ -2259,9 +2346,30 @@ function nearLantern(x, z, r){
 
 function hurtMob(m, dmg, kx, kz){
   if (m.dead) return;
-  m.hp -= dmg;
+  //  The Lumber Priest's ward. Not immunity — a wall of numbers, so a player
+  //  who does not spot the tell still gets there, slowly.
+  if (m.boss && m.boss.trait === 'ward' && (m.ward || 0) > 0){
+    dmg *= 0.16;
+    burst(m.g.position.x, m.g.position.y + m.def.h * 0.7, m.g.position.z, 3, 0x9fe6ff, 5);
+  }
+  //  Two bodies, one life: whatever either takes comes off the same pool.
+  if (m.twinOf && !m.twinOf.dead){
+    m.twinOf.hp -= dmg * 0.5;
+    m.hp -= dmg * 0.5;
+    if (m.twinOf.hp <= 0 || m.hp <= 0){
+      m.hp = 0; m.twinOf.hp = 0;
+    }
+  } else if (m.twin && !m.twin.dead){
+    m.twin.hp -= dmg * 0.5;
+    m.hp -= dmg * 0.5;
+    if (m.twin.hp <= 0 || m.hp <= 0){ m.hp = 0; m.twin.hp = 0; }
+  } else {
+    m.hp -= dmg;
+  }
   m.hurt = 0.16;
-  m.stun = 0.10;
+  //  A boss is not stun-locked by chip damage; that is what made the old big
+  //  ones trivial to back into a corner and hold there.
+  m.stun = m.boss ? 0.02 : 0.10;
   m.x += kx; m.z += kz;
   burst(m.g.position.x, m.g.position.y + m.def.h * 0.6, m.g.position.z,
         5, m.def.spark, 4.5);
@@ -2272,6 +2380,7 @@ function hurtMob(m, dmg, kx, kz){
 function killMob(m){
   m.dead = true; m.deadT = 0.9;
   St.kills++;
+  if (m.boss) bossDown(m);
   //  A blighted thing was holding a ruin. One fewer.
   if (m.ruin && m.ruin.blight > 0){
     m.ruin.blight--;
@@ -2351,6 +2460,19 @@ function tickMobs(dt){
     }
     m.g.position.set(m.x, m.y, m.z);
     m.g.rotation.y = m.yaw;
+
+    //  Boss behaviour rides on top of the ordinary one, so a boss walks,
+    //  swings and dies through exactly the same code as everything else.
+    if (m.boss) tickBoss(m, dt, d);
+    if (m.dash > 0){
+      m.dash -= dt;
+      m.x += (dx / d) * m.def.spd * 2.4 * dt;
+      m.z += (dz / d) * m.def.spd * 2.4 * dt;
+    }
+    if (m.volley > 0){
+      m.volleyT -= dt;
+      if (m.volleyT <= 0){ m.volleyT = 0.30; m.volley--; spit(m); }
+    }
 
     poseMob(m, dt);
 
@@ -2609,6 +2731,8 @@ function advanceClock(dt){
       spawnWave();
     }
   }
+  tickBossCall(dt);
+  updateBossBar();
 }
 
 // ─── 18 · Camera and movement ────────────────────────────────────────────────
@@ -3386,6 +3510,39 @@ const CSS = `
   transition:transform .75s ease-out,opacity .75s ease-out;pointer-events:none;}
 
 /* ── banner ── */
+
+/*  The bar for one of the ten. Sits under the day plate, spans the middle of
+    the screen, and turns cold blue while the Priest's ward is shut. */
+#shw-bossbar{position:absolute;left:50%;top:86px;transform:translate(-50%,0);
+  width:min(560px,62vw);opacity:0;transition:opacity .35s;pointer-events:none;
+  text-align:center;}
+#shw-bossbar.on{opacity:1;}
+#shw-bossbar .nm{font:800 17px/1.2 Georgia,serif;letter-spacing:3px;color:#ffd9a0;
+  text-shadow:0 2px 0 #3a0d14,0 0 18px rgba(255,60,80,.5);margin-bottom:5px;}
+#shw-bossbar .nm i{font:10px/1 ui-monospace,Menlo,monospace;font-style:normal;
+  letter-spacing:2px;color:#c3bcd8;margin-left:9px;opacity:.8;}
+#shw-bossbar .tr{height:11px;background:#180c14;border:1px solid #4a2230;
+  box-shadow:0 2px 0 rgba(0,0,0,.5);overflow:hidden;}
+#shw-bossbar .tr b{display:block;height:100%;width:100%;
+  background:linear-gradient(180deg,#ff6b5c,#c3172f);transition:width .18s;}
+#shw-bossbar.warded .tr b{background:linear-gradient(180deg,#b9ecff,#3f93c8);}
+#shw-bossbar.warded .nm{color:#b9ecff;text-shadow:0 2px 0 #10303f;}
+
+/*  The ending. It does not take the world away, so it is a card and not a
+    curtain: dismiss it and the ground you changed is still out there. */
+#shw-win{position:absolute;inset:0;display:none;place-items:center;text-align:center;
+  background:radial-gradient(ellipse at 50% 44%,rgba(60,22,12,.94),rgba(5,3,12,.97) 74%);
+  z-index:40;pointer-events:auto;}
+#shw-win.on{display:grid;}
+#shw-win b{display:block;font:800 56px/1 Georgia,serif;letter-spacing:-2px;color:#ffd9a0;
+  text-shadow:0 6px 0 #8a3a12,0 0 60px rgba(255,150,60,.5);margin-bottom:14px;}
+#shw-win p{max-width:520px;margin:0 auto 10px;font:14px/1.8 Georgia,serif;color:#e6dcc6;}
+#shw-win #shw-win-sub{font:10px/1 ui-monospace,Menlo,monospace;letter-spacing:4px;
+  text-transform:uppercase;color:#c3bcd8;margin:16px 0 24px;}
+#shw-win button{font:11px/1 ui-monospace,Menlo,monospace;letter-spacing:3px;
+  text-transform:uppercase;color:#05030c;background:#ffc65a;border:0;
+  padding:13px 26px;cursor:pointer;box-shadow:0 4px 0 #8a5a12;}
+#shw-win button:hover{background:#ffd9a0;}
 #shw-banner{position:absolute;left:50%;top:38%;transform:translate(-50%,-50%);
   text-align:center;opacity:0;transition:opacity .35s;}
 #shw-banner.on{opacity:1;}
@@ -3496,6 +3653,17 @@ function buildHUD(host){
       <div id="shw-compass"></div>
       <div id="shw-quest"></div>
       <div id="shw-toasts"></div>
+      <div id="shw-bossbar"><div class="nm"><span></span><i></i></div><div class="tr"><b></b></div></div>
+      <div id="shw-win"><div>
+        <b>STILL HUMAN</b>
+        <p>The tenth is down. The Kiln has finished lighting, and for the first
+        time since you got here the ring reaches past where you can see.</p>
+        <p>Nothing else is coming for the ground. The nights still come, and
+        what walks in them is ordinary now. The country is yours to keep
+        building in.</p>
+        <div id="shw-win-sub"></div>
+        <button id="shw-win-go">go back out</button>
+      </div></div>
       <div id="shw-banner"><b></b><span></span></div>
       <div id="shw-combo"><b>0</b><span>chain</span></div>
 
@@ -3607,6 +3775,13 @@ function buildHUD(host){
   hud.comboN = root.querySelector('#shw-combo b');
   hud.toasts = root.querySelector('#shw-toasts');
   hud.banner = root.querySelector('#shw-banner');
+  hud.bossbar = root.querySelector('#shw-bossbar');
+  hud.bossName = root.querySelector('#shw-bossbar .nm span');
+  hud.bossNo = root.querySelector('#shw-bossbar .nm i');
+  hud.bossFill = root.querySelector('#shw-bossbar .tr b');
+  hud.win = root.querySelector('#shw-win');
+  const winGo = root.querySelector('#shw-win-go');
+  if (winGo) winGo.addEventListener('click', (e) => { e.stopPropagation(); closeWin(); });
   hud.flash = root.querySelector('#shw-flash');
   hud.dead = root.querySelector('#shw-dead');
   hud.compass = root.querySelector('#shw-compass');
@@ -4338,6 +4513,9 @@ function bindInput(){
 
     if (k === 'escape'){
       ev.stopPropagation();
+      //  The ending card is dismissible like anything else, and dismissing it
+      //  puts you back in the world rather than out of the game.
+      if (hud.win && hud.win.classList.contains('on')){ closeWin(); return; }
       if (St.mapOpen){ openMap(false); return; }
       if (St.benchOpen){ toggleBench(false); return; }
       if (St.invOpen){ toggleInv(); return; }
@@ -4508,6 +4686,7 @@ function save(){
     day: St.day, cycle: St.cycle,
     hp: St.hp, xp: St.xp, level: St.level,
     res: St.res, kills: St.kills, nights: St.nightsSurvived,
+    bossIdx: St.bossIdx, keystones: St.keystones, won: St.won, wonOnDay: St.wonOnDay,
     kiln: St.kiln, tools: St.tools,
     sites: settlements.map(st => ({ id: st.id, claimed: st.claimed,
                                     cleared: st.cleared, blight: st.blight })),
@@ -4561,6 +4740,10 @@ function applySave(d){
   St.night = St.cycle >= DAY_LEN;
   St.xp = d.xp || 0; St.level = d.level || 1;
   St.kills = d.kills || 0; St.nightsSurvived = d.nights || 0;
+  //  Additive, so a save written before the ten existed loads as "none down"
+  //  rather than refusing to load at all.
+  St.bossIdx = d.bossIdx || 0; St.keystones = d.keystones || 0;
+  St.won = !!d.won; St.wonOnDay = d.wonOnDay || 0; St.bossCalled = false;
   if (d.res) Object.assign(St.res, d.res);
   St.kiln = Object.assign({ ring:0, brazier:0, height:0, bench:0 }, d.kiln || {});
   St.tools = Object.assign({ axe:0, pick:0 }, d.tools || {});
@@ -4643,7 +4826,13 @@ function start(fresh){
       tools: { axe: 0, pick: 0 },
       quest: { i: 0, done: {} }, contracts: {}, contractSeed: 1, waypoint: null,
       dead: false,
+      //  A new world starts the ten over. Forgetting this is how a fresh run
+      //  would have opened on the Unmaker.
+      bossIdx: 0, bossCalled: false, keystones: 0, won: false, wonOnDay: 0,
     });
+    bossRef = null;
+    if (hud.win) hud.win.classList.remove('on');
+    if (hud.bossbar) hud.bossbar.classList.remove('on');
     blocks = new Map();
     St.savedPos = null; St.savedFell = null;
     //  A starting weapon, so the first day is not bare hands.
@@ -5595,6 +5784,26 @@ function renderBench(){
       ${c.taken && !done ? '<u>in hand</u>' : ''}</button>`;
   }
 
+  //  The Ten, as a list you can actually read: what is down, what is next,
+  //  and nothing at all about the ones you have not met.
+  let ten = '';
+  for (let i = 0; i < BOSSES.length; i++){
+    const B = BOSSES[i];
+    const down = i < St.bossIdx;
+    const next = i === St.bossIdx;
+    const name = (down || next) ? B.name : '· · · · ·';
+    const note = down ? 'down'
+               : next ? (St.day < 2 ? 'comes on the second night'
+                                    : 'comes tonight, past the middle of it')
+               : 'not yet';
+    ten += `<button class="shw-craft${down ? '' : ' off'}"><b>${i + 1}. ${name}</b>
+      <span>${down ? B.line : (next ? B.line : 'Kill the one before it.')}</span>
+      <em class="${down ? '' : 'no'}">${note}</em></button>`;
+  }
+  const tenHead = St.won
+    ? `The Ten · all down on night ${St.wonOnDay}`
+    : `The Ten · ${St.bossIdx} of ${BOSSES.length}`;
+
   hud.benchBody.innerHTML =
     `<section><h4>Tools</h4>${tools}</section>` +
     `<section><h4>Gear</h4>${gear}
@@ -5605,7 +5814,8 @@ function renderBench(){
     (site.kind === 'home'
       ? `<section><h4>The Kiln</h4>${kiln}</section>`
       : `<section><h4>Work</h4>${work}</section>`) +
-    (site.kind === 'home' ? `<section><h4>Work</h4>${work}</section>` : '');
+    (site.kind === 'home' ? `<section><h4>Work</h4>${work}</section>` : '') +
+    `<section><h4>${tenHead}</h4>${ten}</section>`;
 
   hud.benchRes.textContent =
     `${Math.floor(res.earth)} earth · ${Math.floor(res.timber)} timber · ` +
@@ -5722,6 +5932,353 @@ function withRim(mat){
   };
   mat.customProgramCacheKey = () => 'clay-rim';
   return mat;
+}
+
+
+// ─── 37 · THE TEN — a named thing walks in, and one night it is the last ─────
+//
+//  The night wave was endless and therefore weightless: no matter how well a
+//  night went, the next one was the same night. So there is now a spine of ten
+//  named bosses through it. One walks in per night, starting on the second,
+//  and only once the one before it is dead — so falling behind slows the story
+//  down rather than stacking two of them on you.
+//
+//  Every one of them is the same armature and the same code path as an
+//  ordinary corpse, with its own numbers laid over the top and one behaviour
+//  that nothing else in the game does. That is deliberate: a boss built out of
+//  a separate system is a boss that breaks every time the shared one changes.
+//
+//  Kill the tenth and the Kiln finishes lighting. The world stays afterwards —
+//  the nights keep coming, the ten just stop.
+
+const BOSSES = [
+  { key:'warden', name:'THE MARROW WARDEN', title:'first of the ten',
+    kind:'husk', scale:2.05, hp:360, dmg:24, spd:2.0, r:1.1,
+    col:0x9aa07a, eye:0xff7a4f, spark:0xffa24f, trait:'summon',
+    line:'It carries the others in it.' },
+
+  { key:'gravelash', name:'GRAVELASH', title:'second of the ten',
+    kind:'stalker', scale:1.70, hp:430, dmg:20, spd:5.2, r:0.9,
+    col:0xbfa07c, eye:0xfff06b, spark:0xffe14f, trait:'lunge',
+    line:'It was fast before. It is faster now.' },
+
+  { key:'priest', name:'THE LUMBER PRIEST', title:'third of the ten',
+    kind:'lumber', scale:1.95, hp:640, dmg:32, spd:1.9, r:1.3,
+    col:0x7d9296, eye:0xffb84f, spark:0x6fd0ff, trait:'ward',
+    line:'Something is holding the blows off it. Wait for the light to drop.' },
+
+  { key:'choir', name:'THE EMBERCHOIR', title:'fourth of the ten',
+    kind:'wisp', scale:1.75, hp:520, dmg:18, spd:3.4, r:0.9,
+    col:0xc0a074, eye:0xffd76b, spark:0xff9a3d, trait:'volley',
+    line:'It does not come to you. It does not have to.' },
+
+  { key:'bell', name:'THE HOLLOW BELL', title:'fifth of the ten',
+    kind:'wraith', scale:1.95, hp:700, dmg:26, spd:3.6, r:1.0,
+    col:0xd2e0e8, eye:0x9ff0ff, spark:0xbfe9ff, trait:'blink',
+    line:'It is not always where you last put your eyes.' },
+
+  { key:'moonjaw', name:'MOONJAW', title:'sixth of the ten',
+    kind:'wolf', scale:1.85, hp:820, dmg:34, spd:5.8, r:1.1,
+    col:0xa98a63, eye:0xffe24f, spark:0xffb23d, trait:'howl',
+    line:'It is calling the rest of them in.' },
+
+  { key:'king', name:'THE MOLDER KING', title:'seventh of the ten',
+    kind:'molder', scale:2.30, hp:1150, dmg:44, spd:1.5, r:1.8,
+    col:0x7d876a, eye:0xff2f4f, spark:0xff2f4f, trait:'slam',
+    line:'Do not be standing on the ground when it lands.' },
+
+  { key:'choirmaster', name:'THE ASHEN CHOIRMASTER', title:'eighth of the ten',
+    kind:'wisp', scale:2.10, hp:980, dmg:24, spd:3.8, r:1.0,
+    col:0xb4a888, eye:0xfff3c0, spark:0xffd76b, trait:'swarm',
+    line:'It is making more of them faster than you are killing them.' },
+
+  { key:'twins', name:'THE PALE TWINS', title:'ninth of the ten',
+    kind:'stalker', scale:1.95, hp:1240, dmg:30, spd:4.6, r:1.0,
+    col:0xd8cbb0, eye:0xffffff, spark:0xffd0e4, trait:'twin',
+    line:'Two bodies. One life between them. Hurting either hurts both.' },
+
+  { key:'unmaker', name:'THE UNMAKER', title:'last of the ten',
+    kind:'molder', scale:2.70, hp:2200, dmg:52, spd:1.9, r:2.1,
+    col:0x4c4440, eye:0xff2f4f, spark:0xff2f4f, trait:'unmaker',
+    line:'This is the one the Kiln was built against.' },
+];
+
+//  Minions a summoner calls, by boss.
+const BOSS_MINIONS = {
+  warden: ['husk', 'husk', 'stalker'],
+  moonjaw: ['wolf', 'wolf'],
+  swarm: ['wisp', 'wisp'],
+  unmaker: ['molder', 'wraith', 'wolf'],
+};
+
+let bossRef = null;
+
+function bossDef(i){ return BOSSES[i] || null; }
+
+//  Where it comes in from: outside the ring the player is standing in, but
+//  close enough that they know immediately.
+function bossArrivalSpot(){
+  for (let tries = 0; tries < 40; tries++){
+    const a = Math.random() * 6.2832;
+    const d = 20 + Math.random() * 10;
+    const x = Pl.pos.x + Math.cos(a) * d;
+    const z = Pl.pos.z + Math.sin(a) * d;
+    if (Math.abs(x) > HALF - 8 || Math.abs(z) > HALF - 8) continue;
+    if (groundY(x, z) < WATER_Y + 0.4) continue;
+    return { x, z };
+  }
+  return { x: Pl.pos.x + 18, z: Pl.pos.z };
+}
+
+function spawnBoss(i, at){
+  const B = bossDef(i);
+  if (!B) return null;
+  const spot = at || bossArrivalSpot();
+  const base = MOBS[B.kind];
+  const m = makeMob(B.kind, spot.x, spot.z, {
+    def: { name: B.name, hp: B.hp, spd: B.spd, dmg: B.dmg, r: B.r,
+           h: base.h * (B.scale / (BODY[B.kind] || BODY.husk).scale) * 0.62 + base.h * 0.38,
+           col: B.col, eye: B.eye, spark: B.spark, tier: 4 },
+    B: { scale: B.scale },
+  });
+  m.boss = B;
+  m.bossIdx = i;
+  m.bt = 3.0;                       // first special is never instant
+  m.ward = 0;
+  //  It does not burn at dawn. A boss you can out-wait is not a boss.
+  m.ruin = m.ruin || {};
+  return m;
+}
+
+//  Called every frame of every night.
+function tickBossCall(dt){
+  if (St.bossIdx >= BOSSES.length) return;
+  if (!St.night){ St.bossCalled = false; return; }
+  //  A third of the way into the night, so there is time to be caught out in
+  //  the open and time to get back if you are not.
+  if (St.cycle < DAY_LEN + (CYCLE - DAY_LEN) * 0.30) return;
+  if (St.day < 2) return;
+  if (St.bossCalled) return;
+  if (bossRef && !bossRef.dead) return;
+
+  St.bossCalled = true;
+  const B = bossDef(St.bossIdx);
+  bossRef = spawnBoss(St.bossIdx);
+  if (!bossRef){ St.bossCalled = false; return; }
+
+  //  The ninth is two bodies on one life. The twin is an ordinary spawn with a
+  //  back-reference, so every existing damage path already works on it.
+  if (B.trait === 'twin'){
+    const t = spawnBoss(St.bossIdx, { x: bossRef.x + 4, z: bossRef.z + 2 });
+    if (t){
+      t.twinOf = bossRef; bossRef.twin = t;
+      t.isTwinBody = true;                 // does not get its own health bar
+    }
+  }
+
+  banner(B.name, B.title);
+  toast(B.line, '#ff8a5c');
+  St.shake = Math.max(St.shake, 0.8);
+  flash(0.32);
+  save();
+}
+
+//  One behaviour each. Kept small on purpose: a boss the player can read in
+//  four seconds and beat in forty is better than one with a hidden rulebook.
+function tickBoss(m, dt, distToPlayer){
+  const B = m.boss;
+  m.bt -= dt;
+
+  if (B.trait === 'ward'){
+    //  Four seconds open, three seconds shut, and it says which out loud by
+    //  glowing. Damage is scaled where it is taken, in hurtMob.
+    m.ward = (m.ward || 0) - dt;
+    if (m.ward <= -4.0) m.ward = 3.0;
+    const shut = m.ward > 0;
+    if (m.ember) m.ember.color.setHex(shut ? 0x9fe6ff : B.eye);
+    if (m.glow)  m.glow.color.setHex(shut ? 0x9fe6ff : B.eye);
+  }
+
+  if (m.bt > 0) return;
+
+  switch (B.trait){
+    case 'summon': {
+      m.bt = 6.5;
+      for (const k of BOSS_MINIONS.warden){
+        const a = Math.random() * 6.2832;
+        makeMob(k, m.x + Math.cos(a) * 4, m.z + Math.sin(a) * 4);
+      }
+      burst(m.x, m.y + 2, m.z, 18, B.spark, 7);
+      toast('The Warden opens.', '#ffa24f');
+      break;
+    }
+    case 'lunge': {
+      m.bt = 3.4;
+      m.dash = 0.55;                       // read in tickMobs as a speed burst
+      burst(m.x, m.y + 1.4, m.z, 8, B.spark, 6);
+      break;
+    }
+    case 'volley': {
+      m.bt = 3.8;
+      m.volley = 3;                        // three spits, spat in tickMobs
+      m.volleyT = 0;
+      break;
+    }
+    case 'blink': {
+      m.bt = 4.6;
+      burst(m.x, m.y + 1.6, m.z, 14, B.spark, 6);
+      const a = Math.random() * 6.2832;
+      m.x = Pl.pos.x + Math.cos(a) * 6.5;
+      m.z = Pl.pos.z + Math.sin(a) * 6.5;
+      m.y = groundY(m.x, m.z);
+      burst(m.x, m.y + 1.6, m.z, 14, B.spark, 6);
+      break;
+    }
+    case 'howl': {
+      m.bt = 9.0;
+      for (const k of BOSS_MINIONS.moonjaw){
+        const a = Math.random() * 6.2832;
+        makeMob(k, m.x + Math.cos(a) * 5, m.z + Math.sin(a) * 5);
+      }
+      m.dash = 0.8;
+      St.shake = Math.max(St.shake, 0.5);
+      toast('Moonjaw howls. Something answers.', '#ffe24f');
+      break;
+    }
+    case 'slam': {
+      m.bt = 4.2;
+      if (distToPlayer < 14){
+        bossSlam(m, 9.0, B.dmg * 0.8);
+      }
+      break;
+    }
+    case 'swarm': {
+      m.bt = 3.2;
+      for (const k of BOSS_MINIONS.swarm){
+        const a = Math.random() * 6.2832;
+        makeMob(k, m.x + Math.cos(a) * 5, m.z + Math.sin(a) * 5);
+      }
+      break;
+    }
+    case 'twin': {
+      m.bt = 3.0;
+      m.dash = 0.45;
+      break;
+    }
+    case 'unmaker': {
+      //  Everything, in a rotation, so the last fight is a recap of the nine.
+      m.phaseN = ((m.phaseN || 0) + 1) % 4;
+      m.bt = 4.0;
+      if (m.phaseN === 0){
+        bossSlam(m, 11.0, B.dmg * 0.7);
+      } else if (m.phaseN === 1){
+        for (const k of BOSS_MINIONS.unmaker){
+          const a = Math.random() * 6.2832;
+          makeMob(k, m.x + Math.cos(a) * 6, m.z + Math.sin(a) * 6);
+        }
+        burst(m.x, m.y + 3, m.z, 22, B.spark, 8);
+      } else if (m.phaseN === 2){
+        const a = Math.random() * 6.2832;
+        burst(m.x, m.y + 2.4, m.z, 16, B.spark, 7);
+        m.x = Pl.pos.x + Math.cos(a) * 7;
+        m.z = Pl.pos.z + Math.sin(a) * 7;
+        m.y = groundY(m.x, m.z);
+        burst(m.x, m.y + 2.4, m.z, 16, B.spark, 7);
+      } else {
+        m.volley = 4; m.volleyT = 0;
+      }
+      break;
+    }
+    default: m.bt = 5;
+  }
+}
+
+//  A ring of ground going up, and anything standing in it taking it.
+function bossSlam(m, radius, dmg){
+  St.shake = Math.max(St.shake, 0.75);
+  for (let i = 0; i < 26; i++){
+    const a = (i / 26) * 6.2832;
+    burst(m.x + Math.cos(a) * radius * 0.8, m.y + 0.3, m.z + Math.sin(a) * radius * 0.8,
+          2, m.boss.spark, 6);
+  }
+  const d = Math.hypot(Pl.pos.x - m.x, Pl.pos.z - m.z);
+  if (d < radius){
+    hurtPlayer(dmg);
+    //  Thrown clear, which is the point: it makes space it can then close.
+    const ox = (Pl.pos.x - m.x) / (d || 1), oz = (Pl.pos.z - m.z) / (d || 1);
+    Pl.vel.x += ox * 14; Pl.vel.z += oz * 14; Pl.vel.y = Math.max(Pl.vel.y, 6);
+  }
+}
+
+//  Ten keystones, one per boss, and the tenth finishes the Kiln.
+function bossDown(m){
+  const B = m.boss;
+  //  The twin body is not its own kill. If it is the one that went down, the
+  //  other half goes with it and THAT is the kill that counts — otherwise the
+  //  pair could be left with one dead body and one standing on zero life.
+  if (m.isTwinBody){
+    const p = m.twinOf;
+    if (p && !p.dead){ p.hp = 0; killMob(p); }
+    return;
+  }
+  if (m.bossIdx !== St.bossIdx) return;    // already counted
+
+  St.bossIdx++;
+  St.keystones = (St.keystones || 0) + 1;
+  St.bossCalled = false;
+  bossRef = null;
+
+  //  Kill the other half with it.
+  if (m.twin && !m.twin.dead){ m.twin.hp = 0; killMob(m.twin); }
+
+  St.xp += 260;
+  St.res.ember += 14;
+  for (let i = 0; i < 3; i++)
+    dropLoot(m.g.position.x + (i - 1) * 1.4, m.g.position.y, m.g.position.z, 4);
+
+  if (St.bossIdx >= BOSSES.length){
+    winRun();
+  } else {
+    banner(B.name, 'down · ' + St.bossIdx + ' of ' + BOSSES.length);
+    toast(`${St.bossIdx} of ${BOSSES.length}. The Kiln burns brighter.`, '#7dffb3');
+  }
+  recomputeStats();
+  save();
+}
+
+//  The ending. Not a door closing: the ten stop coming, the Kiln finishes
+//  lighting, and the world you spent all that time changing is still there.
+function winRun(){
+  St.won = true;
+  St.wonOnDay = St.day;
+  St.shake = Math.max(St.shake, 1.2);
+  flash(0.9);
+  //  Everything still standing goes with it.
+  for (const m of mobs.slice()) if (!m.dead) killMob(m);
+  if (hud.win){
+    hud.win.querySelector('#shw-win-sub').textContent =
+      'ten down · night ' + St.day + ' · ' + St.kills + ' put back in the ground';
+    hud.win.classList.add('on');
+  }
+  save();
+}
+
+function closeWin(){ if (hud.win) hud.win.classList.remove('on'); }
+
+//  The bar over the top of the screen while one of them is up.
+function updateBossBar(){
+  if (!hud.bossbar) return;
+  let b = null;
+  for (const m of mobs) if (m.boss && !m.dead && !m.isTwinBody){ b = m; break; }
+  if (!b){ hud.bossbar.classList.remove('on'); return; }
+  //  The ninth shares a life across two bodies, so show the pair.
+  let hp = b.hp, max = b.maxHp;
+  if (b.twin && !b.twin.dead){ hp += b.twin.hp; max += b.twin.maxHp; }
+  hud.bossbar.classList.add('on');
+  hud.bossName.textContent = b.boss.name;
+  hud.bossNo.textContent = (b.bossIdx + 1) + ' / ' + BOSSES.length;
+  hud.bossFill.style.width = Math.max(0, (hp / max) * 100) + '%';
+  hud.bossbar.classList.toggle('warded', (b.ward || 0) > 0);
 }
 
 // ─── The lens ───────────────────────────────────────────────────────────────
@@ -5961,7 +6518,8 @@ window.SHW_WILD = {
     bench(){ Pl.pos.set(S.bench.x, groundY(S.bench.x, S.bench.z) + 0.2, S.bench.z); },
     sites: () => settlements, quest: () => (questStep()||{}).title || 'done',
     groundY: (x,z) => groundY(x,z), seed: () => SHW.seed,
-    renderer: () => SHW.renderer, post: () => SHW.post, quality: () => QUALITY, tick: (dt) => { tickMobs(dt); tickDrops(dt); tickProjectiles(dt); },
+    renderer: () => SHW.renderer, post: () => SHW.post, quality: () => QUALITY,
+    tick: (dt) => { tickMobs(dt); tickDrops(dt); tickProjectiles(dt); updateBossBar(); },
     collect(){ for (const d of drops.slice()){ d.mesh.position.set(Pl.pos.x,Pl.pos.y,Pl.pos.z); } },
     lights(){ let n=0; S.world.traverse(o=>{ if(o.isLight && o.visible) n++; }); return n; },
     dropsN: () => drops.length,
@@ -6008,6 +6566,20 @@ window.SHW_WILD = {
       updateFocus(0.016);
     },
     give(tier){ return dropLoot(Pl.pos.x + 1.1, Pl.pos.y, Pl.pos.z, tier || 3); },
+    bosses: () => BOSSES,
+    bossIdx: () => St.bossIdx,
+    callBoss(i){ St.bossIdx = (i === undefined ? St.bossIdx : i);
+                 St.bossCalled = false; St.day = Math.max(St.day, 2);
+                 bossRef = null;
+                 this.holdNight(); St.cycle = CYCLE - 2; tickBossCall(0.016);
+                 return bossRef; },
+    bossAlive(){ return mobs.filter(m => m.boss && !m.dead)
+                            .map(m => ({ name:m.boss.name, hp:Math.round(m.hp),
+                                         max:Math.round(m.maxHp), twin:!!m.isTwinBody })); },
+    killBoss(){ for (const m of mobs.slice()) if (m.boss && !m.dead){ m.hp = 0; killMob(m); } },
+    won: () => St.won,
+    winCard(){ return hud.win && hud.win.classList.contains('on'); },
+    closeWin(){ closeWin(); },
   },
 };
 
