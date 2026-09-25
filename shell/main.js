@@ -211,6 +211,38 @@ function defaultProviders() {
     openai:       { key: '',          model: 'gpt-image-1' },
   };
 }
+// ─── Language models ─────────────────────────────────────────────────────────
+//  The shell owns the connection to whatever model server is running on this
+//  machine, for the reason set out at the top of services/llm.js: apps load
+//  from file://, and a file:// origin is refused by every local model server
+//  there is. The main process has no origin, so it makes the call and relays
+//  the bytes. Loopback only — llm.js checks the hostname before it opens a
+//  socket, so this cannot become a general outbound proxy for apps.
+const { LLM } = require('./services/llm');
+const llm = new LLM();
+
+ipcMain.handle('llm:discover', (event, extra) => llm.discover(extra));
+ipcMain.handle('llm:models', (event, baseUrl, api) =>
+  llm.models(baseUrl, api).catch(e => ({ ok: false, error: e.code || 'ERR',
+                                         message: e.message })));
+
+//  Streaming. The renderer gets one 'llm:event' per token on its own
+//  webContents, tagged with the stream id it was handed when it started.
+ipcMain.handle('llm:chat', (event, opts) => {
+  const wc = event.sender;
+  return llm.start(opts, (msg) => {
+    if (!wc.isDestroyed()) wc.send('llm:event', msg);
+  });
+});
+ipcMain.handle('llm:stop', (event, id) => llm.stop(id));
+
+//  A window that closes mid-generation must not leave a socket pulling tokens
+//  out of the model for the rest of the session.
+app.on('browser-window-created', (e, win) => {
+  win.on('closed', () => { try { llm.stopAll(); } catch (err) {} });
+});
+
+
 ipcMain.handle('providers:read', () => readProviders());
 ipcMain.handle('providers:write', (event, p) => { writeProviders(p); return true; });
 

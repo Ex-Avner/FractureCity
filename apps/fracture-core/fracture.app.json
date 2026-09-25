@@ -1,0 +1,30 @@
+{
+  "slug": "fracture-core",
+  "version": "1.0.0",
+  "name": "FractureCore",
+  "entry": "index.html",
+  "runtime": "html5",
+  "description": "The three Fractured Mirror manuscripts, made answerable. A retrieval model trained on all 2,265 passages of Fractured Mirror Theory, Exulansis and The Next Ten Years ships inside the app: it finds the right passage from a description of what you half remember, in a few milliseconds, entirely offline, and it was tuned on held-out material rather than guessed. Ask puts those passages in front of whatever language model is running on this machine and cites every one it used, so a claim can be checked against the book it came from instead of taken on trust. Read is the same model on its own: search by meaning, every occurrence of an exact phrase, and what any passage sits next to. Train is the fine-tune the app cannot run and does not pretend to: it picks the right base model for this Mac's memory, writes the exact commands, tracks where you are in the sequence, and sets the tuned model beside the base one so the difference is heard rather than assumed. Engine finds whatever model server is already running - Ollama, LM Studio, llama.cpp, MLX - and needs no key and no internet. With nothing running at all the app still answers, with passages, and says plainly that nothing wrote them.",
+  "inputs": [
+    {
+      "type": "person.v1",
+      "description": "The resident, read from the shell, so the conversation is filed under the same name as everything else in the hub."
+    }
+  ],
+  "outputs": [
+    {
+      "type": "fracturecore.session.v1",
+      "description": "The conversation, which model answered it, the generation settings, and where you have got to in the training sequence. Written on every turn, so closing the window loses nothing."
+    }
+  ],
+  "tags": [
+    "llm", "local-model", "retrieval", "rag", "search", "semantic-search",
+    "corpus", "concordance", "fine-tuning", "mlx", "ollama", "writing",
+    "research", "offline", "fractured-mirror", "tot", "p-r-erickson",
+    "present-palm", "fracture-city"
+  ],
+  "author": "Present Palm",
+  "license": "personal-use",
+  "window_width": 1320,
+  "window_height": 880
+}

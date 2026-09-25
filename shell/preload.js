@@ -137,6 +137,51 @@ contextBridge.exposeInMainWorld('fracture', {
   //  that is a game, means the game is gone.
   openExternal: (url) => ipcRenderer.invoke('app:openExternal', url),
 
+  // ── Language models ──
+  //  Talks to whatever model server is running on this machine — Ollama, LM
+  //  Studio, llama.cpp, mlx_lm.server, and anything else speaking either the
+  //  Ollama or the OpenAI wire format. The shell makes the request, not the
+  //  app, because an app's origin is file:// and every one of those servers
+  //  refuses that.
+  //
+  //    llm.discover(extraUrl?)  → { endpoints:[{url,api,name,models:[…]}], probed }
+  //    llm.models(url, api)     → { models:[…] }
+  //    llm.chat(opts, onEvent)  → { ok, id, stop() }
+  //
+  //  chat streams. onEvent receives, in order:
+  //      { type:'token', text }      … many
+  //      { type:'done',  stats }     … once
+  //      { type:'error', error, message }
+  //  and the returned object's stop() halts generation at the model.
+  llm: {
+    discover: (extra) => ipcRenderer.invoke('llm:discover', extra || null),
+    models:   (url, api) => ipcRenderer.invoke('llm:models', url, api),
+    chat: async (opts, onEvent) => {
+      const res = await ipcRenderer.invoke('llm:chat', opts);
+      if (!res || !res.ok) {
+        //  start() reports its own failure through the event channel, so the
+        //  caller's handler still sees it and there is one error path, not two.
+        return { ok: false, id: res && res.id, stop: () => {} };
+      }
+      const id = res.id;
+      const handler = (event, msg) => {
+        if (!msg || msg.id !== id) return;
+        try { onEvent(msg); } catch (e) {}
+        if (msg.type === 'done' || msg.type === 'error') {
+          ipcRenderer.removeListener('llm:event', handler);
+        }
+      };
+      ipcRenderer.on('llm:event', handler);
+      return {
+        ok: true, id,
+        stop: () => {
+          ipcRenderer.removeListener('llm:event', handler);
+          return ipcRenderer.invoke('llm:stop', id);
+        },
+      };
+    },
+  },
+
   // ── Cross-app data read ──
   // Read another app's stored data. Single-user trust: Visitor can read the
   // latest tot.profile.v1 written by Coherence Assessment, etc.

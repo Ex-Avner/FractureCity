@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>FractureCore</title>
+<style>
+/* ===========================================================================
+   FractureCore — house style. Georgia throughout, diamond dividers, and a
+   dark ground that matches the shell's launcher (#080614) so an app window
+   opening beside it does not look like a different program.
+   =========================================================================== */
+
+:root{
+  --bg:#080614; --bg2:#0e0b1e; --bg3:#151029;
+  --line:rgba(255,255,255,.10); --line2:rgba(255,255,255,.055);
+  --ink:#e8e2d6; --dim:#a79ec2; --faint:#6f6690;
+  --gold:#ffc65a; --amber:#ff9a3d; --rose:#ff6b7f;
+  --cyan:#7fd8ff; --green:#7dffb3; --violet:#b59cff;
+  --mono:ui-monospace,'SF Mono',Menlo,Consolas,monospace;
+  --serif:Georgia,'Iowan Old Style','Times New Roman',serif;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--ink);
+  font:15px/1.7 var(--serif);-webkit-font-smoothing:antialiased;}
+button,input,select,textarea{font-family:inherit;color:inherit;}
+::selection{background:rgba(255,198,90,.28);}
+::-webkit-scrollbar{width:11px;height:11px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:rgba(255,255,255,.09);border-radius:6px;
+  border:3px solid var(--bg);}
+::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,.17);}
+
+/* ── frame ───────────────────────────────────────────────────────────────── */
+#app{display:grid;grid-template-rows:auto 1fr auto;height:100%;}
+
+#top{display:flex;align-items:center;gap:20px;padding:0 20px;height:52px;
+  border-bottom:1px solid var(--line);background:linear-gradient(180deg,#120e26,#0b0818);}
+#brand{display:flex;align-items:baseline;gap:9px;}
+#brand b{font:700 15px/1 var(--mono);letter-spacing:4px;color:var(--gold);}
+#brand i{font:9px/1 var(--mono);font-style:normal;letter-spacing:2.4px;color:var(--faint);}
+nav{display:flex;gap:2px;margin-left:8px;}
+nav button{background:none;border:0;padding:8px 15px;cursor:pointer;
+  font:10px/1 var(--mono);letter-spacing:3px;text-transform:uppercase;
+  color:var(--faint);border-bottom:2px solid transparent;transition:.16s;}
+nav button:hover{color:var(--dim);}
+nav button.on{color:var(--gold);border-bottom-color:var(--gold);}
+#engine{margin-left:auto;display:flex;align-items:center;gap:9px;cursor:pointer;
+  padding:6px 12px;border:1px solid var(--line);background:rgba(255,255,255,.02);
+  font:10px/1 var(--mono);letter-spacing:1.6px;color:var(--dim);transition:.16s;}
+#engine:hover{border-color:rgba(255,255,255,.22);color:var(--ink);}
+#dot{width:7px;height:7px;border-radius:50%;background:var(--faint);flex:0 0 auto;}
+#dot.live{background:var(--green);box-shadow:0 0 9px rgba(125,255,179,.85);}
+#dot.busy{background:var(--gold);animation:pulse 1s infinite;}
+#dot.bad{background:var(--rose);}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+
+main{overflow:hidden;position:relative;}
+.view{position:absolute;inset:0;display:none;overflow:hidden;}
+.view.on{display:grid;}
+
+#status{display:flex;align-items:center;gap:16px;padding:0 20px;height:30px;
+  border-top:1px solid var(--line);background:#0a0716;
+  font:9.5px/1 var(--mono);letter-spacing:1.5px;color:var(--faint);}
+#status span.r{margin-left:auto;}
+
+/* ── shared bits ─────────────────────────────────────────────────────────── */
+.hdr{font:700 9px/1 var(--mono);letter-spacing:4px;text-transform:uppercase;
+  color:var(--faint);padding:16px 18px 10px;}
+.rule{height:1px;background:var(--line2);margin:12px 18px;position:relative;}
+.rule::after{content:"◆";position:absolute;left:50%;top:50%;
+  transform:translate(-50%,-50%);background:var(--bg);padding:0 9px;
+  font-size:8px;color:var(--faint);line-height:1;}
+.btn{background:rgba(255,255,255,.04);border:1px solid var(--line);
+  padding:8px 14px;cursor:pointer;font:10px/1 var(--mono);letter-spacing:2px;
+  text-transform:uppercase;color:var(--dim);transition:.16s;}
+.btn:hover:not(:disabled){background:rgba(255,255,255,.09);color:var(--ink);
+  border-color:rgba(255,255,255,.26);}
+.btn:disabled{opacity:.34;cursor:default;}
+.btn.go{background:var(--gold);border-color:var(--gold);color:#0b0818;font-weight:700;}
+.btn.go:hover:not(:disabled){background:#ffd98d;}
+.btn.sm{padding:5px 10px;font-size:9px;letter-spacing:1.6px;}
+.chip{display:inline-block;padding:3px 8px;border:1px solid var(--line);
+  font:9px/1.5 var(--mono);letter-spacing:1.2px;color:var(--faint);}
+.chip.on{border-color:var(--gold);color:var(--gold);background:rgba(255,198,90,.08);}
+input[type=text],input[type=number],select,textarea{background:#060411;
+  border:1px solid var(--line);padding:9px 11px;color:var(--ink);
+  font:13px/1.5 var(--serif);width:100%;outline:none;}
+input:focus,select:focus,textarea:focus{border-color:rgba(255,198,90,.55);}
+label.f{display:block;margin-bottom:13px;}
+label.f>u{display:block;text-decoration:none;font:9px/1 var(--mono);
+  letter-spacing:2.4px;text-transform:uppercase;color:var(--faint);margin-bottom:6px;}
+label.f>em{display:block;font-style:normal;font-size:11.5px;color:var(--faint);
+  margin-top:5px;line-height:1.55;}
+.empty{padding:40px 24px;text-align:center;color:var(--faint);font-size:13.5px;}
+.empty b{display:block;font:700 12px/1 var(--mono);letter-spacing:3px;
+  text-transform:uppercase;color:var(--dim);margin-bottom:10px;}
+code{font:12px/1.5 var(--mono);background:rgba(255,255,255,.06);padding:1px 5px;}
+
+/* ── ASK ─────────────────────────────────────────────────────────────────── */
+#v-ask{grid-template-columns:1fr 330px;}
+#thread{overflow-y:auto;padding:26px 30px 10px;}
+#thread .turn{max-width:760px;margin:0 auto 26px;}
+.turn .who{font:9px/1 var(--mono);letter-spacing:3px;text-transform:uppercase;
+  color:var(--faint);margin-bottom:9px;display:flex;gap:10px;align-items:center;}
+.turn.me .who{color:var(--cyan);}
+.turn.it .who{color:var(--gold);}
+.turn .body{white-space:pre-wrap;font-size:15px;line-height:1.78;}
+.turn.me .body{color:var(--dim);border-left:2px solid rgba(127,216,255,.34);
+  padding-left:15px;}
+.turn .cites{margin-top:12px;display:flex;flex-wrap:wrap;gap:6px;}
+.cite{font:9px/1 var(--mono);letter-spacing:1.2px;padding:4px 8px;cursor:pointer;
+  border:1px solid rgba(255,198,90,.3);color:var(--gold);
+  background:rgba(255,198,90,.06);transition:.15s;}
+.cite:hover{background:rgba(255,198,90,.2);}
+.turn .meta{margin-top:9px;font:9px/1 var(--mono);letter-spacing:1.3px;color:var(--faint);}
+.caret{display:inline-block;width:8px;height:15px;background:var(--gold);
+  vertical-align:-2px;animation:pulse .9s infinite;}
+#compose{border-top:1px solid var(--line);padding:14px 30px 16px;background:#0a0716;}
+#compose .row{max-width:760px;margin:0 auto;display:flex;gap:10px;align-items:flex-end;}
+#q{flex:1;resize:none;min-height:46px;max-height:190px;overflow-y:auto;
+  font-size:14.5px;line-height:1.6;}
+#ask-opts{max-width:760px;margin:9px auto 0;display:flex;gap:8px;align-items:center;
+  font:9px/1 var(--mono);letter-spacing:1.4px;color:var(--faint);}
+#ask-opts label{display:flex;gap:5px;align-items:center;cursor:pointer;}
+#sources-pane{border-left:1px solid var(--line);overflow-y:auto;background:#0a0716;}
+.src-card{margin:0 16px 12px;border:1px solid var(--line2);padding:12px 13px;
+  background:rgba(255,255,255,.017);cursor:pointer;transition:.15s;}
+.src-card:hover{border-color:rgba(255,198,90,.35);}
+.src-card .t{font:9px/1 var(--mono);letter-spacing:1.6px;color:var(--gold);
+  margin-bottom:7px;display:flex;justify-content:space-between;}
+.src-card .x{font-size:12.5px;line-height:1.6;color:var(--dim);
+  max-height:92px;overflow:hidden;position:relative;}
+.src-card.open .x{max-height:none;}
+
+/* ── READ ────────────────────────────────────────────────────────────────── */
+#v-read{grid-template-columns:270px 1fr;}
+#read-side{border-right:1px solid var(--line);overflow-y:auto;background:#0a0716;padding-bottom:20px;}
+#read-main{overflow-y:auto;padding:22px 30px 40px;}
+#searchbar{position:sticky;top:0;background:var(--bg);padding:0 0 16px;z-index:3;}
+#hits .hit{max-width:820px;margin:0 0 20px;padding-bottom:18px;
+  border-bottom:1px solid var(--line2);}
+.hit .top{display:flex;align-items:center;gap:10px;margin-bottom:9px;
+  font:9px/1 var(--mono);letter-spacing:1.6px;color:var(--faint);}
+.hit .top b{color:var(--gold);}
+.hit .tx{font-size:14.5px;line-height:1.75;white-space:pre-wrap;}
+.hit mark{background:rgba(255,198,90,.26);color:var(--gold);padding:0 2px;}
+.hit .acts{margin-top:10px;display:flex;gap:7px;}
+.kwic{font-size:13px;line-height:1.8;padding:7px 0;border-bottom:1px solid var(--line2);}
+.kwic b{color:var(--gold);}
+.kwic i{font-style:normal;color:var(--faint);}
+.axis{display:flex;height:4px;width:74px;border:1px solid var(--line2);}
+.axis i{display:block;height:100%;}
+
+/* ── TRAIN ───────────────────────────────────────────────────────────────── */
+#v-train{grid-template-columns:1fr;overflow-y:auto;}
+#train-inner{max-width:900px;margin:0 auto;padding:26px 30px 60px;width:100%;}
+.step{border:1px solid var(--line);margin-bottom:16px;background:rgba(255,255,255,.015);}
+.step>.h{display:flex;align-items:center;gap:13px;padding:14px 17px;cursor:pointer;
+  border-bottom:1px solid transparent;}
+.step.open>.h{border-bottom-color:var(--line2);}
+.step .n{width:24px;height:24px;border:1px solid var(--line);display:grid;
+  place-items:center;font:10px/1 var(--mono);color:var(--faint);flex:0 0 auto;}
+.step.done .n{border-color:var(--green);color:var(--green);}
+.step.now .n{border-color:var(--gold);color:var(--gold);
+  box-shadow:0 0 12px rgba(255,198,90,.3);}
+.step .h b{font:700 11px/1 var(--mono);letter-spacing:2.6px;text-transform:uppercase;}
+.step .h span{font-size:12px;color:var(--faint);margin-left:auto;}
+.step>.c{display:none;padding:4px 17px 18px 54px;}
+.step.open>.c{display:block;}
+.step p{font-size:13.5px;line-height:1.75;color:var(--dim);margin:0 0 12px;}
+pre.cmd{background:#050310;border:1px solid var(--line);padding:13px 15px;
+  overflow-x:auto;font:12px/1.65 var(--mono);color:var(--green);margin:0 0 9px;
+  white-space:pre;}
+.cmdrow{display:flex;gap:8px;align-items:center;margin-bottom:16px;}
+table.mem{width:100%;border-collapse:collapse;margin-bottom:14px;font-size:13px;}
+table.mem td,table.mem th{border:1px solid var(--line2);padding:8px 11px;text-align:left;}
+table.mem th{font:9px/1 var(--mono);letter-spacing:2px;text-transform:uppercase;
+  color:var(--faint);font-weight:400;}
+table.mem tr.pick{background:rgba(255,198,90,.09);}
+table.mem tr{cursor:pointer;}
+table.mem tr:hover td{background:rgba(255,255,255,.035);}
+.ab{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:12px;}
+.ab>div{border:1px solid var(--line2);padding:13px;background:rgba(0,0,0,.25);}
+.ab h5{margin:0 0 9px;font:9px/1 var(--mono);letter-spacing:2.4px;
+  text-transform:uppercase;color:var(--faint);}
+.ab .o{font-size:13.5px;line-height:1.7;white-space:pre-wrap;min-height:90px;color:var(--dim);}
+
+/* ── MODEL ───────────────────────────────────────────────────────────────── */
+#v-model{grid-template-columns:1fr;overflow-y:auto;}
+#model-inner{max-width:880px;margin:0 auto;padding:26px 30px 60px;width:100%;}
+.ep{border:1px solid var(--line);padding:13px 15px;margin-bottom:10px;cursor:pointer;
+  display:flex;align-items:center;gap:14px;transition:.15s;}
+.ep:hover{border-color:rgba(255,255,255,.26);}
+.ep.pick{border-color:var(--gold);background:rgba(255,198,90,.07);}
+.ep .nm{font:700 11px/1.3 var(--mono);letter-spacing:1.6px;}
+.ep .u{font:10px/1.5 var(--mono);color:var(--faint);}
+.ep .ct{margin-left:auto;font:9px/1 var(--mono);letter-spacing:1.4px;color:var(--dim);}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:0 22px;}
+.warn{border-left:2px solid var(--amber);padding:11px 15px;margin:14px 0;
+  background:rgba(255,154,61,.06);font-size:13px;line-height:1.7;color:var(--dim);}
+.warn b{color:var(--amber);}
+.ok{border-left-color:var(--green);background:rgba(125,255,179,.05);}
+.ok b{color:var(--green);}
+dl.kv{display:grid;grid-template-columns:auto 1fr;gap:6px 18px;font-size:12.5px;margin:0;}
+dl.kv dt{font:9px/1.6 var(--mono);letter-spacing:1.6px;text-transform:uppercase;
+  color:var(--faint);}
+dl.kv dd{margin:0;color:var(--dim);}
+
+/* ── overlay ─────────────────────────────────────────────────────────────── */
+#sheet{position:fixed;inset:0;background:rgba(4,3,10,.87);display:none;
+  place-items:center;z-index:50;padding:34px;}
+#sheet.on{display:grid;}
+#sheet-card{width:min(760px,100%);max-height:84vh;display:flex;flex-direction:column;
+  background:var(--bg2);border:1px solid rgba(255,255,255,.17);
+  box-shadow:0 30px 80px rgba(0,0,0,.6);}
+#sheet-head{display:flex;align-items:center;gap:14px;padding:15px 19px;
+  border-bottom:1px solid var(--line);}
+#sheet-head b{font:700 11px/1 var(--mono);letter-spacing:3px;text-transform:uppercase;
+  color:var(--gold);}
+#sheet-body{overflow-y:auto;padding:20px 22px 26px;font-size:14.5px;line-height:1.78;}
+#boot{position:fixed;inset:0;display:grid;place-items:center;background:var(--bg);
+  z-index:99;text-align:center;}
+#boot.gone{display:none;}
+#boot b{display:block;font:700 22px/1 var(--mono);letter-spacing:9px;
+  color:var(--gold);margin-bottom:16px;}
+#boot span{font-size:13px;color:var(--faint);}
+</style>
+</head>
+<body>
+
+<div id="app">
+  <div id="top">
+    <div id="brand"><b>FRACTURECORE</b><i>fractured mirror</i></div>
+    <nav>
+      <button data-v="ask" class="on">Ask</button>
+      <button data-v="read">Read</button>
+      <button data-v="train">Train</button>
+      <button data-v="model">Engine</button>
+    </nav>
+    <div id="engine"><span id="dot"></span><span id="engine-label">no engine</span></div>
+  </div>
+
+  <main>
+    <!-- ── ASK ── -->
+    <section class="view on" id="v-ask">
+      <div style="display:flex;flex-direction:column;overflow:hidden">
+        <div id="thread"></div>
+        <div id="compose">
+          <div class="row">
+            <textarea id="q" rows="1" placeholder="Ask the corpus something, or give it a line to continue…"></textarea>
+            <button class="btn go" id="send">Ask</button>
+            <button class="btn" id="halt" style="display:none">Stop</button>
+          </div>
+          <div id="ask-opts">
+            <label><input type="checkbox" id="opt-ground" checked> ground in the books</label>
+            <label><input type="checkbox" id="opt-voice" checked> hold the voice</label>
+            <span style="margin-left:auto" id="ask-hint">⌘↵ to send</span>
+          </div>
+        </div>
+      </div>
+      <div id="sources-pane">
+        <div class="hdr">What it was given</div>
+        <div id="sources-list"><div class="empty">Sources appear here once you ask something.</div></div>
+      </div>
+    </section>
+
+    <!-- ── READ ── -->
+    <section class="view" id="v-read">
+      <div id="read-side">
+        <div class="hdr">The corpus</div>
+        <div id="corpus-stats" style="padding:0 18px"></div>
+        <div class="rule"></div>
+        <div class="hdr">Books</div>
+        <div id="src-filters" style="padding:0 18px;display:flex;flex-direction:column;gap:7px"></div>
+        <div class="rule"></div>
+        <div class="hdr">Mode</div>
+        <div style="padding:0 18px;display:flex;flex-direction:column;gap:7px">
+          <label style="font-size:12.5px;cursor:pointer;color:var(--dim)">
+            <input type="radio" name="rmode" value="search" checked> search by meaning</label>
+          <label style="font-size:12.5px;cursor:pointer;color:var(--dim)">
+            <input type="radio" name="rmode" value="kwic"> every occurrence of a phrase</label>
+        </div>
+        <div class="rule"></div>
+        <div class="hdr">How it was trained</div>
+        <div id="eval-report" style="padding:0 18px"></div>
+      </div>
+      <div id="read-main">
+        <div id="searchbar">
+          <input type="text" id="s" placeholder="A theme, a half-remembered line, a phrase…" autocomplete="off">
+        </div>
+        <div id="hits"></div>
+      </div>
+    </section>
+
+    <!-- ── TRAIN ── -->
+    <section class="view" id="v-train"><div id="train-inner"></div></section>
+
+    <!-- ── ENGINE ── -->
+    <section class="view" id="v-model"><div id="model-inner"></div></section>
+  </main>
+
+  <div id="status">
+    <span id="st-left">·</span>
+    <span class="r" id="st-right"></span>
+  </div>
+</div>
+
+<div id="sheet"><div id="sheet-card">
+  <div id="sheet-head"><b id="sheet-title">·</b>
+    <button class="btn sm" id="sheet-x" style="margin-left:auto">Close</button></div>
+  <div id="sheet-body"></div>
+</div></div>
+
+<div id="boot"><div><b>FRACTURECORE</b><span id="boot-msg">loading the corpus…</span></div></div>
+
+<!--  The model is a script assignment, not a fetch: a file:// page
+      cannot fetch a file:// URL, and an app window is always one.  -->
+<script src="data/fracture-index.js"></script>
+<script src="engine/retrieval.js"></script>
+<script src="fracture-core.js"></script>
+</body>
+</html>
