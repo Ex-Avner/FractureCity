@@ -56,6 +56,53 @@ const CANDIDATES = [
 
 const LOOPBACK = new Set(['127.0.0.1', 'localhost', '::1', '[::1]', '0.0.0.0']);
 
+//  Hosted providers, by exact hostname. This is an ALLOW-LIST and not a
+//  pattern, deliberately: the moment this service will dial an arbitrary
+//  host, an app that can call it has an outbound proxy with the user's
+//  network position, and that is a much bigger thing than a chat window.
+//
+//  `wire` is the request shape. Anthropic is its own: a different path, a
+//  different auth header, a system prompt that is a top-level field rather
+//  than a message, and an event-typed SSE stream.
+const PROVIDERS = {
+  openai: {
+    name: 'OpenAI', host: 'api.openai.com', base: 'https://api.openai.com',
+    wire: 'openai', auth: 'bearer', models: '/v1/models',
+    hint: 'platform.openai.com/api-keys',
+  },
+  anthropic: {
+    name: 'Anthropic', host: 'api.anthropic.com', base: 'https://api.anthropic.com',
+    wire: 'anthropic', auth: 'x-api-key', models: '/v1/models',
+    hint: 'console.anthropic.com/settings/keys',
+  },
+  openrouter: {
+    name: 'OpenRouter', host: 'openrouter.ai', base: 'https://openrouter.ai/api',
+    wire: 'openai', auth: 'bearer', models: '/v1/models',
+    hint: 'openrouter.ai/keys \u2014 one key, most models',
+  },
+  groq: {
+    name: 'Groq', host: 'api.groq.com', base: 'https://api.groq.com/openai',
+    wire: 'openai', auth: 'bearer', models: '/v1/models',
+    hint: 'console.groq.com/keys \u2014 very fast',
+  },
+  mistral: {
+    name: 'Mistral', host: 'api.mistral.ai', base: 'https://api.mistral.ai',
+    wire: 'openai', auth: 'bearer', models: '/v1/models',
+    hint: 'console.mistral.ai/api-keys',
+  },
+  deepseek: {
+    name: 'DeepSeek', host: 'api.deepseek.com', base: 'https://api.deepseek.com',
+    wire: 'openai', auth: 'bearer', models: '/v1/models',
+    hint: 'platform.deepseek.com',
+  },
+  together: {
+    name: 'Together', host: 'api.together.xyz', base: 'https://api.together.xyz',
+    wire: 'openai', auth: 'bearer', models: '/v1/models',
+    hint: 'api.together.ai/settings/api-keys',
+  },
+};
+const HOSTED_HOSTS = new Set(Object.values(PROVIDERS).map(p => p.host));
+
 function isLocal(u) {
   try {
     const p = new URL(u);
@@ -64,6 +111,25 @@ function isLocal(u) {
   } catch (e) {
     return false;
   }
+}
+
+//  The only two kinds of address this service will ever open a socket to.
+function isAllowed(u) {
+  try {
+    const p = new URL(u);
+    if (LOOPBACK.has(p.hostname)) return true;
+    return p.protocol === 'https:' && HOSTED_HOSTS.has(p.hostname);
+  } catch (e) {
+    return false;
+  }
+}
+
+function authHeaders(prov, key) {
+  if (!key) return {};
+  if (prov && prov.auth === 'x-api-key') {
+    return { 'x-api-key': key, 'anthropic-version': '2023-06-01' };
+  }
+  return { authorization: 'Bearer ' + key };
 }
 
 //  One request helper for the whole file. Returns the body as a string, or
@@ -196,6 +262,44 @@ class LLM {
     return { ok: true, models: r.models };
   }
 
+  //  What a hosted provider will answer for, given a key. Two of them do not
+  //  return a usable list — Anthropic's needs a recent API version and some
+  //  keys cannot read it at all — so a curated fallback is shipped rather
+  //  than an empty menu, which is indistinguishable from a broken key.
+  providers() {
+    return Object.keys(PROVIDERS).map(k => ({
+      key: k, name: PROVIDERS[k].name, base: PROVIDERS[k].base,
+      wire: PROVIDERS[k].wire, hint: PROVIDERS[k].hint,
+    }));
+  }
+
+  async hostedModels(provKey, apiKey) {
+    const prov = PROVIDERS[provKey];
+    if (!prov) return { ok: false, error: 'UNKNOWN_PROVIDER' };
+    if (!apiKey) return { ok: false, error: 'NO_KEY' };
+    try {
+      const text = await request(prov.base + prov.models, {
+        timeout: 12000, headers: authHeaders(prov, apiKey),
+      });
+      const d = JSON.parse(text);
+      const arr = Array.isArray(d.data) ? d.data
+                : (Array.isArray(d.models) ? d.models : []);
+      let models = arr.map(m => ({ id: m.id || m.name, size: 0,
+                                   params: '', quant: '',
+                                   family: m.owned_by || m.display_name || '' }));
+      //  Anything that cannot hold a conversation is noise in a model picker.
+      models = models.filter(m => m.id &&
+        !/embed|moderation|whisper|tts|dall-e|rerank|guard|vision-only/i.test(m.id));
+      models.sort((a, b) => String(a.id).localeCompare(String(b.id)));
+      return { ok: true, models };
+    } catch (e) {
+      return { ok: false, error: e.code || 'ERR',
+               message: e.code === 'HTTP_401' || e.code === 'HTTP_403'
+                 ? 'That key was refused by ' + prov.name + '.'
+                 : 'Could not reach ' + prov.name + ': ' + e.message };
+    }
+  }
+
   // ── Chat ─────────────────────────────────────────────────────────────────
   //  Streaming, because a local 8B model on a laptop produces its first token
   //  in about a second and its last one in thirty, and a UI that shows nothing
@@ -208,16 +312,33 @@ class LLM {
   start(opts, send) {
     const id = 'llm' + (++this.seq) + '.' + Date.now().toString(36);
     const {
-      baseUrl, api = 'openai', model,
+      provider = null, apiKey = null,
       messages = [], temperature = 0.8, topP = 0.95,
       maxTokens = 1024, stop = [], seed = null,
     } = opts || {};
+    let { baseUrl, api = 'openai', model } = opts || {};
+
+    //  A hosted provider supplies its own base and wire format; the caller
+    //  only names it and hands over the key.
+    const prov = provider ? PROVIDERS[provider] : null;
+    if (provider && !prov) {
+      send({ id, type: 'error', error: 'UNKNOWN_PROVIDER',
+             message: 'No provider called "' + provider + '".' });
+      return { ok: false, id };
+    }
+    if (prov) { baseUrl = prov.base; api = prov.wire; }
 
     const base = String(baseUrl || '').replace(/\/+$/, '');
-    if (!isLocal(base)) {
+    if (!isAllowed(base)) {
       send({ id, type: 'error', error: 'BLOCKED',
-             message: 'That address is not on this machine. The model service '
-                    + 'only talks to servers running locally.' });
+             message: 'This service only opens connections to this machine or '
+                    + 'to a known model provider. ' + base + ' is neither.' });
+      return { ok: false, id };
+    }
+    if (prov && !apiKey) {
+      send({ id, type: 'error', error: 'NO_KEY',
+             message: prov.name + ' needs an API key. Add one on the Engine '
+                    + 'screen.' });
       return { ok: false, id };
     }
     if (!model) {
@@ -227,17 +348,36 @@ class LLM {
     }
 
     const isOllama = api === 'ollama';
-    const path = isOllama ? '/api/chat' : '/v1/chat/completions';
-    const body = isOllama
-      ? { model, messages, stream: true,
-          options: Object.assign(
-            { temperature, top_p: topP, num_predict: maxTokens },
-            stop.length ? { stop } : {},
-            seed != null ? { seed } : {}) }
-      : { model, messages, stream: true, temperature, top_p: topP,
-          max_tokens: maxTokens,
-          ...(stop.length ? { stop } : {}),
-          ...(seed != null ? { seed } : {}) };
+    const isAnthropic = api === 'anthropic';
+
+    //  Anthropic takes the system prompt out of the message list and puts it
+    //  at the top level, and refuses a list that starts with anything but a
+    //  user turn. Everything else here speaks one of the other two shapes.
+    let path, body;
+    if (isAnthropic) {
+      const sys = messages.filter(m => m.role === 'system')
+                          .map(m => m.content).join('\n\n');
+      let turns = messages.filter(m => m.role !== 'system');
+      while (turns.length && turns[0].role !== 'user') turns = turns.slice(1);
+      path = '/v1/messages';
+      body = { model, messages: turns, stream: true, max_tokens: maxTokens,
+               temperature, top_p: topP,
+               ...(sys ? { system: sys } : {}),
+               ...(stop.length ? { stop_sequences: stop } : {}) };
+    } else if (isOllama) {
+      path = '/api/chat';
+      body = { model, messages, stream: true,
+               options: Object.assign(
+                 { temperature, top_p: topP, num_predict: maxTokens },
+                 stop.length ? { stop } : {},
+                 seed != null ? { seed } : {}) };
+    } else {
+      path = '/v1/chat/completions';
+      body = { model, messages, stream: true, temperature, top_p: topP,
+               max_tokens: maxTokens,
+               ...(stop.length ? { stop } : {}),
+               ...(seed != null ? { seed } : {}) };
+    }
 
     let parsed;
     try { parsed = new URL(base + path); } catch (e) {
@@ -252,9 +392,10 @@ class LLM {
 
     const req = lib.request(parsed, {
       method: 'POST',
-      headers: { 'content-type': 'application/json',
-                 'content-length': payload.length,
-                 accept: 'text/event-stream' },
+      headers: Object.assign({ 'content-type': 'application/json',
+                               'content-length': payload.length,
+                               accept: 'text/event-stream' },
+                             authHeaders(prov, apiKey)),
       //  No response timeout: generation legitimately takes minutes on a big
       //  model. The connect phase is guarded separately below.
       timeout: 0,
@@ -287,7 +428,28 @@ class LLM {
           buf = buf.slice(nl + 1);
           if (!line) continue;
           let piece = null, done = false;
-          if (isOllama) {
+          if (isAnthropic) {
+            //  Event-typed SSE. The text lives in content_block_delta; the
+            //  other event kinds carry structure this does not need, except
+            //  message_stop, which is the end.
+            if (!line.startsWith('data:')) continue;
+            try {
+              const o = JSON.parse(line.slice(5).trim());
+              if (o.type === 'content_block_delta' && o.delta) {
+                piece = o.delta.text || '';
+              } else if (o.type === 'message_delta' && o.usage) {
+                state.evalCount = o.usage.output_tokens;
+              } else if (o.type === 'message_stop') {
+                done = true;
+              } else if (o.type === 'error') {
+                this.streams.delete(id);
+                send({ id, type: 'error', error: 'PROVIDER',
+                       message: (o.error && o.error.message) || 'Provider error.' });
+                try { res.destroy(); } catch (e) {}
+                return;
+              }
+            } catch (e) { continue; }
+          } else if (isOllama) {
             try {
               const o = JSON.parse(line);
               piece = (o.message && o.message.content) || '';

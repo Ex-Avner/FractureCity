@@ -156,6 +156,9 @@ contextBridge.exposeInMainWorld('fracture', {
   llm: {
     discover: (extra) => ipcRenderer.invoke('llm:discover', extra || null),
     models:   (url, api) => ipcRenderer.invoke('llm:models', url, api),
+    providers: () => ipcRenderer.invoke('llm:providers'),
+    hostedModels: (provider, apiKey) =>
+      ipcRenderer.invoke('llm:hostedModels', provider, apiKey),
     chat: async (opts, onEvent) => {
       const res = await ipcRenderer.invoke('llm:chat', opts);
       if (!res || !res.ok) {

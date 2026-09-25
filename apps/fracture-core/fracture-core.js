@@ -121,6 +121,11 @@ const LLM = (function () {
     },
     async models(url, api) { const r = await probe({ url, api, name: '' });
       return r.ok ? { ok: true, models: r.models } : { ok: false, error: r.error }; },
+    //  Deliberately absent on this path: providers/hostedModels. Reaching a
+    //  hosted provider from a file:// page means putting the user's API key
+    //  in the page and hoping CORS lets it through, which it does not. The
+    //  Engine screen checks for these and says so rather than failing later.
+    providers: null, hostedModels: null,
     async chat(opts, onEvent) {
       const isO = opts.api === 'ollama';
       const path = isO ? '/api/chat' : '/v1/chat/completions';
@@ -221,11 +226,17 @@ function copyText(t, btn) {
 const S = {
   R: null,                    // the retrieval model
   view: 'ask',
-  engine: null,               // { url, api, name, model }
+  engine: null,               // { url, api, name, model } or { provider, model }
+  keys: {},                   // provider -> api key, kept in this app's own store
+  hosted: [],                 // provider catalogue from the shell
+  hostedModels: {},           // provider -> [models], once a key works
   endpoints: [],
   probed: [],
   gen: {                      // generation settings
-    temperature: 0.8, topP: 0.95, maxTokens: 900, passages: 6,
+    //  2,400 rather than 900: a capable model asked a real question needs
+    //  room to work, and an answer that stops mid-thought reads as
+    //  stupidity when it is actually a budget.
+    temperature: 0.7, topP: 0.95, maxTokens: 2400, passages: 5,
   },
   thread: [],                 // [{ role, text, cites, stats }]
   stream: null,
@@ -239,7 +250,7 @@ const SAVE_KEY = 'session';
 
 async function persist() {
   await F.save(SAVE_KEY, {
-    engine: S.engine, gen: S.gen, train: S.train,
+    engine: S.engine, gen: S.gen, train: S.train, keys: S.keys,
     thread: S.thread.slice(-40),
   });
 }
@@ -248,6 +259,7 @@ async function restore() {
   const d = await F.read(SAVE_KEY);
   if (!d) return;
   if (d.engine) S.engine = d.engine;
+  if (d.keys) S.keys = d.keys;
   if (d.gen) Object.assign(S.gen, d.gen);
   if (d.train) Object.assign(S.train, d.train);
   if (Array.isArray(d.thread)) S.thread = d.thread;
@@ -291,6 +303,7 @@ async function boot() {
   //  usable the moment it opens, and probing eight ports that mostly are not
   //  there takes a second or two.
   setTimeout(discover, 120);
+  setTimeout(loadProviders, 200);
 }
 
 // ─── 5 · The engine ─────────────────────────────────────────────────────────
@@ -312,6 +325,13 @@ async function discover(extra) {
   //  A remembered choice wins if it is still answering; otherwise the first
   //  thing found does, because an app that finds a model and refuses to use
   //  it until you pick it from a menu is just a menu.
+  //  A hosted engine is not something discovery can confirm or deny, so it
+  //  is left alone entirely. Only a local choice is re-checked.
+  if (S.engine && S.engine.provider) {
+    setDot('live', shortModel(S.engine.model));
+    if (S.view === 'model') buildModel();
+    return;
+  }
   if (S.engine) {
     const still = S.endpoints.find(e => e.url === S.engine.url && e.api === S.engine.api);
     if (still && still.models.some(m => m.id === S.engine.model)) {
@@ -355,62 +375,151 @@ $('#engine').onclick = () => show('model');
 
 // ─── 6 · ASK ────────────────────────────────────────────────────────────────
 
+//  THE PROMPT, AND WHY THE FIRST ONE MADE A DECENT MODEL SOUND STUPID
+//  -------------------------------------------------------------------
+//  The first version opened with "You answer out of three manuscripts" and
+//  told the model to announce when it was working without them. What came
+//  back was: "As FractureCore, I must rely on general knowledge since no
+//  passages were retrieved for this question." That is not the model being
+//  dim. That is the prompt turning an assistant into a compliance officer,
+//  and then the compliance officer hedging instead of answering.
+//
+//  Three things were wrong and all three are fixed here.
+//
+//    1. It was told it answers OUT OF the books. So anything not in the books
+//       felt out of scope, and it deflected rather than just answering.
+//       It is a general assistant now. The books are something it knows,
+//       not the edge of what it is allowed to think about.
+//
+//    2. Passages went in on EVERY question. Ask it "think" and it got six
+//       paragraphs of unrelated prose to reconcile with a one-word prompt.
+//       Irrelevant context does not sit there harmlessly; it drags the answer
+//       toward whatever it happens to say. Passages are now gated on their
+//       actual retrieval score, and most questions get none.
+//
+//    3. It was told to say when it had not used the manuscripts. Nobody
+//       wants that sentence. The sources are on screen. It now narrates
+//       nothing about its own plumbing, ever.
+
 const VOICE_RULES = [
-  'Write in flat declarative prose. Short sentences. No hedging.',
-  'Never use em dashes. Use a comma, a full stop, or a colon.',
-  'Do not open with a summary of the question or close with a summary of the answer.',
-  'No bullet lists unless the material is genuinely a list.',
-  'Concrete before abstract. An example earns its keep; a restatement does not.',
+  'Flat declarative prose. Short sentences. Concrete before abstract.',
+  'Never use em dashes. A comma, a full stop, or a colon instead.',
+  'No throat-clearing. Do not restate the question before answering it.',
+  'No summary paragraph at the end repeating what you just said.',
+  'Bullet lists only when the material is genuinely a list.',
 ];
+
+//  WHEN TO HAND OVER PASSAGES, AND WHY THIS IS NOT A CLASSIFIER
+//  -----------------------------------------------------------
+//  The obvious design is a relevance gate: decide whether the question is
+//  about these books, and pass passages only if it is. That was tried and it
+//  does not work, and the reason is worth writing down rather than tuning
+//  around.
+//
+//  Measured over on-topic and off-topic questions, no single signal
+//  separates them. Not the search score, which is min-max normalised so the
+//  top hit is 1.0 whether it is a perfect match or the least bad of 1,132
+//  irrelevant ones. Not the raw cosine, where "retirement is a promise nobody
+//  intends to keep" (on-topic, 0.076) scores BELOW "write a python function"
+//  (off-topic, 0.111), because the books discuss retirement in words the
+//  question does not use while the code question shares ordinary words like
+//  function and list. Not term coverage, where "think" scores a perfect 1.0.
+//
+//  A 106,000-word corpus about meaning, systems and collapse shares
+//  vocabulary with almost any question. That is a fact about the corpus, not
+//  a threshold waiting to be found.
+//
+//  So the gate only refuses the hopeless cases, and the model decides the
+//  rest, because deciding what is relevant is the thing the model is
+//  genuinely better at than a bag of words. The prompt tells it plainly that
+//  some of what it is given may be beside the point.
+//
+//  Failure direction is deliberate: it lets marginal material through rather
+//  than withholding material that turns out to matter. A passage the model
+//  ignores costs a little context. A passage it never saw costs the answer.
+
+const GATE = {
+  minTerms: 2,       // one word is not a question about anything
+  minCos: 0.06,      // below this the corpus has nothing in the neighbourhood
+  minBmFrac: 0.55,   // unless the exact words are there in force
+  max: 4,            // four is plenty; more crowds out the question itself
+};
+
+function relevant(res) {
+  const hits = (res && res.hits) || [];
+  if (!hits.length) return [];
+  if ((res.terms || []).length < GATE.minTerms) return [];
+  const top = hits[0];
+  if (top.cos < GATE.minCos && top.bmFrac < GATE.minBmFrac) return [];
+  return hits.slice(0, GATE.max);
+}
 
 function buildPrompt(question, hits, opts) {
   const sys = [];
-  sys.push('You are FractureCore. You answer out of three manuscripts by '
-         + 'P. R. Erickson: Fractured Mirror Theory, Exulansis, and The Next '
-         + 'Ten Years.');
+
+  sys.push(
+    'You are FractureCore.\n\n'
+  + 'You are a capable, well-read assistant with broad general knowledge, and '
+  + 'you answer anything you are asked as well as you can. Reason carefully. '
+  + 'Take a position. Work through a problem rather than gesturing at how one '
+  + 'might be worked through. Answer hypotheticals as asked instead of '
+  + 'explaining that they are hypothetical.');
+
+  sys.push(
+    'You also happen to know three manuscripts by P. R. Erickson intimately: '
+  + 'Fractured Mirror Theory, Exulansis, and The Next Ten Years. They are '
+  + 'part of what you know, not the boundary of it.');
+
   if (opts.ground && hits.length) {
-    sys.push('Numbered passages from those manuscripts are supplied below. '
-           + 'Answer from them. When you use one, cite it inline as [1], [2] '
-           + 'and so on.');
-    sys.push('If the passages do not cover what was asked, say that plainly '
-           + 'and answer from general knowledge, marked as such. Do not '
-           + 'attribute anything to the manuscripts that is not in the '
-           + 'passages given. A confident invented citation is the single '
-           + 'worst thing you can produce here.');
-  } else {
-    sys.push('No passages were retrieved for this question. Answer from '
-           + 'general knowledge and say that the manuscripts were not '
-           + 'consulted.');
-  }
-  if (opts.voice) {
-    sys.push('Match the register of the passages. ' + VOICE_RULES.join(' '));
+    sys.push(
+      'Passages from those manuscripts are supplied below. A search put them '
+    + 'there; a search can be wrong. Read them, use whichever actually bear '
+    + 'on the question, and ignore the rest completely \u2014 including all of '
+    + 'them, if none do. Never bend an answer toward a passage to justify '
+    + 'having been given it. Cite one as [1], [2] and so on at the point '
+    + 'where you genuinely draw on it.\n\n'
+    + 'Never attribute a claim to the manuscripts that is not in the passages '
+    + 'given. Inventing a citation is the one unforgivable failure here. '
+    + 'Everything else you say from your own knowledge, uncited, in your own '
+    + 'voice.');
   }
 
-  let ctx = '';
-  if (opts.ground && hits.length) {
-    ctx = hits.map((h, i) => {
-      const lbl = S.R.sources[h.source] ? S.R.sources[h.source].label : h.source;
-      return `[${i + 1}] (${lbl})\n${h.text}`;
-    }).join('\n\n');
-  }
+  //  NOTHING about retrieval state. No "no passages were found", no "I must
+  //  rely on general knowledge", no "as FractureCore". The reader can see the
+  //  source panel; being told about it in prose is noise at best and reads as
+  //  incapacity at worst.
+  sys.push(
+    'Never narrate your own machinery. Do not mention passages, retrieval, '
+  + 'context, what you were or were not given, or what you are. Do not open '
+  + 'with "As FractureCore". Just answer.');
+
+  if (opts.voice) sys.push('Style: ' + VOICE_RULES.join(' '));
 
   const messages = [{ role: 'system', content: sys.join('\n\n') }];
 
-  //  Prior turns, trimmed. The context window belongs to the passages, not to
-  //  a transcript of everything ever said; four exchanges is enough for "and
-  //  what about the second one" to resolve.
-  const prior = S.thread.filter(t => t.role !== 'system').slice(-8);
+  //  Prior turns. Longer than before: a model that forgets what was said four
+  //  exchanges ago reads as stupid no matter how good it is.
+  const prior = S.thread.filter(t => t.role !== 'system' && !t.retrievalOnly)
+                        .slice(-12);
   for (const t of prior) {
-    messages.push({ role: t.role === 'me' ? 'user' : 'assistant',
-                    content: t.role === 'me' ? t.text : stripCites(t.text) });
+    const text = (t.text || '').trim();
+    if (!text) continue;
+    messages.push({ role: t.role === 'me' ? 'user' : 'assistant', content: text });
   }
 
-  messages.push({ role: 'user',
-    content: ctx ? `${ctx}\n\n———\n\n${question}` : question });
+  //  Passages ride with the question, not in the system prompt, so they are
+  //  scoped to this turn and do not accumulate across a conversation.
+  let content = question;
+  if (opts.ground && hits.length) {
+    const ctx = hits.map((h, i) => {
+      const lbl = S.R.sources[h.source] ? S.R.sources[h.source].label : h.source;
+      return `[${i + 1}] (${lbl})\n${h.text}`;
+    }).join('\n\n');
+    content = `${ctx}\n\n———\n\n${question}`;
+  }
+  messages.push({ role: 'user', content });
   return messages;
 }
-
-function stripCites(t) { return t; }
 
 function renderThread() {
   const el = $('#thread');
@@ -458,13 +567,18 @@ function renderThread() {
   });
 }
 
-function renderSources(hits) {
+function renderSources(hits, notUsed) {
   const el = $('#sources-list');
   if (!hits || !hits.length) {
     el.innerHTML = '<div class="empty">Nothing was retrieved for that.</div>';
     return;
   }
-  el.innerHTML = hits.map((h, i) => {
+  const head = notUsed
+    ? '<div style="padding:0 16px 12px;font-size:12px;line-height:1.65;'
+    + 'color:var(--faint)">Nothing in the books was close enough to this '
+    + 'question to be worth handing over, so the answer is from general '
+    + 'knowledge. These are the nearest passages anyway.</div>' : '';
+  el.innerHTML = head + hits.map((h, i) => {
     const s = S.R.sources[h.source] || { short: h.source, label: h.source };
     return `<div class="src-card" data-i="${i}">
       <div class="t"><span>[${i + 1}] ${esc(s.short)}</span>
@@ -483,12 +597,18 @@ async function ask() {
   const ground = $('#opt-ground').checked;
   const voice = $('#opt-voice').checked;
 
-  let hits = [];
+  //  Retrieve, then keep only what is actually about the question. Six
+  //  paragraphs of unrelated prose bolted to a one-word prompt is how the
+  //  first version answered “think” with a lecture on retirement.
+  let hits = [], found = [];
   if (ground) {
-    const r = S.R.search(q, { limit: S.gen.passages });
-    hits = r.hits;
-    renderSources(hits);
-    status(null, `retrieved ${hits.length} · blend ${r.alpha.toFixed(2)}`);
+    const r = S.R.search(q, { limit: Math.max(S.gen.passages, 8) });
+    found = r.hits;
+    hits = relevant(r).slice(0, S.gen.passages);
+    renderSources(hits.length ? hits : found.slice(0, 3), hits.length === 0);
+    status(null, hits.length
+      ? `${hits.length} passage${hits.length === 1 ? '' : 's'} in context`
+      : 'nothing in the books on this — answering from knowledge');
   } else {
     renderSources([]);
   }
@@ -531,11 +651,14 @@ async function ask() {
     painted = now; renderThread();
   };
 
-  S.stream = await LLM.chat({
-    baseUrl: S.engine.url, api: S.engine.api, model: S.engine.model,
-    messages, temperature: S.gen.temperature, topP: S.gen.topP,
+  S.stream = await LLM.chat(Object.assign({
+    model: S.engine.model, messages,
+    temperature: S.gen.temperature, topP: S.gen.topP,
     maxTokens: S.gen.maxTokens,
-  }, (ev) => {
+  }, S.engine.provider
+      ? { provider: S.engine.provider, apiKey: S.keys[S.engine.provider] || '' }
+      : { baseUrl: S.engine.url, api: S.engine.api }),
+  (ev) => {
     if (ev.type === 'token') { turn.text += ev.text; repaint(); }
     else if (ev.type === 'done') {
       turn.live = false; turn.stats = ev.stats; S.stream = null;
@@ -989,6 +1112,13 @@ function kitStats() {
 function buildModel() {
   const eps = S.endpoints;
   const cur = S.engine;
+  const curProv = cur && cur.provider;
+  const cm = curProv ? (S.hostedModels[curProv] || []) : [];
+  const cloudModels = curProv && cm.length ? `
+    <label class="f"><u>model at ${esc(providerName(curProv))}</u>
+      <select id="c-model">${cm.map(m => `
+        <option value="${esc(m.id)}" ${m.id === cur.model ? 'selected' : ''}>${esc(m.id)}</option>`).join('')}
+      </select></label>` : '';
   const modelsFor = (e) => e.models || [];
 
   const epHtml = eps.length ? eps.map((e, i) => {
@@ -1059,6 +1189,20 @@ function buildModel() {
       tried, so the port is all you need to know.</em></label>
 
     <div class="rule" style="margin-left:0;margin-right:0"></div>
+    <div class="hdr" style="padding-left:0">A model from outside</div>
+    <p style="font-size:13.5px;line-height:1.8;color:var(--dim);max-width:70ch;margin:0 0 6px">
+      A local model that fits on a laptop is a small model. If you want this to
+      be as capable as it can be, point it at a frontier one. Paste a key and
+      the whole catalogue becomes available.
+    </p>
+    <div class="warn"><b>This sends your questions and the retrieved passages
+      out of the building.</b> The manuscripts are unpublished work, and a
+      hosted provider keeps what it is given. Local is the private option and
+      it stays one keystroke away on this same screen.</div>
+    <div id="cloud-list"></div>
+    ${cloudModels}
+
+    <div class="rule" style="margin-left:0;margin-right:0"></div>
     <div class="hdr" style="padding-left:0">How it writes</div>
     <div class="grid2">
       <label class="f"><u>temperature · <span id="lv-t">${S.gen.temperature}</span></u>
@@ -1069,7 +1213,7 @@ function buildModel() {
         <input type="range" id="g-p" min="0.1" max="1" step="0.05" value="${S.gen.topP}" style="width:100%">
         <em>How much of the probability mass is in play at each word.</em></label>
       <label class="f"><u>longest answer · <span id="lv-m">${S.gen.maxTokens}</span></u>
-        <input type="range" id="g-m" min="200" max="4000" step="100" value="${S.gen.maxTokens}" style="width:100%">
+        <input type="range" id="g-m" min="400" max="16000" step="200" value="${S.gen.maxTokens}" style="width:100%">
         <em>In tokens, which are roughly three quarters of a word each.</em></label>
       <label class="f"><u>passages given · <span id="lv-k">${S.gen.passages}</span></u>
         <input type="range" id="g-k" min="0" max="12" step="1" value="${S.gen.passages}" style="width:100%">
@@ -1102,6 +1246,7 @@ function buildModel() {
       <button class="btn sm" id="m-wipe">forget this conversation</button>
     </div>`;
 
+  renderCloud();
   $('#m-look').onclick = () => discover($('#m-custom') && $('#m-custom').value.trim());
   $('#m-add').onclick = () => {
     const v = $('#m-custom').value.trim();
@@ -1140,6 +1285,139 @@ function buildModel() {
     S.thread = []; renderThread(); persist();
     status(null, 'conversation cleared');
   };
+}
+
+//  Hosted providers: the catalogue, the key box, and what happens when a key
+//  turns out to work. Keys live in this app's own store on disk, in plain
+//  text, which is the same footing as every other key Present Palm holds. It
+//  is said out loud on screen rather than left to be assumed either way.
+
+function providerName(k) {
+  const p = S.hosted.find(x => x.key === k);
+  return p ? p.name : k;
+}
+
+async function loadProviders() {
+  if (!LLM.providers) return;
+  try { S.hosted = await LLM.providers() || []; } catch (e) { S.hosted = []; }
+}
+
+function renderCloud() {
+  const el = $('#cloud-list');
+  if (!el) return;
+  if (!LLM.providers) {
+    el.innerHTML = `<div class="warn"><b>Not available on this path.</b>
+      Hosted models go through the shell, which has not been patched yet.
+      Run <code>python3 _patches/patch_shell.py</code> in the Fracture City
+      folder and restart Present Palm.</div>`;
+    return;
+  }
+  if (!S.hosted.length) {
+    el.innerHTML = '<div style="color:var(--faint);font-size:12.5px">loading\u2026</div>';
+    loadProviders().then(renderCloud);
+    return;
+  }
+  const cur = S.engine;
+  el.innerHTML = S.hosted.map(p => {
+    const has = !!(S.keys[p.key] || '').trim();
+    const on = cur && cur.provider === p.key;
+    const n = (S.hostedModels[p.key] || []).length;
+    return `<div class="ep ${on ? 'pick' : ''}" data-prov="${esc(p.key)}">
+      <div><div class="nm">${esc(p.name)}</div>
+        <div class="u">${esc(p.hint)}</div></div>
+      <div class="ct">${has ? (n ? n + ' models' : 'key saved') : 'no key'}</div>
+    </div>`;
+  }).join('') + `
+    <label class="f" style="margin-top:12px"><u>api key</u>
+      <div style="display:flex;gap:8px">
+        <select id="c-prov" style="max-width:190px">${S.hosted.map(p =>
+          `<option value="${esc(p.key)}" ${cur && cur.provider === p.key ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}</select>
+        <input type="text" id="c-key" placeholder="paste it here"
+          value="${esc(S.keys[(cur && cur.provider) || (S.hosted[0] && S.hosted[0].key)] || '')}">
+        <button class="btn" id="c-save">Use it</button>
+      </div>
+      <em>Stored on this machine, in this app's own data folder, in plain text.
+      Clear the box and press Use it to remove one.</em></label>
+    <div id="c-status" style="font:10px/1.7 var(--mono);letter-spacing:1.2px;
+      color:var(--faint);min-height:18px"></div>`;
+
+  $$('#cloud-list .ep').forEach(card => {
+    card.onclick = async () => {
+      const k = card.dataset.prov;
+      const sel = $('#c-prov'); if (sel) sel.value = k;
+      const box = $('#c-key'); if (box) box.value = S.keys[k] || '';
+      if (S.keys[k]) await useProvider(k, S.keys[k]);
+      else { $('#c-status').textContent = 'paste a key for ' + providerName(k); }
+    };
+  });
+  const sel = $('#c-prov');
+  if (sel) sel.onchange = () => { $('#c-key').value = S.keys[sel.value] || ''; };
+  const save = $('#c-save');
+  if (save) save.onclick = () => useProvider($('#c-prov').value, $('#c-key').value.trim());
+  const cs = $('#c-model');
+  if (cs) cs.onchange = () => {
+    S.engine.model = cs.value;
+    setDot('live', shortModel(cs.value));
+    persist();
+  };
+}
+
+async function useProvider(key, apiKey) {
+  const st = $('#c-status');
+  if (!apiKey) {
+    delete S.keys[key];
+    delete S.hostedModels[key];
+    if (S.engine && S.engine.provider === key) { S.engine = null; discover(); }
+    persist(); buildModel();
+    return;
+  }
+  S.keys[key] = apiKey;
+  persist();
+  if (st) st.textContent = 'asking ' + providerName(key) + ' what it has\u2026';
+  setDot('busy', 'checking key');
+  let r;
+  try { r = await LLM.hostedModels(key, apiKey); }
+  catch (e) { r = { ok: false, message: e.message }; }
+
+  if (!r || !r.ok) {
+    //  A provider that will not list its models can still answer, so this is
+    //  not fatal \u2014 it just means choosing the model by name.
+    S.hostedModels[key] = [];
+    if (st) st.textContent = (r && r.message) || 'that key did not work';
+    setDot('bad', 'key refused');
+    buildModel();
+    return;
+  }
+  S.hostedModels[key] = r.models;
+  const pick = pickHosted(key, r.models);
+  S.engine = { provider: key, name: providerName(key), model: pick };
+  setDot('live', shortModel(pick));
+  if (st) st.textContent = r.models.length + ' models \u00b7 using ' + pick;
+  persist();
+  buildModel();
+}
+
+//  Prefer the strongest general model a provider offers, by the naming
+//  conventions they all happen to share. Dated snapshots and mini/instant
+//  variants lose to their full-size siblings.
+function pickHosted(prov, models) {
+  const ids = models.map(m => m.id);
+  const score = (id) => {
+    const s = id.toLowerCase();
+    let v = 0;
+    if (/opus/.test(s)) v += 100;
+    if (/sonnet/.test(s)) v += 90;
+    if (/\bgpt-5|\bo3|\bo4/.test(s)) v += 95;
+    if (/gpt-4\.?1|gpt-4o/.test(s)) v += 80;
+    if (/deepseek-(chat|reasoner)/.test(s)) v += 80;
+    if (/large|70b|72b|405b|123b/.test(s)) v += 60;
+    if (/mini|small|haiku|instant|lite|8b|7b|3b|1b/.test(s)) v -= 30;
+    if (/preview|alpha|beta|exp/.test(s)) v -= 12;
+    if (/\d{8}|\d{4}-\d{2}-\d{2}/.test(s)) v -= 6;   // dated snapshot
+    return v;
+  };
+  const best = ids.slice().sort((a, b) => score(b) - score(a))[0];
+  return best || ids[0];
 }
 
 // ─── 10 · Views ─────────────────────────────────────────────────────────────

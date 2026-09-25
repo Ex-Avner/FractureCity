@@ -61,6 +61,12 @@ ipcMain.handle('llm:models', (event, baseUrl, api) =>
   llm.models(baseUrl, api).catch(e => ({ ok: false, error: e.code || 'ERR',
                                          message: e.message })));
 
+//  Hosted providers. The allow-list of hosts lives in llm.js; nothing else
+//  can be dialled, so this cannot become a general outbound proxy for apps.
+ipcMain.handle('llm:providers', () => llm.providers());
+ipcMain.handle('llm:hostedModels', (event, provider, apiKey) =>
+  llm.hostedModels(provider, apiKey));
+
 //  Streaming. The renderer gets one 'llm:event' per token on its own
 //  webContents, tagged with the stream id it was handed when it started.
 ipcMain.handle('llm:chat', (event, opts) => {
@@ -99,6 +105,9 @@ PRELOAD_BLOCK = r'''
   llm: {
     discover: (extra) => ipcRenderer.invoke('llm:discover', extra || null),
     models:   (url, api) => ipcRenderer.invoke('llm:models', url, api),
+    providers: () => ipcRenderer.invoke('llm:providers'),
+    hostedModels: (provider, apiKey) =>
+      ipcRenderer.invoke('llm:hostedModels', provider, apiKey),
     chat: async (opts, onEvent) => {
       const res = await ipcRenderer.invoke('llm:chat', opts);
       if (!res || !res.ok) {

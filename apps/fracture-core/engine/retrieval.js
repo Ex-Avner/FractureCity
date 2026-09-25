@@ -193,9 +193,21 @@
         counts.set(t, (counts.get(t) || 0) + 1);
       }
       if (!qTerms.length) {
-        return { hits: [], terms: [], alpha: 0, empty: true,
+        return { hits: [], terms: [], alpha: 0, empty: true, coverage: 0,
                  unknown: qTermsAll.length > 0 };
       }
+
+      //  The share of what was typed that the corpus has any word for, weighted
+      //  by how distinctive those words are. A question about linked lists
+      //  scores near zero here even though "list" and "in" are in the
+      //  vocabulary, because the words that carry the question are not.
+      let haveIdf = 0, allIdf = 0;
+      for (const t of new Set(qTermsAll)) {
+        const w = this.vocab.has(t) ? this.idf[this.vocab.get(t)] : 3.2;
+        allIdf += w;
+        if (this.vocab.has(t)) haveIdf += w;
+      }
+      const coverage = allIdf > 0 ? haveIdf / allIdf : 0;
 
       //  Interpolate the blend on how much the query gives us to work with.
       //  Two terms is a lookup; twenty is a description.
@@ -230,11 +242,19 @@
       }
 
       const nDocs = this.nDocs, lsa = this._lsa, lex = this._lex;
+      //  Kept before normalisation. The normalised scores answer "which of
+      //  these is best", which is all ranking needs; they cannot answer "is
+      //  any of this actually about the question", because min-max makes the
+      //  top hit 1.0 whether it is a perfect match or the least bad of 1,132
+      //  irrelevant ones. The raw cosine is an absolute number and comparable
+      //  across queries, so that is what a relevance gate has to look at.
+      const rawL = new Float32Array(nDocs), rawX = new Float32Array(nDocs);
       for (let doc = 0; doc < nDocs; doc++) {
         const base = doc * k;
         let s = 0;
         for (let d = 0; d < k; d++) s += this.docVecs[base + d] * qv[d];
         lsa[doc] = s;
+        rawL[doc] = s;
       }
 
       // ── BM25 ──
@@ -252,6 +272,14 @@
         }
       }
 
+      rawX.set(lex.subarray(0, nDocs));
+      //  How much of the query's total idf mass the best passage actually
+      //  matched. Absolute, and it is the rare words that move it: a question
+      //  whose distinctive term is "exulansis" scores high when a passage
+      //  contains it and near zero when nothing does.
+      let qIdf = 0;
+      for (const [t] of counts) qIdf += this.idf[this.vocab.get(t)];
+      for (const t of qTermsAll) if (!this.vocab.has(t)) qIdf += 3.4;
       this._minmax(lsa, nDocs);
       this._minmax(lex, nDocs);
 
@@ -279,12 +307,16 @@
         for (const m of w.m) used.add(m);
         hits.push({
           window: doc, score: s, lsa: lsa[doc], lex: lex[doc],
+          //  Absolute: a true cosine in [-1,1] against the query, plus how
+          //  much of the query the corpus even has words for.
+          cos: rawL[doc], cover: coverage,
+          bm: rawX[doc], bmFrac: qIdf > 0 ? rawX[doc] / qIdf : 0,
           source: w.s, members: w.m,
           text: w.m.map(i => this.passages[i].t).join('\n\n'),
         });
         if (hits.length >= limit) break;
       }
-      return { hits, terms: [...counts.keys()], alpha, empty: false };
+      return { hits, terms: [...counts.keys()], alpha, empty: false, coverage };
     }
 
     /** Passages nearest a given window in meaning — "more like this". */
