@@ -238,7 +238,12 @@ const S = {
     //  stupidity when it is actually a budget.
     temperature: 0.7, topP: 0.95, maxTokens: 2400, passages: 5,
   },
-  thread: [],                 // [{ role, text, cites, stats }]
+  //  Conversations. The first version had exactly one thread that grew
+  //  forever with no way to start another, which is not a design choice,
+  //  it is a missing feature.
+  convos: [],                 // [{ id, title, at, thread }]
+  convoId: null,
+  thread: [],                 // the open one's turns, [{ role, text, cites, stats }]
   stream: null,
   srcFilter: new Set(),
   readMode: 'search',
@@ -248,10 +253,24 @@ const S = {
 
 const SAVE_KEY = 'session';
 
+//  Bumped whenever a default in S.gen changes meaning. restore() reads saved
+//  settings over the defaults, so without this a person who has used the app
+//  once keeps the old numbers forever and a shipped improvement never reaches
+//  them — which is how a 900-token answer limit survived being raised to
+//  2,400, and why answers kept stopping mid-thought after the fix.
+const SETTINGS_VERSION = 2;
+
 async function persist() {
+  syncConvo();
   await F.save(SAVE_KEY, {
+    v: SETTINGS_VERSION,
     engine: S.engine, gen: S.gen, train: S.train, keys: S.keys,
-    thread: S.thread.slice(-40),
+    convoId: S.convoId, seenGuide: S.seenGuide,
+    //  Thirty conversations of sixty turns is more than anyone keeps, and it
+    //  bounds the file so a year of use cannot make opening the app slow.
+    convos: S.convos.slice(0, 30).map(c => ({
+      id: c.id, title: c.title, at: c.at, thread: (c.thread || []).slice(-60),
+    })),
   });
 }
 
@@ -260,9 +279,25 @@ async function restore() {
   if (!d) return;
   if (d.engine) S.engine = d.engine;
   if (d.keys) S.keys = d.keys;
-  if (d.gen) Object.assign(S.gen, d.gen);
+  //  Only carry generation settings forward across a version where they still
+  //  mean the same thing. Everything else — the engine, the keys, the
+  //  conversation, where you are in the training sequence — is yours and
+  //  survives regardless.
+  if (d.gen && (d.v || 0) >= SETTINGS_VERSION) Object.assign(S.gen, d.gen);
   if (d.train) Object.assign(S.train, d.train);
-  if (Array.isArray(d.thread)) S.thread = d.thread;
+  S.seenGuide = !!d.seenGuide;
+  if (Array.isArray(d.convos) && d.convos.length) {
+    S.convos = d.convos;
+    const open = S.convos.find(c => c.id === d.convoId) || S.convos[0];
+    S.convoId = open.id;
+    S.thread = open.thread || [];
+  } else if (Array.isArray(d.thread) && d.thread.length) {
+    //  Carry a pre-conversations save forward rather than discarding it.
+    S.convos = [{ id: cid(), title: titleFor(d.thread), at: Date.now(),
+                  thread: d.thread }];
+    S.convoId = S.convos[0].id;
+    S.thread = d.thread;
+  }
 }
 
 // ─── 4 · Boot ───────────────────────────────────────────────────────────────
@@ -289,10 +324,16 @@ async function boot() {
   }
 
   await restore();
+  if (!S.convos.length) {
+    S.convos = [{ id: cid(), title: 'New conversation', at: Date.now(), thread: [] }];
+    S.convoId = S.convos[0].id;
+    S.thread = S.convos[0].thread;
+  }
   buildRead();
   buildTrain();
-  renderThread();
+  renderAll();
   $('#boot').classList.add('gone');
+  if (!S.seenGuide) showGuide();
 
   const st = S.R.stats();
   status(`${nfmt(st.passages)} passages · ${nfmt(st.windows)} windows · `
@@ -312,6 +353,7 @@ function setDot(kind, label) {
   const d = $('#dot');
   d.className = kind || '';
   $('#engine-label').textContent = label;
+  try { weakNote(); } catch (e) {}
 }
 
 async function discover(extra) {
@@ -521,16 +563,153 @@ function buildPrompt(question, hits, opts) {
   return messages;
 }
 
+//  ── Conversations ─────────────────────────────────────────────
+
+function cid() { return 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+
+//  The first thing you said, trimmed. Better than "Conversation 4", and it is
+//  what you will actually recognise the thread by a week later.
+function titleFor(thread) {
+  const first = (thread || []).find(t => t.role === 'me');
+  if (!first) return 'New conversation';
+  const t = first.text.replace(/\s+/g, ' ').trim();
+  return t.length > 64 ? t.slice(0, 63) + '\u2026' : (t || 'New conversation');
+}
+
+function current() { return S.convos.find(c => c.id === S.convoId) || null; }
+
+//  S.thread is the live array the rest of the app appends to. This copies it
+//  back into the conversation record before anything is written to disk.
+function syncConvo() {
+  const c = current();
+  if (!c) return;
+  c.thread = S.thread;
+  const t = titleFor(S.thread);
+  //  Repaint only when the name actually changed, which is once per
+  //  conversation, rather than on every token of every answer.
+  const changed = c.title !== t;
+  c.title = t;
+  c.at = Date.now();
+  if (changed) { try { renderConvoBar(); } catch (e) {} }
+}
+
+function newConvo(focus) {
+  syncConvo();
+  //  Do not stack empty ones. Pressing New twice should not leave a trail of
+  //  blank conversations in the list.
+  const c = current();
+  if (c && !c.thread.length) { S.thread = []; renderAll(); return; }
+  const n = { id: cid(), title: 'New conversation', at: Date.now(), thread: [] };
+  S.convos.unshift(n);
+  S.convoId = n.id;
+  S.thread = n.thread;
+  renderAll();
+  persist();
+  if (focus !== false) setTimeout(() => $('#q').focus(), 20);
+}
+
+function openConvo(id) {
+  syncConvo();
+  const c = S.convos.find(x => x.id === id);
+  if (!c) return;
+  S.convoId = c.id;
+  S.thread = c.thread || (c.thread = []);
+  $('#convolist').classList.remove('on');
+  renderAll();
+  persist();
+}
+
+function deleteConvo(id) {
+  const i = S.convos.findIndex(c => c.id === id);
+  if (i < 0) return;
+  S.convos.splice(i, 1);
+  if (!S.convos.length) {
+    S.convos = [{ id: cid(), title: 'New conversation', at: Date.now(), thread: [] }];
+  }
+  const next = S.convos[Math.min(i, S.convos.length - 1)];
+  S.convoId = next.id;
+  S.thread = next.thread || (next.thread = []);
+  renderAll();
+  persist();
+}
+
+function ago(ms) {
+  const m = Math.round((Date.now() - ms) / 60000);
+  if (m < 1) return 'now';
+  if (m < 60) return m + 'm';
+  const h = Math.round(m / 60);
+  if (h < 24) return h + 'h';
+  return Math.round(h / 24) + 'd';
+}
+
+function renderConvoBar() {
+  const c = current();
+  $('#convo-title').textContent = c ? c.title : 'New conversation';
+  $('#convo-count').textContent = S.convos.length > 1
+    ? S.convos.length + ' conversations' : '';
+  $('#convo-del').style.display = (c && c.thread.length) ? '' : 'none';
+
+  const list = $('#convolist');
+  list.innerHTML = S.convos.map(x => `
+    <div class="crow ${x.id === S.convoId ? 'on' : ''}" data-c="${x.id}">
+      <b>${esc(x.title)}</b>
+      <span>${(x.thread || []).filter(t => t.role === 'me').length} asked</span>
+      <span>${ago(x.at)}</span>
+    </div>`).join('');
+  $$('.crow', list).forEach(r => { r.onclick = () => openConvo(r.dataset.c); });
+}
+
+function renderAll() {
+  renderConvoBar(); renderThread(); renderSources(lastHits);
+  try { weakNote(); } catch (e) {}
+}
+
+let lastHits = [];
+
+//  ── A word about the model actually answering ────────────────────
+//  Everything else in this app is bounded by which model is behind it, and a
+//  person running a two-year-old 8B has no way to know that is why the answers
+//  are thin. So the app says so, once, where it matters, rather than leaving
+//  it to be discovered.
+
+const WEAK = /^(llama3(\.[01])?|llama-?3|mistral|mixtral|gemma:|gemma2|phi3|phi-3|vicuna|orca|openhermes|zephyr|neural-chat|stablelm|tinyllama|qwen2(:|\b)|qwen:)/i;
+
+function weakNote() {
+  const el = $('#weak');
+  if (!el) return;
+  const m = S.engine && S.engine.model;
+  if (!m || S.engine.provider || !WEAK.test(shortModel(m))) {
+    el.classList.remove('on');
+    return;
+  }
+  el.classList.add('on');
+  el.innerHTML = `<b>${esc(shortModel(m))} is the ceiling here.</b>
+    Everything this app does is bounded by the model behind it, and that one is
+    a couple of generations old. Nothing else will make the answers sharper.
+    Two ways out, both on the Engine tab: run
+    <code id="weak-cmd">ollama pull qwen3:8b</code> in a terminal for something
+    the same size and much newer, or paste an API key for a frontier model.
+    <span style="color:var(--faint)">Click the command to copy it.</span>`;
+  const cmd = $('#weak-cmd');
+  if (cmd) cmd.onclick = () => copyText('ollama pull qwen3:8b', null);
+}
+
 function renderThread() {
   const el = $('#thread');
+  const keep = $('#weak');
   if (!S.thread.length) {
-    el.innerHTML = `<div class="empty" style="margin-top:14vh">
-      <b>Ask the corpus</b>
-      Every answer is built on passages actually found in the three books, and
-      the passages sit on the right so you can check the answer against them.<br><br>
-      Try: <em>what does the mirror do that a metaphor does not</em>,
-      or <em>continue this: The town did not grow by gathering.</em>
+    el.innerHTML = `<div class="empty" style="margin-top:9vh">
+      <b>Ask it anything</b>
+      It is a general assistant. Ask it about anything at all and it just
+      answers.<br><br>
+      When the question touches your books it searches them first and builds
+      the answer on what it finds, citing which passage it used. Those appear
+      on the right so you can check it.<br><br>
+      <em>what does the mirror do that a metaphor does not</em><br>
+      <em>continue this, in the same voice: The town did not grow by gathering.</em><br>
+      <em>where does the theory contradict itself</em>
     </div>`;
+    if (keep) el.insertBefore(keep, el.firstChild);
     $('#sources-list').innerHTML = '<div class="empty">Sources appear here once you ask something.</div>';
     return;
   }
@@ -556,6 +735,7 @@ function renderThread() {
         ${cites}${meta}
       </div>`;
   }).join('');
+  if (keep) el.insertBefore(keep, el.firstChild);
   el.scrollTop = el.scrollHeight;
 
   $$('.cite', el).forEach(c => {
@@ -605,11 +785,13 @@ async function ask() {
     const r = S.R.search(q, { limit: Math.max(S.gen.passages, 8) });
     found = r.hits;
     hits = relevant(r).slice(0, S.gen.passages);
-    renderSources(hits.length ? hits : found.slice(0, 3), hits.length === 0);
+    lastHits = hits.length ? hits : found.slice(0, 3);
+    renderSources(lastHits, hits.length === 0);
     status(null, hits.length
       ? `${hits.length} passage${hits.length === 1 ? '' : 's'} in context`
       : 'nothing in the books on this — answering from knowledge');
   } else {
+    lastHits = [];
     renderSources([]);
   }
 
@@ -689,6 +871,21 @@ $('#q').addEventListener('keydown', (e) => {
   else if (e.key === 'Enter' && !e.shiftKey && !e.altKey) { e.preventDefault(); ask(); }
 });
 $('#send').onclick = ask;
+$('#convo-new').onclick = () => newConvo();
+$('#convo-pick').onclick = () => {
+  const l = $('#convolist');
+  l.classList.toggle('on');
+  if (l.classList.contains('on')) renderConvoBar();
+};
+$('#convo-del').onclick = () => deleteConvo(S.convoId);
+$('#helpbtn').onclick = () => showGuide();
+$('#guide-x').onclick = () => {
+  $('#guide').classList.remove('on');
+  S.seenGuide = true;
+  persist();
+  setTimeout(() => $('#q').focus(), 30);
+};
+function showGuide() { $('#guide').classList.add('on'); }
 $('#halt').onclick = () => {
   if (S.stream) { S.stream.stop(); S.stream = null; }
   const last = S.thread[S.thread.length - 1];
@@ -1282,8 +1479,8 @@ function buildModel() {
   $('#m-eval').onclick = () => sheet('How the retrieval model was measured',
                                      evalHtml(S.R.stats().eval || {}));
   $('#m-wipe').onclick = () => {
-    S.thread = []; renderThread(); persist();
-    status(null, 'conversation cleared');
+    S.thread.length = 0; renderAll(); persist();
+    status(null, 'this conversation cleared');
   };
 }
 
@@ -1428,14 +1625,23 @@ function show(v) {
   $$('.view').forEach(s => s.classList.toggle('on', s.id === 'v-' + v));
   if (v === 'model') buildModel();
   if (v === 'train') buildTrain();
-  if (v === 'ask') setTimeout(() => $('#q').focus(), 30);
+  if (v === 'ask') { weakNote(); setTimeout(() => $('#q').focus(), 30); }
   if (v === 'read') setTimeout(() => $('#s').focus(), 30);
 }
 $$('nav button').forEach(b => { b.onclick = () => show(b.dataset.v); });
 
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
+    if ($('#guide').classList.contains('on')) { $('#guide-x').click(); return; }
     if ($('#sheet').classList.contains('on')) { $('#sheet').classList.remove('on'); return; }
+    if ($('#convolist').classList.contains('on')) {
+      $('#convolist').classList.remove('on'); return;
+    }
+  }
+  //  A new conversation is the one thing you reach for often enough to want a
+  //  key for.
+  if ((e.metaKey || e.ctrlKey) && e.key === 'n' && S.view === 'ask') {
+    e.preventDefault(); newConvo(); return;
   }
   if ((e.metaKey || e.ctrlKey) && e.key >= '1' && e.key <= '4') {
     e.preventDefault();
@@ -1451,6 +1657,7 @@ boot();
 
 //  For the test harness, and for anyone who wants to drive the retrieval
 //  model from the console.
-window.FC = { S, show, discover, ask, search: (q, o) => S.R.search(q, o) };
+window.FC = { S, show, discover, ask, newConvo, openConvo, deleteConvo, weakNote,
+              search: (q, o) => S.R.search(q, o) };
 
 })();

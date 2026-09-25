@@ -219,6 +219,60 @@ dl.kv dd{margin:0;color:var(--dim);}
 #sheet-head b{font:700 11px/1 var(--mono);letter-spacing:3px;text-transform:uppercase;
   color:var(--gold);}
 #sheet-body{overflow-y:auto;padding:20px 22px 26px;font-size:14.5px;line-height:1.78;}
+/* ── conversations ── */
+#convobar{display:flex;align-items:center;gap:9px;padding:9px 30px;
+  border-bottom:1px solid var(--line2);background:#0a0716;flex:0 0 auto;}
+#convo-pick{background:none;border:0;cursor:pointer;display:flex;align-items:center;
+  gap:7px;padding:5px 9px;color:var(--ink);font:13px/1.3 var(--serif);
+  max-width:400px;}
+#convo-pick:hover{background:rgba(255,255,255,.05);}
+#convo-pick span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+#convo-pick i{font-style:normal;color:var(--faint);font-size:10px;}
+#convo-count{margin-left:auto;font:9px/1 var(--mono);letter-spacing:1.6px;
+  color:var(--faint);}
+#convolist{display:none;max-height:44%;overflow-y:auto;background:#0d0a1c;
+  border-bottom:1px solid var(--line);flex:0 0 auto;}
+#convolist.on{display:block;}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 30px;cursor:pointer;
+  border-bottom:1px solid var(--line2);}
+.crow:hover{background:rgba(255,255,255,.04);}
+.crow.on{background:rgba(255,198,90,.08);}
+.crow b{font:400 13px/1.4 var(--serif);flex:1;overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap;}
+.crow.on b{color:var(--gold);}
+.crow span{font:9px/1 var(--mono);letter-spacing:1.2px;color:var(--faint);}
+
+/* ── help ── */
+#helpbtn{margin-left:auto;background:none;border:1px solid var(--line);
+  width:24px;height:24px;border-radius:50%;cursor:pointer;color:var(--faint);
+  font:11px/1 var(--mono);transition:.15s;}
+#helpbtn:hover{border-color:var(--gold);color:var(--gold);}
+#engine{margin-left:12px;}
+
+/* ── first run ── */
+#guide{position:fixed;inset:0;display:none;place-items:center;z-index:80;
+  background:radial-gradient(ellipse at 50% 40%,#1a1030,#05030c 76%);padding:34px;}
+#guide.on{display:grid;}
+#guide-card{width:min(860px,100%);max-height:88vh;overflow-y:auto;text-align:left;}
+#guide-card>b{display:block;font:700 19px/1 var(--mono);letter-spacing:8px;
+  color:var(--gold);margin-bottom:18px;}
+#guide-card p.lede{font-size:15px;line-height:1.85;color:var(--dim);
+  max-width:74ch;margin:0 0 22px;}
+#guide-card p.lede b{color:var(--ink);}
+.gtabs{display:grid;grid-template-columns:1fr 1fr;gap:20px 30px;margin-bottom:8px;}
+.gtabs h5{margin:0 0 7px;font:700 10px/1 var(--mono);letter-spacing:3.4px;
+  text-transform:uppercase;color:var(--gold);}
+.gtabs p{margin:0;font-size:13.5px;line-height:1.75;color:var(--dim);}
+.grule{height:1px;background:var(--line2);margin:22px 0;}
+
+/* ── the nudge ── */
+#weak{margin:0 30px 14px;border-left:2px solid var(--amber);padding:11px 15px;
+  background:rgba(255,154,61,.07);font-size:13px;line-height:1.7;color:var(--dim);
+  display:none;}
+#weak.on{display:block;}
+#weak b{color:var(--amber);}
+#weak code{cursor:pointer;}
+
 #boot{position:fixed;inset:0;display:grid;place-items:center;background:var(--bg);
   z-index:99;text-align:center;}
 #boot.gone{display:none;}
@@ -238,6 +292,7 @@ dl.kv dd{margin:0;color:var(--dim);}
       <button data-v="train">Train</button>
       <button data-v="model">Engine</button>
     </nav>
+    <button id="helpbtn" title="What the tabs do">?</button>
     <div id="engine"><span id="dot"></span><span id="engine-label">no engine</span></div>
   </div>
 
@@ -245,10 +300,17 @@ dl.kv dd{margin:0;color:var(--dim);}
     <!-- ── ASK ── -->
     <section class="view on" id="v-ask">
       <div style="display:flex;flex-direction:column;overflow:hidden">
-        <div id="thread"></div>
+        <div id="convobar">
+          <button class="btn sm" id="convo-new">+ New</button>
+          <button id="convo-pick"><span id="convo-title">New conversation</span><i>▾</i></button>
+          <span id="convo-count"></span>
+          <button class="btn sm" id="convo-del" title="Delete this conversation">Delete</button>
+        </div>
+        <div id="convolist"></div>
+        <div id="thread"><div id="weak"></div></div>
         <div id="compose">
           <div class="row">
-            <textarea id="q" rows="1" placeholder="Ask the corpus something, or give it a line to continue…"></textarea>
+            <textarea id="q" rows="1" placeholder="Ask anything. It searches your books when the question touches them."></textarea>
             <button class="btn go" id="send">Ask</button>
             <button class="btn" id="halt" style="display:none">Stop</button>
           </div>
@@ -310,6 +372,33 @@ dl.kv dd{margin:0;color:var(--dim);}
   <div id="sheet-head"><b id="sheet-title">·</b>
     <button class="btn sm" id="sheet-x" style="margin-left:auto">Close</button></div>
   <div id="sheet-body"></div>
+</div></div>
+
+<div id="guide"><div id="guide-card">
+  <b>FRACTURECORE</b>
+  <p class="lede">Your three books, plus whatever model is running on this Mac.
+  Four tabs, and they do quite different things.</p>
+  <div class="gtabs">
+    <div><h5>Ask</h5><p>A conversation. Before it answers, it searches the books
+      and hands the model whatever is actually relevant, so an answer about your
+      work is built on your words and cites which passage it used. Ask it
+      anything else too, and it just answers.</p></div>
+    <div><h5>Read</h5><p>The search on its own, no model needed. Describe a
+      passage and it finds it. Switch to phrase mode for every single place an
+      exact wording appears across all three books.</p></div>
+    <div><h5>Train</h5><p>Making a model that writes in your voice. It cannot
+      run that itself, so it picks the right one for this Mac, writes the exact
+      commands, and tests the result against the untrained model at the end.</p></div>
+    <div><h5>Engine</h5><p>Which model answers. This is the tab that decides how
+      smart everything else feels.</p></div>
+  </div>
+  <div class="grule"></div>
+  <p class="lede"><b>The one thing worth knowing:</b> this app has no
+  intelligence of its own. The search inside it knows where everything in your
+  books is and cannot write a sentence. Every written answer comes from a model
+  running outside it. If the answers seem thick, the Engine tab is where that
+  is fixed, not here.</p>
+  <button class="btn go" id="guide-x">Start</button>
 </div></div>
 
 <div id="boot"><div><b>FRACTURECORE</b><span id="boot-msg">loading the corpus…</span></div></div>
