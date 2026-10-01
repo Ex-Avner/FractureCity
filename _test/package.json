@@ -1,0 +1,23 @@
+{
+  "name": "present-palm-tests",
+  "version": "0.2.0",
+  "private": true,
+  "description": "Verification harness for the Present Palm ecosystem.",
+  "scripts": {
+    "boot": "node boot.js",
+    "selftest": "node selftest.js",
+    "mesher": "node mesher-golden.js",
+    "mesher:record": "node mesher-golden.js --record",
+    "web": "node webbuild.js",
+    "persist:browser": "node persist-browser.js",
+    "persist:shell": "node persist-shell.js",
+    "compare": "node compare.js",
+    "test": "node boot.js && node mesher-golden.js && node persist-browser.js",
+    "campaign": "node campaign-flow.test.js",
+    "city-visual": "node city-rounded.test.js",
+    "city-grounding": "node city-grounding.test.js"
+  },
+  "devDependencies": {
+    "playwright": "^1.47.0"
+  }
+}

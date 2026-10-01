@@ -1,0 +1,11 @@
+--- "a/apps/fracture-city-game/index.html"	2026-09-18 21:23:10.086489806 -0700
++++ b/apps/fracture-city-game/index.html	2026-09-18 22:16:06.942355382 -0700
+@@ -25668,7 +25668,7 @@
+ // =============================================================================
+ 
+ // ─── The front door ─────────────────────────────────────────────────────────
+-const SH_VERSION = '0.32.0';
++const SH_VERSION = '0.33.0';
+ 
+ (function(){
+   if (typeof shFrontHome !== 'function') return;

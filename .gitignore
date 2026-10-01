@@ -35,3 +35,19 @@ _build/webbeta-dist/
 # python bytecode from the FractureCore trainer
 __pycache__/
 *.pyc
+
+# Holding pen for files the desktop bridge could not delete, anywhere.
+_to_delete/
+
+# Point-in-time safety snapshots (tarballs of source and saves).
+_build/snapshot-*/
+
+# Screenshots and scratch the test harness writes.
+_test/out/
+
+# Pre-release copies of a game file, kept beside it until the release is committed.
+apps/*/index.v*-backup.html
+!apps/fracture-city-game/index.v0.2.0-backup.html
+
+# Applied patch sources for a single app; the result lives in index.html.
+apps/*/_patches/

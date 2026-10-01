@@ -258,6 +258,24 @@ def main():
             print(f'  (could not clear {OUT}: {e.strerror}; overwriting in place)')
     os.makedirs(os.path.join(OUT, 'shared', 'vendor'), exist_ok=True)
     open(os.path.join(OUT, 'index.html'), 'w', encoding='utf-8').write(html)
+
+    #  Whatever local modules the page asks for, ship them. The deploy used to
+    #  be one HTML file plus three.js by assumption, so the first sibling module
+    #  the game loaded would have 404'd in the deploy and nowhere else — the
+    #  same shape of failure as the arcade in section 64. Following the page
+    #  rather than a hand-kept list means nobody has to remember this again.
+    #  _test/webbuild.js fails the build if a script tag has no file behind it.
+    app_dir = os.path.dirname(GAME)
+    for src in re.findall(r'<script[^>]+src="([^"]+)"', html):
+        if src.startswith(('http://', 'https://')) or src.startswith('shared/'):
+            continue
+        src_path = os.path.normpath(os.path.join(app_dir, src))
+        dst_path = os.path.normpath(os.path.join(OUT, src))
+        if not os.path.isfile(src_path):
+            sys.exit(f'! index.html loads {src} and there is no file at {src_path}')
+        os.makedirs(os.path.dirname(dst_path), exist_ok=True)
+        shutil.copy2(src_path, dst_path)
+        print(f'  + {src}')
     shutil.copy2(VENDOR, os.path.join(OUT, 'shared', 'vendor', 'three.min.js'))
     open(os.path.join(OUT, '_headers'), 'w').write(build_headers(args.key, args.host))
     open(os.path.join(OUT, '_redirects'), 'w').write(REDIRECTS)

@@ -259,10 +259,10 @@ canvas{display:block;}
 /* Scan lines — entire screen, very subtle */
 #fx-scanlines{position:fixed;inset:0;pointer-events:none;z-index:9;
   background:repeating-linear-gradient(0deg,transparent 0 2px,rgba(0,0,0,.18) 2px 3px);
-  mix-blend-mode:multiply;opacity:.45;}
+  mix-blend-mode:multiply;opacity:0;}
 /* Vignette — darker corners */
 #fx-vignette{position:fixed;inset:0;pointer-events:none;z-index:9;
-  background:radial-gradient(ellipse at center,transparent 45%,rgba(0,0,0,.55) 100%);}
+  background:radial-gradient(ellipse at center,transparent 45%,rgba(0,0,0,.25) 100%);}
 /* Chromatic aberration at the edges */
 #fx-chroma{position:fixed;inset:0;pointer-events:none;z-index:9;
   background:radial-gradient(ellipse at center,transparent 50%,rgba(255,60,120,.06) 88%,rgba(60,180,255,.08) 100%);
@@ -1391,6 +1391,9 @@ body.in-intro #hud-peace{opacity:0;}
 </div>
 
 <script src="../../shared/vendor/three.min.js"></script>
+<script src="campaign-guide.js"></script>
+<script src="city-rounded.js"></script>
+<script src="city-grounding.js"></script>
 <script>
 //  If the vendored copy is not there, fall back to the CDN before anything
 //  else parses. document.write is the one pattern that still blocks the parser
@@ -1980,8 +1983,8 @@ function initCache(){
   // Geometries
   G.unitBox = new THREE.BoxGeometry(1, 1, 1);
   G.unitPlane = new THREE.PlaneGeometry(1, 1);
-  G.unitCyl = new THREE.CylinderGeometry(0.5, 0.5, 1, 8);
-  G.unitSphere = new THREE.SphereGeometry(0.5, 8, 6);
+  G.unitCyl = new THREE.CylinderGeometry(0.5, 0.5, 1, 16);
+  G.unitSphere = new THREE.SphereGeometry(0.5, 16, 12);
   // ── Voxel materials. Colour rides on the vertex attribute, so the whole
   // blocky world needs only these two — roughly 2 draw calls per section.
   M.voxOpaque = new THREE.MeshLambertMaterial({ vertexColors: true });
@@ -1991,8 +1994,8 @@ function initCache(){
   M.sidewalk  = new THREE.MeshLambertMaterial({ color: 0x4b4252 });
   M.crossLine = new THREE.MeshBasicMaterial({ color: 0xb0a060 });
   M.roof      = new THREE.MeshLambertMaterial({ color: 0x373040 });
-  M.metal     = new THREE.MeshLambertMaterial({ color: 0x767688 });
-  M.darkMetal = new THREE.MeshLambertMaterial({ color: 0x322c3c });
+  M.metal     = new THREE.MeshStandardMaterial({ color: 0x767688, roughness: .38, metalness: .65 });
+  M.darkMetal = new THREE.MeshStandardMaterial({ color: 0x322c3c, roughness: .55, metalness: .35 });
   M.trashBag  = new THREE.MeshLambertMaterial({ color: 0x1a1a18 });
   M.trashBag2 = new THREE.MeshLambertMaterial({ color: 0x281c1c });
   M.foliage   = new THREE.MeshLambertMaterial({ color: 0x3a5a40 });
@@ -2431,7 +2434,7 @@ class Chunk {
     this.placeSidewalkDetails(blockBuildings, district);
 
     // ── Plants ──────────────────────────────────────────────────────────────
-    this.placePlants(district, blockBuildings);
+    // Street fixtures are owned by cityBuildStreet; the retired plant pass was removed.
 
     // ── Parked cars on adjacent street ──────────────────────────────────────
     const carRoll = rng.next();
@@ -2723,7 +2726,7 @@ class Chunk {
     if (rng.bool(0.20)){
       const pipeFace = rng.int(0, 3);
       const pipeR = 0.12;
-      const pipe = makeBoxMesh(pipeR, b.h * 0.8, pipeR, M.metal);
+      const pipe = cityPole(pipeR, b.h * 0.8, pipeR, M.metal);
       let px = b.cx, pz = b.cz;
       switch (pipeFace){
         case 0: px = b.cx + b.w/2 - 0.3; pz = b.cz + rng.range(-b.d/4, b.d/4); break;
@@ -2737,248 +2740,13 @@ class Chunk {
   }
 
   placeSidewalkDetails(buildings, district){
-    const rng = this.rng;
-    const wx = this.worldX, wz = this.worldZ;
-    const blockHalf = CITY_BLOCK_SIZE/2 - 0.6;
-
-    // Helper — get a position near the block edge on the sidewalk
-    const sidewalkSpot = () => {
-      const edge = rng.int(0, 3);
-      const along = rng.range(-blockHalf + 1, blockHalf - 1);
-      switch (edge){
-        case 0: return { x: wx + along, z: wz - blockHalf, edgeRot: 0 };
-        case 1: return { x: wx + blockHalf, z: wz + along, edgeRot: -Math.PI/2 };
-        case 2: return { x: wx + along, z: wz + blockHalf, edgeRot: Math.PI };
-        case 3: return { x: wx - blockHalf, z: wz + along, edgeRot: Math.PI/2 };
-      }
-    };
-
-    // Streetlights on 2 opposite corners (cut from 4 for perf)
-    const cornerStart = rng.int(0, 1); // alternate corner pair
-    for (let cidx = 0; cidx < 2; cidx++){
-      const corner = cornerStart + cidx * 2; // 0,2 or 1,3
-      const cs = [-1, 1];
-      const xSign = cs[corner % 2];
-      const zSign = cs[Math.floor(corner / 2)];
-      const sx = wx + xSign * (CITY_BLOCK_SIZE/2 + STREET_WIDTH * 0.05);
-      const sz = wz + zSign * (CITY_BLOCK_SIZE/2 + STREET_WIDTH * 0.05);
-      // Pole
-      const pole = makeBoxMesh(0.18, 5.5, 0.18, M.metal);
-      pole.position.set(sx, 2.75, sz);
-      this.group.add(pole);
-      // Lamp arm
-      const arm = makeBoxMesh(1.0, 0.12, 0.12, M.metal);
-      arm.position.set(sx - xSign * 0.5, 5.4, sz);
-      this.group.add(arm);
-      // Lamp head
-      const lampColor = rng.pick([0xfff0c8, 0xffe8a0, 0xfffacd, 0xffd47a]);
-      const lampMat = makeNeonMat(lampColor);
-      const lamp = makeBoxMesh(0.4, 0.18, 0.4, lampMat);
-      lamp.position.set(sx - xSign * 1.0, 5.3, sz);
-      this.group.add(lamp);
-      // Light
-      const ll = new THREE.PointLight(lampColor, 0.8, 11);
-      ll.position.set(sx - xSign * 1.0, 5.0, sz);
-      ll.visible = false; // toggled
-      this.group.add(ll);
-      this.lights.push(ll);
-    }
-
-    // Vending machines
-    if (rng.next() < 0.20){
-      const count = 1;
-      for (let i = 0; i < count; i++){
-        const p = sidewalkSpot();
-        const vmColor = rng.pick([0xff3050, 0x3050ff, 0x30c050, 0xffae50, 0xff60d0]);
-        const vm = new THREE.Group();
-        // Body
-        const body = makeBoxMesh(0.9, 1.8, 0.6, new THREE.MeshStandardMaterial({ color: vmColor, roughness: 0.5 }));
-        body.position.y = 0.9;
-        vm.add(body);
-        // Screen / panel (lit)
-        const panel = makeBoxMesh(0.7, 0.6, 0.05, makeNeonMat(0xffffd0));
-        panel.position.set(0, 1.4, 0.31);
-        vm.add(panel);
-        // Logo strip
-        const logo = makeBoxMesh(0.7, 0.15, 0.05, makeNeonMat(0xffffff));
-        logo.position.set(0, 0.4, 0.31);
-        vm.add(logo);
-        vm.position.set(p.x, 0.2, p.z);
-        vm.rotation.y = p.edgeRot + Math.PI; // face into the block
-        this.group.add(vm);
-      }
-    }
-
-    // Trash piles / dumpsters
-    if (rng.next() < district.trashProb * 0.5){
-      const t = rng.next();
-      if (t < 0.5){
-        // Dumpster
-        const p = sidewalkSpot();
-        const dumpColor = rng.pick([0x2a4a2a, 0x4a2a2a, 0x2a3a4a, 0x4a4a2a]);
-        const dump = makeBoxMesh(2.0, 1.1, 1.2,
-          new THREE.MeshStandardMaterial({ color: dumpColor, roughness: 0.85 }));
-        dump.position.set(p.x, 0.55, p.z);
-        dump.rotation.y = p.edgeRot;
-        this.group.add(dump);
-        // Lid (slightly tilted up)
-        const lid = makeBoxMesh(2.0, 0.08, 1.2, M.metal);
-        lid.position.set(p.x, 1.15, p.z);
-        lid.rotation.y = p.edgeRot;
-        lid.rotation.x = -0.1;
-        this.group.add(lid);
-      } else {
-        // Trash bag pile
-        const p = sidewalkSpot();
-        const bagCount = rng.int(2, 5);
-        for (let i = 0; i < bagCount; i++){
-          const bag = new THREE.Mesh(G.unitSphere, rng.bool() ? M.trashBag : M.trashBag2);
-          const bagS = rng.range(0.4, 0.7);
-          bag.scale.set(bagS, bagS * 0.7, bagS);
-          bag.position.set(
-            p.x + rng.range(-0.4, 0.4),
-            bagS * 0.35,
-            p.z + rng.range(-0.4, 0.4)
-          );
-          this.group.add(bag);
-        }
-      }
-    }
-
-    // Newspaper boxes / mailbox-like
-    if (rng.next() < 0.15){
-      const p = sidewalkSpot();
-      const nb = makeBoxMesh(0.5, 1.1, 0.35,
-        new THREE.MeshStandardMaterial({ color: rng.pick([0x4a3030, 0x303a4a, 0x3a3030]), roughness: 0.6 }));
-      nb.position.set(p.x, 0.55, p.z);
-      this.group.add(nb);
-    }
-
-    // Bench
-    if (rng.next() < 0.12){
-      const p = sidewalkSpot();
-      const bench = new THREE.Group();
-      const seat = makeBoxMesh(1.8, 0.1, 0.4, M.darkMetal);
-      seat.position.y = 0.5;
-      bench.add(seat);
-      const back = makeBoxMesh(1.8, 0.6, 0.08, M.darkMetal);
-      back.position.set(0, 0.8, -0.16);
-      bench.add(back);
-      // Legs
-      [-0.7, 0.7].forEach(lx => {
-        const leg = makeBoxMesh(0.08, 0.5, 0.4, M.metal);
-        leg.position.set(lx, 0.25, 0);
-        bench.add(leg);
-      });
-      bench.position.set(p.x, 0.2, p.z);
-      bench.rotation.y = p.edgeRot;
-      this.group.add(bench);
-    }
-
-    // Construction barrier (orange & white striped barrier)
-    if (rng.next() < 0.10){
-      const p = sidewalkSpot();
-      const barrier = new THREE.Group();
-      const baseB = makeBoxMesh(1.4, 0.25, 0.5,
-        new THREE.MeshStandardMaterial({ color: 0xc04020, roughness: 0.8 }));
-      baseB.position.y = 0.125;
-      barrier.add(baseB);
-      const stripe = makeBoxMesh(1.4, 0.06, 0.51, makeNeonMat(0xffffff));
-      stripe.position.y = 0.20;
-      barrier.add(stripe);
-      barrier.position.set(p.x, 0.2, p.z);
-      barrier.rotation.y = p.edgeRot;
-      this.group.add(barrier);
-    }
-  }
-
-  placePlants(district, buildings){
-    const rng = this.rng;
-    const wx = this.worldX, wz = this.worldZ;
-    const blockHalf = CITY_BLOCK_SIZE/2 - 0.6;
-
-    // Trees scattered around the sidewalk edge (capped at 2)
-    const treeCount = Math.min(2, Math.floor(rng.range(0, district.treeProb * 4)));
-    for (let i = 0; i < treeCount; i++){
-      const edge = rng.int(0, 3);
-      const along = rng.range(-blockHalf + 1.2, blockHalf - 1.2);
-      let tx, tz;
-      switch (edge){
-        case 0: tx = wx + along; tz = wz - blockHalf + 0.5; break;
-        case 1: tx = wx + blockHalf - 0.5; tz = wz + along; break;
-        case 2: tx = wx + along; tz = wz + blockHalf - 0.5; break;
-        case 3: tx = wx - blockHalf + 0.5; tz = wz + along; break;
-      }
-      // Trunk
-      const trunkH = rng.range(2.5, 4.2);
-      const trunk = makeBoxMesh(0.25, trunkH, 0.25, M.bark);
-      trunk.position.set(tx, trunkH/2 + 0.2, tz);
-      this.group.add(trunk);
-      // Foliage — 3-5 cubes stacked
-      const isExotic = rng.bool(0.2); // 20% neon plants
-      const foliageMat = isExotic
-        ? makeNeonMat(rng.pick([0x7dffb3, 0x80ffff, 0xff60d0]))
-        : (rng.bool() ? M.foliage : M.foliageDk);
-      const fSize = rng.range(1.3, 2.2);
-      const foliage = makeBoxMesh(fSize, fSize * 0.8, fSize, foliageMat);
-      foliage.position.set(tx, 0.2 + trunkH + fSize * 0.3, tz);
-      this.group.add(foliage);
-      // Add a smaller foliage cube on top
-      const top = makeBoxMesh(fSize * 0.7, fSize * 0.5, fSize * 0.7, foliageMat);
-      top.position.set(tx, 0.2 + trunkH + fSize * 0.95, tz);
-      this.group.add(top);
-      // Exotic plants get a soft glow light
-      if (isExotic){
-        const exoticC = foliageMat.color.getHex();
-        const exoticL = new THREE.PointLight(exoticC, 0.6, 4);
-        exoticL.position.set(tx, 0.2 + trunkH + fSize * 0.5, tz);
-        exoticL.visible = false;
-        this.group.add(exoticL);
-        this.lights.push(exoticL);
-      }
-    }
-
-    // Planters (low rectangles with green tops)
-    if (rng.next() < district.treeProb * 1.5){
-      const count = rng.int(1, 3);
-      for (let i = 0; i < count; i++){
-        const edge = rng.int(0, 3);
-        const along = rng.range(-blockHalf + 1, blockHalf - 1);
-        let px, pz;
-        switch (edge){
-          case 0: px = wx + along; pz = wz - blockHalf + 0.3; break;
-          case 1: px = wx + blockHalf - 0.3; pz = wz + along; break;
-          case 2: px = wx + along; pz = wz + blockHalf - 0.3; break;
-          case 3: px = wx - blockHalf + 0.3; pz = wz + along; break;
-        }
-        // Planter box
-        const planter = makeBoxMesh(1.2, 0.5, 0.5,
-          new THREE.MeshStandardMaterial({ color: 0x3a2618, roughness: 0.9 }));
-        planter.position.set(px, 0.45, pz);
-        this.group.add(planter);
-        // Green fill
-        const fill = makeBoxMesh(1.0, 0.4, 0.35, M.foliage);
-        fill.position.set(px, 0.85, pz);
-        this.group.add(fill);
-        // Sprouts
-        const sproutCount = rng.int(2, 5);
-        for (let j = 0; j < sproutCount; j++){
-          const sprout = makeBoxMesh(0.08, rng.range(0.3, 0.8), 0.08, M.foliageDk);
-          sprout.position.set(
-            px + rng.range(-0.4, 0.4),
-            0.85 + sprout.scale.y/2 + 0.1,
-            pz + rng.range(-0.15, 0.15)
-          );
-          this.group.add(sprout);
-        }
-      }
-    }
+    cityBuildStreet(this);
   }
 
   makeTerminal(x, z){
     const group = new THREE.Group();
     // Body
-    const body = makeBoxMesh(1.0, 2.2, 0.6, new THREE.MeshStandardMaterial({ color: 0x14101c, roughness: 0.7 }));
+    const body = cityRoundMesh(1.0, 2.2, 0.6, new THREE.MeshStandardMaterial({ color: 0x14101c, roughness: 0.7 }));
     body.position.y = 1.1;
     group.add(body);
     // Screen — cyan glow
@@ -3016,13 +2784,13 @@ class Chunk {
     const color = rng.pick(CAR_COLORS);
     const group = new THREE.Group();
     // Body
-    const body = makeBoxMesh(2.0, 0.6, 4.0,
+    const body = cityRoundMesh(2.0, 0.6, 4.0,
       new THREE.MeshStandardMaterial({ color, roughness: 0.5, metalness: 0.4 }));
     body.position.y = 0.6;
     group.add(body);
     // Cabin
     const cabinColor = Math.floor(color * 0.5);
-    const cabin = makeBoxMesh(1.8, 0.7, 2.4,
+    const cabin = cityRoundMesh(1.8, 0.7, 2.4,
       new THREE.MeshStandardMaterial({ color: cabinColor, roughness: 0.4 }));
     cabin.position.set(0, 1.25, -0.2);
     group.add(cabin);
@@ -3182,12 +2950,12 @@ class MobileCar {
     // Build voxel car (same as parked car)
     const color = rng.pick(CAR_COLORS);
     this.group = new THREE.Group();
-    const body = makeBoxMesh(2.0, 0.6, 4.0,
+    const body = cityRoundMesh(2.0, 0.6, 4.0,
       new THREE.MeshStandardMaterial({ color, roughness: 0.5, metalness: 0.4 }));
     body.position.y = 0.6;
     this.group.add(body);
     const cabinColor = Math.floor(color * 0.5);
-    const cabin = makeBoxMesh(1.8, 0.7, 2.4,
+    const cabin = cityRoundMesh(1.8, 0.7, 2.4,
       new THREE.MeshStandardMaterial({ color: cabinColor, roughness: 0.4 }));
     cabin.position.set(0, 1.25, -0.2);
     this.group.add(cabin);
@@ -4096,7 +3864,10 @@ function updateWalkPhysics(dt){
 
   let nf = feet + Player.velocity.y * dt;
   if (Player.velocity.y <= 0){
-    if (blockedAt(p.x, nf, p.z, r, h)){
+    const propTop = cityLandingTop(p.x,p.z,r,feet,nf);
+    if (propTop !== null){
+      nf = propTop; Player.velocity.y = 0; Player.onGround = true;
+    } else if (blockedAt(p.x, nf, p.z, r, h)){
       nf = Math.floor(nf) + 1;              // land on the block top
       Player.velocity.y = 0;
       Player.onGround = true;
@@ -5013,7 +4784,7 @@ function tick(){
   shTickDialogue(dt);
   // The cold open drives the camera and draws its own frames; the sim must
   // not fight it for control of either.
-  if (State.ui.inIntro){ requestAnimationFrame(tick); return; }
+  if (State.ui.inIntro) return; // The next frame was already requested above.
   if (!State.ui.paused && !State.ui.inMiniGame && !State.ui.inShiftPanel &&
       !State.ui.inInventory && !State.ui.inDialogue && !State.ui.inArcade){
     State.hud.playTime += dt;
@@ -6110,7 +5881,7 @@ Chunk.prototype.generateLandmark = function(spec){
 
   // A pair of streetlights on the crossroads corners so the core reads at night
   for (const [sx, sz] of [[wx - half - 1, wz - half - 1], [wx + half + 1, wz + half + 1]]){
-    const pole = makeBoxMesh(0.18, 5.5, 0.18, M.metal);
+    const pole = cityPole(0.18, 5.5, 0.18, M.metal);
     pole.position.set(sx, SH_STREET_Y + 2.75, sz);
     this.group.add(pole);
     const lampMat = makeNeonMat(0xffe8a0);
@@ -6237,6 +6008,13 @@ function shBuildFCN(chunk, wx, wz, rng){
   chunk.stampBox(wx - 2, 12, wz - 2, wx + 2, 38, wz + 2, B_METAL);
   chunk.stampBox(wx - 1, 38, wz - 1, wx + 1, 42, wz + 1, B_NEON);
 
+  // An accessible observation deck makes the anniversary a place to visit,
+  // rather than an altitude players have to reach by climbing the antenna.
+  chunk.stampBox(wx - 4, 21, wz - 4, wx + 4, 22, wz + 4, B_METAL);
+  for (const edge of [-4, 3]){
+    chunk.stampBox(wx + edge, 22, wz - 4, wx + edge + 1, 23, wz + 4, B_METAL);
+    chunk.stampBox(wx - 4, 22, wz + edge, wx + 4, 23, wz + edge + 1, B_METAL);
+  }
   // Entrance recess on the east face
   const ex = wx + W/2;
   chunk.stampBox(ex - 4, 2, wz - 2, ex, 6, wz + 2, B_AIR);
@@ -6479,7 +6257,6 @@ function shRefreshProject(){
 function shOpenPanel(id){
   if (id && id.startsWith('cab:')){ shPlayCabinet(id.slice(4)); return; }
   Shift.panel = id;
-  shCampaignEvent('panel', id);
   State.ui.inShiftPanel = true;
   document.exitPointerLock();
   document.body.style.cursor = 'auto';
@@ -6497,6 +6274,7 @@ function shOpenPanel(id){
   //  a news ticker stapled to a wardrobe.
   if (id === 'fcn'){ shBindWire(); shMountCrawl(); }
   else shUnmountCrawl();
+  shCampaignEvent('panel', id);
 }
 
 function shClosePanel(){
@@ -6525,6 +6303,7 @@ function shRenderPanel(){
   else if (id.startsWith('echo-')) body.innerHTML = shPanelEcho(id);
   else if (id === 'hold')    { card.classList.add('ink','wide'); body.innerHTML = shRenderHold(); }
   else if (id === 'armoury') body.innerHTML = shPanelArmoury();
+  else if (id === 'casebook') body.innerHTML = shCampaignCasebook();
   else {
     // An id nothing claims used to fall straight through, leaving whatever the
     // last panel rendered on screen — so asking for a panel that does not exist
@@ -6705,6 +6484,8 @@ function shPanelProject(){
 
 // ─── 3. FCN ─────────────────────────────────────────────────────────────────
 function shPanelFCN(){
+  const story = shCampaignPanel('fcn');
+  if (story) return story;
   const news = SH_NEWS[Shift.profile.interests[0]] || SH_NEWS.world;
   return `
     <p class="sh-kicker">${news.label}</p>
@@ -6816,6 +6597,8 @@ function shPanelBureau(){
 
 // ─── 5. The Residue Room ────────────────────────────────────────────────────
 function shPanelClub(){
+  const story = shCampaignPanel('club');
+  if (story) return story;
   const list = Shift.residue.length
     ? Shift.residue.map(r => `<div class="sh-residue-item">${shEsc(r.body)}
         <small>${shEsc(r.displayName)} ${shEsc(r.handle)} · ${r.actionCount||0} field action${(r.actionCount||0)===1?'':'s'} · ${r.kind||'sentence'}</small>
@@ -6860,6 +6643,8 @@ function shPanelValeWitness(){
 }
 
 function shPanelEcho(id){
+  const story = shCampaignPanel(id);
+  if (story) return story;
   if (id === 'echo-rook' && typeof Campaign !== 'undefined' && Campaign.active &&
       shChapter() && shChapter().id === 'evening') return shPanelValeWitness();
   const slot = SH_ECHO_IDS.indexOf(id);
@@ -6953,6 +6738,16 @@ function shBindPanels(){
         shBuy(el.dataset.id);
         return;
 
+      case 'campaign-file':
+        shClosePanel(); shCampaignEvent('evidence', val); return;
+      case 'campaign-street':
+        shClosePanel(); shCampaignStreet(); return;
+      case 'campaign-roof':
+        shClosePanel(); shCampaignRoof(); return;
+      case 'campaign-journal':
+        shOpenPanel('casebook'); return;
+      case 'campaign-listen':
+        shClosePanel(); shCampaignEvent('echo', 'echo-mara'); return;
       case 'case-witness':
         shClosePanel();
         shCampaignEvent('witness');
@@ -7083,6 +6878,7 @@ function holdSave(){
   };
   Shift.holdSaved = payload;
   window.fracture.save('hold-run', payload);
+  shCampaignCheckpointSoon();
 }
 
 function holdEnding(){
@@ -7904,6 +7700,7 @@ function shBakeParts(parts, emit){
   for (const p of parts){
     if (!!p.emit !== !!emit) continue;
     c.setHex(p.color);
+    if (p.round || p.organic){ base += cityBakeRoundedPart(p,pos,nrm,col,idx,base,c); continue; }
     const cy = Math.cos(p.ry || 0), sy = Math.sin(p.ry || 0);
     const cx = Math.cos(p.rx || 0), sx = Math.sin(p.rx || 0);
     for (const f of CUBE_FACES){
@@ -8072,6 +7869,7 @@ function shBuildCharacter(arch, rng, cfg){
   }
 
   // ── Bake ──────────────────────────────────────────────────────────────────
+  citySoftenResident({body,headP,armLP,armRP,legLP,legRP});
   const bodySolid = shBakeParts(body, false);
   if (bodySolid) g.add(new THREE.Mesh(bodySolid, CHAR_BODY_MAT()));
   const bodyGlow = shBakeParts(body, true);
@@ -9256,283 +9054,8 @@ function shUpdateFires(dt){
 
 // ─── Static clutter, described then baked ───────────────────────────────────
 function shStreetDetail(chunk, buildings, district){
-  const rng = chunk.rng;
-  const base = DETAIL_MIX[district.name] || DETAIL_MIX.DOWNTOWN;
-  // Density scales with the player's detail setting rather than being fixed
-  const mix = {};
-  for (const k in base) mix[k] = Math.min(0.98, base[k] * LOOK.detail);
-  const wx = chunk.worldX, wz = chunk.worldZ;
-  const half = CITY_BLOCK_SIZE / 2;
-  const parts = [];
-  const P = (w, h, d, x, y, z, color, emit) => parts.push({ w, h, d, x, y, z, color, emit });
-
-  // A point on the pavement ring around the block
-  const edge = () => {
-    const side = rng.int(0, 3);
-    const along = rng.range(-half + 1.5, half - 1.5);
-    const off = half - 0.45;   // the pavement ring between the block edge and the kerb
-    if (side === 0) return { x: wx + along, z: wz - off, face: 0 };
-    if (side === 1) return { x: wx + off,   z: wz + along, face: 1 };
-    if (side === 2) return { x: wx + along, z: wz + off, face: 2 };
-    return { x: wx - off, z: wz + along, face: 3 };
-  };
-  // Only street or pavement level counts. Without the ceiling a query can walk
-  // up the side of the building and return a rooftop, which is how street
-  // furniture ends up on roofs.
-  const groundAt = (x, z) => {
-    const y = shSurfaceY(x, z, 4);
-    return (y > 0 && y <= 3) ? y : 0;
-  };
-
-  // Traffic cones — cheap, and they read as "someone works here"
-  if (rng.bool(mix.cones)){
-    const n = rng.int(2, 5);
-    const base = edge();
-    for (let i = 0; i < n; i++){
-      const x = base.x + rng.range(-1.6, 1.6), z = base.z + rng.range(-1.6, 1.6);
-      const y = groundAt(x, z);
-      if (!y) continue;
-      P(0.42, 0.07, 0.42, x, y + 0.03, z, 0x1c1a20);
-      P(0.24, 0.44, 0.24, x, y + 0.26, z, 0xd85a1e);
-      P(0.27, 0.09, 0.27, x, y + 0.34, z, 0xf2f0e6);
-    }
-  }
-
-  // Stacked crates and pallets
-  if (rng.bool(mix.crates)){
-    const s = edge();
-    const y = groundAt(s.x, s.z);
-    if (y){
-      P(1.30, 0.14, 1.00, s.x, y + 0.07, s.z, 0x5a4028);
-      const stack = rng.int(1, 3);
-      for (let i = 0; i < stack; i++){
-        const jx = rng.range(-0.12, 0.12), jz = rng.range(-0.12, 0.12);
-        P(0.86, 0.70, 0.86, s.x + jx, y + 0.14 + 0.35 + i * 0.72, s.z + jz,
-          rng.pick([0x8a5c30, 0x6f4a26, 0x94663a]));
-        P(0.88, 0.06, 0.88, s.x + jx, y + 0.14 + 0.70 + i * 0.72, s.z + jz, 0x4a3220);
-      }
-    }
-  }
-
-  // Rain puddles — a dark sheet a shade below the pavement
-  if (rng.bool(mix.puddle)){
-    const n = rng.int(1, 3);
-    for (let i = 0; i < n; i++){
-      const s = edge();
-      const x = s.x + rng.range(-2.5, 2.5), z = s.z + rng.range(-2.5, 2.5);
-      const y = groundAt(x, z);
-      if (!y) continue;
-      P(rng.range(1.2, 2.8), 0.035, rng.range(1.0, 2.4), x, y + 0.018, z, 0x1b2430);
-    }
-  }
-
-  // Wall-mounted air conditioners and their drip stains
-  if (rng.bool(mix.ac)){
-    for (const b of buildings){
-      if (!rng.bool(0.55)) continue;
-      const n = rng.int(1, 3);
-      for (let i = 0; i < n; i++){
-        const side = rng.int(0, 3);
-        const hAt = 2 + rng.range(1.6, Math.max(2.2, Math.min(b.h - 1, 9)));
-        let x = b.cx, z = b.cz, w = 0.7, d = 0.5;
-        if (side === 0){ z = b.cz - b.d/2 - 0.28; x += rng.range(-b.w/3, b.w/3); }
-        else if (side === 1){ x = b.cx + b.w/2 + 0.28; z += rng.range(-b.d/3, b.d/3); w = 0.5; d = 0.7; }
-        else if (side === 2){ z = b.cz + b.d/2 + 0.28; x += rng.range(-b.w/3, b.w/3); }
-        else { x = b.cx - b.w/2 - 0.28; z += rng.range(-b.d/3, b.d/3); w = 0.5; d = 0.7; }
-        P(w, 0.52, d, x, hAt, z, 0x8f9298);
-        P(w * 0.86, 0.06, d * 0.86, x, hAt + 0.29, z, 0x6e7176);
-      }
-    }
-  }
-
-  // Fire escapes — brick blocks get zigzag landings
-  if (rng.bool(mix.escape)){
-    const b = buildings[rng.int(0, buildings.length - 1)];
-    if (b && b.h > 8){
-      const side = rng.bool() ? 1 : 3;
-      const x = b.cx + (side === 1 ? b.w/2 + 0.55 : -b.w/2 - 0.55);
-      const floors = Math.min(6, Math.floor((b.h - 3) / 2.6));
-      for (let i = 0; i < floors; i++){
-        const y = 4.2 + i * 2.6;
-        P(1.05, 0.09, 2.4, x, y, b.cz + (i % 2 ? 0.9 : -0.9), 0x3d4148);
-        P(0.06, 1.0, 2.4, x + (side === 1 ? 0.5 : -0.5), y + 0.5, b.cz + (i % 2 ? 0.9 : -0.9), 0x3d4148);
-        P(0.9, 0.06, 0.9, x, y + 1.3, b.cz + (i % 2 ? -0.5 : 0.5), 0x33373d);
-      }
-    }
-  }
-
-  // Shop awnings over the doorway line
-  if (rng.bool(mix.awning)){
-    const b = buildings[rng.int(0, buildings.length - 1)];
-    if (b){
-      const side = rng.int(0, 3);
-      const col = rng.pick([0xb8322f, 0x2b6f5a, 0x2f4f86, 0x8a5a1e, 0x6b3a72]);
-      let x = b.cx, z = b.cz, w = b.w * 0.5, d = 1.3;
-      if (side === 0) z = b.cz - b.d/2 - 0.6;
-      else if (side === 1){ x = b.cx + b.w/2 + 0.6; w = 1.3; d = b.d * 0.5; }
-      else if (side === 2) z = b.cz + b.d/2 + 0.6;
-      else { x = b.cx - b.w/2 - 0.6; w = 1.3; d = b.d * 0.5; }
-      P(w, 0.12, d, x, 5.1, z, col);
-      P(w, 0.42, 0.10, x, 4.85, z + (side === 2 ? 0.6 : -0.6), col);
-    }
-  }
-
-  // Cables strung between neighbouring blocks
-  if (rng.bool(mix.cable)){
-    const n = rng.int(1, 3);
-    for (let i = 0; i < n; i++){
-      const y = 7 + rng.range(0, 5);
-      const horiz = rng.bool();
-      if (horiz) P(CHUNK_SIZE, 0.07, 0.07, wx, y, wz + rng.range(-half, half), 0x14161c);
-      else       P(0.07, 0.07, CHUNK_SIZE, wx + rng.range(-half, half), y, wz, 0x14161c);
-    }
-  }
-
-  // Bus shelter — a roof, a bench, a lit route panel
-  if (rng.bool(mix.cones * 0.5)){
-    const s = edge();
-    const y = groundAt(s.x, s.z);
-    if (y){
-      const horiz = Math.abs(s.x - wx) < Math.abs(s.z - wz);
-      const w = horiz ? 3.6 : 1.4, d = horiz ? 1.4 : 3.6;
-      P(w, 0.10, d, s.x, y + 2.45, s.z, 0x2f3038);                    // roof
-      for (const e of horiz ? [[-1.7,0],[1.7,0]] : [[0,-1.7],[0,1.7]])
-        P(0.12, 2.40, 0.12, s.x + e[0], y + 1.20, s.z + e[1], 0x4a4f5a);
-      P(w * 0.86, 0.10, 0.44, s.x, y + 0.52, s.z, 0x5a4028);          // bench
-      P(0.10, 0.50, 0.44, s.x, y + 0.26, s.z, 0x3a3a44);
-      P(0.7, 1.0, 0.06, s.x + (horiz ? 1.4 : 0), y + 1.5, s.z + (horiz ? 0 : 1.4), 0x2cb8c7, true);
-    }
-  }
-
-  // Benches, bins and a bicycle chained to something
-  if (rng.bool(0.55)){
-    const s = edge();
-    const y = groundAt(s.x, s.z);
-    if (y){
-      P(1.90, 0.10, 0.52, s.x, y + 0.48, s.z, 0x5a4028);
-      P(1.90, 0.42, 0.10, s.x, y + 0.72, s.z - 0.21, 0x5a4028);
-      for (const ox of [-0.75, 0.75]) P(0.10, 0.46, 0.46, s.x + ox, y + 0.24, s.z, 0x33383f);
-    }
-  }
-  if (rng.bool(0.6)){
-    const s = edge();
-    const y = groundAt(s.x, s.z);
-    if (y){
-      P(0.62, 0.92, 0.62, s.x, y + 0.46, s.z, 0x2f3a34);              // bin
-      P(0.70, 0.08, 0.70, s.x, y + 0.94, s.z, 0x1f2a24);
-    }
-  }
-  if (rng.bool(0.32)){
-    const s = edge();
-    const y = groundAt(s.x, s.z);
-    if (y){
-      P(0.08, 0.62, 0.62, s.x - 0.5, y + 0.34, s.z, 0x22262c);        // wheels
-      P(0.08, 0.62, 0.62, s.x + 0.5, y + 0.34, s.z, 0x22262c);
-      P(1.10, 0.08, 0.08, s.x, y + 0.62, s.z, rng.pick([0xd85a1e,0x2cb8c7,0x7dffb3]));
-      P(0.30, 0.06, 0.14, s.x + 0.32, y + 0.72, s.z, 0x1a1a22);       // saddle
-    }
-  }
-
-  // Phone kiosk and a planter
-  if (rng.bool(0.28)){
-    const s = edge();
-    const y = groundAt(s.x, s.z);
-    if (y){
-      P(0.90, 2.30, 0.90, s.x, y + 1.15, s.z, 0x2a2f4a);
-      P(0.70, 1.10, 0.06, s.x, y + 1.45, s.z + 0.45, 0x80ffff, true);
-      P(1.00, 0.12, 1.00, s.x, y + 2.36, s.z, 0xff5268, true);
-    }
-  }
-  if (rng.bool(0.45)){
-    const s = edge();
-    const y = groundAt(s.x, s.z);
-    if (y){
-      P(1.20, 0.62, 1.20, s.x, y + 0.31, s.z, 0x6a5a48);
-      P(1.00, 0.14, 1.00, s.x, y + 0.66, s.z, 0x3a2e22);
-      for (let i = 0; i < 4; i++)
-        P(0.16, 0.60 + rng.range(0, 0.5), 0.16, s.x + rng.range(-0.35, 0.35),
-          y + 1.00, s.z + rng.range(-0.35, 0.35), rng.pick([0x3a6b3a, 0x4a7c4a, 0x2f5a35]));
-    }
-  }
-
-  // Market stall — a canopy, a table and stacked goods
-  if (rng.bool(mix.crates * 0.55)){
-    const s = edge();
-    const y = groundAt(s.x, s.z);
-    if (y){
-      const col = rng.pick([0xb8322f, 0x2b6f5a, 0x8a5a1e, 0x6b3a72]);
-      P(2.60, 0.10, 1.80, s.x, y + 2.30, s.z, col);
-      for (const [ox, oz] of [[-1.2,-0.8],[1.2,-0.8],[-1.2,0.8],[1.2,0.8]])
-        P(0.09, 2.25, 0.09, s.x + ox, y + 1.13, s.z + oz, 0x4a4f5a);
-      P(2.30, 0.10, 1.20, s.x, y + 0.86, s.z, 0x6b4a2e);
-      for (let i = 0; i < 5; i++)
-        P(0.26, 0.26, 0.26, s.x + rng.range(-0.9, 0.9), y + 1.04, s.z + rng.range(-0.4, 0.4),
-          rng.pick([0xd85a1e, 0xf4bb3d, 0x7dffb3, 0xff5268]));
-    }
-  }
-
-  // Rooftop clutter — satellite dishes and plant rooms
-  for (const b of buildings){
-    if (!rng.bool(0.5)) continue;
-    const roof = 2 + b.h;
-    P(1.40, 0.90, 1.40, b.cx + rng.range(-b.w/4, b.w/4), roof + 0.45,
-      b.cz + rng.range(-b.d/4, b.d/4), 0x4a4f5a);
-    if (rng.bool(0.6)){
-      const dx2 = b.cx + rng.range(-b.w/3, b.w/3), dz2 = b.cz + rng.range(-b.d/3, b.d/3);
-      P(0.12, 0.70, 0.12, dx2, roof + 0.35, dz2, 0x6e7176);
-      P(1.10, 0.10, 1.10, dx2, roof + 0.75, dz2, 0xd6dae0);
-    }
-  }
-
-  // Hanging banners down the facades
-  if (rng.bool(mix.awning * 0.7)){
-    for (const b of buildings){
-      if (!rng.bool(0.5)) continue;
-      const side = rng.int(0, 3);
-      const col = rng.pick([0xff5268, 0x2cb8c7, 0xf4bb3d, 0x7956c9]);
-      const hgt = rng.range(2.5, 5);
-      let x = b.cx, z = b.cz;
-      if (side === 0) z = b.cz - b.d/2 - 0.2;
-      else if (side === 1) x = b.cx + b.w/2 + 0.2;
-      else if (side === 2) z = b.cz + b.d/2 + 0.2;
-      else x = b.cx - b.w/2 - 0.2;
-      P(side % 2 ? 0.06 : 0.9, hgt, side % 2 ? 0.9 : 0.06, x, 6 + hgt/2, z, col);
-    }
-  }
-
-  // Loose newspaper and flyers on the pavement
-  {
-    const n = rng.int(2, 7);
-    for (let i = 0; i < n; i++){
-      const s = edge();
-      const x = s.x + rng.range(-2.2, 2.2), z = s.z + rng.range(-2.2, 2.2);
-      const y = groundAt(x, z);
-      if (!y) continue;
-      P(rng.range(0.18, 0.34), 0.02, rng.range(0.14, 0.28), x, y + 0.012, z,
-        rng.pick([0xd8d2c0, 0xc6bfa8, 0xb9b09a]));
-    }
-  }
-
-  //  Municipal furniture — see section 36.
-  if (typeof shStreetExtra === 'function'){
-    try { shStreetExtra(chunk, P, edge, groundAt, rng, district); } catch (e){}
-  }
-
-  // Bake: two meshes for the whole block's clutter
-  const solid = shBakeParts(parts, false);
-  if (solid) chunk.group.add(new THREE.Mesh(solid, CHAR_BODY_MAT()));
-  const glow = shBakeParts(parts, true);
-  if (glow) chunk.group.add(new THREE.Mesh(glow, CHAR_EMIT_MAT()));
-
-  // Fires last, because they are alive
-  if (rng.bool(mix.fire)){
-    const count = rng.bool(0.25) ? 2 : 1;
-    for (let i = 0; i < count; i++){
-      const s = edge();
-      const x = s.x + rng.range(-1.4, 1.4), z = s.z + rng.range(-1.4, 1.4);
-      shMakeTrashFire(chunk, x, groundAt(x, z), z, rng);
-    }
-  }
+  // The old layered clutter pass had no collision or support ownership.
+  // Street furniture is now generated by cityBuildStreet and grounded after fittings.
 }
 
 // The detail pass asks the voxel field how high the ground is — but getBlock()
@@ -11855,6 +11378,10 @@ function shHardReset(){
   Campaign.caseDecision = null;
   Campaign.caseFiled = false;
   Campaign.driveCarry = 0;
+  Campaign.choices = {};
+  Campaign._entryToken = (Campaign._entryToken || 0) + 1;
+  Campaign._choicePending = false;
+  shCampaignSilence();
   shCampaignSave();
   const hud = $('campaign-hud');
   if (hud) hud.classList.remove('show');
@@ -12886,7 +12413,7 @@ function shCarMat(kind, hex){
 function shDetailCar(group, rng, color){
   const build = rng.pick(CAR_BUILDS);
   const box = (w, h, d, mat, x, y, z) => {
-    const m = makeBoxMesh(w, h, d, mat);
+    const m = cityRoundMesh(w, h, d, mat);
     m.position.set(x, y, z);
     group.add(m);
     return m;
@@ -12912,8 +12439,10 @@ function shDetailCar(group, rng, color){
 
   // Wheels and arches — four of each, because three is a tricycle.
   for (const sx of [-0.92, 0.92]) for (const sz of [1.35, -1.35]){
-    box(0.22, 0.52, 0.52, trim, sx, 0.42, sz);
-    box(0.30, 0.62, 0.62, shCarMat('trim'), sx * 1.02, 0.42, sz);
+    const tyre = new THREE.Mesh(new THREE.CylinderGeometry(.31,.31,.30,20),trim);
+    tyre.rotation.z=Math.PI/2;tyre.position.set(sx,.42,sz);group.add(tyre);
+    const hub = new THREE.Mesh(new THREE.CylinderGeometry(.17,.17,.315,16),M.metal);
+    hub.rotation.z=Math.PI/2;hub.position.copy(tyre.position);group.add(hub);
   }
 
   // Lamps: warm forward, red aft.
@@ -14395,17 +13924,11 @@ const CAMPAIGN = [
     open:'At six in the evening the wall turns itself on. The Bureau has found a contradiction and temporarily assigned it your name.',
     close:'Two people have given you accounts that cannot share one field. The night has begun.',
     intro:[
-      {who:'ned',text:'Good evening, Fracture City. It is six o’clock. Shared meaning ended at 17:58. Municipal services remain unaffected.'},
-      {who:'ned',text:'The Bureau has received Application Q-1957 from Marcus and Clara Vale of the Stone District.'},
-      {who:'ned',text:'Marcus has worked Quarry 4 for eighteen years. Clara wants a small loan to open a general store so he can leave it before his lungs do.'},
-      {who:'ned',text:'The city agrees that he should leave. It also requires the quarry income as proof that he can afford to.'},
-      {who:'self',text:'Then the form is wrong.'},
-      {who:'ned',text:'Careful. The form is functioning.'},
-      {who:'ned',text:'Daniel at Window Three has until midnight to make two lives fit one answer field. You have been assigned as temporary field witness.'},
-      {who:'self',text:'I did not apply for that.'},
-      {who:'ned',text:'Neither did Daniel. Temporary assignments are the city’s most permanent building material.'},
-      {who:'ned',text:'A relay is waiting at the crossroads with both statements. Listen before the Bureau teaches you which one counts.'},
-      {who:'ned',text:'FCN will follow the case professionally, which means from far enough away to remain correct.'},
+      {who:'ned',text:'Marcus Vale has one more shift at Quarry 4 before his lungs give out. His wife has a way out. The city has a form.'},
+      {who:'clara',text:'They will lend us the money to leave only if he keeps the job that is killing him. Please. Hear both of us.'},
+      {who:'ned',text:'You are the witness. Rook is outside at the crossroads. WASD to move; E to speak. Follow the gold marker. J keeps your case notes.'},
+      {who:'self',text:'And if the form is wrong?'},
+      {who:'ned',text:'Then tonight we find out what being right costs.'},
     ],
     beats:{
       out:[{who:'ned',text:'The witness has left Residence 14. The city recognizes this as travel and not yet as intent.'}],
@@ -14586,8 +14109,9 @@ function shCampaignSave(){
     chapter: Campaign.chapter, progress: Campaign.progress, done: Campaign.done,
     seenSeconds: Campaign.seenSeconds, districtsSeen: Campaign.districtsSeen,
     finished: Campaign.finished, caseDecision: Campaign.caseDecision,
-    caseFiled: Campaign.caseFiled,
+    caseFiled: Campaign.caseFiled, choices: {...Campaign.choices},
   });
+  shCampaignCheckpointSoon();
 }
 async function shCampaignLoad(){
   try {
@@ -14601,6 +14125,7 @@ async function shCampaignLoad(){
       Campaign.finished = !!c.finished;
       Campaign.caseDecision = c.caseDecision || null;
       Campaign.caseFiled = !!c.caseFiled;
+      Campaign.choices = {...(c.choices || {})};
     }
   } catch (e){ /* fresh */ }
 }
@@ -14623,8 +14148,13 @@ function shCampaignStart(reset){
 function shEnterChapter(){
   const ch = shChapter();
   if (!ch) return;
+  const token = Campaign._entryToken = (Campaign._entryToken || 0) + 1;
+  Campaign._briefing = true;
+  Campaign._choicePending = false;
+  shCampaignSilence();
   if (typeof ch.time === 'number') State.dayTime = ch.time;
   Campaign.driveCarry = 0;
+  if (typeof Player.hpMax === 'number'){ Player.hp = Player.hpMax; refreshHpHUD(); }
   // The first movement opens in the flat, with the screen dead until Ned takes it.
   if (ch.inApartment){
     if (shPlaceInBed()) shSetWallScreen('off');
@@ -14632,19 +14162,30 @@ function shEnterChapter(){
   shShowChapterCard();
   shCampaignHUD();
   setTimeout(() => {
-    if (ch.inApartment) shSetWallScreen('ned');
-    shSay(ch.intro || [], () => {
+    if (!Campaign.active || shChapter() !== ch || Campaign._entryToken !== token) return;
+    if (ch.inApartment){
+      shSetWallScreen('ned');
+      Campaign.broadcastPlayed = true;
+      shCampaignEvent('broadcast');
+    }
+    shSay(shCampaignIntro(ch), () => {
+      if (!Campaign.active || shChapter() !== ch || Campaign._entryToken !== token) return;
+      Campaign._briefing = false;
       if (ch.inApartment){
         shSetWallScreen('idle');
         Campaign.broadcastPlayed = true;
         shCampaignEvent('broadcast');
       }
+      shCheckChapterComplete();
     });
   }, ch.inApartment ? 2600 : 2000);
 }
 
 function shCampaignStop(){
   Campaign.active = false;
+  Campaign._entryToken = (Campaign._entryToken || 0) + 1;
+  shCampaignSilence();
+  shCampaignGuideTick(0);
   $('campaign-hud').classList.remove('show');
 }
 
@@ -14675,7 +14216,7 @@ function shCampaignEvent(kind, detail, amount){
   let completedId = null, touched = false;
 
   for (const o of ch.objectives){
-    if (Campaign.done[o.id] || o.kind !== kind) continue;
+    if (Campaign.done[o.id] || o.kind !== kind || (o.after && !Campaign.done[o.after])) continue;
     let hit = false;
     switch (kind){
       case 'panel':     hit = (detail === o.target); break;
@@ -14683,6 +14224,9 @@ function shCampaignEvent(kind, detail, amount){
       case 'echo': case 'hack': case 'mine': case 'place': case 'drive':
       case 'brick': case 'residue': case 'hold': case 'shift':
       case 'witness': case 'site': case 'case': case 'vehicle': hit = true; break;
+      case 'evidence':
+        if (!CAMPAIGN_FILES.some(f => f.id === detail) || Campaign.done['file:' + detail]) break;
+        Campaign.done['file:' + detail] = true; hit = true; break;
       case 'district':
         if (detail && !Campaign.districtsSeen.includes(detail)){
           Campaign.districtsSeen.push(detail); hit = true;
@@ -14690,7 +14234,7 @@ function shCampaignEvent(kind, detail, amount){
         break;
     }
     if (!hit) continue;
-    Campaign.progress[o.id] = (Campaign.progress[o.id] || 0) + (amount || 1);
+    Campaign.progress[o.id] = (Campaign.progress[o.id] || 0) + (Number.isFinite(amount) && amount > 0 ? amount : 1);
     touched = true;
     if (Campaign.progress[o.id] >= (o.count || 1) && !Campaign.done[o.id]){
       Campaign.done[o.id] = true;
@@ -14708,10 +14252,11 @@ function shCampaignEvent(kind, detail, amount){
 
 function shCheckChapterComplete(){
   const ch = shChapter();
-  if (!ch || Campaign.finished) return;
+  if (!ch || !Campaign.active || Campaign.finished || Campaign._briefing) return;
   if (ch.objectives.some(o => o.kind !== 'unseen' && !shObjDone(o))) return;
   if (Campaign.done['closed:' + ch.id]) return;
   Campaign.done['closed:' + ch.id] = true;
+  shCampaignSave();
 
   const unseen = ch.objectives.find(o => o.kind === 'unseen');
   const grade = unseen ? Campaign.seenSeconds <= unseen.limit : null;
@@ -14722,12 +14267,16 @@ function shCheckChapterComplete(){
 }
 
 function shAdvanceChapter(){
+  const previous = shChapter();
+  if (!previous || !Campaign.done['closed:' + previous.id]) return;
+  shCampaignSilence();
   Campaign.chapter += 1;
   Campaign.seenSeconds = 0;
   if (Campaign.chapter >= CAMPAIGN.length){
     Campaign.chapter = CAMPAIGN.length - 1;
     Campaign.finished = true;
     shCampaignSave();
+    shCampaignCheckpoint();
     shShowCampaignEnd();
     return;
   }
@@ -14746,7 +14295,8 @@ function shCampaignTick(dt){
       if (o.after && !Campaign.done[o.after]) continue;
       // Chapter One will not let you skip the broadcast by walking out
       if (ch.inApartment && !Campaign.broadcastPlayed) continue;
-      if (Math.hypot(Player.position.x - o.x, Player.position.z - o.z) < o.r){
+      if ((!o.y || Player.position.y - Player.height >= o.y) &&
+          Math.hypot(Player.position.x - o.x, Player.position.z - o.z) < o.r){
         Campaign.done[o.id] = true;
         Campaign.progress[o.id] = 1;
         toast(`Objective complete — ${o.text}`, 'success');
@@ -14823,6 +14373,7 @@ function shShowChapterComplete(ch, grade){
     State.ui.paused = false;
     document.body.style.cursor = 'none';
     shAdvanceChapter();
+    shCampaignCheckpoint();
   };
 }
 
@@ -14852,7 +14403,7 @@ function shShowCampaignEnd(){
     State.ui.paused = false;
     document.body.style.cursor = 'none';
     shCampaignStop();
-    openMenu();
+    closeMenu();
   };
 }
 
@@ -14968,6 +14519,7 @@ async function shSlotSave(id, name){
       seenSeconds: Campaign.seenSeconds, districtsSeen: Campaign.districtsSeen,
       finished: Campaign.finished, caseDecision: Campaign.caseDecision,
       caseFiled: Campaign.caseFiled, active: Campaign.active,
+      choices: {...Campaign.choices}, holdSaved: Shift.holdSaved ? JSON.parse(JSON.stringify(Shift.holdSaved)) : null,
     },
     player: {
       x: Player.position.x, y: Player.position.y, z: Player.position.z,
@@ -15033,6 +14585,12 @@ async function shSlotRestore(id){
   Campaign.finished      = !!c.finished;
   Campaign.caseDecision  = c.caseDecision || null;
   Campaign.caseFiled     = !!c.caseFiled;
+  Campaign.choices       = {...(c.choices || {})};
+  Shift.holdSaved        = c.holdSaved || null;
+  Shift.hold             = null;
+  Campaign._entryToken = (Campaign._entryToken || 0) + 1;
+  Campaign._briefing = false; Campaign._choicePending = false; Campaign._quiet = false;
+  shCampaignSilence();
   Campaign.active        = rec.mode === 'campaign' && !c.finished;
   //  You have already sat through the broadcast in this save; the apartment
   //  gate must not strand you in bed a second time.
@@ -15065,6 +14623,7 @@ async function shSlotRestore(id){
   if (Campaign.active && typeof shCampaignHUD === 'function') shCampaignHUD();
   shUpdateHUD();
   closeMenu();
+  shCampaignResume();
   toast(`Loaded “${rec.name || 'save'}” — ${rec.mode === 'campaign' ? (rec.chapterTitle || 'campaign') : 'free roam'}.`, 'success');
   return true;
 }
@@ -15323,7 +14882,8 @@ function shFrontAct(act){
 
     case 'new-campaign':
       shWithClass(() => {
-        shSlotNew('campaign').then(() => {
+        fcLoad('Building your story…', async () => {
+          await shSlotNew('campaign');
           shPlayIntro(() => shCampaignStart(true));
         });
       });
@@ -15331,7 +14891,8 @@ function shFrontAct(act){
 
     case 'new-free':
       shWithClass(() => {
-        shSlotNew('freeroam').then(() => {
+        fcLoad('Building your city…', async () => {
+          await shSlotNew('freeroam');
           closeMenu();
           toast('Free roam. No story, no clock — the city is yours to take apart.', 'info');
         });
@@ -18329,8 +17890,6 @@ function shNoirFog(){
 function shNeonPools(chunk, buildings, district){
   if (!buildings || !buildings.length) return;
   const rng = new RNG('pool:' + chunk.key);
-  const parts = [];
-  const P = (w, h, d, x, y, z, color, emit) => parts.push({ w, h, d, x, y, z, color, emit });
   const hue = () => rng.pick([0xff60d0, 0x80ffff, 0xf4bb3d, 0xff5268, 0x7dffb3, 0xb45ad8]);
 
   for (const b of buildings){
@@ -18347,18 +17906,7 @@ function shNeonPools(chunk, buildings, district){
     const gy = shSurfaceY(px, pz, 6);
     if (!Number.isFinite(gy) || gy > 4) continue;
     const c = hue();
-    //  A long soft smear rather than a disc — light on wet asphalt runs.
-    P(Math.abs(ox) > 0 ? 2.4 : 7.5, 0.02, Math.abs(ox) > 0 ? 7.5 : 2.4,
-      px, gy + 0.02, pz, c, true);
-    P(Math.abs(ox) > 0 ? 1.2 : 4.5, 0.03, Math.abs(ox) > 0 ? 4.5 : 1.2,
-      px, gy + 0.03, pz, c, true);
-  }
-  if (!parts.length) return;
-  const glow = shBakeParts(parts, true);
-  if (glow){
-    const m = new THREE.Mesh(glow, CHAR_EMIT_MAT());
-    m.renderOrder = -1;
-    chunk.group.add(m);
+    citySoftPool(chunk,px,gy,pz,Math.abs(ox)>0?3.0:7.5,Math.abs(ox)>0?7.5:3.0,c);
   }
 }
 
@@ -20432,8 +19980,8 @@ function shDistrict(chunk, buildings, district){
 
   const rng = new RNG('dist:' + chunk.key);
   const parts = [];
-  const P = (w, h, d, x, y, z, color, emit, ry, rx) =>
-    parts.push({ w, h, d, x, y, z, color, emit, ry, rx });
+  // Keep solid voxel architecture; omit unsupported decorative overlays.
+  const P = () => {};
 
   // ── The ground you are standing on ─────────────────────────────────────
   const pave = DIST_PAVE[district.name];
@@ -21487,8 +21035,8 @@ const ACT_TWO = [
       {who:'ned',  text:'Weather: the same. Closures: the same. A correction: yesterday I said the city had stopped agreeing on things at 17:58. It was 17:58 and forty seconds. I regret the imprecision.'},
     ],
     beats:{
-      out:[{who:'ned', text:'He is outside at six in the morning, of his own accord. The record will show initiative. The record is generous like that.'}],
-      vale:[
+      'm7-out':[{who:'ned', text:'He is outside at six in the morning, of his own accord. The record will show initiative. The record is generous like that.'}],
+      'm7-vale':[
         {who:'mara', text:'You’re the witness. I recognised the walk — it’s the one everyone has on the way back to look at something.'},
         {who:'mara', text:'They’re inside. Don’t knock. Whatever you decided, they’ve had all night to be right about it, and you’d only be asking them to be polite about it as well.'},
         {who:'mara', text:'I’ll tell you the part the file won’t. Marcus asked what the witness was called. Clara said it doesn’t work like that. He said it should.'},
@@ -21505,7 +21053,7 @@ const ACT_TWO = [
   },
 
   {
-    id:'seventeen', title:'THE SEVENTEEN OTHERS', kicker:'Eighth Movement · 09:20',
+    id:'seventeen', decisionKey:'pattern', title:'THE SEVENTEEN OTHERS', kicker:'Eighth Movement · 09:20',
     time: 9 * 60 + 20,
     open:'Q-1957 was not unusual. That is the discovery, and it is worse than the case was.',
     close:'Seventeen applications, one shape. You have decided what to do with a pattern.',
@@ -21515,7 +21063,7 @@ const ACT_TWO = [
       {who:'rook', text:'Each one was resolved individually. Each resolution was within tolerance. Seventeen times, the city looked at the same broken thing and called it a one-off.'},
       {who:'self',text:'That’s not an accident.'},
       {who:'rook', text:'It’s worse than an accident. An accident would need somebody to have made it. This is what happens when *nobody* looks at two things at once. The Bureau doesn’t hide the pattern. It just has no field for one.'},
-      {who:'rook', text:'Terminals on the crossroads still carry the raw index. Pull three. Then decide whether seventeen cases are seventeen cases or one case, because the moment you file it as one, it stops being routine and starts being an allegation.'},
+      {who:'rook', text:'Meet me at the crossroads. I have three files from the raw index. Read them. Then decide whether seventeen cases are seventeen cases or one case, because the moment you file it as one, it stops being routine and starts being an allegation.'},
     ],
     beats:{
       'm8-read':[
@@ -21540,13 +21088,13 @@ const ACT_TWO = [
       {who:'ned', text:'A pattern has been observed in the municipal record. FCN will report the observation without characterising it, which is how you can tell it matters.'},
     ],
     objectives:[
-      { id:'m8-read',  kind:'hack',   text:'Pull three case files from the index', count: 3 },
+      { id:'m8-read',  kind:'evidence', text:'Compare three households at Rook’s case relay', count: 3 },
       { id:'m8-decide',kind:'choose', text:'Decide how the seventeen are filed', after:'m8-read' },
     ],
   },
 
   {
-    id:'fourteenth', title:'THE FOURTEENTH', kicker:'Ninth Movement · 13:00',
+    id:'fourteenth', decisionKey:'tape', title:'THE FOURTEENTH', kicker:'Ninth Movement · 13:00',
     time: 13 * 60,
     open:'Everybody in this city knows the network said Ned was taking a short break to recuperate. Nobody has ever said what he was recuperating from.',
     close:'He has been reading the news to a city that stopped commissioning it, every morning, for eleven months, out of a room nobody signs into.',
@@ -21610,7 +21158,7 @@ const ACT_TWO = [
       {who:'ned', text:'Nineteen fifty-nine. Fracture City, we are back. Nothing was resolved, nothing was announced, and everybody came.'},
     ],
     objectives:[
-      { id:'m10-high', kind:'reach', text:'Get somewhere high before 17:58', x: 0, z: 0, r: 60, y: 18 },
+      { id:'m10-high', kind:'reach', text:'Take the FCN fire escape to the observation deck', x: 0, z: 0, r: 60, y: 18 },
       { id:'m10-hold', kind:'hold',  text:'Stand through the minute' },
     ],
   },
@@ -21650,8 +21198,8 @@ const ACT_TWO = [
   },
 
   {
-    id:'second-light', title:'THE SECOND LIGHT', kicker:'Twelfth Movement · 05:5x',
-    time: 5 * 60 + 40,
+    id:'second-light', decisionKey:'ending', title:'THE SECOND LIGHT', kicker:'Twelfth Movement · 05:56',
+    time: 5 * 60 + 56,
     open:'Four minutes to six. The record hardens at six. Everything you have carried for two days is in your hands and there are exactly three places to put it.',
     close:'Six o’clock, Fracture City.',
     intro:[
@@ -21680,7 +21228,8 @@ const ACT_TWO = [
       ], then);
     },
     objectives:[
-      { id:'m12-choose', kind:'choose', text:'Decide where it goes' },
+      { id:'m12-arrive', kind:'reach', x:-2.6, z:-12, r:5, text:'Bring the index to FCN before the bulletin' },
+      { id:'m12-choose', kind:'choose', text:'Decide where it goes', after:'m12-arrive' },
     ],
     ending: { title:'The Second Light', body:'—' },
   },
@@ -21695,7 +21244,7 @@ const ENDINGS = {
   },
   'end-file': {
     title:'A Field, Amended',
-    body:'It took eleven weeks and it was unbelievably boring. Vess made you write it four times, because the version that was true was not yet the version that was procedurally unanswerable. Field 14 now reads *income presently relied upon*, which is nine words and looks like nothing, and which means that Marcus Vale and four hundred people you will never meet are no longer required to prove they can afford to stop by continuing not to. Nobody reported it. Nobody thanked you. It applies to everybody, forever, whether or not they are standing in front of a desk.',
+    body:'It took eleven weeks and it was unbelievably boring. Vess made you write it four times, because the version that was true was not yet the version that was procedurally unanswerable. Field 14 now reads *income presently relied upon*, which is four words and looks like nothing, and which means that Marcus Vale and four hundred people you will never meet are no longer required to prove they can afford to stop by continuing not to. Nobody reported it. Nobody thanked you. It applies to everybody, forever, whether or not they are standing in front of a desk.',
   },
   'end-walk': {
     title:'Two People and a Document',
@@ -21717,69 +21266,68 @@ function shEndingFor(){
   //  putting anything before the existing six would drop every player into the
   //  wrong movement on load.
   for (const m of ACT_TWO) CAMPAIGN.push(m);
+  for (const ch of CAMPAIGN){
+    ch.objectives.forEach((o, i) => { if (i && !o.after) o.after = ch.objectives[i - 1].id; });
+  }
 
-  //  'choose' completes when the decision with that id has been made, and
-  //  'hold' is fired by the minute of quiet.
   const origEvent = shCampaignEvent;
   window.shCampaignEvent = function(kind, detail, amount){
-    if (kind === 'choose'){
-      const ch = shChapter();
-      if (!ch || !Campaign.active) return;
-      for (const o of ch.objectives){
-        if (o.kind !== 'choose' || Campaign.done[o.id]) continue;
-        Campaign.done[o.id] = true;
-        Campaign.progress[o.id] = 1;
-        toast(`Objective complete — ${o.text}`, 'success');
-      }
-      shCampaignSave(); shCampaignHUD();
-      return shCheckChapterComplete();
+    if (kind !== 'choose') return origEvent.apply(this, arguments);
+    const ch = shChapter();
+    if (!ch || !Campaign.active || Campaign.finished || detail !== ch.decisionKey || !shChoiceMade(detail)) return;
+    for (const o of ch.objectives){
+      if (o.kind !== 'choose' || (o.after && !Campaign.done[o.after])) continue;
+      Campaign.done[o.id] = true; Campaign.progress[o.id] = 1;
     }
-    return origEvent.apply(this, arguments);
+    shCampaignSave(); shCampaignHUD();
+    shCheckChapterComplete();
   };
 
-  //  A movement can require a decision before it will close. The engine's
-  //  completion check is where that hooks in, because it is the one place that
-  //  knows every objective is done.
   const origCheck = shCheckChapterComplete;
   window.shCheckChapterComplete = function(){
     const ch = shChapter();
-    if (ch && ch.onComplete && !Campaign.done['chose:' + ch.id] &&
-        !ch.objectives.some(o => o.kind !== 'unseen' && !shObjDone(o))){
-      Campaign.done['chose:' + ch.id] = true;
-      shCampaignSave();
-      return ch.onComplete(() => origCheck.call(window));
+    if (!ch || !Campaign.active || Campaign.finished || Campaign._briefing) return;
+    if (ch.onComplete && !shChoiceMade(ch.decisionKey)){
+      // The choice is the result of the physical objectives, never its prerequisite.
+      if (Campaign._choicePending || ch.objectives.some(o => o.kind !== 'choose' && o.kind !== 'unseen' && !shObjDone(o))) return;
+      Campaign._choicePending = true;
+      const token = Campaign._entryToken;
+      setTimeout(() => {
+        if (!Campaign.active || shChapter() !== ch || Campaign._entryToken !== token) return;
+        shClosePanel();
+        ch.onComplete(() => {
+          Campaign._choicePending = false;
+          Campaign.done['chose:' + ch.id] = true;
+          shCampaignSave();
+          origCheck.call(window);
+        });
+      }, 0);
+      return;
+    }
+    // Repair old saves that recorded the decision but not its objective.
+    if (ch.decisionKey && shChoiceMade(ch.decisionKey)){
+      for (const o of ch.objectives) if (o.kind === 'choose') Campaign.done[o.id] = true;
     }
     return origCheck.apply(this, arguments);
   };
 
-  //  A 'reach' objective with a y on it wants height as well as position —
-  //  "get somewhere high" is not a place, it is an altitude.
   const origTick = shCampaignTick;
   window.shCampaignTick = function(dt){
     const r = origTick.apply(this, arguments);
+    shCampaignGuideTick(dt);
     if (!Campaign.active || Campaign.finished) return r;
     const ch = shChapter();
-    if (!ch) return r;
-    for (const o of ch.objectives){
-      if (o.kind !== 'reach' || !o.y || Campaign.done[o.id]) continue;
-      if (Player.position.y - Player.height >= o.y){
-        Campaign.done[o.id] = true; Campaign.progress[o.id] = 1;
-        toast(`Objective complete — ${o.text}`, 'success');
-        shCampaignSave(); shCampaignHUD();
-        if (!shFireBeat(o.id, () => shCheckChapterComplete())) shCheckChapterComplete();
+    if (ch && ch.id === 'anniversary' && Campaign.done['m10-high'] && !Campaign.done['m10-hold'] && !Campaign._briefing){
+      if (Player.position.y - Player.height < 18){
+        if (Campaign._quiet){ shQuietMinute(false); Campaign._quiet = false; }
+        return r;
       }
-    }
-    //  The minute. Sixty seconds from 17:58, with the signage dropped.
-    if (ch.id === 'anniversary'){
-      const hour = (State.dayTime || 0) / 60;
-      const inMinute = hour >= 17 + 58/60 && hour < 18;
-      if (inMinute !== !!Campaign._quiet){
-        Campaign._quiet = inMinute;
-        shQuietMinute(inMinute);
-      }
-      if (inMinute){
-        Campaign._quietT = (Campaign._quietT || 0) + dt;
-        if (Campaign._quietT > 6 && !Campaign.done['m10-hold']) shCampaignEvent('hold');
+      if (!Campaign._quiet){ Campaign._quiet = true; shQuietMinute(true); }
+      Campaign.progress['quiet-seconds'] = Math.min(60, (Campaign.progress['quiet-seconds'] || 0) + dt);
+      State.dayTime = 17 * 60 + 58 + Campaign.progress['quiet-seconds'] / 60;
+      if (Campaign.progress['quiet-seconds'] >= 60){
+        Campaign._quiet = false; shQuietMinute(false);
+        shCampaignEvent('hold');
       }
     }
     return r;
@@ -21792,7 +21340,11 @@ function shEndingFor(){
     try {
       const m = (typeof M !== 'undefined') && M.charEmit;
       if (m) m.opacity = on ? 0.25 : 1, m.transparent = on;
-      if (State.renderer) State.renderer.toneMappingExposure *= on ? 0.72 : 1;
+      if (State.renderer){
+        if (on && Campaign._quietExposure == null) Campaign._quietExposure = State.renderer.toneMappingExposure;
+        State.renderer.toneMappingExposure = on ? Campaign._quietExposure * 0.72 : (Campaign._quietExposure ?? State.renderer.toneMappingExposure);
+        if (!on) Campaign._quietExposure = null;
+      }
       if (typeof Snd !== 'undefined' && Snd.master){
         Snd.master.gain.setTargetAtTime(on ? 0.06 : 0.75, shSndCtx().currentTime, 0.5);
       }
@@ -21843,7 +21395,7 @@ function shEndingFor(){
       State.ui.paused = false;
       document.body.style.cursor = 'none';
       shCampaignStop();
-      openMenu();
+      closeMenu();
     };
   };
 
@@ -21865,7 +21417,7 @@ function shEndingFor(){
   };
   const origStart = shCampaignStart;
   window.shCampaignStart = function(reset){
-    if (reset) Campaign.choices = {};
+    if (reset){ Campaign.choices = {}; Shift.hold = null; Shift.holdSaved = null; Campaign._quiet = false; }
     return origStart.apply(this, arguments);
   };
 
@@ -22394,7 +21946,7 @@ function shCastDetail(arch, rng, cfg, buckets, dims){
 //    A CHOICE  shChoice. Two or three options, consequences, your name on the
 //              filing. This genuinely should stop everything, and still does.
 //
-//  So all one-way campaign speech becomes narration: subtitles, auto-advancing,
+//  One-way campaign speech uses narration: subtitles advanced by the reader,
 //  with a portrait, while you get out of bed and walk to the door. Ned talks you
 //  out of the flat instead of talking at you until he is finished. That single
 //  change turns thirty-seven frozen seconds into thirty-seven seconds of play,
@@ -22413,7 +21965,7 @@ function shCastDetail(arch, rng, cfg, buckets, dims){
 const Narr = {
   queue: [], line: null, chars: 0, t: 0, hold: 0, done: null,
   el: null, speed: 62,          // characters per second — nearly double the card
-  active: false,
+  active: false, pending: [],
 };
 
 function shNarrBuild(){
@@ -22423,12 +21975,12 @@ function shNarrBuild(){
   el.innerHTML = '<div id="narr-portrait"></div>' +
                  '<div id="narr-body"><p id="narr-who"><b></b><i></i></p>' +
                  '<p id="narr-text"></p></div>' +
-                 '<div id="narr-more">▸</div>';
+                 '<button id="narr-more" type="button" aria-label="Continue narration">N · Continue</button>';
   const css = document.createElement('style');
   css.textContent = `
     #narr{position:fixed;left:50%;bottom:118px;transform:translate(-50%,8px);
       z-index:59;pointer-events:none;width:min(720px,80vw);
-      display:grid;grid-template-columns:56px 1fr 18px;gap:14px;align-items:center;
+      display:grid;grid-template-columns:56px 1fr 88px;gap:14px;align-items:center;
       padding:12px 14px;
       background:linear-gradient(135deg,rgba(8,4,20,.93) 0%,rgba(24,8,34,.90) 100%);
       border-left:3px solid var(--narr-tint,#ff5268);
@@ -22445,13 +21997,16 @@ function shNarrBuild(){
     #narr-text{margin:0;font:14px/1.6 'Courier New',monospace;color:#efeaff;
       text-shadow:0 0 12px rgba(0,0,0,.9);}
     #narr-more{align-self:end;color:var(--narr-tint,#ff5268);font-size:12px;
-      opacity:0;transition:opacity .15s;}
-    #narr-more.ready{opacity:.55;}
+      opacity:0;transition:opacity .15s;pointer-events:auto;background:none;border:1px solid currentColor;padding:8px;cursor:pointer;}
+    #narr-more.ready{opacity:1;}
+    #narr:not(.on) #narr-more{pointer-events:none;}
     body.in-dialogue #narr,body.in-intro #narr{display:none;}
   `;
   document.head.appendChild(css);
   document.body.appendChild(el);
   Narr.el = el;
+  el.querySelector('#narr-more').onpointerdown = e => e.stopPropagation();
+  el.querySelector('#narr-more').onclick = e => {e.preventDefault();e.stopPropagation();shNarrPush();};
 }
 
 //  One-way speech, delivered without taking the game away.
@@ -22460,6 +22015,7 @@ function shNarrate(lines, onDone){
   const list = (Array.isArray(lines) ? lines : [lines]).map(
     l => typeof l === 'string' ? { who:'ned', text:l } : l);
   if (!list.length){ if (onDone) onDone(); return; }
+  if (Narr.active){ Narr.pending.push({list, onDone}); return; }
   Narr.queue = list;
   Narr.done = onDone || null;
   Narr.active = true;
@@ -22474,13 +22030,13 @@ function shNarrNext(){
     if (Narr.el) Narr.el.classList.remove('on');
     const d = Narr.done; Narr.done = null;
     if (d) d();
+    if (!Narr.active && Narr.pending.length){ const job = Narr.pending.shift(); shNarrate(job.list, job.onDone); }
     return;
   }
   Narr.line = next;
   Narr.chars = 0; Narr.t = 0;
-  //  Long enough to read comfortably, and it moves on by itself — the player
-  //  has better things to be doing with their hands.
-  Narr.hold = Math.min(7, 1.2 + next.text.length / 46);
+  // The player owns reading pace; completion callbacks run only after acknowledgement.
+  Narr.hold = Infinity;
 
   const s = next.speaker ? next.speaker
     : next.who === 'self'
@@ -22510,11 +22066,10 @@ function shNarrTick(dt){
     return;
   }
   Narr.el.querySelector('#narr-more').classList.add('ready');
-  Narr.hold -= dt;
-  if (Narr.hold <= 0) shNarrNext();
+  // Remain readable until N or the Continue button is pressed.
 }
 
-//  E or a click pushes it along — completes the line, then moves on.
+//  N or Continue completes the line first, then advances on a separate press.
 function shNarrPush(){
   if (!Narr.active || !Narr.line) return false;
   const full = Narr.line.text;
@@ -22522,7 +22077,7 @@ function shNarrPush(){
     Narr.chars = full.length;
     Narr.el.querySelector('#narr-text').textContent = full;
     Narr.el.querySelector('#narr-more').classList.add('ready');
-    Narr.hold = Math.min(Narr.hold, 1.4);
+    Narr.hold = Infinity;
     return true;
   }
   shNarrNext();
@@ -22552,7 +22107,6 @@ function shNarrPush(){
   //  E advances it, but must not also open the door you happen to be facing.
   const origInteract = handleInteract;
   window.handleInteract = function(){
-    if (shNarrPush()) return;
     return origInteract.apply(this, arguments);
   };
 
@@ -22758,7 +22312,7 @@ function shNedSay(event){
 
   NED.last = now;
   NED.perEvent[event] = now;
-  //  His own register: the narration panel, one line, auto-advancing. It is the
+  //  His own register: the narration panel, one line, reader-advanced. It is the
   //  same voice as the chapter openings because it is the same man.
   shNarrate([{ who:'ned', text }]);
   return true;
@@ -23345,11 +22899,9 @@ if (typeof NED_LINES !== 'undefined'){
     return r;
   };
 
-  //  E order of precedence: a line of dialogue first (section 49 owns that),
-  //  then whatever you are looking at, then the old proximity list.
+  //  E operates fittings while N independently advances narration.
   const prev = handleInteract;
   window.handleInteract = function(){
-    if (typeof Narr !== 'undefined' && Narr.active) return prev.apply(this, arguments);
     try { if (shFitUse()) return; } catch (e){ console.warn('fit use:', e.message); }
     return prev.apply(this, arguments);
   };
@@ -25668,7 +25220,7 @@ function shStreamQuiet(){
 // =============================================================================
 
 // ─── The front door ─────────────────────────────────────────────────────────
-const SH_VERSION = '0.32.0';
+const SH_VERSION = '0.35.1';
 
 (function(){
   if (typeof shFrontHome !== 'function') return;
@@ -25726,7 +25278,7 @@ const SH_VERSION = '0.32.0';
         campaign.textContent = '◈ NEW GAME — THE SECOND LIGHT  ·  start here';
         const h = document.createElement('div');
         h.className = 'hint';
-        h.textContent = 'Six movements over one night. Ned reads you in; the city does the rest.';
+        h.textContent = 'Twelve movements. One impossible loan. Three endings. Follow the gold marker; J opens your casebook.';
         campaign.after(h);
       }
       const free = rows.querySelector('[data-front="new-free"]');
@@ -25799,21 +25351,20 @@ function shBearingWords(dx, dz){
   return d < 1.18 ? `slightly ${side}` : d < 1.96 ? `to your ${side}` : `hard ${side}`;
 }
 
-function shNextLine(){
+function shObjectiveLine(){
   const o = shNextObjective();
   if (!o) return null;
+  const target = shCampaignTarget(o);
   let where = '';
-  if (o.kind === 'reach' && typeof o.x === 'number'){
-    const dx = o.x - Player.position.x, dz = o.z - Player.position.z;
+  if (target){
+    const dx = target.x - Player.position.x, dz = target.z - Player.position.z;
     const dist = Math.hypot(dx, dz);
-    where = dist < (o.r || 6)
-      ? ' — you are there'
-      : ` — ${Math.round(dist)}m, ${shBearingWords(dx, dz)}`;
+    where = dist < 3.5 ? ' — ' + target.label
+      : ` — ${Math.round(dist)}m, ${shBearingWords(dx, dz)} · ${target.label}`;
   }
   const need = o.count || 1;
   const have = Math.min(need, Campaign.progress[o.id] || 0);
-  const count = need > 1 ? ` (${have} of ${need})` : '';
-  return { text: o.text + count + where, kind: o.kind };
+  return { text: o.text + (need > 1 ? ` (${have}/${need})` : '') + where, kind: o.kind };
 }
 
 (function(){
@@ -25823,7 +25374,7 @@ function shNextLine(){
     try {
       const el = $('campaign-hud');
       if (!el || !el.classList.contains('show')) return r;
-      const next = shNextLine();
+      const next = shObjectiveLine();
       if (!next) return r;
       const p = el.querySelector('.ch');
       if (!p) return r;
@@ -25858,7 +25409,7 @@ function shNextLine(){
       const el = $('campaign-hud');
       if (!el || !el.classList.contains('show')) return r;
       const line = el.querySelector('.next');
-      const next = shNextLine();
+      const next = shObjectiveLine();
       if (line && next) line.innerHTML = `<b>NOW</b> ${next.text}`;
     } catch (e){}
     return r;
@@ -26291,7 +25842,7 @@ function shTransEnd(){
 //      function tick(){
 //        requestAnimationFrame(tick);                                    // (1)
 //        ...
-//        if (State.ui.inIntro){ requestAnimationFrame(tick); return; }   // (2)
+//        if (State.ui.inIntro) return; // The next frame was already requested above.   // (2)
 //
 //  Every frame that an intro is up schedules TWO ticks. Two become four, four
 //  become eight. Ten seconds in there are thousands of tick callbacks per frame
@@ -27348,7 +26899,7 @@ function shFitCheck(){
       //  for margins, wrapped text, and whatever the menu decided to render
       //  this time.
       const over = el.scrollHeight > el.clientHeight + 1;
-      el.classList.toggle('sh-overflowing', over);
+      if (el.classList.contains('sh-overflowing') !== over) el.classList.toggle('sh-overflowing', over);
       if (over) marked++;
     }
   }
@@ -28507,7 +28058,1940 @@ const CITY_SCALE = {
 })();
 
 
+// =============================================================================
+//  69 · HD — the main world, at a resolution it deserves
+// -----------------------------------------------------------------------------
+//  Everything outside a panel is still drawn the way v0.2 drew it: one flat
+//  colour per block face, a per-quad jitter standing in for texture, no shadow
+//  of any kind, and nothing happening to the frame after it is rendered. From
+//  three metres away a wall is four hundred identical pixels, and no amount of
+//  street dressing fixes that, because the problem is the surface itself.
+//
+//  Four parts, and they are independent — any one can be off.
+//
+//    SURFACES  Every voxel face now carries a world-anchored 2D coordinate and
+//              its material id into the shader, and the shader draws the
+//              surface procedurally: brick courses, slab joints, panel lines,
+//              brushed metal, mullions, tar seams, rivets, grime that runs
+//              downward because water does. It is generated per pixel, so it
+//              holds up with your face against a wall, and it fades out on
+//              fwidth so nothing crawls at distance.
+//    LIGHT     The directional light has been in the scene since v0.2 pointing
+//              at (50,80,30) forever. It now tracks the hour and casts a real
+//              shadow map that follows the player, snapped to a grid so the
+//              edges do not swim.
+//    BLOOM     The whole argument for a neon city, missing until now. The scene
+//              renders into a half-float target, then a bright pass, two
+//              separable blurs and a composite that does the ACES tone map
+//              itself — three disables tone mapping the moment you render into
+//              a target, so the composite has to carry it.
+//    BUDGET    None of that is free. Four tiers, a watchdog that steps down if
+//              the measured frame time says it must, and a panel on F.
+//
+//  The tier is persisted, and once it is set by hand the watchdog stops moving
+//  it. A machine that can hold ULTRA is never quietly dropped to BALANCED and
+//  left there.
+// =============================================================================
+
+(function(){
+
+// ─── Tiers ──────────────────────────────────────────────────────────────────
+//  dpr    device pixel ratio ceiling
+//  msaa   samples on the scene target (WebGL2 only; 0 disables)
+//  shadow shadow map size, 0 for none
+//  span   half-width of the shadow camera box, in metres
+//  bloom  composite strength
+//  bscale bloom buffer scale against the drawing buffer
+//  surf   0 flat, 1 grain and joints, 2 the full surface pass
+//  view   chunk radius kept live around the player
+//  fog    multiplier on fog density, so a longer view actually shows something
+const HD_TIERS = {
+  ultra:    { label:'ULTRA',       dpr:2.00, msaa:4, shadow:2048, span:80, bloom:0.55, bscale:0.50, surf:2, view:5, fog:0.58, far:1100 },
+  high:     { label:'HIGH',        dpr:1.80, msaa:2, shadow:1536, span:64, bloom:0.48, bscale:0.50, surf:2, view:4, fog:0.74, far:900 },
+  balanced: { label:'BALANCED',    dpr:1.40, msaa:0, shadow:1024, span:48, bloom:0.40, bscale:0.36, surf:1, view:3, fog:0.92, far:700 },
+  perf:     { label:'PERFORMANCE', dpr:1.00, msaa:0, shadow:0,    span:0,  bloom:0.00, bscale:0.30, surf:0, view:3, fog:1.10, far:600 },
+};
+const HD_ORDER = ['perf', 'balanced', 'high', 'ultra'];
+
+const HD = window.HD = {
+  tier: 'ultra',
+  locked: false,                                  // set by hand; watchdog keeps off
+  want: { shadows:true, bloom:true, surfaces:true },
+  fps: 60, ms: 16, _acc: 0, _n: 0, _hot: 0,
+  get T(){ return HD_TIERS[this.tier] || HD_TIERS.balanced; },
+  get shadowsOn(){ return !!this.want.shadows && this.T.shadow > 0; },
+  get bloomOn(){ return !!this.want.bloom && this.T.bloom > 0; },
+  get surfMode(){ return this.want.surfaces ? this.T.surf : 0; },
+};
+
+function hdSave(){
+  try { window.fracture.save('hd', { tier:HD.tier, locked:HD.locked, want:HD.want }); } catch (e){}
+}
+function hdLoad(){
+  try {
+    return window.fracture.read('hd').then(v => {
+      if (!v) return;
+      if (HD_TIERS[v.tier]) HD.tier = v.tier;
+      HD.locked = !!v.locked;
+      if (v.want) Object.assign(HD.want, v.want);
+    }).catch(() => {});
+  } catch (e){ return Promise.resolve(); }
+}
+
+//  A first guess, used once, before anything has been measured. A phone starts
+//  at BALANCED because the watchdog climbing down from ULTRA on a phone would
+//  cost it ten seconds of stutter to learn what the pointer type already said.
+function hdGuessTier(){
+  try { if (typeof shIsTouch === 'function' && shIsTouch()) return 'balanced'; } catch (e){}
+  const mem = navigator.deviceMemory || 8;
+  const cpu = navigator.hardwareConcurrency || 8;
+  if (mem <= 4 || cpu <= 4) return 'balanced';
+  if (mem <= 8 && cpu <= 6) return 'high';
+  return 'ultra';
+}
+
+// =============================================================================
+//  SURFACES — the mesher hands the shader two more things
+// -----------------------------------------------------------------------------
+//  The greedy mesher emitted position, normal and colour. A quad can be nine
+//  blocks wide, so there is no per-block information left in the geometry at
+//  all — which is precisely why every wall reads as one flat rectangle.
+//
+//  Two attributes fix that for good:
+//
+//    aSurfUV  the quad corner's WORLD coordinate along the two axes of its own
+//             face. World, not local, so a brick course runs unbroken across a
+//             quad boundary, across a chunk boundary, and across a remesh.
+//    aMat     the block id, so the shader knows whether it is drawing brick or
+//             asphalt or a window.
+//
+//  Everything else about the geometry is unchanged, and the attributes are
+//  written at every tier — the tier only decides whether the shader reads them.
+//  That way changing tier never needs a remesh of the city.
+// =============================================================================
+
+const _hdQuads = quadsToGeometry;
+window.quadsToGeometry = function(quads, ox, oy, oz, wantEmit){
+  const pos = [], nrm = [], col = [], suv = [], mid = [], idx = [];
+  const off = [ox, oy, oz];
+  const c3 = new THREE.Color();
+  let vi = 0;
+  for (const Q of quads){
+    const blk = BLOCKS[Q.id];
+    if (!blk || !!blk.emit !== wantEmit) continue;
+    const [px, py, pz] = Q.p;
+    const s = Q.back ? -1 : 1;
+    const nx = Q.d === 0 ? s : 0, ny = Q.d === 1 ? s : 0, nz = Q.d === 2 ? s : 0;
+    const a = [px, py, pz];
+    const b = [px + Q.du[0], py + Q.du[1], pz + Q.du[2]];
+    const c = [px + Q.du[0] + Q.dv[0], py + Q.du[1] + Q.dv[1], pz + Q.du[2] + Q.dv[2]];
+    const e = [px + Q.dv[0], py + Q.dv[1], pz + Q.dv[2]];
+    const quad = Q.back ? [a, e, c, b] : [a, b, c, e];
+    const face = Q.d*2 + (Q.back ? 1 : 0);
+    const shade = FACE_SHADE[face] ?? 0.8;
+    c3.setHex(blk.color);
+    const grain = blk.grain || 0;
+    let jitter = 1;
+    if (grain){
+      const h = hashStr(`${Q.id}:${px}:${py}:${pz}:${face}`);
+      jitter = 1 + ((h % 1000) / 1000 - 0.5) * 2 * grain;
+    }
+    const sh = shade * jitter;
+    //  The two in-plane axes of this face, exactly as the mesher chose them.
+    const ua = (Q.d + 1) % 3, va = (Q.d + 2) % 3;
+    for (const p of quad){
+      pos.push(p[0] + ox, p[1] + oy, p[2] + oz);
+      nrm.push(nx, ny, nz);
+      col.push(c3.r * sh, c3.g * sh, c3.b * sh);
+      suv.push(p[ua] + off[ua], p[va] + off[va]);
+      mid.push(Q.id);
+    }
+    idx.push(vi, vi+1, vi+2, vi, vi+2, vi+3);
+    vi += 4;
+  }
+  if (!idx.length) return null;
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('normal',   new THREE.Float32BufferAttribute(nrm, 3));
+  g.setAttribute('color',    new THREE.Float32BufferAttribute(col, 3));
+  g.setAttribute('aSurfUV',  new THREE.Float32BufferAttribute(suv, 2));
+  g.setAttribute('aMat',     new THREE.Float32BufferAttribute(mid, 1));
+  g.setIndex(idx);
+  return g;
+};
+
+// ─── The surface shader ─────────────────────────────────────────────────────
+//  One function, dispatched on block id, returning a multiplier on the flat
+//  colour the mesher already chose. Multiplying rather than replacing means
+//  every district palette, every night tint and every damage state that has
+//  ever been written into a vertex colour survives this section untouched.
+const HD_U = {
+  uSurfMode: { value: 2.0 },
+  uWet:      { value: 0.0 },   // reserved: rain is a later section's problem
+};
+
+const HD_GLSL_COMMON = `
+varying vec2 vSurfUV;
+varying float vSurfMat;
+varying vec3 vSurfN;
+varying vec3 vSurfW;
+uniform float uSurfMode;
+
+float hdHash(vec2 p){
+  p = fract(p * vec2(127.1, 311.7));
+  p += dot(p, p + 34.56);
+  return fract(p.x * p.y);
+}
+float hdNoise(vec2 p){
+  vec2 i = floor(p), f = fract(p);
+  f = f * f * (3.0 - 2.0 * f);
+  float a = hdHash(i);
+  float b = hdHash(i + vec2(1.0, 0.0));
+  float c = hdHash(i + vec2(0.0, 1.0));
+  float d = hdHash(i + vec2(1.0, 1.0));
+  return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+}
+float hdFbm(vec2 p){
+  float s = 0.0, a = 0.5;
+  for (int i = 0; i < 3; i++){ s += a * hdNoise(p); p *= 2.07; a *= 0.5; }
+  return s;
+}
+//  A groove, antialiased against the pixel footprint so it never crawls.
+float hdGroove(float d, float w, float aa){
+  return 1.0 - smoothstep(w - aa, w + aa, abs(d));
+}
+float hdBox(vec2 c, vec2 lo, vec2 hi, float aa){
+  vec2 s = smoothstep(lo - aa, lo + aa, c) * (1.0 - smoothstep(hi - aa, hi + aa, c));
+  return s.x * s.y;
+}
+
+//  wp is world position, used only where a surface has a sense of down:
+//  grime runs, rust pools, paint fails at the bottom of a wall first.
+vec3 hdSurface(vec2 uv, vec3 n, vec3 wp, float mid){
+  if (uSurfMode < 0.5) return vec3(1.0);
+  float px = max(fwidth(uv.x), fwidth(uv.y));
+  float det = 1.0 - smoothstep(0.03, 0.30, px);
+  if (det <= 0.004) return vec3(1.0);
+  float aa = max(px * 0.85, 0.002);
+
+  int id = int(mid + 0.5);
+  vec2 c = fract(uv);
+  vec2 cell = floor(uv);
+  float up = abs(n.y);
+
+  //  Every block boundary gets a shadow line. This one cheap thing is most of
+  //  what makes the city read as built out of objects rather than painted.
+  float edge = min(min(c.x, 1.0 - c.x), min(c.y, 1.0 - c.y));
+  float seam = 1.0 - smoothstep(0.0, 0.05 + px * 2.0, edge);
+  float seamWeight = (id == 1) ? 0.08 : 0.85;
+  float g = mix(1.0, 0.74, seam * det * seamWeight);
+
+  if (uSurfMode < 1.5){
+    //  Tier BALANCED: joints and a little grain, nothing per-material.
+    g *= 1.0 + (hdNoise(uv * 6.0) - 0.5) * 0.10 * det;
+    return vec3(g);
+  }
+
+  vec3 tint = vec3(1.0);
+
+  if (id == 1){
+    //  ASPHALT — aggregate, tar seams on the block grid, a wear stripe where
+    //  the wheels go.
+    float agg = hdFbm(uv * 14.0);
+    g *= 1.0 + (agg - 0.5) * 0.30 * det;
+    float tar = hdGroove(c.x - 0.5, 0.035, aa) * step(0.5, hdHash(cell.yy * 0.7));
+    g *= mix(1.0, 1.18, tar * det * 0.5);
+    float wear = smoothstep(0.34, 0.5, abs(fract(uv.x * 0.25) - 0.5));
+    g *= mix(1.0, 1.07, wear * det * 0.4);
+    float pot = smoothstep(0.62, 0.8, hdNoise(uv * 2.3));
+    g *= mix(1.0, 0.82, pot * det);
+  } else if (id == 2){
+    //  SIDEWALK — poured slabs, aggregate, a stain that knows which way is
+    //  down when it is on a kerb face rather than a pavement.
+    float agg = hdFbm(uv * 20.0);
+    g *= 1.0 + (agg - 0.5) * 0.22 * det;
+    float half_ = hdGroove(fract(uv.x * 2.0) - 0.5, 0.03, aa * 2.0);
+    g *= mix(1.0, 0.88, half_ * det * 0.6);
+    float stain = smoothstep(0.55, 0.95, hdFbm(uv * 1.7 + 11.0));
+    g *= mix(1.0, 0.86, stain * det * 0.7);
+  } else if (id == 3 || id == 6){
+    //  CONCRETE and ROOF — formwork panels every four blocks, tie holes at the
+    //  corners, and vertical grime under every horizontal line.
+    float panel = hdGroove(fract(uv.x * 0.25) - 0.5, 0.012, aa * 0.25)
+                + hdGroove(fract(uv.y * 0.25) - 0.5, 0.012, aa * 0.25);
+    g *= mix(1.0, 0.80, clamp(panel, 0.0, 1.0) * det);
+    float tie = hdBox(fract(uv * 0.5), vec2(0.46), vec2(0.54), aa) * step(0.5, up < 0.5 ? 1.0 : 0.0);
+    g *= mix(1.0, 0.72, tie * det);
+    float run = smoothstep(0.45, 1.0, hdFbm(vec2(uv.x * 3.0, uv.y * 0.35)));
+    float below = (1.0 - up) * smoothstep(0.0, 0.7, fract(uv.y * 0.25));
+    g *= mix(1.0, 0.80, run * below * det * 0.9);
+    g *= 1.0 + (hdNoise(uv * 9.0) - 0.5) * 0.14 * det;
+  } else if (id == 4 || id == 5 || id == 38){
+    //  WINDOWS — a pane inset in its cell, a mullion cross, a sill, and for
+    //  the lit ones a per-cell temperature so a tower is not one colour.
+    float pane = hdBox(c, vec2(0.14, 0.12), vec2(0.86, 0.84), aa);
+    float frame = 1.0 - pane;
+    float mull = hdGroove(c.x - 0.5, 0.022, aa) + hdGroove(c.y - 0.52, 0.02, aa);
+    float sill = hdBox(c, vec2(0.08, 0.02), vec2(0.92, 0.10), aa);
+    float r = hdHash(cell + 3.7);
+    g *= mix(0.62, 1.0, pane);
+    g *= mix(1.0, 0.70, clamp(mull, 0.0, 1.0) * pane * det);
+    g *= mix(1.0, 1.12, sill * det);
+    if (id == 4){
+      //  Warm at the top of the pane, cooler at the bottom: a ceiling light.
+      //  Block 38 is the same window with the power off, and falls through to
+      //  the dark branch so a cut supply reads as a cut supply.
+      float grad = smoothstep(0.1, 0.9, c.y);
+      g *= mix(0.80, 1.16, grad * pane + (1.0 - pane) * 0.4);
+      g *= mix(0.86, 1.14, r);
+      tint = mix(vec3(1.0), vec3(1.06, 0.98, 0.88), r * pane);
+      //  Something in front of the window in one pane in six.
+      float blind = step(0.83, r) * hdBox(c, vec2(0.14, 0.45), vec2(0.86, 0.84), aa);
+      g *= mix(1.0, 0.45, blind * det);
+    } else {
+      float refl = smoothstep(0.3, 0.9, c.x + c.y * 0.5) * pane;
+      g *= mix(1.0, 1.22, refl * det * 0.5);
+      g *= mix(1.0, 0.86, step(0.6, hdHash(cell + 9.1)) * pane * det);
+    }
+  } else if (id == 7){
+    //  METAL — brushed along the long axis, rivets on the block corners.
+    float brush = hdNoise(vec2(uv.x * 40.0, uv.y * 3.0));
+    g *= 1.0 + (brush - 0.5) * 0.26 * det;
+    float rivets = 0.0;
+    rivets += 1.0 - smoothstep(0.028, 0.045, length(c - vec2(0.10, 0.10)));
+    rivets += 1.0 - smoothstep(0.028, 0.045, length(c - vec2(0.90, 0.10)));
+    rivets += 1.0 - smoothstep(0.028, 0.045, length(c - vec2(0.10, 0.90)));
+    rivets += 1.0 - smoothstep(0.028, 0.045, length(c - vec2(0.90, 0.90)));
+    g *= mix(1.0, 1.35, clamp(rivets, 0.0, 1.0) * det * 0.7);
+    float scuff = smoothstep(0.6, 0.95, hdFbm(uv * 3.1 + 5.0));
+    g *= mix(1.0, 0.88, scuff * det);
+  } else if (id == 8 || id == 25 || id == 26 || id == 32 ||
+             id == 39 || id == 40 || id == 41 || id == 42){
+    //  NEON, FASCIA, TILL — a tube with a bright core, or a dot matrix. These
+    //  are the surfaces the bloom pass is for.
+    float band = abs(fract(uv.y * 2.0) - 0.5);
+    float core = 1.0 - smoothstep(0.08, 0.34, band);
+    g *= mix(0.72, 1.45, core);
+    float dot_ = hdBox(fract(uv * 6.0), vec2(0.18), vec2(0.82), aa * 6.0);
+    g *= mix(0.92, 1.10, dot_ * det);
+  } else if (id == 9){
+    //  GLASS — a sheet, a diagonal sheen, and the ghost of what is behind it.
+    float sheen = smoothstep(0.2, 0.95, fract((uv.x + uv.y) * 0.22));
+    g *= mix(0.88, 1.30, sheen * det);
+    float grid = hdGroove(fract(uv.x * 0.5) - 0.5, 0.02, aa)
+               + hdGroove(fract(uv.y * 0.5) - 0.5, 0.02, aa);
+    g *= mix(1.0, 0.78, clamp(grid, 0.0, 1.0) * det);
+  } else if (id == 10){
+    //  PAINT — road paint and civic paint, which is to say paint that is
+    //  failing. It fails from the bottom.
+    float chip = smoothstep(0.55, 0.85, hdFbm(uv * 7.0));
+    float low = 1.0 - smoothstep(0.0, 0.5, fract(uv.y));
+    g *= mix(1.0, 0.70, chip * mix(0.4, 1.0, low) * det);
+  } else if (id == 11){
+    //  BRICK — running bond. Four courses to the block, two bricks across,
+    //  every other course offset by half. Mortar is a groove, not a line.
+    vec2 b = vec2(uv.x * 2.0, uv.y * 4.0);
+    float row = floor(b.y);
+    b.x += mod(row, 2.0) * 0.5;
+    vec2 f = fract(b);
+    float mortar = 1.0 - hdBox(f, vec2(0.045), vec2(0.955), aa * 3.0);
+    g *= mix(1.0, 0.64, mortar * det);
+    float v = hdHash(vec2(floor(b.x), row));
+    g *= mix(0.86, 1.14, v);
+    tint = mix(vec3(1.0), vec3(1.05, 0.96, 0.92), (v - 0.5) * 0.8);
+    float soot = smoothstep(0.5, 0.95, hdFbm(uv * 2.0 + 21.0));
+    g *= mix(1.0, 0.84, soot * det * 0.8);
+  } else if (id == 12){
+    //  RUST — pitting, and a bloom of iron that spreads downward.
+    float r1 = hdFbm(uv * 5.0);
+    float r2 = hdFbm(uv * 13.0 + 3.0);
+    g *= 1.0 + (r1 - 0.5) * 0.45 * det;
+    float pit = smoothstep(0.66, 0.9, r2);
+    g *= mix(1.0, 0.62, pit * det);
+    tint = mix(vec3(1.0), vec3(1.14, 0.88, 0.74), smoothstep(0.4, 0.8, r1) * det);
+  } else if (id == 19 || id == 27){
+    //  DOORS — two panels, a rail between them, and a handle on one side.
+    float panel = hdBox(c, vec2(0.16, 0.10), vec2(0.84, 0.44), aa)
+                + hdBox(c, vec2(0.16, 0.56), vec2(0.84, 0.92), aa);
+    g *= mix(0.84, 1.06, clamp(panel, 0.0, 1.0));
+    float plank = hdGroove(fract(uv.x * 4.0) - 0.5, 0.02, aa * 4.0);
+    g *= mix(1.0, 0.92, plank * det * 0.5);
+    float handle = 1.0 - smoothstep(0.03, 0.055, length(c - vec2(0.80, 0.50)));
+    g *= mix(1.0, 1.55, handle * det);
+    if (id == 27){
+      float seal = hdBox(c, vec2(0.10, 0.46), vec2(0.90, 0.54), aa);
+      tint = mix(tint, vec3(1.25, 0.72, 0.78), seal * det);
+    }
+  } else if (id == 20 || id == 21){
+    //  LOCKERS and CABINETS — a stack of drawers, each with a pull.
+    float dv = fract(c.y * 3.0);
+    float line = hdGroove(dv - 0.5, 0.06, aa * 3.0);
+    g *= mix(1.0, 0.70, line * det);
+    float pull = hdBox(vec2(c.x, dv), vec2(0.38, 0.40), vec2(0.62, 0.52), aa * 3.0);
+    g *= mix(1.0, 1.30, pull * det);
+    g *= 1.0 + (hdNoise(uv * 24.0) - 0.5) * 0.10 * det;
+  } else if (id == 22){
+    //  VENDOR — a window with product behind it, and a keypad.
+    float win = hdBox(c, vec2(0.12, 0.30), vec2(0.72, 0.92), aa);
+    g *= mix(1.0, 0.72, win * det);
+    float shelf = hdGroove(fract(c.y * 4.0) - 0.5, 0.06, aa * 4.0) * win;
+    g *= mix(1.0, 1.35, shelf * det);
+    float keys = hdBox(fract(vec2(c.x * 8.0, c.y * 12.0)), vec2(0.2), vec2(0.8), aa * 8.0)
+               * hdBox(c, vec2(0.78, 0.40), vec2(0.94, 0.72), aa);
+    g *= mix(1.0, 1.4, keys * det);
+  } else if (id == 23){
+    //  CRATE — freight ply, a diagonal brace, and a stencil that is a solid
+    //  block at this size and a word from further away, which is honest.
+    float plank = hdGroove(fract(c.y * 4.0) - 0.5, 0.05, aa * 4.0);
+    g *= mix(1.0, 0.76, plank * det);
+    float brace = hdGroove(fract((c.x + c.y) * 1.0) - 0.5, 0.06, aa);
+    g *= mix(1.0, 1.12, brace * det * 0.6);
+    float sten = hdBox(c, vec2(0.24, 0.40), vec2(0.76, 0.62), aa)
+               * step(0.5, hdNoise(vec2(c.x * 9.0, c.y * 4.0)));
+    g *= mix(1.0, 1.45, sten * det);
+  } else if (id == 24){
+    //  BENCH — slats with a gap you can see the ground through, almost.
+    float slat = hdGroove(fract(uv.x * 5.0) - 0.5, 0.12, aa * 5.0);
+    g *= mix(0.78, 1.08, slat);
+  } else if (id >= 29 && id <= 37){
+    //  The section 70 fittings: a bezel, a face, and one indicator that the
+    //  fitting's own code lights by swapping the block, not the shader.
+    float bez = hdBox(c, vec2(0.10), vec2(0.90), aa);
+    g *= mix(0.80, 1.05, bez);
+    float face = hdBox(c, vec2(0.20), vec2(0.80), aa);
+    g *= mix(1.0, 1.10, face * det);
+    float ridge = hdGroove(fract(c.y * 8.0) - 0.5, 0.08, aa * 8.0) * face;
+    g *= mix(1.0, 0.90, ridge * det * 0.7);
+  } else {
+    g *= 1.0 + (hdNoise(uv * 8.0) - 0.5) * 0.14 * det;
+  }
+
+  //  A little ambient dirt in every inside corner, everywhere, always.
+  float grime = smoothstep(0.35, 0.0, edge) * det;
+  g *= mix(1.0, 0.93, grime);
+
+  return clamp(vec3(g) * tint, vec3(0.25), vec3(2.2));
+}
+`;
+
+function hdPatchVoxMaterial(mat){
+  if (!mat || mat.__hdPatched) return;
+  mat.__hdPatched = 1;
+  mat.onBeforeCompile = function(shader){
+    shader.uniforms.uSurfMode = HD_U.uSurfMode;
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', `#include <common>
+attribute vec2 aSurfUV;
+attribute float aMat;
+varying vec2 vSurfUV;
+varying float vSurfMat;
+varying vec3 vSurfN;
+varying vec3 vSurfW;`)
+      .replace('#include <begin_vertex>', `#include <begin_vertex>
+vSurfUV = aSurfUV;
+vSurfMat = aMat;
+vSurfN = normal;
+vSurfW = (modelMatrix * vec4(transformed, 1.0)).xyz;`);
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', '#include <common>\n' + HD_GLSL_COMMON)
+      .replace('#include <color_fragment>', `#include <color_fragment>
+diffuseColor.rgb *= hdSurface(vSurfUV, vSurfN, vSurfW, vSurfMat);`);
+  };
+  //  Without this three shares one compiled program between the patched and
+  //  unpatched versions of the same material class and the injection is
+  //  silently dropped on whichever one compiles second.
+  mat.customProgramCacheKey = function(){ return 'hd-surface-1'; };
+  mat.needsUpdate = true;
+}
+
+// =============================================================================
+//  LIGHT — a sun that moves, and a shadow that follows you
+// =============================================================================
+
+const HD_SUN = new THREE.Vector3(0.4, 0.9, 0.3);
+
+//  Direction from the city up toward the light. The sun runs an arc from the
+//  east at 06:00 to the west at 18:00; after dusk the moon takes the same arc
+//  from the other side, lower and shallower, so night keeps a soft direction
+//  rather than snapping to flat.
+function hdLightDir(hour, out){
+  const day = hour >= 6 && hour <= 18;
+  const t = day ? (hour - 6) / 12 : ((hour < 6 ? hour + 6 : hour - 18) / 12);
+  const az = Math.PI * (day ? t : t + 1.0) + 0.6;
+  const el = day ? (0.18 + Math.sin(Math.PI * t) * 0.72)
+                 : (0.32 + Math.sin(Math.PI * t) * 0.34);
+  const ch = Math.cos(el * Math.PI * 0.5);
+  out.set(Math.cos(az) * ch, Math.sin(el * Math.PI * 0.5) + 0.12, Math.sin(az) * ch);
+  return out.normalize();
+}
+
+function hdSetupShadow(){
+  const sun = State.sunLight;
+  if (!sun) return;
+  const T = HD.T;
+  if (!HD.shadowsOn){
+    sun.castShadow = false;
+    if (State.renderer) State.renderer.shadowMap.enabled = false;
+    return;
+  }
+  if (State.renderer){
+    State.renderer.shadowMap.enabled = true;
+    State.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    State.renderer.shadowMap.autoUpdate = true;
+  }
+  sun.castShadow = true;
+  if (sun.shadow.mapSize.x !== T.shadow){
+    sun.shadow.mapSize.set(T.shadow, T.shadow);
+    if (sun.shadow.map){ sun.shadow.map.dispose(); sun.shadow.map = null; }
+  }
+  const cam = sun.shadow.camera;
+  cam.left = -T.span; cam.right = T.span;
+  cam.top = T.span;   cam.bottom = -T.span;
+  cam.near = 1; cam.far = T.span * 4.2;
+  cam.updateProjectionMatrix();
+  //  Voxel faces are axis aligned and enormous, which is the worst case for
+  //  shadow acne. normalBias does nearly all the work here; a depth bias on its
+  //  own pushed contact shadows a metre off their own wall.
+  sun.shadow.bias = -0.0004;
+  sun.shadow.normalBias = 0.09;
+  if (sun.target && !sun.target.parent) State.scene.add(sun.target);
+}
+
+//  The light box follows the player, snapped to two metres so the shadow edges
+//  do not swim while you walk.
+function hdSunTick(){
+  const sun = State.sunLight;
+  if (!sun || !HD.shadowsOn) return;
+  const hour = ((State.dayTime || 0) / 60) % 24;
+  hdLightDir(hour, HD_SUN);
+  const T = HD.T;
+  const p = Player.position;
+  const sx = Math.round(p.x / 2) * 2, sz = Math.round(p.z / 2) * 2;
+  const d = T.span * 1.6;
+  sun.position.set(sx + HD_SUN.x * d, HD_SUN.y * d + 10, sz + HD_SUN.z * d);
+  if (sun.target){
+    sun.target.position.set(sx, Math.max(0, p.y - 10), sz);
+    sun.target.updateMatrixWorld();
+  }
+}
+
+//  Nothing in this file ever set castShadow on anything, and there are forty
+//  places that add meshes to the scene. Rather than patch all forty, sweep the
+//  graph now and then and flag whatever is new. Each object is touched once.
+let hdTagAcc = 9;
+function hdTagShadows(dt){
+  if (!HD.shadowsOn || !State.scene) return;
+  hdTagAcc += dt;
+  if (hdTagAcc < 0.6) return;
+  hdTagAcc = 0;
+  State.scene.traverse(o => {
+    if (o.userData && o.userData._hdTag) return;
+    if (!o.isMesh){ if (o.userData) o.userData._hdTag = 1; return; }
+    o.userData._hdTag = 1;
+    const m = o.material;
+    const mm = Array.isArray(m) ? m[0] : m;
+    if (!mm || mm.side === THREE.BackSide || (mm.transparent && mm.opacity < 0.6)){
+      o.castShadow = false; o.receiveShadow = false; return;
+    }
+    if (o.geometry && !o.geometry.boundingSphere){
+      try { o.geometry.computeBoundingSphere(); } catch (e){}
+    }
+    const r = (o.geometry && o.geometry.boundingSphere) ? o.geometry.boundingSphere.radius : 0;
+    //  The distant skyline is a ring of ninety-metre boxes two hundred metres
+    //  out. It must never enter a shadow map that is eighty metres wide.
+    if (r > 40 || o.position.length() > 180){ o.castShadow = false; o.receiveShadow = false; return; }
+    o.castShadow = true;
+    o.receiveShadow = true;
+  });
+}
+
+// =============================================================================
+//  BLOOM — and the tone map that had to come with it
+// -----------------------------------------------------------------------------
+//  three turns tone mapping OFF when the destination is a render target, which
+//  is correct — you do not want to tone map twice — but it means the moment the
+//  scene goes into a buffer, the composite owes the frame an ACES curve and an
+//  sRGB encode or the whole city comes back flat and pale. Both are here, and
+//  they are three's own constants, so bloom on and bloom off match.
+// =============================================================================
+
+const Bloom = {
+  scene:null, cam:null, quad:null, rt:null, a:null, b:null,
+  w:0, h:0, msaa:-1, scale:-1, fail:0,
+};
+
+const HD_VERT = `
+varying vec2 vUvq;
+void main(){ vUvq = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }
+`;
+
+function hdBloomInit(){
+  if (Bloom.scene) return;
+  Bloom.scene = new THREE.Scene();
+  Bloom.cam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+  Bloom.quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), null);
+  Bloom.quad.frustumCulled = false;
+  Bloom.scene.add(Bloom.quad);
+
+  Bloom.bright = new THREE.ShaderMaterial({
+    uniforms: { tSrc:{value:null}, uThresh:{value:1.0}, uKnee:{value:0.6} },
+    vertexShader: HD_VERT,
+    fragmentShader: `
+      varying vec2 vUvq;
+      uniform sampler2D tSrc;
+      uniform float uThresh;
+      uniform float uKnee;
+      void main(){
+        vec3 c = texture2D(tSrc, vUvq).rgb;
+        float l = max(c.r, max(c.g, c.b));
+        //  A soft knee, so a window that is just over the line does not pop
+        //  into the bloom the frame after it lights.
+        float s = clamp((l - uThresh + uKnee) / (2.0 * uKnee), 0.0, 1.0);
+        float w = max(l - uThresh, s * s * uKnee) / max(l, 0.0001);
+        gl_FragColor = vec4(c * w, 1.0);
+      }`,
+    depthTest:false, depthWrite:false, toneMapped:false,
+  });
+
+  Bloom.blur = new THREE.ShaderMaterial({
+    uniforms: { tSrc:{value:null}, uDir:{value:new THREE.Vector2(1,0)} },
+    vertexShader: HD_VERT,
+    fragmentShader: `
+      varying vec2 vUvq;
+      uniform sampler2D tSrc;
+      uniform vec2 uDir;
+      void main(){
+        //  Nine-tap gaussian, the usual weights.
+        vec3 s = texture2D(tSrc, vUvq).rgb * 0.227027;
+        s += (texture2D(tSrc, vUvq + uDir * 1.3846).rgb +
+              texture2D(tSrc, vUvq - uDir * 1.3846).rgb) * 0.316216;
+        s += (texture2D(tSrc, vUvq + uDir * 3.2308).rgb +
+              texture2D(tSrc, vUvq - uDir * 3.2308).rgb) * 0.070270;
+        gl_FragColor = vec4(s, 1.0);
+      }`,
+    depthTest:false, depthWrite:false, toneMapped:false,
+  });
+
+  Bloom.comp = new THREE.ShaderMaterial({
+    uniforms: {
+      tScene:{value:null}, tBloom:{value:null},
+      uStrength:{value:1.0}, uExposure:{value:1.0}, uVignette:{value:0.32},
+    },
+    vertexShader: HD_VERT,
+    fragmentShader: `
+      varying vec2 vUvq;
+      uniform sampler2D tScene;
+      uniform sampler2D tBloom;
+      uniform float uStrength;
+      uniform float uExposure;
+      uniform float uVignette;
+
+      vec3 hdRRTFit(vec3 v){
+        vec3 a = v * (v + 0.0245786) - 0.000090537;
+        vec3 b = v * (0.983729 * v + 0.4329510) + 0.238081;
+        return a / b;
+      }
+      vec3 hdACES(vec3 color){
+        mat3 IN = mat3(
+          0.59719, 0.07600, 0.02840,
+          0.35458, 0.90834, 0.13383,
+          0.04823, 0.01566, 0.83777);
+        mat3 OUT = mat3(
+           1.60475, -0.10208, -0.00327,
+          -0.53108,  1.10813, -0.07276,
+          -0.07367, -0.00605,  1.07602);
+        color *= uExposure / 0.6;
+        color = IN * color;
+        color = hdRRTFit(color);
+        color = OUT * color;
+        return clamp(color, 0.0, 1.0);
+      }
+      vec3 hdToSRGB(vec3 c){
+        return mix(pow(c, vec3(0.41666)) * 1.055 - vec3(0.055), c * 12.92,
+                   vec3(lessThanEqual(c, vec3(0.0031308))));
+      }
+      void main(){
+        vec3 base = texture2D(tScene, vUvq).rgb;
+        vec3 glow = texture2D(tBloom, vUvq).rgb;
+        vec3 lin = base + glow * uStrength;
+        vec3 col = hdToSRGB(hdACES(lin));
+        //  A vignette, because a city at night has a horizon and the corners
+        //  of a screen do not.
+        vec2 d = vUvq - 0.5;
+        float v = 1.0 - uVignette * dot(d, d) * 2.0;
+        gl_FragColor = vec4(col * v, 1.0);
+      }`,
+    depthTest:false, depthWrite:false, toneMapped:false,
+  });
+}
+
+function hdBloomSize(r){
+  const sz = r.getDrawingBufferSize(new THREE.Vector2());
+  const w = Math.max(2, Math.floor(sz.x)), h = Math.max(2, Math.floor(sz.y));
+  const msaa = HD.T.msaa, scale = HD.T.bscale;
+  if (Bloom.rt && Bloom.w === w && Bloom.h === h && Bloom.msaa === msaa && Bloom.scale === scale) return;
+  if (Bloom.rt) Bloom.rt.dispose();
+  if (Bloom.a) Bloom.a.dispose();
+  if (Bloom.b) Bloom.b.dispose();
+  Bloom.w = w; Bloom.h = h; Bloom.msaa = msaa; Bloom.scale = scale;
+  const opts = { type: THREE.HalfFloatType, depthBuffer: true, stencilBuffer: false };
+  if (msaa > 0) opts.samples = msaa;
+  Bloom.rt = new THREE.WebGLRenderTarget(w, h, opts);
+  Bloom.rt.texture.colorSpace = THREE.LinearSRGBColorSpace;
+  Bloom.rt.texture.minFilter = THREE.LinearFilter;
+  Bloom.rt.texture.magFilter = THREE.LinearFilter;
+  const bw = Math.max(2, Math.floor(w * scale)), bh = Math.max(2, Math.floor(h * scale));
+  const bopt = { type: THREE.HalfFloatType, depthBuffer: false, stencilBuffer: false };
+  Bloom.a = new THREE.WebGLRenderTarget(bw, bh, bopt);
+  Bloom.b = new THREE.WebGLRenderTarget(bw, bh, bopt);
+  Bloom.a.texture.colorSpace = THREE.LinearSRGBColorSpace;
+  Bloom.b.texture.colorSpace = THREE.LinearSRGBColorSpace;
+}
+
+function hdComposite(r, base, scene, cam){
+  hdBloomInit();
+  hdBloomSize(r);
+  const T = HD.T;
+
+  r.setRenderTarget(Bloom.rt);
+  r.clear();
+  base(scene, cam);
+
+  Bloom.bright.uniforms.tSrc.value = Bloom.rt.texture;
+  //  Threshold in linear light, above the diffuse range, so only emitters and
+  //  specular hits bloom — not every pale wall in daylight.
+  Bloom.bright.uniforms.uThresh.value = 1.05;
+  Bloom.quad.material = Bloom.bright;
+  r.setRenderTarget(Bloom.a);
+  r.clear();
+  base(Bloom.scene, Bloom.cam);
+
+  Bloom.quad.material = Bloom.blur;
+  for (let i = 0; i < 2; i++){
+    const step = 1.0 + i * 1.7;
+    Bloom.blur.uniforms.tSrc.value = Bloom.a.texture;
+    Bloom.blur.uniforms.uDir.value.set(step / Bloom.a.width, 0);
+    r.setRenderTarget(Bloom.b); r.clear(); base(Bloom.scene, Bloom.cam);
+    Bloom.blur.uniforms.tSrc.value = Bloom.b.texture;
+    Bloom.blur.uniforms.uDir.value.set(0, step / Bloom.a.height);
+    r.setRenderTarget(Bloom.a); r.clear(); base(Bloom.scene, Bloom.cam);
+  }
+
+  Bloom.comp.uniforms.tScene.value = Bloom.rt.texture;
+  Bloom.comp.uniforms.tBloom.value = Bloom.a.texture;
+  Bloom.comp.uniforms.uStrength.value = T.bloom;
+  Bloom.comp.uniforms.uExposure.value = r.toneMappingExposure;
+  Bloom.quad.material = Bloom.comp;
+  r.setRenderTarget(null);
+  r.clear();
+  base(Bloom.scene, Bloom.cam);
+}
+
+function hdInstallRender(r){
+  if (!r || r.__hdWrapped) return;
+  r.__hdWrapped = 1;
+  const base = r.render.bind(r);
+  r.render = function(scene, cam, target){
+    if (!HD.bloomOn || target || Bloom.fail || scene !== State.scene){
+      return base(scene, cam, target);
+    }
+    try {
+      hdComposite(r, base, scene, cam);
+    } catch (e){
+      Bloom.fail = 1;
+      console.error('hd: bloom disabled after an error', e);
+      try { r.setRenderTarget(null); base(scene, cam); } catch (e2){}
+    }
+  };
+}
+
+// =============================================================================
+//  BUDGET — view distance, fog to match, and the tier itself
+// =============================================================================
+
+//  The streaming pass from section 57, with the radius taken from the tier
+//  instead of a constant. Everything else about it is unchanged: the chunk you
+//  stand in is never queued, the rest is nearest-first on a time budget.
+const _hdStreamChunks = window.updateChunks;
+window.updateChunks = function(force){
+  const R = HD.T.view;
+  const U = Math.max(UNLOAD_RADIUS, R + 1);
+  const t0 = performance.now();
+  const px = Player.position.x, pz = Player.position.z;
+  const pcx = Math.floor((px + CHUNK_SIZE / 2) / CHUNK_SIZE);
+  const pcz = Math.floor((pz + CHUNK_SIZE / 2) / CHUNK_SIZE);
+  const here = `${pcx},${pcz}`;
+
+  if (!State.chunkMap.has(here)) shBuildChunk(here);
+
+  const missing = [];
+  for (let dx = -R; dx <= R; dx++){
+    for (let dz = -R; dz <= R; dz++){
+      const key = `${pcx + dx},${pcz + dz}`;
+      if (State.chunkMap.has(key)) continue;
+      missing.push({ key, d: Math.abs(dx) + Math.abs(dz) });
+    }
+  }
+  missing.sort((a, b) => a.d - b.d);
+  Stream.queue = missing.map(m => m.key);
+
+  if (Stream.prime > 0){
+    let n = Stream.prime; Stream.prime = 0;
+    while (n-- > 0 && Stream.queue.length) shBuildChunk(Stream.queue.shift());
+  } else if (force){
+    while (Stream.queue.length) shBuildChunk(Stream.queue.shift());
+  } else {
+    const ms = shStreamQuiet() ? Stream.msQuiet : Stream.msBudget;
+    let first = true;
+    while (Stream.queue.length && (first || performance.now() - t0 < ms)){
+      shBuildChunk(Stream.queue.shift());
+      first = false;
+    }
+  }
+
+  const stale = [];
+  for (const [key, chunk] of State.chunkMap){
+    const dx = chunk.cx - pcx, dz = chunk.cz - pcz;
+    if (Math.abs(dx) > U || Math.abs(dz) > U) stale.push(key);
+  }
+  const canDrop = force ? stale.length : Stream.unloadPerFrame;
+  for (let i = 0; i < Math.min(canDrop, stale.length); i++) shDestroyChunk(stale[i]);
+
+  const ms = performance.now() - t0;
+  if (ms > Stream.peakMs) Stream.peakMs = ms;
+  return Stream.queue.length;
+};
+
+//  Fog was tuned for a three-chunk view. At five chunks the same density is a
+//  wall of violet at seventy metres and the extra city is invisible, so the
+//  tier scales it and the camera's far plane together.
+const _hdApplyLighting = shApplyLighting;
+window.shApplyLighting = function(hour){
+  const r = _hdApplyLighting.apply(this, arguments);
+  try {
+    if (State.scene && State.scene.fog) State.scene.fog.density *= HD.T.fog;
+    if (State.camera && State.camera.far !== HD.T.far){
+      State.camera.far = HD.T.far;
+      State.camera.updateProjectionMatrix();
+    }
+  } catch (e){}
+  return r;
+};
+
+function hdApply(quiet){
+  const T = HD.T;
+  const r = State.renderer;
+  HD_U.uSurfMode.value = HD.surfMode;
+  if (r){
+    r.setPixelRatio(Math.min(T.dpr, window.devicePixelRatio || 1));
+    hdInstallRender(r);
+    if (!HD.bloomOn){ try { r.setRenderTarget(null); } catch (e){} }
+  }
+  hdSetupShadow();
+  if (!HD.shadowsOn && State.scene){
+    //  Leaving stale flags on means a later tier change re-lights half a city
+    //  and not the other half. Clear them so the sweep runs clean next time.
+    State.scene.traverse(o => { if (o.userData) o.userData._hdTag = 0; });
+  }
+  try { shApplyLighting((State.dayTime || 0) / 60); } catch (e){}
+  hdPanelSync();
+  if (!quiet) hdSave();
+}
+
+//  Exposed, because the panel is not the only thing that has reason to change
+//  the render: a cutscene can drop bloom for a frame, a test can force a tier,
+//  and the console is a legitimate way in.
+HD.apply = hdApply;
+
+function hdSetTier(name, byHand){
+  if (!HD_TIERS[name]) return;
+  HD.tier = name;
+  if (byHand) HD.locked = true;
+  HD._hot = 0;
+  hdApply();
+  try { toast('Graphics: ' + HD.T.label, 'info'); } catch (e){}
+}
+
+//  The watchdog. Four seconds of sustained sub-thirty is not a hitch, it is a
+//  machine saying no. It steps down one tier, once, and says so — and it never
+//  touches a tier that was chosen by hand.
+function hdWatchdog(dt){
+  HD._acc += dt; HD._n++;
+  if (HD._acc < 0.5) return;
+  HD.ms = (HD._acc / HD._n) * 1000;
+  HD.fps = 1000 / Math.max(0.001, HD.ms);
+  HD._acc = 0; HD._n = 0;
+  hdPanelStats();
+  if (HD.locked) return;
+  if (typeof shStreamQuiet === 'function' && shStreamQuiet()) return;
+  if (Stream && Stream.queue.length > 6) return;     // streaming, not struggling
+  if (HD.ms > 33){
+    HD._hot += 0.5;
+    if (HD._hot >= 4){
+      const i = HD_ORDER.indexOf(HD.tier);
+      if (i > 0){
+        HD.tier = HD_ORDER[i - 1];
+        HD._hot = 0;
+        hdApply();
+        try { toast('Frame time high — graphics stepped down to ' + HD.T.label + '. F to set it yourself.', 'warn'); } catch (e){}
+      }
+    }
+  } else if (HD.ms < 20){
+    HD._hot = Math.max(0, HD._hot - 0.5);
+  }
+}
+
+HD.setTier = hdSetTier;
+
+// =============================================================================
+//  THE PANEL — F, and everything above it on one card
+// =============================================================================
+
+const HD_CSS = `
+#hd-panel{position:fixed;right:18px;top:96px;z-index:57;width:252px;
+  background:rgba(8,4,14,.93);border:1px solid rgba(180,140,255,.42);
+  padding:14px 16px 12px;font-family:'SF Mono','Courier New',monospace;
+  color:#e7e2ff;display:none;box-shadow:0 0 34px rgba(0,0,0,.65);}
+#hd-panel.on{display:block;}
+#hd-panel h4{margin:0 0 10px;font-size:9px;letter-spacing:4px;color:#ffd47a;font-weight:600;}
+#hd-panel .row{display:flex;gap:4px;margin-bottom:10px;}
+#hd-panel button{flex:1;background:rgba(30,16,60,.5);border:1px solid rgba(180,140,255,.3);
+  color:#e7e2ff;font:9px/1 inherit;letter-spacing:1px;padding:7px 2px;cursor:pointer;
+  text-transform:uppercase;transition:all .12s;}
+#hd-panel button:hover{background:rgba(60,32,110,.7);border-color:rgba(255,212,122,.6);}
+#hd-panel button.on{background:rgba(255,212,122,.16);border-color:#ffd47a;color:#ffd47a;}
+#hd-panel .tog{display:flex;justify-content:space-between;align-items:center;
+  padding:5px 0;font-size:10px;letter-spacing:1px;border-top:1px solid rgba(180,140,255,.14);
+  cursor:pointer;color:#c8c0e8;}
+#hd-panel .tog b{font-weight:600;letter-spacing:2px;font-size:9px;}
+#hd-panel .tog.off b{color:#6a6088;}
+#hd-panel .tog.on b{color:#7dffb3;}
+#hd-panel .stat{margin-top:10px;padding-top:9px;border-top:1px solid rgba(180,140,255,.2);
+  font-size:9px;letter-spacing:1px;color:#8d84b0;line-height:1.7;}
+#hd-panel .stat i{font-style:normal;color:#e7e2ff;}
+#hd-panel .note{margin-top:8px;font-size:9px;line-height:1.5;color:#6a6088;letter-spacing:.5px;}
+body.in-dialogue #hd-panel,body.in-intro #hd-panel{display:none;}
+`;
+
+let hdPanelEl = null;
+
+function hdPanelBuild(){
+  if (hdPanelEl) return;
+  const css = document.createElement('style');
+  css.textContent = HD_CSS;
+  document.head.appendChild(css);
+  const el = document.createElement('div');
+  el.id = 'hd-panel';
+  el.innerHTML =
+    '<h4>RENDER</h4>' +
+    '<div class="row">' +
+      HD_ORDER.slice().reverse().map(k =>
+        `<button data-tier="${k}">${HD_TIERS[k].label.slice(0,4)}</button>`).join('') +
+    '</div>' +
+    '<div class="tog" data-flag="surfaces"><span>SURFACES</span><b></b></div>' +
+    '<div class="tog" data-flag="shadows"><span>SHADOWS</span><b></b></div>' +
+    '<div class="tog" data-flag="bloom"><span>BLOOM</span><b></b></div>' +
+    '<div class="stat"><span>FRAME</span> <i id="hd-ms">—</i> · <span>FPS</span> <i id="hd-fps">—</i><br>' +
+      '<span>VIEW</span> <i id="hd-view">—</i> · <span>CHUNKS</span> <i id="hd-chunks">—</i></div>' +
+    '<div class="note">F closes this. Picking a tier by hand stops the watchdog moving it.</div>';
+  document.body.appendChild(el);
+  hdPanelEl = el;
+  el.addEventListener('click', ev => {
+    const tb = ev.target.closest('button[data-tier]');
+    if (tb){ hdSetTier(tb.dataset.tier, true); return; }
+    const tg = ev.target.closest('.tog[data-flag]');
+    if (tg){
+      const f = tg.dataset.flag;
+      HD.want[f] = !HD.want[f];
+      hdApply();
+      return;
+    }
+  });
+}
+
+function hdPanelSync(){
+  if (!hdPanelEl) return;
+  for (const b of hdPanelEl.querySelectorAll('button[data-tier]')){
+    b.classList.toggle('on', b.dataset.tier === HD.tier);
+  }
+  for (const t of hdPanelEl.querySelectorAll('.tog[data-flag]')){
+    const f = t.dataset.flag;
+    const on = !!HD.want[f] && (f !== 'shadows' || HD.T.shadow > 0) && (f !== 'bloom' || HD.T.bloom > 0);
+    t.classList.toggle('on', on);
+    t.classList.toggle('off', !on);
+    t.querySelector('b').textContent = on ? 'ON' : 'OFF';
+  }
+}
+
+function hdPanelStats(){
+  if (!hdPanelEl || !hdPanelEl.classList.contains('on')) return;
+  const set = (id, v) => { const e = document.getElementById(id); if (e) e.textContent = v; };
+  set('hd-ms', HD.ms.toFixed(1) + 'ms');
+  set('hd-fps', Math.round(HD.fps));
+  set('hd-view', (HD.T.view * CHUNK_SIZE) + 'm');
+  set('hd-chunks', State.chunkMap ? State.chunkMap.size : 0);
+}
+
+function hdPanelToggle(){
+  hdPanelBuild();
+  const on = !hdPanelEl.classList.contains('on');
+  hdPanelEl.classList.toggle('on', on);
+  hdPanelSync();
+  hdPanelStats();
+  if (on && document.pointerLockElement) document.exitPointerLock();
+}
+
+// =============================================================================
+//  WIRING
+// =============================================================================
+
+window.addEventListener('keydown', e => {
+  if (e.key !== 'f' && e.key !== 'F') return;
+  if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
+  const tag = (document.activeElement && document.activeElement.tagName) || '';
+  if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+  if (State.ui && (State.ui.inMiniGame || State.ui.inDialogue || State.ui.inArcade)) return;
+  e.preventDefault();
+  hdPanelToggle();
+});
+
+(function(){
+  const origInit = init;
+  window.init = function(){
+    const r = origInit.apply(this, arguments);
+    try {
+      hdPatchVoxMaterial(M.voxOpaque);
+      hdPatchVoxMaterial(M.voxEmit);
+      hdBloomInit();
+      hdPanelBuild();
+      hdLoad().then(() => {
+        if (!HD.locked) HD.tier = hdGuessTier();
+        hdApply(true);
+      });
+      hdApply(true);
+      const c = document.getElementById('hud-controls');
+      if (c && !/render/.test(c.dataset.hd || '')){
+        c.dataset.hd = 'render';
+        const b = document.createElement('span');
+        b.className = 'key';
+        b.textContent = 'F';
+        c.appendChild(document.createTextNode(' '));
+        c.appendChild(b);
+        c.appendChild(document.createTextNode(' render '));
+      }
+    } catch (e){ console.error('hd init:', e); }
+    return r;
+  };
+})();
+
+//  newGame() empties the scene, which takes the sun's target and every shadow
+//  flag with it.
+(function(){
+  const origNew = newGame;
+  window.newGame = function(){
+    const r = origNew.apply(this, arguments);
+    try {
+      hdSetupShadow();
+      hdTagAcc = 9;
+      hdApply(true);
+    } catch (e){}
+    return r;
+  };
+})();
+
+//  One hook into the frame for the sun, the sweep and the watchdog. shUpdateHUD
+//  runs inside the simulation branch of tick(), which is exactly where this
+//  belongs — none of it should run behind a panel or a film.
+(function(){
+  const origHud = shUpdateHUD;
+  let last = performance.now();
+  window.shUpdateHUD = function(dt){
+    const r = origHud.apply(this, arguments);
+    const now = performance.now();
+    const real = Math.min(0.25, (now - last) / 1000);
+    last = now;
+    try {
+      hdSunTick();
+      hdTagShadows(real);
+      hdWatchdog(real);
+    } catch (e){
+      if (!window.__hdTickWarned){ window.__hdTickWarned = 1; console.error('hd tick:', e); }
+    }
+    return r;
+  };
+})();
+
+})();
+
+
+// =============================================================================
+//  70 · THE CITY RESPONDS — nine more fittings, and a supply that can be cut
+// -----------------------------------------------------------------------------
+//  Section 51 gave E one verb and six things to point it at: a door, a bench, a
+//  locker, a cabinet, a vendor, a crate. Four of those six are the same object
+//  with a different loot table. So the street looks built and answers to almost
+//  nothing, and the only systemic thing you can do to a block is mine it.
+//
+//  This section is two halves and they are meant to be read as one.
+//
+//  MORE THINGS   A switch, a roller shutter, a standpipe, a wall screen, a
+//                payphone, a breaker box, a bin, a notice board and a payment
+//                meter. Each is a block id, so each is part of the world: it
+//                meshes with everything else, it occludes, it can be mined, and
+//                it costs nothing until you are standing in front of it.
+//
+//  MORE SYSTEM   The breaker is the one that matters. Every chunk has a supply.
+//                Cut it and every lit window, fascia, till and neon tube inside
+//                that chunk goes out together, the block goes dark on the map
+//                and stays dark across a save, a reload and a regeneration of
+//                the same seed. Doors get locks that are a property of the
+//                coordinate rather than a flag someone set, so the same door is
+//                locked in your city and in mine. Glass breaks and stays broken.
+//                Benches can be sat on, and sitting is the only way to make the
+//                night go faster.
+//
+//  The supply is deliberately the most destructive thing in the game that kills
+//  nobody. Ned has views on it.
+// =============================================================================
+
+(function(){
+
+// ─── Block ids, at fixed indices, continuing section 51's table ─────────────
+const B_SWITCH   = shDefBlock(29, { name:'light switch',  solid:true, emit:false, color:0x9aa0b4, grain:0.05 });
+const B_SHUTTER  = shDefBlock(30, { name:'roller shutter',solid:true, emit:false, color:0x6a6e7c, grain:0.10 });
+const B_TAP      = shDefBlock(31, { name:'standpipe',     solid:true, emit:false, color:0x5a6a72, grain:0.12 });
+const B_SCREEN   = shDefBlock(32, { name:'wall screen',   solid:true, emit:true,  color:0x7ad0ff, grain:0.02 });
+const B_PHONE    = shDefBlock(33, { name:'payphone',      solid:true, emit:false, color:0x2f4a5c, grain:0.08 });
+const B_BREAKER  = shDefBlock(34, { name:'breaker box',   solid:true, emit:false, color:0x7a6a4a, grain:0.09 });
+const B_BIN      = shDefBlock(35, { name:'bin',           solid:true, emit:false, color:0x3a4a3e, grain:0.14 });
+const B_NOTICE   = shDefBlock(36, { name:'notice board',  solid:true, emit:false, color:0x8a8270, grain:0.07 });
+const B_METER    = shDefBlock(37, { name:'payment meter', solid:true, emit:false, color:0x54506a, grain:0.08 });
+
+//  The unpowered twins. A separate id rather than a flag, because the supply
+//  has to survive a remesh, a chunk unload and a reload of the save — and the
+//  voxel field is the only thing in this game that already does all three.
+const B_WIN_OFF    = shDefBlock(38, { name:'cold pane',    solid:true, emit:false, color:0x1d1b2e, grain:0.04 });
+const B_FASCIA_OFF = shDefBlock(39, { name:'dead fascia',  solid:true, emit:false, color:0x2a3a32, grain:0.03 });
+const B_TILL_OFF   = shDefBlock(40, { name:'dead till',    solid:true, emit:false, color:0x3a3228, grain:0.03 });
+const B_NEON_OFF   = shDefBlock(41, { name:'dead tube',    solid:true, emit:false, color:0x3a2434, grain:0.02 });
+const B_SCREEN_OFF = shDefBlock(42, { name:'dead screen',  solid:true, emit:false, color:0x1c2430, grain:0.03 });
+
+const POWER_PAIRS = [
+  [B_WIN_LIT, B_WIN_OFF], [B_FASCIA, B_FASCIA_OFF],
+  [B_TILL, B_TILL_OFF],   [B_NEON, B_NEON_OFF],
+  [B_SCREEN, B_SCREEN_OFF],
+];
+const POWER_OFF_OF = {}, POWER_ON_OF = {};
+for (const [on, off] of POWER_PAIRS){ POWER_OFF_OF[on] = off; POWER_ON_OF[off] = on; }
+
+// ─── What they are made of ──────────────────────────────────────────────────
+const CITY_MATS = {
+  [B_SWITCH]:  { label:'Switch Plate',  cls:'signal', hardness:0.6, drop:B_METAL, yield:1, value:3,
+                 desc:'One pole, one throw. The most decisive object in the district.' },
+  [B_SHUTTER]: { label:'Shutter Slat',  cls:'metal',  hardness:3.4, drop:B_METAL, yield:2, value:9,
+                 desc:'Galvanised, corrugated, and painted over four times by four different tenants.' },
+  [B_TAP]:     { label:'Standpipe',     cls:'metal',  hardness:3.6, drop:B_METAL, yield:2, value:10,
+                 desc:'Municipal water, still pressurised. The Bureau has been meaning to invoice this street since spring.' },
+  [B_SCREEN]:  { label:'Screen Panel',  cls:'signal', hardness:0.9, drop:B_NEON,  yield:1, value:14,
+                 desc:'Civic display. It has one job and it does it at everybody.' },
+  [B_PHONE]:   { label:'Handset Shell', cls:'metal',  hardness:2.8, drop:B_METAL, yield:2, value:8,
+                 desc:'A payphone. It still connects, which is the surprising part.' },
+  [B_BREAKER]: { label:'Breaker Case',  cls:'metal',  hardness:3.0, drop:B_METAL, yield:2, value:12,
+                 desc:'The supply for this block, in a steel box, at chest height, unlocked.' },
+  [B_BIN]:     { label:'Bin Shell',     cls:'stone',  hardness:1.2, drop:B_RUST,  yield:1, value:3,
+                 desc:'Emptied on a schedule that ended eleven months ago.' },
+  [B_NOTICE]:  { label:'Notice Board',  cls:'stone',  hardness:1.0, drop:B_BRICK, yield:1, value:4,
+                 desc:'Everything on it is current and none of it is true.' },
+  [B_METER]:   { label:'Meter Head',    cls:'metal',  hardness:2.4, drop:B_METAL, yield:1, value:9,
+                 desc:'Takes payment for a thing it does not name.' },
+  [B_WIN_OFF]:    { label:'Cold Pane',   cls:'stone', hardness:0.9, drop:B_GLASS, yield:1, value:2, desc:'Dark, and not because anyone went to bed.' },
+  [B_FASCIA_OFF]: { label:'Dead Fascia', cls:'signal',hardness:0.7, drop:B_METAL, yield:1, value:3, desc:'The strip that told you the machine was awake.' },
+  [B_TILL_OFF]:   { label:'Dead Till',   cls:'signal',hardness:0.7, drop:B_METAL, yield:1, value:3, desc:'Counting nothing, now, instead of counting something nobody read.' },
+  [B_NEON_OFF]:   { label:'Dead Tube',   cls:'signal',hardness:0.7, drop:B_GLASS, yield:1, value:4, desc:'Glass, gas and no argument.' },
+  [B_SCREEN_OFF]: { label:'Dead Screen', cls:'signal',hardness:0.9, drop:B_METAL, yield:1, value:6, desc:'A civic display with nothing civic to say.' },
+};
+for (const k in CITY_MATS) MATERIALS[k] = CITY_MATS[k];
+
+// ─── What they are ──────────────────────────────────────────────────────────
+FITTINGS[B_SWITCH]  = { name:'LIGHT SWITCH',   verb:'throw',  tall:1, city:'switch' };
+FITTINGS[B_SHUTTER] = { name:'ROLLER SHUTTER', verb:'raise',  tall:2, city:'shutter' };
+FITTINGS[B_TAP]     = { name:'STANDPIPE',      verb:'open',   tall:1, city:'tap' };
+FITTINGS[B_SCREEN]  = { name:'WALL SCREEN',    verb:'tune',   tall:1, city:'screen' };
+FITTINGS[B_SCREEN_OFF] = { name:'DEAD SCREEN', verb:'tune',   tall:1, city:'screen' };
+FITTINGS[B_PHONE]   = { name:'PAYPHONE',       verb:'lift',   tall:2, city:'phone' };
+FITTINGS[B_BREAKER] = { name:'BREAKER BOX',    verb:'pull',   tall:1, city:'breaker' };
+FITTINGS[B_BIN]     = { name:'BIN',            verb:'turn out',tall:1, city:'bin' };
+FITTINGS[B_NOTICE]  = { name:'NOTICE BOARD',   verb:'read',   tall:1, city:'notice' };
+FITTINGS[B_METER]   = { name:'PAYMENT METER',  verb:'pay',    tall:1, city:'meter' };
+
+// =============================================================================
+//  STATE — the same diff trick, one letter wider
+// -----------------------------------------------------------------------------
+//  Section 51 wrote each fitting as "x,y,z|od": two bits, positional. Nine more
+//  fittings want more than two, so the format becomes a version-stamped object
+//  and the loader still reads the old one. Nobody loses a door they opened.
+// =============================================================================
+
+const POWER = new Map();                 // "cx,cz" -> 0 when the supply is cut
+let _cityLoadedSeed = null;
+let _citySaveTimer = 0;
+
+function powerKey(cx, cz){ return cx + ',' + cz; }
+function powerOn(cx, cz){ return POWER.get(powerKey(cx, cz)) !== 0; }
+
+window.shFitSave = function(){
+  clearTimeout(_citySaveTimer);
+  _citySaveTimer = setTimeout(() => {
+    try {
+      const e = [];
+      for (const [k, v] of FIT_STATE) e.push([k, v]);
+      window.fracture.save('fittings-' + State.citySeed, { v:2, e });
+      const p = [];
+      for (const [k, v] of POWER) if (v === 0) p.push(k);
+      window.fracture.save('power-' + State.citySeed, p);
+    } catch (err){}
+  }, 400);
+};
+
+window.shFitLoad = async function(force){
+  const seed = State.citySeed;
+  if (!force && _cityLoadedSeed === seed) return;
+  const next = new Map();
+  try {
+    const raw = await window.fracture.read('fittings-' + seed);
+    if (Array.isArray(raw)){
+      //  v1: "x,y,z|od"
+      for (const s of raw){
+        const i = s.lastIndexOf('|');
+        if (i < 0) continue;
+        const f = s.slice(i + 1);
+        next.set(s.slice(0, i), { o: f.includes('o') ? 1 : 0, d: f.includes('d') ? 1 : 0 });
+      }
+    } else if (raw && raw.v === 2 && Array.isArray(raw.e)){
+      for (const [k, v] of raw.e) if (k && v) next.set(k, v);
+    }
+  } catch (e){}
+  FIT_STATE.clear();
+  for (const [k, v] of next) FIT_STATE.set(k, v);
+
+  POWER.clear();
+  try {
+    const p = await window.fracture.read('power-' + seed);
+    if (Array.isArray(p)) for (const k of p) POWER.set(k, 0);
+  } catch (e){}
+  _cityLoadedSeed = seed;
+};
+
+// ─── Local voxel writes that do not enter the player's edit log ────────────
+//  A cut supply is not a block the player placed, and a chunk that regenerates
+//  has to be able to reapply it from the supply map alone.
+function cvSet(chunk, wx, wy, wz, id){
+  if (!chunk || !chunk.vox) return false;
+  if (wy < 0 || wy >= VOX_H) return false;
+  const lx = wx - chunk.cx * VOX_W, lz = wz - chunk.cz * VOX_W;
+  if (lx < 0 || lz < 0 || lx >= VOX_W || lz >= VOX_W) return false;
+  chunk.vox[vIndex(lx, wy, lz)] = id;
+  chunk.markSectionDirty(Math.floor(wy / SEC_H));
+  return true;
+}
+function cvAt(chunk, wx, wy, wz){
+  if (!chunk || !chunk.vox) return B_AIR;
+  if (wy < 0 || wy >= VOX_H) return B_AIR;
+  const lx = wx - chunk.cx * VOX_W, lz = wz - chunk.cz * VOX_W;
+  if (lx < 0 || lz < 0 || lx >= VOX_W || lz >= VOX_W) return B_AIR;
+  return chunk.vox[vIndex(lx, wy, lz)];
+}
+
+// =============================================================================
+//  THE SUPPLY
+// =============================================================================
+
+function cityPowerApply(chunk, on){
+  if (!chunk || !chunk.vox) return 0;
+  const vox = chunk.vox;
+  const map = on ? POWER_ON_OF : POWER_OFF_OF;
+  let n = 0;
+  for (let i = 0; i < vox.length; i++){
+    const to = map[vox[i]];
+    if (to !== undefined){ vox[i] = to; n++; }
+  }
+  if (n) for (let s = 0; s < N_SEC; s++) chunk.markSectionDirty(s);
+  return n;
+}
+
+function cityPowerSet(cx, cz, on){
+  const k = powerKey(cx, cz);
+  if (on) POWER.delete(k); else POWER.set(k, 0);
+  const chunk = State.chunkMap.get(k);
+  const n = chunk ? cityPowerApply(chunk, on) : 0;
+  shFitSave();
+  return n;
+}
+
+//  The supply, exposed. The campaign, the siege and the map all have reason to
+//  ask whether a block is lit, and a test has reason to cut one without
+//  standing in front of the box.
+window.CityPower = {
+  on: powerOn,
+  set: cityPowerSet,
+  keyOf: powerKey,
+};
+
+//  A chunk built while its supply is cut comes up dark, not bright-then-dark.
+(function(){
+  const orig = shBuildChunk;
+  window.shBuildChunk = function(key){
+    const chunk = orig.apply(this, arguments);
+    try {
+      if (chunk && POWER.get(key) === 0) cityPowerApply(chunk, false);
+    } catch (e){}
+    return chunk;
+  };
+})();
+
+// =============================================================================
+//  PLACEMENT — hung on walls the generator already built
+// =============================================================================
+
+const PAVE_REACH = 3;
+
+//  Find an air cell with a wall behind it and something to stand on below.
+//  Sampling rather than scanning: a chunk is 24x64x24 and this runs on every
+//  chunk that loads, so it gets forty tries and then it gives up.
+function cityFindWall(chunk, rng, wantY){
+  for (let t = 0; t < 40; t++){
+    const lx = rng.int(1, VOX_W - 2), lz = rng.int(1, VOX_W - 2);
+    const wx = chunk.cx * VOX_W + lx, wz = chunk.cz * VOX_W + lz;
+    //  Ground under this column.
+    let gy = -1;
+    for (let y = 10; y >= 1; y--){
+      if (isSolid(cvAt(chunk, wx, y, wz)) && !isSolid(cvAt(chunk, wx, y + 1, wz))){ gy = y; break; }
+    }
+    if (gy < 1) continue;
+    const y = gy + (wantY || 1);
+    if (isSolid(cvAt(chunk, wx, y, wz))) continue;
+    if (isSolid(cvAt(chunk, wx, gy + 1, wz))) continue;      // the walking line stays clear
+    const dirs = [[1,0],[-1,0],[0,1],[0,-1]];
+    for (let d = 0; d < 4; d++){
+      const [nx, nz] = dirs[(d + rng.int(0,3)) % 4];
+      const wall = cvAt(chunk, wx + nx, y, wz + nz);
+      if (!isSolid(wall)) continue;
+      if (FITTINGS[wall]) continue;                          // not on another fitting
+      return { x:wx, y, z:wz, nx, nz, gy };
+    }
+  }
+  return null;
+}
+
+function cityPlace(chunk, p, id, tall){
+  if (!p) return false;
+  for (let i = 0; i < (tall || 1); i++){
+    if (isSolid(cvAt(chunk, p.x, p.y + i, p.z))) return false;
+  }
+  for (let i = 0; i < (tall || 1); i++) cvSet(chunk, p.x, p.y + i, p.z, id);
+  chunk.fittings = chunk.fittings || [];
+  chunk.fittings.push({ x:p.x, y:p.y, z:p.z, id });
+  return true;
+}
+
+function cityPlaceFittings(chunk){
+  if (!chunk || !chunk.vox || chunk.__cityFitted) return;
+  chunk.__cityFitted = 1;
+  const rng = new RNG(`hd70:${chunk.cx}:${chunk.cz}:${State.citySeed}`);
+  const dname = (chunk.district && chunk.district.name) || 'RESIDENTIAL';
+
+  //  ONE breaker for the block's supply, always, because a system with a
+  //  sometimes-switch is not a system.
+  cityPlace(chunk, cityFindWall(chunk, rng, 2), B_BREAKER, 1);
+
+  //  A switch beside every alcove door, and one door in five is a shutter
+  //  instead — the same two-tall leaf, a different thing to say about it.
+  for (const f of (chunk.fittings || []).slice()){
+    if (f.id !== B_DOOR) continue;
+    if (rng.bool(0.20)){
+      cvSet(chunk, f.x, f.y,     f.z, B_SHUTTER);
+      cvSet(chunk, f.x, f.y + 1, f.z, B_SHUTTER);
+      f.id = B_SHUTTER;
+      continue;
+    }
+    //  The switch goes on whichever side of the doorway is still wall.
+    for (const [sx, sz] of [[1,0],[-1,0],[0,1],[0,-1]]){
+      const ax = f.x + sx, az = f.z + sz;
+      if (isSolid(cvAt(chunk, ax, f.y + 1, az))) continue;
+      if (!isSolid(cvAt(chunk, ax + sx, f.y + 1, az + sz))) continue;
+      if (cityPlace(chunk, { x:ax, y:f.y + 1, z:az }, B_SWITCH, 1)) break;
+    }
+  }
+
+  //  Everything else is weighted by district, because a notice board in the
+  //  Night Market is a screen and a screen in the greenbelt is a notice board.
+  const screens = dname === 'DOWNTOWN' ? 3 : dname === 'CHINATOWN' ? 3 : 1;
+  for (let i = 0; i < screens; i++){
+    if (rng.bool(0.55)) cityPlace(chunk, cityFindWall(chunk, rng, 2), B_SCREEN, 1);
+  }
+  if (rng.bool(0.8)) cityPlace(chunk, cityFindWall(chunk, rng, 2), B_NOTICE, 1);
+  if (rng.bool(dname === 'FORGE' ? 0.7 : 0.4)) cityPlace(chunk, cityFindWall(chunk, rng, 1), B_TAP, 1);
+  if (rng.bool(0.3)) cityPlace(chunk, cityFindWall(chunk, rng, 1), B_PHONE, 2);
+  if (rng.bool(dname === 'DOWNTOWN' ? 0.7 : 0.35)) cityPlace(chunk, cityFindWall(chunk, rng, 1), B_METER, 1);
+  const bins = rng.int(1, 3);
+  for (let i = 0; i < bins; i++) cityPlace(chunk, cityFindWall(chunk, rng, 1), B_BIN, 1);
+
+  cityReplay(chunk);
+}
+
+//  Replay what the player did here. Doors are section 51's job; shutters,
+//  emptied bins and a cut supply are this one's.
+function cityReplay(chunk){
+  for (const f of (chunk.fittings || [])){
+    const st = FIT_STATE.get(fitKey(f.x, f.y, f.z));
+    if (!st) continue;
+    if (f.id === B_SHUTTER && st.d){
+      cvSet(chunk, f.x, f.y, f.z, B_AIR);
+      cvSet(chunk, f.x, f.y + 1, f.z, B_AIR);
+    }
+    if (f.id === B_SWITCH && st.k) cityLampSet(chunk, f, false, true);
+  }
+  if (POWER.get(powerKey(chunk.cx, chunk.cz)) === 0) cityPowerApply(chunk, false);
+}
+
+(function(){
+  const orig = shRunPendingDetail;
+  window.shRunPendingDetail = function(chunk){
+    const r = orig.apply(this, arguments);
+    try { cityPlaceFittings(chunk); }
+    catch (e){ if (!cityPlaceFittings._warned){ cityPlaceFittings._warned = 1; console.error('city fittings:', e); } }
+    return r;
+  };
+})();
+
+// =============================================================================
+//  THE VERBS
+// =============================================================================
+
+function citySound(kind){
+  if (typeof shTone !== 'function') return;
+  try {
+    if (kind === 'switch') shTone({ type:'square', f0:900, f1:300, dur:0.05, gain:0.10 });
+    else if (kind === 'clunk') shTone({ noise:true, filter:'lowpass', ff0:600, ff1:120, dur:0.22, gain:0.16 });
+    else if (kind === 'shutter') shTone({ noise:true, filter:'bandpass', ff0:1400, ff1:500, q:2, dur:0.55, gain:0.13 });
+    else if (kind === 'water') shTone({ noise:true, filter:'highpass', ff0:900, ff1:2400, dur:0.9, gain:0.10 });
+    else if (kind === 'glass') shTone({ noise:true, filter:'highpass', ff0:3000, ff1:1200, dur:0.35, gain:0.18 });
+    else if (kind === 'dial') shTone({ type:'sine', f0:440, f1:660, dur:0.18, gain:0.10 });
+    else if (kind === 'power') shTone({ type:'sawtooth', f0:120, f1:40, dur:0.6, gain:0.16 });
+    else if (kind === 'coin') shTone({ type:'triangle', f0:1200, f1:1800, dur:0.10, gain:0.12 });
+  } catch (e){}
+}
+
+function cityNed(line){
+  try { if (typeof shNarrate === 'function'){ shNarrate([{ who:'ned', text:line }]); return; } } catch (e){}
+  try { toast(line, 'info'); } catch (e){}
+}
+
+// ─── The switch, and the lamp it owns ───────────────────────────────────────
+//  A switch turns off every lit fascia within six metres inside its own chunk,
+//  which in practice is exactly the alcove it is standing in.
+function cityLampSet(chunk, f, on, quiet){
+  let n = 0;
+  for (let dx = -6; dx <= 6; dx++){
+    for (let dz = -6; dz <= 6; dz++){
+      for (let dy = -1; dy <= 3; dy++){
+        const x = f.x + dx, y = f.y + dy, z = f.z + dz;
+        const id = cvAt(chunk, x, y, z);
+        if (on && id === B_FASCIA_OFF){ cvSet(chunk, x, y, z, B_FASCIA); n++; }
+        else if (!on && id === B_FASCIA){ cvSet(chunk, x, y, z, B_FASCIA_OFF); n++; }
+      }
+    }
+  }
+  if (!quiet && !n) toast('Nothing on this circuit is lit.', 'info');
+  return n;
+}
+
+function cityUseSwitch(f){
+  const chunk = State.chunkMap.get(`${chunkCoordOf(f.x)},${chunkCoordOf(f.z)}`);
+  if (!chunk) return true;
+  const st = fitGet(f.x, f.y, f.z);
+  const wasKilled = !!(st && st.k);
+  cityLampSet(chunk, f, wasKilled);
+  fitMark(f.x, f.y, f.z, { k: wasKilled ? 0 : 1 });
+  citySound('switch');
+  toast(wasKilled ? 'Light on.' : 'Light off.', 'info');
+  return true;
+}
+
+// ─── The shutter ────────────────────────────────────────────────────────────
+function cityUseShutter(f){
+  const st = fitGet(f.x, f.y, f.z);
+  const open = !!(st && st.d);
+  if (open){
+    const px = Math.floor(Player.position.x), pz = Math.floor(Player.position.z);
+    if (px === f.x && pz === f.z){ toast('You are standing under it.', 'info'); return true; }
+    setBlock(f.x, f.y,     f.z, B_SHUTTER, false);
+    setBlock(f.x, f.y + 1, f.z, B_SHUTTER, false);
+    fitMark(f.x, f.y, f.z, { d: 0 });
+  } else {
+    setBlock(f.x, f.y,     f.z, B_AIR, false);
+    setBlock(f.x, f.y + 1, f.z, B_AIR, false);
+    fitMark(f.x, f.y, f.z, { d: 1 });
+  }
+  citySound('shutter');
+  shEmitNoise(f.x, f.z, 14, 'shutter');
+  return true;
+}
+
+// ─── The standpipe ──────────────────────────────────────────────────────────
+const Water = { jets: [] };
+
+function cityJet(x, y, z, nx, nz){
+  const n = 90;
+  const pos = new Float32Array(n * 3);
+  const vel = [];
+  for (let i = 0; i < n; i++){
+    pos[i*3] = x + 0.5; pos[i*3+1] = y + 0.5; pos[i*3+2] = z + 0.5;
+    vel.push({
+      x: -nx * (2.2 + Math.random() * 1.6) + (Math.random() - 0.5) * 0.7,
+      y: 1.2 + Math.random() * 1.4,
+      z: -nz * (2.2 + Math.random() * 1.6) + (Math.random() - 0.5) * 0.7,
+      t: Math.random() * 1.2,
+    });
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  const m = new THREE.PointsMaterial({ color: 0xbfe6ff, size: 0.11, transparent:true, opacity:0.85, depthWrite:false });
+  const pts = new THREE.Points(g, m);
+  pts.frustumCulled = false;
+  State.scene.add(pts);
+  Water.jets.push({ pts, vel, ox:x + 0.5, oy:y + 0.5, oz:z + 0.5, life: 7 });
+}
+
+function cityWaterTick(dt){
+  for (let i = Water.jets.length - 1; i >= 0; i--){
+    const j = Water.jets[i];
+    j.life -= dt;
+    const arr = j.pts.geometry.attributes.position.array;
+    for (let k = 0; k < j.vel.length; k++){
+      const v = j.vel[k];
+      v.t += dt;
+      if (v.t > 1.1){ v.t = 0; arr[k*3] = j.ox; arr[k*3+1] = j.oy; arr[k*3+2] = j.oz; continue; }
+      arr[k*3]   += v.x * dt;
+      arr[k*3+1] += (v.y - 9.8 * v.t) * dt;
+      arr[k*3+2] += v.z * dt;
+    }
+    j.pts.geometry.attributes.position.needsUpdate = true;
+    j.pts.material.opacity = Math.min(0.85, j.life * 0.6);
+    if (j.life <= 0){
+      State.scene.remove(j.pts);
+      j.pts.geometry.dispose();
+      j.pts.material.dispose();
+      Water.jets.splice(i, 1);
+    }
+  }
+}
+
+function cityUseTap(f){
+  const st = fitGet(f.x, f.y, f.z);
+  if (st && st.w && performance.now() - st.w < 7000){ toast('Already running.', 'info'); return true; }
+  //  Spray away from whatever it is bolted to.
+  let nx = 0, nz = 0;
+  for (const [ax, az] of [[1,0],[-1,0],[0,1],[0,-1]]){
+    if (isSolid(getBlock(f.x + ax, f.y, f.z + az))){ nx = ax; nz = az; break; }
+  }
+  cityJet(f.x, f.y, f.z, nx, nz);
+  fitMark(f.x, f.y, f.z, { w: performance.now() });
+  citySound('water');
+  //  If the fire system is present, this is the only thing in the game that
+  //  argues with it.
+  let doused = 0;
+  try {
+    const fires = window.Fires || window.CityFires;
+    if (Array.isArray(fires)){
+      for (const fr of fires){
+        if (!fr || typeof fr.x !== 'number') continue;
+        if (Math.hypot(fr.x - f.x, fr.z - f.z) < 6){ fr.life = Math.min(fr.life || 0, 0.4); doused++; }
+      }
+    }
+  } catch (e){}
+  toast(doused ? `Standpipe open. ${doused} fire${doused>1?'s':''} knocked down.` : 'Standpipe open. Municipal water, unbilled.', doused ? 'success' : 'info');
+  return true;
+}
+
+// ─── The wall screen ────────────────────────────────────────────────────────
+const SCREEN_FEED = [
+  'FRACTURE CITY NEWS · The Bureau confirms the shortfall is now described as a surplus of demand.',
+  'FRACTURE CITY NEWS · Ned Halloran reminds residents that the ninth form supersedes the eighth form.',
+  'CIVIC · Flooded East Road remains open in the sense that nobody has closed it.',
+  'CIVIC · The Quarry is operating to schedule. The schedule has been revised.',
+  'FRACTURE CITY NEWS · Dr Oren Vell has published a correction to a paper nobody has read.',
+  'TRANSIT · The tow route runs tonight. Leon asks that you do not park on the tow route.',
+  'CIVIC · Temporary measures enter their twelfth month of temporariness.',
+  'HOLD · Seven cases remain unresolved. This is the same seven.',
+  'MARKET · Salvage prices steady. The word steady is doing a great deal of work.',
+  'WEATHER · Overcast, with a chance of the other thing.',
+];
+
+function cityUseScreen(f){
+  const st = fitGet(f.x, f.y, f.z) || {};
+  if (f.id === B_SCREEN_OFF){
+    toast('No supply at this screen.', 'warn');
+    return true;
+  }
+  const n = ((st.c || 0) + 1) % SCREEN_FEED.length;
+  fitMark(f.x, f.y, f.z, { c: n });
+  citySound('dial');
+  toast(SCREEN_FEED[n], 'info');
+  return true;
+}
+
+// ─── The payphone ───────────────────────────────────────────────────────────
+const PHONE_LINES = [
+  'The line opens onto a recorded voice. It thanks you for holding, then thanks you again, then stops.',
+  'Someone picks up. They say a name that is not yours, wait, and hang up.',
+  'Ned Halloran, live, from an office with the light off: "You have reached the newsroom. The newsroom has reached its limit."',
+  'A dial tone with something behind it, a long way back, breathing.',
+  'The Bureau switchboard. Nine options. None of them is the reason you called.',
+  'It connects to another payphone. You can hear a street that sounds exactly like this one.',
+];
+
+function cityUsePhone(f){
+  const h = Math.abs(hashStr(`phone:${f.x}:${f.y}:${f.z}:${Math.floor(Date.now()/60000)}`));
+  citySound('dial');
+  cityNed(PHONE_LINES[h % PHONE_LINES.length]);
+  return true;
+}
+
+// ─── The breaker ────────────────────────────────────────────────────────────
+function cityUseBreaker(f){
+  const cx = chunkCoordOf(f.x), cz = chunkCoordOf(f.z);
+  const on = powerOn(cx, cz);
+  const n = cityPowerSet(cx, cz, !on);
+  citySound('power');
+  shEmitNoise(f.x, f.z, 10, 'breaker');
+  if (on){
+    toast(`Supply cut. ${n} fittings dark on this block.`, 'warn');
+    cityNed('He has pulled a breaker. The Bureau wishes to state that the block is not dark, it is unlit, and that these are separate line items.');
+  } else {
+    toast(`Supply restored. ${n} fittings live.`, 'success');
+  }
+  return true;
+}
+
+// ─── The bin ────────────────────────────────────────────────────────────────
+function cityUseBin(f){
+  const st = fitGet(f.x, f.y, f.z);
+  if (st && st.o){ toast('Turned out already.', 'info'); return true; }
+  fitMark(f.x, f.y, f.z, { o: 1 });
+  citySound('clunk');
+  shEmitNoise(f.x, f.z, 8, 'bin');
+  const h = Math.abs(hashStr(`bin:${f.x}:${f.y}:${f.z}`));
+  const n = h % 3;
+  if (!n){ toast('Nothing in it but the smell of a schedule nobody kept.', 'info'); return true; }
+  const pool = [B_RUST, B_METAL, B_BRICK, B_GLASS];
+  for (let i = 0; i < n; i++){
+    const id = pool[(h >> (i * 3)) % pool.length];
+    try { shSpawnDrop(f.x + 0.5, f.y + 1.1, f.z + 0.5, id, 1); } catch (e){}
+  }
+  toast('Turned out. ' + n + ' thing' + (n > 1 ? 's' : '') + ' worth keeping.', 'success');
+  return true;
+}
+
+// ─── The notice board ───────────────────────────────────────────────────────
+const NOTICE_HEAD = [
+  'TEMPORARY MEASURE 41-C', 'SCHEDULE OF WORKS', 'PUBLIC CONSULTATION',
+  'REVISED BOUNDARY', 'NOTICE OF CONTINUITY', 'INTERIM ARRANGEMENT',
+];
+const NOTICE_BODY = [
+  'This arrangement remains in force until it is replaced by an arrangement of the same kind.',
+  'Residents affected by the works will be notified after the works.',
+  'The consultation closed before it opened. Responses are welcome and will be filed.',
+  'The boundary has moved. The residents have not. Both statements are correct.',
+  'Services continue at their current level, which has been redefined as the current level.',
+  'Where this notice conflicts with the situation, the notice is authoritative.',
+];
+
+function cityUseNotice(f){
+  const h = Math.abs(hashStr(`notice:${f.x}:${f.y}:${f.z}`));
+  const head = NOTICE_HEAD[h % NOTICE_HEAD.length];
+  const body = NOTICE_BODY[(h >> 4) % NOTICE_BODY.length];
+  cityNoticeShow(head, body);
+  try { if (typeof shCampaignEvent === 'function') shCampaignEvent('read'); } catch (e){}
+  return true;
+}
+
+let noticeEl = null;
+function cityNoticeShow(head, body){
+  if (!noticeEl){
+    const css = document.createElement('style');
+    css.textContent = `
+      #city-notice{position:fixed;left:50%;top:50%;transform:translate(-50%,-46%);
+        z-index:56;width:min(420px,80vw);padding:22px 26px;pointer-events:none;
+        background:rgba(12,8,18,.95);border:1px solid rgba(255,212,122,.5);
+        box-shadow:0 0 40px rgba(0,0,0,.7);opacity:0;transition:opacity .2s ease,transform .2s ease;}
+      #city-notice.on{opacity:1;transform:translate(-50%,-50%);}
+      #city-notice h5{margin:0 0 10px;font:600 10px/1 'Courier New',monospace;
+        letter-spacing:4px;color:#ffd47a;}
+      #city-notice p{margin:0;font:14px/1.6 Georgia,'Times New Roman',serif;color:#e7e2ff;}
+      #city-notice i{display:block;margin-top:12px;font:9px/1 'Courier New',monospace;
+        letter-spacing:3px;color:#6a6088;font-style:normal;}
+    `;
+    document.head.appendChild(css);
+    noticeEl = document.createElement('div');
+    noticeEl.id = 'city-notice';
+    document.body.appendChild(noticeEl);
+  }
+  noticeEl.innerHTML = `<h5>${head}</h5><p>${body}</p><i>ISSUED BY THE BUREAU · NO DATE GIVEN</i>`;
+  noticeEl.classList.add('on');
+  clearTimeout(cityNoticeShow._t);
+  cityNoticeShow._t = setTimeout(() => noticeEl.classList.remove('on'), 6500);
+}
+
+// ─── The meter ──────────────────────────────────────────────────────────────
+function cityUseMeter(f){
+  const cost = 2;
+  if (!State.hud || (State.hud.credits || 0) < cost){
+    toast('Insufficient credit. The meter notes this.', 'warn');
+    return true;
+  }
+  State.hud.credits -= cost;
+  try { const el = document.getElementById('hud-credits-val'); if (el) el.textContent = String(Math.floor(State.hud.credits)); } catch (e){}
+  const st = fitGet(f.x, f.y, f.z) || {};
+  const paid = (st.p || 0) + cost;
+  fitMark(f.x, f.y, f.z, { p: paid });
+  citySound('coin');
+  toast(`Paid ${cost}. Total paid at this meter: ${paid}. The meter does not say for what.`, 'info');
+  if (paid >= 10){
+    try { shSpawnDrop(f.x + 0.5, f.y + 1.2, f.z + 0.5, B_METAL, 2); } catch (e){}
+    toast('The meter returns something. It is not change.', 'success');
+  }
+  return true;
+}
+
+// ─── Doors that lock ────────────────────────────────────────────────────────
+//  The lock is a property of the coordinate, not a flag someone set, so the
+//  same door is locked in your city and in mine and in a fresh install.
+function cityDoorLocked(f){
+  if (f.id !== B_DOOR) return false;
+  const st = fitGet(f.x, f.y, f.z);
+  if (st && st.u) return false;
+  return (Math.abs(hashStr(`lock:${f.x}:${f.y}:${f.z}`)) % 100) < 34;
+}
+
+function cityForceDoor(f){
+  const hasBar = (() => {
+    try { return !!(Upgrades && Upgrades.owned && (Upgrades.owned.override || Upgrades.owned.prybar)); }
+    catch (e){ return false; }
+  })();
+  const st = fitGet(f.x, f.y, f.z) || {};
+  const hits = (st.f || 0) + 1;
+  const need = hasBar ? 1 : 3;
+  citySound('clunk');
+  shEmitNoise(f.x, f.z, 18, 'force');
+  if (hits < need){
+    fitMark(f.x, f.y, f.z, { f: hits });
+    toast(`Locked. It gives, but not yet. (${hits}/${need})`, 'warn');
+    return true;
+  }
+  fitMark(f.x, f.y, f.z, { u: 1, f: 0 });
+  toast(hasBar ? 'The bar does it in one.' : 'The lock gives.', 'success');
+  cityNed('A door has been forced. I am obliged to report that the door was municipal and that the lock was, on paper, sufficient.');
+  return shDoorToggle(f);
+}
+
+// ─── Sitting down ───────────────────────────────────────────────────────────
+const Sit = { on:false, y:0, bench:null };
+
+function citySitToggle(f){
+  if (Sit.on){
+    Sit.on = false;
+    toast('Up.', 'info');
+    return true;
+  }
+  Sit.on = true;
+  Sit.bench = f;
+  toast('Sat down. E to stand, or walk. The night moves faster from here.', 'info');
+  cityNed('Our correspondent has sat down on municipal furniture. This is permitted. I have checked.');
+  return true;
+}
+
+(function(){
+  //  Sitting is the only thing in the game that takes the controls away, so it
+  //  gives them straight back on any movement key rather than trapping anyone.
+  const orig = updateWalkInput;
+  window.updateWalkInput = function(dt){
+    if (!Sit.on) return orig.apply(this, arguments);
+    const k = State.keys;
+    if (k.has('w') || k.has('a') || k.has('s') || k.has('d') || k.has(' ')){
+      Sit.on = false;
+      return orig.apply(this, arguments);
+    }
+    //  Five extra minutes of city clock per second, so a night on a bench is a
+    //  few minutes of sitting rather than a few hours of it.
+    State.dayTime += dt * 60 * 5;
+    //  Still hand the frame to the original: no keys are held, so all it does
+    //  is apply the friction that stops you sliding while seated.
+    return orig.apply(this, arguments);
+  };
+})();
+
+// ─── Glass that breaks ──────────────────────────────────────────────────────
+const GLASSY = {};
+GLASSY[B_GLASS] = 1; GLASSY[B_WIN_LIT] = 1; GLASSY[B_WIN_DARK] = 1; GLASSY[B_WIN_OFF] = 1;
+
+function cityShatter(){
+  if (!State.ui.locked || State.ui.construct || Player.mode !== 'walk') return false;
+  const dir = new THREE.Vector3(0, 0, -1).applyEuler(
+    new THREE.Euler(Player.pitch, Player.yaw, 0, 'YXZ'));
+  const hit = raycastVoxel(Player.position, dir, 3.4);
+  if (!hit || !GLASSY[hit.id]) return false;
+  setBlock(hit.x, hit.y, hit.z, B_AIR, true);
+  citySound('glass');
+  shEmitNoise(hit.x, hit.z, 20, 'glass');
+  try { shSpawnDrop(hit.x + 0.5, hit.y + 0.5, hit.z + 0.5, B_GLASS, 1); } catch (e){}
+  try {
+    if (!cityShatter._said){
+      cityShatter._said = 1;
+      cityNed('A window has been broken. The Bureau records this as an unscheduled opening and will not be sending anyone.');
+    }
+  } catch (e){}
+  return true;
+}
+
+(function(){
+  const orig = tryAttack;
+  window.tryAttack = function(){
+    const r = orig.apply(this, arguments);
+    try { cityShatter(); } catch (e){}
+    return r;
+  };
+})();
+
+// =============================================================================
+//  ONE VERB, WIDENED
+// =============================================================================
+
+(function(){
+  const orig = shFitUse;
+  window.shFitUse = function(){
+    if (Sit.on) return citySitToggle(null);
+    const f = shFitLookingAt();
+    if (!f) return orig.apply(this, arguments);
+    const kind = f.def && f.def.city;
+    try {
+      if (kind === 'switch')  return cityUseSwitch(f);
+      if (kind === 'shutter') return cityUseShutter(f);
+      if (kind === 'tap')     return cityUseTap(f);
+      if (kind === 'screen')  return cityUseScreen(f);
+      if (kind === 'phone')   return cityUsePhone(f);
+      if (kind === 'breaker') return cityUseBreaker(f);
+      if (kind === 'bin')     return cityUseBin(f);
+      if (kind === 'notice')  return cityUseNotice(f);
+      if (kind === 'meter')   return cityUseMeter(f);
+      //  A bench is section 51's requisition bench first; shift+E sits on it.
+      if (f.def.door && cityDoorLocked(f)) return cityForceDoor(f);
+    } catch (e){
+      console.error('city verb:', e);
+      return true;
+    }
+    return orig.apply(this, arguments);
+  };
+})();
+
+//  Sitting needs its own way in, because the bench's first verb is taken.
+//  Crouch-use: hold shift and use a bench.
+window.addEventListener('keydown', e => {
+  if (e.key !== 'e' && e.key !== 'E') return;
+  if (!e.shiftKey || e.repeat) return;
+  if (!State.ui || !State.ui.locked) return;
+  const f = shFitLookingAt();
+  if (f && f.def && f.def.bench){ e.preventDefault(); e.stopPropagation(); citySitToggle(f); return; }
+  if (Sit.on){ e.preventDefault(); citySitToggle(null); }
+}, true);
+
+// ─── The prompt knows what state a thing is in ──────────────────────────────
+//  Section 51's prompt reads def.verb, which is static. These nine are not:
+//  a shutter that is up says "lower", a supply that is cut says "restore".
+(function(){
+  const origLook = shFitLookingAt;
+  window.shFitLookingAt = function(){
+    const f = origLook.apply(this, arguments);
+    if (!f || !f.def || !f.def.city) return f;
+    const st = fitGet(f.x, f.y, f.z);
+    let verb = f.def.verb;
+    if (f.def.city === 'shutter') verb = (st && st.d) ? 'lower' : 'raise';
+    else if (f.def.city === 'switch') verb = (st && st.k) ? 'light' : 'kill';
+    else if (f.def.city === 'breaker') verb = powerOn(chunkCoordOf(f.x), chunkCoordOf(f.z)) ? 'cut supply' : 'restore';
+    else if (f.def.city === 'bin' && st && st.o) verb = 'empty';
+    if (verb !== f.def.verb) f.def = Object.assign({}, f.def, { verb });
+    return f;
+  };
+})();
+
+// ─── Ned has opinions about all of it ───────────────────────────────────────
+if (typeof NED_LINES !== 'undefined'){
+  NED_LINES.supply = {
+    cool: 300,
+    once: 'The supply on this block has been interrupted by a member of the public. The Bureau maintains a list of people permitted to do that and it is, at time of broadcast, empty.',
+    pool: [
+      'Another breaker. He is doing this one street at a time and I am running out of ways to call it maintenance.',
+      'The lights are off on a block that was scheduled to be lit until the end of the temporary period, which has no end.',
+    ],
+  };
+}
+
+// ─── The frame hook ─────────────────────────────────────────────────────────
+(function(){
+  const origHud = shUpdateHUD;
+  let last = performance.now();
+  window.shUpdateHUD = function(dt){
+    const r = origHud.apply(this, arguments);
+    const now = performance.now();
+    const real = Math.min(0.2, (now - last) / 1000);
+    last = now;
+    try {
+      cityWaterTick(real);
+      //  The camera copy happens earlier in the frame, so a seated eye height
+      //  is applied here rather than by moving the body the physics owns.
+      if (Sit.on && State.camera) State.camera.position.y -= 0.55;
+    } catch (e){}
+    return r;
+  };
+})();
+
+//  A new city means a new supply map and a new set of fittings.
+(function(){
+  const origNew = newGame;
+  window.newGame = function(){
+    POWER.clear();
+    _cityLoadedSeed = null;
+    Sit.on = false;
+    const r = origNew.apply(this, arguments);
+    try { shFitLoad(true); } catch (e){}
+    return r;
+  };
+})();
+
+})();
+
+
+// Ground fixtures only after the final voxel/fitting pass has finished.
+(function(){
+  const build = shRunPendingDetail;
+  window.shRunPendingDetail = function(chunk){
+    const result=build.apply(this,arguments);cityGroundProps(chunk);return result;
+  };
+  const hud = shUpdateHUD;
+  window.shUpdateHUD = function(dt){
+    const result=hud.apply(this,arguments);
+    if(!State.ui.paused && !State.ui.inIntro){
+      for(const chunk of State.chunkMap.values()){
+        if(Math.hypot(chunk.worldX-Player.position.x,chunk.worldZ-Player.position.z)<48)
+          cityGroundProps(chunk,Math.min(.05,Math.max(0,dt||0)));
+      }
+    }
+    return result;
+  };
+})();
+
 document.addEventListener('DOMContentLoaded', init);
 </script>
+<script src="front-menu.js"></script>
 </body>
 </html>

@@ -1,49 +1,49 @@
 {
   "slug": "fracture-city-game",
   "name": "Fracture City // Shift",
-  "version": "0.32.0",
+  "version": "0.35.1",
   "icon": "icon.png",
   "entry": "index.html",
   "runtime": "html5",
-  "description": "First-person voxel Fracture City with a six-movement campaign adapted from The Collapse of Meaning. Over one night, a temporary field witness carries Marcus and Clara Vale's impossible loan through the Quarry and the Bureau, rides Leon's tow route, acts through HOLD's seven unresolved cases, and crosses Flooded East Road during the Fourth Watch. Ned Halloran converts each lived event into clean civic language as the player learns to act without pretending contradiction has disappeared. The Second Light arrives at dawn, but the city does not heal or become whole. Free roam, building, mining, driving, combat, businesses, character customisation, terminal games, the connected Present Palm arcade, greenbelt districts, and the municipal rink remain intact outside the campaign.",
+  "description": "First-person voxel Fracture City with a six-movement campaign adapted from The Collapse of Meaning. Over one night, a temporary field witness carries Marcus and Clara Vale's impossible loan through the Quarry and the Bureau, rides Leon's tow route, acts through HOLD's seven unresolved cases, and crosses Flooded East Road during the Fourth Watch. Ned Halloran converts each lived event into clean civic language as the player learns to act without pretending contradiction has disappeared. The Second Light arrives at dawn, but the city does not heal or become whole. Free roam, building, mining, driving, combat, businesses, character customisation, terminal games, the connected Present Palm arcade, greenbelt districts, and the municipal rink remain intact outside the campaign. The main world now renders procedural surfaces per pixel, a sun that moves and casts, and a bloom composite, across four quality tiers on F; the street answers E with switches, shutters, standpipes, screens, payphones, breakers, bins, notices and meters, and every block has a supply that can be cut.",
   "inputs": [
     {
       "type": "person.v1",
-      "description": "The resident's identity — name, handle, bio and look — read from the shell rather than stored here."
+      "description": "The resident's identity \u2014 name, handle, bio and look \u2014 read from the shell rather than stored here."
     },
     {
       "type": "tot.profile.v1",
-      "description": "Optional Coherence Assessment profile — biases the resident's default confrontation voice."
+      "description": "Optional Coherence Assessment profile \u2014 biases the resident's default confrontation voice."
     }
   ],
   "outputs": [
     {
       "type": "game.run.v1",
-      "description": "Game run record — credits earned, tasks completed, districts visited, playtime, blocks mined and placed."
+      "description": "Game run record \u2014 credits earned, tasks completed, districts visited, playtime, blocks mined and placed."
     },
     {
       "type": "shift.day.v1",
-      "description": "Daily Shift record — resident profile, project progress, bricks laid, echo actions, residue left in the shared field."
+      "description": "Daily Shift record \u2014 resident profile, project progress, bricks laid, echo actions, residue left in the shared field."
     },
     {
       "type": "hold.fieldbook.v1",
-      "description": "HOLD field book — seven case decisions, operator axis drift, residue carried forward and language recovered, as a standalone HTML document."
+      "description": "HOLD field book \u2014 seven case decisions, operator axis drift, residue carried forward and language recovered, as a standalone HTML document."
     },
     {
       "type": "inventory.v1",
-      "description": "Material inventory — per-material counts, hotbar assignment and build mode, carried across cities."
+      "description": "Material inventory \u2014 per-material counts, hotbar assignment and build mode, carried across cities."
     },
     {
       "type": "campaign.progress.v1",
-      "description": "Campaign progress — current chapter, objective completion, stealth log and ending state."
+      "description": "Campaign progress \u2014 current chapter, objective completion, stealth log and ending state."
     },
     {
       "type": "story.state.v1",
-      "description": "Story state — chapter, scene beats already played, stealth log and ending."
+      "description": "Story state \u2014 chapter, scene beats already played, stealth log and ending."
     },
     {
       "type": "arcade.session.v1",
-      "description": "Arcade cabinet session — which Present Palm app was launched from inside the city, and for how long."
+      "description": "Arcade cabinet session \u2014 which Present Palm app was launched from inside the city, and for how long."
     }
   ],
   "tags": [
@@ -114,7 +114,18 @@
     "weather",
     "day-night",
     "minimap",
-    "districts"
+    "districts",
+    "hd",
+    "shadows",
+    "bloom",
+    "surfaces",
+    "quality-tiers",
+    "fittings",
+    "power",
+    "supply",
+    "breaker",
+    "glass",
+    "sitting"
   ],
   "author": "Present Palm",
   "license": "personal-use",
