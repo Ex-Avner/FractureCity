@@ -18476,6 +18476,11 @@ const GRIND = {
   boost: 1.06,
 };
 
+// Narrow extension seam for the late visual/grounding pass.
+window.FCRails = {
+  get lay(){ return shLayRails; }, set lay(fn){ shLayRails = fn; },
+  get make(){ return shMakeRail; }, set make(fn){ shMakeRail = fn; },
+};
 function shMakeRail(x0, y0, z0, x1, y1, z1){
   const dx = x1 - x0, dy = y1 - y0, dz = z1 - z0;
   const len = Math.hypot(dx, dy, dz);
@@ -25220,7 +25225,7 @@ function shStreamQuiet(){
 // =============================================================================
 
 // ─── The front door ─────────────────────────────────────────────────────────
-const SH_VERSION = '0.36.0';
+const SH_VERSION = '0.36.1';
 
 (function(){
   if (typeof shFrontHome !== 'function') return;
@@ -29994,5 +29999,8 @@ document.addEventListener('DOMContentLoaded', init);
 </script>
 <script src="front-menu.js"></script>
 <script src="first-night.js"></script>
+<script src="visual-cohesion.js"></script>
+<script src="resident-head.js"></script>
+<script src="character-studio.js"></script>
 </body>
 </html>

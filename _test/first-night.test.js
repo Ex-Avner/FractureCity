@@ -41,12 +41,29 @@ const EXE = process.env.PW_CHROMIUM || undefined;
     c.ok('warden enemy type registered', reg.warden);
 
     // ── The prologue, from the front door ──────────────────────────────────
-    await page.evaluate(() => { if (window.HD){ HD.locked = true; HD.tier = 'low'; } shFrontAct('new-campaign'); });
-    const seen = { steps: new Set(), choices: [], cards: 0, took: [], dialogue: 0 };
+    await page.evaluate(() => { if (window.HD){ HD.locked = true; HD.tier = 'perf'; } shFrontAct('new-campaign'); });
+    const seen = { steps: new Set(), choices: [], cards: 0, took: [], dialogue: 0, beats: [], lines: [], context: true, leaked: false, injections: 0 };
+    let holdChecked=false;
     let done = false;
     for (let i = 0; i < 900 && !done; i++){
       const s = await page.evaluate(() => {
         const o = { step: FN.prologue ? FN.prologue.step : null, campaign: Campaign.active, chapter: Campaign.chapter };
+        if(FN.prologue){
+          o.beat=FN.prologue.index;
+          shNarrate([{who:'ned',text:'BACKGROUND DISTRICT SENTINEL'}]);
+          shSay([{who:'ned',text:'BACKGROUND SAY SENTINEL'}]);
+          shNedSay('market');toast('BACKGROUND TOAST SENTINEL','info');
+          o.injected=true;o.leaked=Narr.active||Narr.pending.length>0;
+        }
+        if(FN.scene){
+          const el=document.getElementById('fn-scene');
+          o.scene=true;o.line=FN.scene.lines[FN.scene.index].text;
+          o.context=!!el.querySelector('.where').textContent&&!!el.querySelector('.role').textContent&&!!el.querySelector('.next').textContent;
+          o.clockMatches=State.dayTime===FN.prologue.clock;
+          o.cityReady=['-1,-1','0,-1','-1,0','0,0'].every(k=>State.chunkMap.get(k)?.secMesh.some(Boolean));
+          o.cameraAboveGround=State.camera.position.y>shSurfaceY(Player.position.x,Player.position.z,Player.position.y)+.5;
+          return o;
+        }
         const card = document.getElementById('fn-card');
         if (card && card.classList.contains('on')){
           const rec = card.querySelector('.fn-cls.rec'), opt = card.querySelector('.fn-opt');
@@ -79,6 +96,25 @@ const EXE = process.env.PW_CHROMIUM || undefined;
         }
         return o;
       });
+      if(s.injected)seen.injections++;
+      seen.leaked ||= !!s.leaked;
+      if(s.beat>=0 && seen.beats.at(-1)!==s.beat)seen.beats.push(s.beat);
+      if(s.scene){
+        seen.lines.push(s.line);seen.context &&= s.context;
+        if(!holdChecked){
+          c.ok('opening camera is above the street',s.cameraAboveGround);
+          c.ok('Civic Core is rendered before the opening pause',s.cityReady);
+          c.ok('opening clock matches the scene time',s.clockMatches);
+          const held=await page.evaluate(()=>({line:FN.scene.index,clock:State.dayTime,actors:State.globalNPCs.map(n=>n.position.toArray())}));
+          await page.evaluate(()=>shCampaignSilence());
+          await page.waitForTimeout(700);
+          const still=await page.evaluate(()=>({line:FN.scene.index,clock:State.dayTime,actors:State.globalNPCs.map(n=>n.position.toArray())}));
+          c.eq('scene holds until acknowledged, even through campaign silence',JSON.stringify(still),JSON.stringify(held));
+          await shot('blocking-dialogue');holdChecked=true;
+        }
+        if(seen.lines.length%2)await page.keyboard.press('n');
+        else await page.locator('#fn-scene-next').click();
+      }
       if (s.step) seen.steps.add(s.step);
       if (s.card){ seen.cards++; if (s.card === 'choice') seen.choices.push(s.step); }
       if (s.took) seen.took.push(s.took);
@@ -102,6 +138,57 @@ const EXE = process.env.PW_CHROMIUM || undefined;
     c.ok('the case began at the First Movement', after.campaign && after.chapter === 0);
     c.ok('first-night state survives the campaign reset', after.choicesSaved);
     c.eq('heat cleared after a year', after.heat, 0);
+
+    c.gt('background narration injected throughout the prologue',seen.injections,20);
+    c.ok('ambient narration never enters the scene queue',!seen.leaked);
+    c.ok('every scene line names its location, speaker role and next action',seen.context&&seen.lines.length>20);
+    c.ok('scene sequence visited in order exactly once',seen.beats.every((n,i)=>n===i)&&seen.beats.length===10,seen.beats.join(','));
+    c.ok('all scene text was individually acknowledged',seen.lines.some(t=>t.includes('back after a short break'))&&seen.lines.some(t=>t.includes('carrier tone')));
+    c.ok('no background line leaks into the case',await page.evaluate(()=>!JSON.stringify([Narr.line,Narr.queue,Narr.pending]).includes('SENTINEL')));
+    const rails=await page.evaluate(()=>{
+      const list=[...State.chunkMap.values()].filter(c=>!c._skatepark).flatMap(c=>c.rails||[]);
+      return {count:list.length,bad:list.filter(r=>Math.abs(r.y1-r.y0)>Math.hypot(r.x1-r.x0,r.z1-r.z0)*.6).length};
+    });
+    c.gt('valid street rails retained',rails.count,0);
+    c.eq('no wall-to-road rails generated',rails.bad,0);
+
+    // A real Warden walks across a voxel kerb, including its rendered feet.
+    const kerb = await page.evaluate(() => {
+      const savedHeat = FN.heat; FN.heat = 0;
+      const cells = [];
+      for (let x = 40; x < 50; x++) for (let z = 40; z < 45; z++) for (let y = 0; y < 8; y++){
+        cells.push([x,y,z,getBlock(x,y,z)]);
+        setBlock(x,y,z, y < (x < 45 ? 1 : 2) ? B_CONCRETE : 0, false);
+      }
+      const e = new Enemy('warden',42,42,new RNG('kerb-regression'));
+      e.position.set(42,1,42); e.group.position.copy(e.position);
+      e.direction=0; e.patrolTimer=100;
+      for(let i=0;i<100;i++) e.update(0.05,Player);
+      const surface=shSurfaceY(e.position.x,e.position.z,e.position.y+2.2);
+      const result={x:e.position.x,y:e.position.y,feet:e.group.position.y,surface,paths:{}};
+      // The actual bypass branches must all publish their ground height.
+      for(const mode of ['escort','frozen','heat']){
+        e.position.set(47,1,42);e.group.position.y=1;e.fnChar.baseY=1;
+        e.fnEscort=mode==='escort';e.fnFrozen=mode==='frozen'?2:0;
+        FN.heat=mode==='heat'?2:0;e.state='patrol';e.update(.05,Player);
+        result.paths[mode]=Math.abs(e.group.position.y-shSurfaceY(e.position.x,e.position.z,e.position.y+2.2))<.15;
+      }
+      e.fnEscort=false;e.fnFrozen=0;
+      // Hook moves a real target from the road to a raised pad via the Q handler.
+      const pp=Player.position.clone(),cls=Player.classKey,oldEnemies=State.enemies.slice();
+      applyClass('tow');FN.heat=2;State.enemies.length=0;State.enemies.push(e);
+      e.position.set(43,1,42);e.group.position.copy(e.position);
+      Player.position.set(48,2+Player.height,42);FN.abilityCd=0;State.ui.paused=false;Player.mode='walk';
+      document.dispatchEvent(new KeyboardEvent('keydown',{code:'KeyQ',key:'q'}));
+      result.paths.hook=e.position.x>45&&Math.abs(e.group.position.y-shSurfaceY(e.position.x,e.position.z,e.position.y+2.2))<.15;
+      State.enemies.splice(0,State.enemies.length,...oldEnemies);Player.position.copy(pp);applyClass(cls);
+      for(const [x,y,z,id] of cells) setBlock(x,y,z,id,false);
+      FN.heat=savedHeat;
+      return result;
+    });
+    c.ok('Warden actually crossed the kerb', kerb.x > 46 && kerb.surface === 2, JSON.stringify(kerb));
+    c.ok('Warden feet follow the raised pavement', Math.abs(kerb.feet-kerb.surface)<0.15, JSON.stringify(kerb));
+    for(const [mode,ok] of Object.entries(kerb.paths))c.ok('grounding: '+mode,ok);
 
     // ── Free play: hitting people, heat and Wardens ─────────────────────────
     const street = await page.evaluate(async () => {

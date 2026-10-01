@@ -1,72 +1,30 @@
-// A/B the HD pass: same seed, same camera, four frames.
-const { chromium } = require('playwright');
-const http = require('http');
-const fs = require('fs');
-const path = require('path');
-
-const ROOT = process.argv[2] || path.resolve(__dirname, '..');
-const PORT = 8732;
-const TYPES = { '.html':'text/html', '.js':'application/javascript', '.png':'image/png' };
-const server = http.createServer((req, res) => {
-  const p = path.join(ROOT, decodeURIComponent(req.url.split('?')[0]));
-  fs.readFile(p, (err, data) => {
-    if (err){ res.writeHead(404); res.end('no'); return; }
-    res.writeHead(200, { 'Content-Type': TYPES[path.extname(p)] || 'application/octet-stream' });
-    res.end(data);
-  });
-});
-
-(async () => {
-  fs.mkdirSync(path.join(__dirname, 'out'), { recursive: true });
-  await new Promise(r => server.listen(PORT, r));
-  const browser = await chromium.launch({
-    args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--disable-dev-shm-usage'],
-  });
-  const page = await browser.newPage({ viewport: { width: 960, height: 600 } });
-  const errs = [];
-  page.on('pageerror', e => errs.push(String(e && e.message)));
-  page.on('console', m => { if (m.type() === 'error' && !/ERR_TUNNEL|Failed to load resource/.test(m.text())) errs.push(m.text()); });
-  await page.goto(`http://127.0.0.1:${PORT}/apps/fracture-city-game/index.html`, { waitUntil: 'load' });
-  await page.waitForTimeout(2200);
-
-  await page.evaluate(() => {
-    window.HD.locked = true;
-    window.HD.tier = 'ultra';
-    newGame('hd-compare');
-  });
-  await page.waitForTimeout(3000);
-
-  // Park the camera somewhere with a street in front of it and hold it there.
-  const place = await page.evaluate(() => {
-    Player.position.set(6, 3.2, 6);
-    Player.yaw = 0.9; Player.pitch = -0.05;
-    for (let i = 0; i < 12; i++) updateChunks();
-    State.camera.position.copy(Player.position);
-    State.camera.rotation.y = Player.yaw;
-    State.camera.rotation.x = Player.pitch;
-    return { chunks: State.chunkMap.size };
-  });
-
-  async function shot(name, hour, cfg){
-    await page.evaluate(([hour, cfg]) => {
-      State.dayTime = hour * 60;
-      Object.assign(window.HD.want, cfg);
-      if (cfg.tier) window.HD.tier = cfg.tier;
-      window.HD.apply(true);
-      shApplyLighting(hour);
-      State.renderer.render(State.scene, State.camera);
-    }, [hour, cfg]);
-    await page.waitForTimeout(700);
-    await page.screenshot({ path: path.join(__dirname, 'out', `cmp-${name}.png`) });
-  }
-
-  await shot('night-off', 21, { surfaces:false, bloom:false, shadows:false });
-  await shot('night-on',  21, { surfaces:true,  bloom:true,  shadows:true });
-  await shot('noon-off',  12, { surfaces:false, bloom:false, shadows:false });
-  await shot('noon-on',   12, { surfaces:true,  bloom:true,  shadows:true });
-
-  console.log('place:', JSON.stringify(place));
-  console.log('errors:', errs.slice(0, 10));
-  await browser.close();
-  server.close();
-})();
+// Same seed, clock, camera and graphics for palette and beam comparisons.
+// FC_COMPARE_PHASE=before|after npm run compare
+const {chromium}=require('playwright');
+const {serve}=require('./lib/harness');
+const fs=require('fs'),path=require('path');
+(async()=>{
+ const site=await serve(process.argv[2]||path.resolve(__dirname,'..'));
+ const browser=await chromium.launch({channel:'chrome'});
+ const page=await browser.newPage({viewport:{width:1280,height:800}});
+ const out=path.join(__dirname,'out');fs.mkdirSync(out,{recursive:true});
+ const phase=process.env.FC_COMPARE_PHASE||'before';const errors=[];
+ page.on('pageerror',e=>errors.push(e.message));
+ try{
+ await page.goto(site.origin+'/apps/fracture-city-game/index.html');await page.waitForTimeout(2200);
+ await page.evaluate(()=>{HD.locked=true;HD.tier='high';newGame('hd-compare')});await page.waitForTimeout(5000);
+ await page.evaluate(()=>{Player.position.set(9,3.65,5);Player.yaw=Math.atan2(11.6,12.5);Player.pitch=0;for(let i=0;i<20;i++)updateChunks();State.ui.paused=true;shCampaignSilence();State.camera.position.copy(Player.position);State.camera.rotation.set(0,Player.yaw,0,'YXZ');});
+ for(const hour of [18,23]){
+ await page.evaluate(hour=>{State.dayTime=hour*60;updateDayNight(0);shApplyLighting(hour);shSkyFrame(0);},hour);
+ await page.waitForTimeout(800);await page.screenshot({path:path.join(out,`civic-${phase}-${hour}00.png`)});
+ }
+ if(phase==='before')for(const category of Object.keys(await page.evaluate(()=>FCDEBUG.categories))){
+ await page.evaluate(category=>{State.dayTime=18*60;updateDayNight(0);FCDEBUG.set(category,false);},category);
+ await page.waitForTimeout(350);await page.screenshot({path:path.join(out,`beams-${category}-off.png`)});
+ await page.evaluate(category=>FCDEBUG.set(category,true),category);
+ }
+ fs.writeFileSync(path.join(out,`civic-${phase}.json`),JSON.stringify({seed:'hd-compare',camera:[9,3.65,5],tier:'high',errors,counts:await page.evaluate(()=>FCDEBUG.counts()),rails:await page.evaluate(()=>[...State.chunkMap.values()].flatMap(c=>c.rails||[]))},null,2));
+ if(errors.length)throw new Error(errors.join('\n'));
+ console.log('Saved Civic Core '+phase+' at 18:00 and 23:00.');
+ }finally{await browser.close();site.close();}
+})().catch(e=>{console.error(e);process.exitCode=1;});

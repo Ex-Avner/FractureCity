@@ -1,6 +1,6 @@
 # The First Night
 
-Story bible for v0.36.0. Code lives in `first-night.js`. This file is the reference for anyone extending the prologue, classes, weapons or heat.
+Story bible for v0.36.1. Code lives in `first-night.js`. This file is the reference for anyone extending the prologue, classes, weapons or heat.
 
 ◆
 
@@ -12,7 +12,7 @@ At 17:58, one year before the case, every screen in Fracture City said the same 
 
 | When | What |
 |---|---|
-| Nine years before | Ned Halloran's six o'clock bulletin begins. It never misses a morning. |
+| Nine years before | Ned Halloran's six o'clock bulletin begins. It never misses an evening. |
 | One year before the case, 17:56 | The prologue. You are on the street at the Civic Core, two minutes before the evening bulletin. |
 | 17:58 | The Fracture. Ned's pre-roll plays on every screen. Each listener hears a different sentence. The only line everyone hears the same: "Back after a short break." |
 | 17:59 to 18:30 | The first night. Looting, the Turned in the side streets, the Bureau's first Compliance Wardens declare a "temporary arrangement." |
@@ -98,3 +98,18 @@ Five diamonds at the top of the screen.
 What raises it: hitting a civilian (small), putting one down (large), hitting a story person, killing a Warden, firing a gun near people. What lowers it: 25 seconds with no Warden in sight, then one diamond every 18 seconds. The Witness cools twice as fast. Dying clears it and costs a fine.
 
 At zero heat, Wardens walk the streets on patrol and ignore you.
+
+
+## 0.36.1 scene contract
+
+The five dramatic beats now use ten ordered scene/action steps in `FN_BEATS`.
+Each step publishes its location and objective before it enters, and exits only
+when its explicit condition holds. Scene speech uses `FN.scene`, separate from
+`Narr` and `Dialogue`; N or the visible Continue button acknowledges one complete
+line. World simulation pauses during scene speech and choices. Ambient head
+barks remain non-blocking; other narration and tutorial toasts are discarded
+while the prologue owns the screen, including the year-later transition card.
+
+The first bulletin is a 17:58 pre-roll, two minutes before the scheduled six
+ o'clock news. Ned does not return live; the wall in the case plays a recording.
+Choice IDs, affinities, standing changes and saved class IDs remain compatible.
