@@ -81,7 +81,7 @@ const MAX_BLOCKS = 900;
 const SAVE_KEY  = 'stillhuman-wild-v2';
 //  Nothing in the build said which build it was, so a bug report could not
 //  name one. It is on the title card and on window.SHW_WILD.
-const SHW_VERSION = '0.4.0';
+const SHW_VERSION = '0.4.1';
 
 // ─── 2 · Palette ─────────────────────────────────────────────────────────────
 //  Saturated, poster-bright. Clay that somebody actually pressed pigment into.
@@ -1360,104 +1360,105 @@ function makeBase(){
 }
 
 // ─── 11 · Player puppet ──────────────────────────────────────────────────────
-//  Blocky limbs on visible joints. Stop-motion armature, not a skinned mesh.
+//  Rounded human anatomy with shoulder, elbow, hip and knee pivots.
+//  Keeps the existing player and equipment contracts; no save migration.
 
 function makePlayer(){
   const g = new THREE.Group();
-  const skin = clayMat({ rep: 1, mat: { color: 0xe0a074 } });
-  const cloth = clayMat({ rep: 1, mat: { color: 0x3f6f8f } });
-  const boot = clayMat({ rep: 1, mat: { color: 0x4a3526 } });
-  const B = (w, h, d, mat) => new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
-
-  const torso = B(0.72, 0.92, 0.44, cloth); torso.position.y = 1.22; g.add(torso);
-  const head = B(0.52, 0.50, 0.50, skin);   head.position.y = 1.95; g.add(head);
-  const hair = B(0.56, 0.16, 0.54, clayMat({ rep:1, mat:{ color:0x2a1d19 } }));
-  hair.position.y = 2.22; g.add(hair);
-
-  const armL = B(0.20, 0.80, 0.22, skin);
-  armL.geometry.translate(0, -0.40, 0); armL.position.set(-0.47, 1.62, 0); g.add(armL);
-  const armR = armL.clone(); armR.position.x = 0.47; g.add(armR);
-
-  const legL = B(0.26, 0.80, 0.28, boot);
-  legL.geometry.translate(0, -0.40, 0); legL.position.set(-0.19, 0.80, 0); g.add(legL);
-  const legR = legL.clone(); legR.position.x = 0.19; g.add(legR);
-
-  //  Gear plates, shown only when worn.
-  const helm = B(0.60, 0.30, 0.58, clayMat({ rep:1, mat:{ color:0xc8c2b4 } }));
-  helm.position.y = 2.08; helm.visible = false; g.add(helm);
-  const plate = B(0.82, 0.70, 0.54, clayMat({ rep:1, mat:{ color:0xc8c2b4 } }));
-  plate.position.y = 1.30; plate.visible = false; g.add(plate);
-  const greave = B(0.34, 0.46, 0.36, clayMat({ rep:1, mat:{ color:0xc8c2b4 } }));
-  greave.position.set(-0.19, 0.56, 0); greave.visible = false; g.add(greave);
-  const greave2 = greave.clone(); greave2.position.x = 0.19; g.add(greave2);
-
-  //  Trim. The corpses got faces and hands, and next to them the resident was
-  //  seven plain boxes — so the same treatment, parented to the limb it rides
-  //  on so every piece of it animates for free. Added after the clones above,
-  //  or the clones would carry a second copy of all of it.
-  const hairMat  = clayMat({ rep:1, mat:{ color:0x2a1d19 } });
-  const leather  = clayMat({ rep:1, mat:{ color:0x6b4a30 } });
-  const dark     = clayMat({ rep:1, mat:{ color:0x2a2430 } });
-  const linen    = clayMat({ rep:1, mat:{ color:0xd8cdb4 } });
-  const buckle   = clayMat({ rep:1, mat:{ color:0xd8b45a } });
-  //  attach(parent, w,h,d, x,y,z, mat, rz) — local to the parent's own box.
-  const at = (p, w, h, d, x, y, z, mat, rz, ry) => {
-    const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
-    m.position.set(x, y, z);
-    if (rz) m.rotation.z = rz;
-    if (ry) m.rotation.y = ry;
-    p.add(m); return m;
+  g.name = 'resident-human';
+  // Smooth normals on the resident, while retaining the world's clay texture.
+  const material = color => clayMat({rep:1,mat:{color,flatShading:false}});
+  const skin=material(0xc99270), cloth=material(0x3f6f8f), trousers=material(0x35424b);
+  const leather=material(0x503a2e), hairMat=material(0x2b201d), dark=material(0x27262b);
+  const linen=material(0xd5ccbb), eyeWhite=material(0xc9bfa9), iris=material(0x44382d);
+  const metal=()=>material(0xbcbab1);
+  // Radii, not box dimensions: every body part has an organic silhouette.
+  const oval=(parent,name,rx,ry,rz,x,y,z,mat)=>{
+    const mesh=new THREE.Mesh(new THREE.SphereGeometry(1,24,16),mat);
+    mesh.name=name;mesh.scale.set(rx,ry,rz);mesh.position.set(x,y,z);parent.add(mesh);return mesh;
   };
-
-  //  Face: brow, nose, two eyes and a pair of ears. Small, but it is the
-  //  difference between a person and a mannequin at over-the-shoulder range.
-  at(head, 0.42, 0.055, 0.05, 0, 0.09, 0.26, hairMat);
-  at(head, 0.09, 0.12, 0.07, 0, 0.00, 0.27, skin);
-  at(head, 0.085, 0.055, 0.03, -0.13, 0.03, 0.26, dark);
-  at(head, 0.085, 0.055, 0.03,  0.13, 0.03, 0.26, dark);
-  at(head, 0.05, 0.14, 0.11, -0.27, 0.00, 0, skin);
-  at(head, 0.05, 0.14, 0.11,  0.27, 0.00, 0, skin);
-  //  Fringe hanging out from under the hair.
-  at(hair, 0.44, 0.13, 0.05, 0, -0.10, 0.26, hairMat);
-  at(hair, 0.17, 0.20, 0.05, -0.16, -0.14, 0.25, hairMat, 0.2);
-
-  //  Torso: a collar, a strap across the chest, a laced seam, a belt with a
-  //  buckle, and a pouch hung off the hip.
-  at(torso, 0.78, 0.13, 0.50, 0, 0.42, 0, leather);
-  at(torso, 0.15, 0.96, 0.05, -0.10, 0.02, 0.235, leather, 0.30);
-  at(torso, 0.07, 0.62, 0.04, 0.14, 0.02, 0.235, linen);
-  for (let i = 0; i < 4; i++)
-    at(torso, 0.19, 0.035, 0.035, 0.14, 0.22 - i * 0.145, 0.245, linen, (i % 2 ? 0.4 : -0.4));
-  at(torso, 0.80, 0.14, 0.48, 0, -0.40, 0, leather);
-  at(torso, 0.13, 0.13, 0.05, 0, -0.40, 0.245, buckle);
-  at(torso, 0.20, 0.22, 0.14, -0.34, -0.44, 0.14, leather, 0.12);
-  //  Shoulder caps, one larger, so the outline is not a straight-sided crate.
-  at(torso, 0.22, 0.20, 0.40, -0.42, 0.34, 0, leather, 0.22);
-  at(torso, 0.18, 0.16, 0.36,  0.42, 0.32, 0, leather, -0.18);
-
-  //  Sleeves and wrist wraps.
-  for (const a2 of [armL, armR]){
-    at(a2, 0.235, 0.30, 0.255, 0, -0.13, 0, cloth);
-    at(a2, 0.225, 0.10, 0.245, 0, -0.60, 0, linen);
-    at(a2, 0.21, 0.16, 0.22, 0, -0.75, 0.02, skin);
+  const pivot=(parent,name,x,y,z)=>{
+    const part=new THREE.Group();part.name=name;part.position.set(x,y,z);parent.add(part);return part;
+  };
+  const tube=(parent,name,top,bottom,length,x,y,z,mat)=>{
+    const mesh=new THREE.Mesh(new THREE.CylinderGeometry(top,bottom,length,20),mat);
+    mesh.name=name;mesh.position.set(x,y,z);parent.add(mesh);return mesh;
+  };
+  // Jacket shaped from hips through waist, ribcage and sloping shoulders.
+  const profile=[[-.35,.22],[-.29,.245],[-.16,.215],[.02,.26],[.19,.295],[.27,.27],[.33,.145],[.35,.115]];
+  const torso=new THREE.Mesh(new THREE.LatheGeometry(profile.map(([y,r])=>new THREE.Vector2(r,y)),32),cloth);
+  torso.name='tapered-jacket';torso.scale.z=.63;torso.position.y=1.34;g.add(torso);
+  oval(g,'pelvis',.24,.145,.155,0,1.005,0,trousers);
+  tube(g,'neck',.08,.095,.16,0,1.745,0,skin);
+  // A seven-head adult proportion, with a narrower jaw and projecting face.
+  const head=oval(g,'head',.145,.19,.151,0,1.938,0,skin);
+  // Face attachments use a separate unscaled pivot; head rotation drives both.
+  const face=pivot(g,'face',0,1.938,0);
+  oval(face,'jaw',.111,.094,.117,0,-.111,.012,skin);
+  oval(face,'chin',.069,.034,.045,0,-.160,.069,skin);
+  for(const side of [-1,1]){
+    oval(face,'ear',.032,.052,.026,side*.146,-.017,0,skin);
+    oval(face,'cheek',.063,.058,.032,side*.068,-.040,.097,skin);
+    oval(face,'eye-socket',.042,.025,.020,side*.058,.031,.133,skin);
+    oval(face,'eye',.022,.009,.008,side*.058,.026,.147,eyeWhite);
+    oval(face,'iris',.008,.008,.004,side*.058,.026,.154,iris);
+    oval(face,'pupil',.004,.005,.002,side*.058,.026,.158,dark);
+    const brow=oval(face,'brow',.037,.007,.009,side*.06,.060,.149,hairMat);
+    brow.rotation.z=-side*.10;
   }
-  //  Boot cuffs and knee patches.
-  for (const l of [legL, legR]){
-    at(l, 0.29, 0.12, 0.31, 0, -0.10, 0, leather);
-    at(l, 0.27, 0.13, 0.10, 0, -0.40, 0.11, leather);
-    at(l, 0.30, 0.12, 0.34, 0, -0.70, 0.02, dark);
-    at(l, 0.28, 0.10, 0.14, 0, -0.78, 0.14, dark);
+  oval(face,'nose-bridge',.019,.049,.027,0,-.005,.15,skin);
+  oval(face,'nose-tip',.026,.02,.031,0,-.039,.17,skin);
+  oval(face,'upper-lip',.040,.006,.010,0,-.094,.130,material(0x906452));
+  oval(face,'lower-lip',.036,.007,.012,0,-.105,.130,material(0xb77e64));
+  // Cropped hair cap, open below the hairline; no rectangular fringe.
+  const hair=new THREE.Mesh(new THREE.SphereGeometry(1,28,18,0,Math.PI*2,0,1.10),hairMat);
+  hair.name='hair-cap';hair.scale.set(.155,.20,.16);hair.position.set(0,.016,-.011);face.add(hair);
+  const swept=oval(face,'swept-hair',.123,.035,.117,.025,.183,.005,hairMat);swept.rotation.z=-.16;
+
+  const armL=pivot(g,'left-shoulder',-.322,1.635,0);
+  const armR=pivot(g,'right-shoulder',.322,1.635,0);
+  const elbows=[];
+  for(const [arm,side] of [[armL,-1],[armR,1]]){
+    oval(arm,'sleeve',.106,.207,.109,0,-.143,0,cloth);
+    const elbow=pivot(arm,'elbow',0,-.335,0);elbows.push(elbow);
+    oval(elbow,'elbow-joint',.073,.077,.075,0,0,0,skin);
+    oval(elbow,'forearm',.068,.176,.072,0,-.153,.009,skin);
+    tube(elbow,'wrist-wrap',.061,.054,.073,0,-.30,.011,linen);
+    oval(elbow,'palm',.058,.083,.033,0,-.38,.016,skin);
+    // Four softly separated fingers and a thumb; readable even at rest.
+    for(let i=0;i<4;i++)oval(elbow,'finger',.012,.044-(Math.abs(i-1.5)*.006),.014,(i-1.5)*.025,-.450,.021,skin);
+    const thumb=oval(elbow,'thumb',.020,.044,.022,-side*.061,-.38,.028,skin);thumb.rotation.z=side*.40;
   }
+  const legL=pivot(g,'left-hip',-.139,1.00,0),legR=pivot(g,'right-hip',.139,1.00,0);
+  const knees=[];
+  for(const leg of [legL,legR]){
+    oval(leg,'thigh',.12,.273,.12,0,-.205,0,trousers);
+    const knee=pivot(leg,'knee',0,-.445,0);knees.push(knee);
+    oval(knee,'kneecap',.092,.082,.100,0,-.007,.012,trousers);
+    oval(knee,'calf',.087,.225,.09,0,-.19,-.012,trousers);
+    tube(knee,'boot-shaft',.088,.068,.19,0,-.33,0,leather);
+    oval(knee,'boot',.092,.077,.176,0,-.465,.066,leather);
+    oval(knee,'sole',.096,.028,.18,0,-.503,.066,dark);
+  }
+  // Belt and short collar follow the curved body instead of boxing it in.
+  const belt=tube(g,'belt',.232,.236,.064,0,1.045,0,leather);belt.scale.z=.67;
+  oval(g,'buckle',.036,.024,.012,0,1.045,.165,material(0xb99c62));
+  for(const side of [-1,1]){
+    const collar=oval(g,'collar',.080,.023,.080,side*.067,1.683,.029,linen);collar.rotation.z=side*.22;
+  }
+  oval(g,'belt-pouch',.071,.105,.043,-.225,1.015,.105,leather);
 
-  //  Weapon in the right hand, swapped by shape when the gear changes.
-  const weaponPivot = new THREE.Group();
-  weaponPivot.position.set(0.47, 1.62, 0);
-  g.add(weaponPivot);
-
+  // Equipment keeps the existing slots, but follows the head and lower legs.
+  const helm=new THREE.Mesh(new THREE.SphereGeometry(1,24,16,0,Math.PI*2,0,1.7),metal());
+  helm.name='rounded-helmet';helm.scale.set(.177,.211,.177);helm.position.set(0,.018,0);helm.visible=false;face.add(helm);
+  const plate=oval(g,'shaped-breastplate',.29,.28,.19,0,1.40,.01,metal());plate.visible=false;
+  const greave=oval(knees[0],'left-greave',.098,.18,.054,0,-.24,.083,metal());greave.visible=false;
+  const greave2=oval(knees[1],'right-greave',.098,.18,.054,0,-.24,.083,metal());greave2.visible=false;
+  const weaponPivot=pivot(g,'weapon-pivot',.322,1.635,0);
   shadowize(g);
-  Pl.group = g;
-  Pl.parts = { torso, head, hair, armL, armR, legL, legR,
-               helm, plate, greave, greave2, weaponPivot, weapon: null };
+  Pl.group=g;
+  Pl.parts={torso,head,face,hair,armL,armR,legL,legR,elbowL:elbows[0],elbowR:elbows[1],
+    kneeL:knees[0],kneeR:knees[1],helm,plate,greave,greave2,weaponPivot,weapon:null};
   S.world.add(g);
   refreshWeaponMesh();
 }
@@ -2850,6 +2851,13 @@ function updatePlayer(dt){
   p.armL.rotation.x = -sw * 0.85;
   p.torso.rotation.z = moving ? Math.sin(ph * 10.4) * 0.05 : 0;
   p.head.rotation.x = clamp(-Pl.pitch * 0.4, -0.5, 0.5);
+  if (p.face) p.face.rotation.copy(p.head.rotation);
+  if (p.kneeL){
+    p.kneeL.rotation.x = moving ? Math.max(0,-Math.sin(ph*5.2))*.65 : .03;
+    p.kneeR.rotation.x = moving ? Math.max(0, Math.sin(ph*5.2))*.65 : .03;
+    p.elbowL.rotation.x = -.13 - (moving ? Math.max(0,sw)*.18 : 0);
+    p.elbowR.rotation.x = -.13;
+  }
   p.group = Pl.group;
 
   //  Swing arc for the right arm and whatever it is holding.

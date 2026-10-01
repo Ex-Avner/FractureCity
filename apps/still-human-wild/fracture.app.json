@@ -1,28 +1,49 @@
 {
   "slug": "still-human-wild",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "name": "Still Human // Wild",
   "entry": "index.html",
   "runtime": "html5",
-  "description": "The spin-off of Still Human, with the walls taken off. Five hundred and seventy-six metres of hand-pressed clay country that streams in around you as you walk it — plains, a river cut, ridge lines with snow on them, seven settlements of which three still burn and four are ruins with something living in them — and a kiln at the middle that nothing can break. Look at a tree, a boulder or a clay bank and hold the button: a ring fills and it comes up in one piece. Craft an axe and a pick at the bench and it comes up faster and gives more. Sculpt the hill into a shape you meant, raise a house out of brick, thatch, timber, cut stone, kiln glass and lantern light. After dark the ground gives up husks, stalkers, lumberers, emberwisps, molders, wraiths you can see straight through and werewolves that close before you have finished deciding what to do, and every one of them leaves a weapon or a piece of plate on the grass before it goes; dawn burns whatever is still standing. Running through all of it is a spine of ten named bosses — one walks in per night, starting on the second, each with a behaviour nothing else in the game has, from the Marrow Warden that opens and pours out husks to the Pale Twins that share one life across two bodies to the Unmaker the Kiln was built against. Put the tenth down and the Kiln finishes lighting; the country stays yours to keep building in. Spend what you gather on the kiln itself — widen the protected ring, feed the braziers, raise the tower, better the bench — and the safe ground grows with you. Third person over the shoulder, stop-motion at twelve frames a second, and the world you changed is still changed when you come back.",
+  "description": "The spin-off of Still Human, with the walls taken off. Five hundred and seventy-six metres of hand-pressed clay country that streams in around you as you walk it \u2014 plains, a river cut, ridge lines with snow on them, seven settlements of which three still burn and four are ruins with something living in them \u2014 and a kiln at the middle that nothing can break. Look at a tree, a boulder or a clay bank and hold the button: a ring fills and it comes up in one piece. Craft an axe and a pick at the bench and it comes up faster and gives more. Sculpt the hill into a shape you meant, raise a house out of brick, thatch, timber, cut stone, kiln glass and lantern light. After dark the ground gives up husks, stalkers, lumberers, emberwisps, molders, wraiths you can see straight through and werewolves that close before you have finished deciding what to do, and every one of them leaves a weapon or a piece of plate on the grass before it goes; dawn burns whatever is still standing. Running through all of it is a spine of ten named bosses \u2014 one walks in per night, starting on the second, each with a behaviour nothing else in the game has, from the Marrow Warden that opens and pours out husks to the Pale Twins that share one life across two bodies to the Unmaker the Kiln was built against. Put the tenth down and the Kiln finishes lighting; the country stays yours to keep building in. Spend what you gather on the kiln itself \u2014 widen the protected ring, feed the braziers, raise the tower, better the bench \u2014 and the safe ground grows with you. Third person over the shoulder, stop-motion at twelve frames a second, and the world you changed is still changed when you come back.",
   "inputs": [
     {
       "type": "person.v1",
-      "description": "The resident — read from the shell so the ground is filed under the same name you use everywhere else in the hub."
+      "description": "The resident \u2014 read from the shell so the ground is filed under the same name you use everywhere else in the hub."
     }
   ],
   "outputs": [
     {
       "type": "wild.ground.v1",
-      "description": "The ground itself — seed, day count, every cell of terrain you raised or lowered, every block you placed, which trees, boulders and clay banks are gone, which settlements you have claimed, the kiln's upgrade levels, how many of the ten are down, your tools, your kit and what is spare. Written on leaving and every twenty-two seconds, so a run survives the window closing."
+      "description": "The ground itself \u2014 seed, day count, every cell of terrain you raised or lowered, every block you placed, which trees, boulders and clay banks are gone, which settlements you have claimed, the kiln's upgrade levels, how many of the ten are down, your tools, your kit and what is spare. Written on leaving and every twenty-two seconds, so a run survives the window closing."
     }
   ],
   "tags": [
-    "game", "survival", "sandbox", "open-world", "third-person", "building",
-    "terraforming", "gathering", "crafting", "claymation", "stop-motion",
-    "day-night", "loot", "base-building", "upgrades", "bosses", "zombies",
-    "ghosts", "werewolves", "arcade", "three.js",
-    "still-human", "fracture-city", "present-palm", "persistent", "spin-off"
+    "game",
+    "survival",
+    "sandbox",
+    "open-world",
+    "third-person",
+    "building",
+    "terraforming",
+    "gathering",
+    "crafting",
+    "claymation",
+    "stop-motion",
+    "day-night",
+    "loot",
+    "base-building",
+    "upgrades",
+    "bosses",
+    "zombies",
+    "ghosts",
+    "werewolves",
+    "arcade",
+    "three.js",
+    "still-human",
+    "fracture-city",
+    "present-palm",
+    "persistent",
+    "spin-off"
   ],
   "author": "Present Palm",
   "license": "personal-use",
