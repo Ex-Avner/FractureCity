@@ -15,7 +15,8 @@
     "test": "node boot.js && node mesher-golden.js && node persist-browser.js",
     "campaign": "node campaign-flow.test.js",
     "city-visual": "node city-rounded.test.js",
-    "city-grounding": "node city-grounding.test.js"
+    "city-grounding": "node city-grounding.test.js",
+    "first-night": "node first-night.test.js"
   },
   "devDependencies": {
     "playwright": "^1.47.0"

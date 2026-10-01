@@ -26,6 +26,7 @@ npx playwright install chromium
 | `npm run web` | the built deploy: `build-beta.py`, every local script present, real CSP headers, `FC_STANDALONE` | yes |
 | `npm run persist:browser` | localStorage survives a real browser restart, with a persistent profile | yes |
 | `npm run persist:shell` | the Electron save bridge writes to an isolated data dir and survives a restart | **no, see below** |
+| `npm run first-night` | the prologue plays front door to First Movement; classes, weapons, pickups, hittable civilians, witnesses, heat, Wardens, abilities, save/restore | yes |
 | `npm run compare` | four A/B screenshots of the render pass | yes |
 
 `persist-shell.js` has never been run to completion. Electron needs a display
