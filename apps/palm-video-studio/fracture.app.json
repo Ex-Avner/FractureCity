@@ -1,0 +1,16 @@
+{
+  "slug": "palm-video-studio",
+  "name": "Palm Video Studio",
+  "version": "1.0.0",
+  "entry": "Palm Video Studio.app",
+  "runtime": "external",
+  "icon": "icon.svg",
+  "description": "Generate short videos with sound locally with LTX-2.3. Write a shot, or animate a still from Palm Image Studio. Wide, cinema, vertical and square frames, two to five seconds, reproducible seeds, and a saved reel. Runs on this Mac with no subscription.",
+  "tags": ["video", "local-ai", "animation", "creative"],
+  "inputs": [
+    { "type": "image.png", "description": "Optional still from Palm Image Studio, or any uploaded image, to animate" }
+  ],
+  "outputs": [
+    { "type": "video.mp4", "description": "Locally generated MP4 clips with audio, saved with prompt and seed" }
+  ]
+}
