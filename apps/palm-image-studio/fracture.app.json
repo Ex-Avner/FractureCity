@@ -1,0 +1,22 @@
+{
+  "slug": "palm-image-studio",
+  "name": "Palm Image Studio",
+  "version": "1.0.0",
+  "entry": "Palm Image Studio.app",
+  "runtime": "external",
+  "icon": "icon.svg",
+  "description": "Generate realistic HD images locally with Z-Image Turbo. Prompt presets, square and wide formats, reproducible seeds, and a saved image gallery. Runs on this Mac with no subscription.",
+  "tags": [
+    "images",
+    "local-ai",
+    "photography",
+    "creative"
+  ],
+  "inputs": [],
+  "outputs": [
+    {
+      "type": "image.png",
+      "description": "Locally generated PNG images with prompt and seed metadata"
+    }
+  ]
+}
