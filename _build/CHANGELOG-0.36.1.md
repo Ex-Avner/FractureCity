@@ -45,3 +45,11 @@ No push or deployment. Existing personal data and saves are excluded from the co
 The shared cast now uses an anatomical MakeHuman CC0 head mesh, fitted clothing, articulated elbows and knees, more restrained street clothing colours and adult proportions. The resident editor has a live, rotatable 3D preview, face close-up, face/frame controls, eye colours, four jacket cuts and four coordinated wardrobe palettes. Existing skin, hair, headwear, props, build and saved-avatar controls remain available.
 
 V and the on-screen view button toggle third person. The camera retracts at voxel walls, preserves the combat aim ray, restores the eye camera between renders, and keeps driving/cinematic cameras intact. The selected view persists locally. See `apps/fracture-city-game/RESIDENT-STUDIO.md` for controls, limits, asset provenance and verification. The added browser test passes fourteen checks covering editing, persistence, rendering, camera clearance and aiming.
+
+## Hostile cast and physical arcade follow-up
+
+Zombies, stalkers, spitters, howlers, husks, thugs and heavies now use the detailed resident anatomy and articulated rig. Infected faces receive restrained discolouration, with distinct body proportions, posture, throat/back growths and armor. Enemy health, tactics and collision bodies remain unchanged; damage-flash materials are isolated from civilians.
+
+The arcade now owns its furnishing state per loaded chunk. Destroying its chunk clears stale hotspots and the old global furnishing flag, allowing all nine cabinets to return on the next visit. Cabinet models have shaped shells, recessed screens, marquees, control decks, buttons, joysticks and coin doors. Their screens use captured title/entry screens from the installed apps, with the existing E-to-play embedded app flow. Captures are static attract screens, not nine simultaneously running games.
+
+`node _test/enemies-arcade.test.js` passes sixteen integration checks: all seven enemy rigs, health/grounding/material isolation, nine cabinets and screenshots, idempotent furnishing, three unload/revisit cycles, collision-free interaction spots and opening/leaving Palm Drive. The four required release suites also pass.

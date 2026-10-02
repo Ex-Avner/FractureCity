@@ -8369,7 +8369,7 @@ function shToggleFreeBuild(){
   State.ui.freeBuild = !State.ui.freeBuild;
   window.fracture.save('free-build', { on: State.ui.freeBuild });
   toast(State.ui.freeBuild ? 'FREE BUILD — placement no longer spends materials'
-                           : 'QUARRY MODE — placement spends what you mined', 'info');
+                           : 'SALVAGE MODE: placement spends what you mined', 'info');
   refreshBuildHUD();
 }
 
@@ -8405,7 +8405,7 @@ function shRefreshHotbar(){
     const total = [...Inventory.values()].reduce((a, b) => a + b, 0);
     st.innerHTML = `mined ${State.hud.blocksMined||0} · placed ${State.hud.blocksPlaced||0} · ` +
       `carrying ${total} · <kbd>I</kbd> inventory · <kbd>G</kbd> ` +
-      (State.ui.freeBuild ? 'quarry mode' : 'free build');
+      (State.ui.freeBuild ? 'salvage mode' : 'free build');
   }
 }
 
@@ -8434,7 +8434,7 @@ function shRenderInventory(){
   $('inv-summary').innerHTML =
     `<span>${total} units carried</span><span>${worth} credits if melted</span>` +
     `<span>${ids.filter(i => shInvCount(i) > 0).length} / ${ids.length} materials discovered</span>` +
-    `<span class="${State.ui.freeBuild ? 'on' : ''}">${State.ui.freeBuild ? 'FREE BUILD' : 'QUARRY MODE'}</span>`;
+    `<span class="${State.ui.freeBuild ? 'on' : ''}">${State.ui.freeBuild ? 'FREE BUILD' : 'SALVAGE MODE'}</span>`;
 
   grid.innerHTML = ids.map(id => {
     const m = shMat4Block(id);
@@ -9301,7 +9301,7 @@ const SPEAKERS = {
     feature:'hood', tint:'#80ffff',
   },
   marcus: {
-    name: 'MARCUS VALE', role: 'STONE DISTRICT // QUARRY 4',
+    name: 'MARCUS VALE', role: 'CITY MAINS // NIGHT CREW',
     skin:'#9b6248', hair:'#2e1c14', coat:'#454b52', accent:'#ff8a3c',
     feature:'cap', tint:'#ff8a3c',
   },
@@ -13829,7 +13829,7 @@ const LEGACY_CAMPAIGN = [
       { who:'clerk', text:'Then they will be filing about a building. That is a slower and much more expensive kind of lie. Take the slower lie. Always take the slower lie.' },
     ],
     beats: {
-      quarry: [{ who:'rook', text:'You’re quarrying the city to argue with the city. I like it. I’ve been doing it for four years and it hasn’t worked once.' },
+      quarry: [{ who:'rook', text:'You’re salvaging the city to argue with the city. I like it. I’ve been doing it for four years and it hasn’t worked once.' },
                { who:'rook', text:'Hasn’t stopped either, mind. That might be the whole trick.' }],
       floors: [{ who:'ned', text:'Update. The abandoned lot has grown two floors overnight. FCN has asked the Bureau to comment. The Bureau has asked for a form.' }],
     },
@@ -13838,7 +13838,7 @@ const LEGACY_CAMPAIGN = [
       { who:'watch', text:'They will send people tonight. Not to take it down. To be seen near it. That is how a filing gets made true after the fact.' },
     ],
     objectives: [
-      { id:'quarry', kind:'mine',  count:24, text:'Quarry 24 units of material from the city' },
+      { id:'quarry', kind:'mine',  count:24, text:'Salvage 24 units of material from the city' },
       { id:'build',  kind:'place', count:12, text:'Place 12 of them somewhere that holds' },
       { id:'floors', kind:'brick', count:2,  text:'Raise the Unfinished Thing by two floors' },
     ],
@@ -14392,7 +14392,7 @@ function shShowCampaignEnd(){
     <p class="body">${shEsc(ending.body)}</p>
     ${decision ? `<p class="body" style="opacity:.72">Q-1957 remained in the city as: ${shEsc(decision.consequence)}</p>` : ''}
     <p class="body" style="opacity:.75">
-      ${State.hud.blocksMined || 0} blocks quarried ·
+      ${State.hud.blocksMined || 0} blocks salvaged ·
       ${Math.round(State.hud.distanceDriven || 0)} metres driven ·
       ${Shift.hold && Shift.hold.decisions ? Shift.hold.decisions.length : 0} HOLD cases carried ·
       ${State.hud.credits} credits</p>
@@ -29624,7 +29624,7 @@ const SCREEN_FEED = [
   'FRACTURE CITY NEWS · The Bureau confirms the shortfall is now described as a surplus of demand.',
   'FRACTURE CITY NEWS · Ned Halloran reminds residents that the ninth form supersedes the eighth form.',
   'CIVIC · Flooded East Road remains open in the sense that nobody has closed it.',
-  'CIVIC · The Quarry is operating to schedule. The schedule has been revised.',
+  'CIVIC · The Bureau is operating to schedule. The schedule has been revised.',
   'FRACTURE CITY NEWS · Dr Oren Vell has published a correction to a paper nobody has read.',
   'TRANSIT · The tow route runs tonight. Leon asks that you do not park on the tow route.',
   'CIVIC · Temporary measures enter their twelfth month of temporariness.',
@@ -30002,5 +30002,8 @@ document.addEventListener('DOMContentLoaded', init);
 <script src="visual-cohesion.js"></script>
 <script src="resident-head.js"></script>
 <script src="character-studio.js"></script>
+<script src="arcade-previews.js"></script>
+<script src="enemies-arcade.js"></script>
+<script src="outbreak.js"></script>
 </body>
 </html>
