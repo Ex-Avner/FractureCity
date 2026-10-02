@@ -1,0 +1,17 @@
+{
+  "slug": "fracture-city-signal",
+  "name": "Fracture City \u2014 The Signal",
+  "version": "1.0.0",
+  "entry": "Fracture City Signal.app",
+  "runtime": "external",
+  "icon": "icon.svg",
+  "description": "The official Fracture City community. Explore the 3D city, create your resident, share narratives and screenshots, and keep a chapter journal. Opens the online site in your browser.",
+  "tags": [
+    "community",
+    "3d-city",
+    "narratives",
+    "progress"
+  ],
+  "inputs": [],
+  "outputs": []
+}

@@ -1,0 +1,2 @@
+#!/bin/sh
+exec /usr/bin/open "https://fracture-city-official.whoneedsproof.chatgpt.site"
