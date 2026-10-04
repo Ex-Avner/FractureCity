@@ -5,7 +5,7 @@
 //  and the on-disk data directory.
 // =============================================================================
 
-const { app, BrowserWindow, ipcMain, shell, Menu } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, Menu, protocol } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const Registry = require('./services/registry');
@@ -14,6 +14,10 @@ const { createNewswire } = require('./services/newswire');
 const { createFeeds } = require('./services/feeds');
 const Launcher = require('./services/launcher');
 const Bus = require('./services/bus');
+const Media = require('./services/media');
+
+// Your music, art and clips for apps (palm-media://). Must register before ready.
+Media.registerScheme(protocol);
 
 // ── Resolve the ecosystem root ───────────────────────────────────────────────
 // In dev: shell/ is inside Fracture City/, root is the parent.
@@ -56,11 +60,13 @@ function resolveRoot() {
 }
 const ROOT = resolveRoot();
 const APPS_DIR   = path.join(ROOT, 'apps');
-const DATA_DIR   = path.join(ROOT, 'data');
+const WRITE_ROOT = app.isPackaged ? app.getPath('userData') : ROOT;
+const DATA_DIR   = path.join(WRITE_ROOT, 'data');
 const SHARED_DIR = path.join(ROOT, 'shared');
-const IDEAS_DIR  = path.join(ROOT, 'ideas');
+const IDEAS_DIR  = path.join(WRITE_ROOT, 'ideas');
+const media = Media.createMedia({ root: WRITE_ROOT, bundledRoot: app.isPackaged ? process.resourcesPath : null });
 
-// Ensure data dir exists in dev mode (packaged builds get it from extraResources).
+// Saves are writable in Application Support when packaged; never in the app bundle.
 for (const d of [DATA_DIR, IDEAS_DIR]) {
   if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true });
 }
@@ -104,6 +110,8 @@ function createLauncher() {
 
 // ── App lifecycle ────────────────────────────────────────────────────────────
 app.whenReady().then(() => {
+  media.ensure();
+  protocol.handle(Media.SCHEME, (req) => media.respond(req));
   buildMenu();
   registry.scan();
   createLauncher();
@@ -172,6 +180,13 @@ ipcMain.handle('data:listFrom', (e, otherSlug) => {
 });
 
 ipcMain.handle('registry:list', () => registry.list());
+ipcMain.handle('media:list', (e, kind) => media.list(String(kind || '')));
+ipcMain.handle('media:open', (e, kind) => {
+  const dirs = media.folders[kind];
+  if (!dirs) return false;
+  media.ensure();
+  return shell.openPath(dirs[0]).then((err) => !err);
+});
 
 //  Where the apps are actually being read from. The hub shows this, because
 //  "my edit is not showing up" should be answerable by looking at the window

@@ -215,23 +215,13 @@ canvas{display:block;}
   <button id="menuBtn">MENU</button>
 </div>
 
-<div id="pauseUI" class="overlay">
+<div id="pauseUI" class="overlay hidden">
   <h1>PAUSED</h1>
   <p>CLICK SCREEN TO RESUME</p>
 </div>
 
-<script type="importmap">
-{
-  "imports": {
-    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
-    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
-  }
-}
-</script>
-
-<script type="module">
-import * as THREE from 'three';
-
+<script src="../../shared/vendor/three.min.js"></script>
+<script>
 /* ═══════════════════════════════════════════════════════════════════════════
    SUN FALL — v0.1.0
    First-person sci-fi horror. 20 minutes to reroute the Heliogarde.

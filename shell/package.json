@@ -1,6 +1,6 @@
 {
   "name": "present-palm",
-  "version": "0.2.0",
+  "version": "0.40.0",
   "description": "Present Palm \u2014 launcher and integration layer for the Coherence, Fracture City and show-pipeline apps",
   "main": "main.js",
   "scripts": {
@@ -25,12 +25,21 @@
       "preload.js",
       "renderer/**/*",
       "services/**/*",
-      "assets/**/*"
+      "assets/**/*",
+      "preload-launcher.js"
     ],
     "extraResources": [
       {
         "from": "../apps",
-        "to": "apps"
+        "to": "apps",
+        "filter": [
+          "**/*",
+          "!palm-image-studio/**",
+          "!palm-video-studio/**",
+          "!fracture-city-signal/**",
+          "!**/*.bak",
+          "!**/__pycache__/**"
+        ]
       },
       {
         "from": "../shared",
@@ -39,10 +48,18 @@
       {
         "from": "../fracture.json",
         "to": "fracture.json"
+      },
+      {
+        "from": "../media/music/Final Collection",
+        "to": "media/music/Final Collection",
+        "filter": [
+          "**/*.mp3",
+          "collection.json"
+        ]
       }
     ],
     "mac": {
-      "category": "public.app-category.productivity",
+      "category": "public.app-category.games",
       "icon": "assets/AppIcon.icns",
       "target": [
         "dmg",

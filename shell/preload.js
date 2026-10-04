@@ -77,6 +77,11 @@ contextBridge.exposeInMainWorld('fracture', {
   info:     ()                       => ipcRenderer.invoke('shell:info'),
   listApps: ()                       => ipcRenderer.invoke('registry:list'),
   openApp:  (targetSlug, payload)    => ipcRenderer.invoke('app:open', targetSlug, payload),
+  //  Your music, art and clips: Fracture City/media plus the studios' outputs.
+  media: {
+    list:       (kind) => ipcRenderer.invoke('media:list', kind),
+    openFolder: (kind) => ipcRenderer.invoke('media:open', kind),
+  },
 
   // Bus
   emit:      (type, payload) => ipcRenderer.invoke('bus:emit', slug, type, payload),
