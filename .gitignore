@@ -51,3 +51,9 @@ apps/*/index.v*-backup.html
 
 # Applied patch sources for a single app; the result lives in index.html.
 apps/*/_patches/
+
+# Private online accounts, sessions, saves and database backups
+server/data/
+server/**/*.sqlite
+server/**/*.sqlite-wal
+server/**/*.sqlite-shm
