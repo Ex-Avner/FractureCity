@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<script src="../../shared/touch-controls.js" data-game="sun-fall"></script>
 <title>Sun Fall</title>
 <link rel="stylesheet" href="../../shared/theme.css">
 <script>
@@ -1188,7 +1189,7 @@ class Game {
 
   _initRenderer() {
     this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, window.PalmTouch?.active ? 1 : 2));
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     document.body.appendChild(this.renderer.domElement);
@@ -1679,9 +1680,9 @@ class Game {
     document.getElementById('pauseUI').addEventListener('click', () => this._requestLock());
   }
 
-  _isLocked() { return document.pointerLockElement === this.renderer.domElement; }
-  _requestLock() { try { this.renderer.domElement.requestPointerLock(); } catch (e) {} }
-  _requestUnlock() { try { document.exitPointerLock(); } catch (e) {} }
+  _isLocked() { return !!window.PalmTouch?.active || document.pointerLockElement === this.renderer.domElement; }
+  _requestLock() { if(window.PalmTouch?.active){this.paused=false;document.getElementById('pauseUI').classList.add('hidden');return;} try { this.renderer.domElement.requestPointerLock?.(); } catch (e) {} }
+  _requestUnlock() { if(window.PalmTouch?.active){this.paused=true;document.getElementById('pauseUI').classList.remove('hidden');return;} try { document.exitPointerLock?.(); } catch (e) {} }
 
   _toggleFlashlight() {
     if (!this.running) return;
@@ -1824,7 +1825,7 @@ class Game {
     if (this.outcome) return;
     this.outcome = kind;
     this.running = false;
-    try { document.exitPointerLock(); } catch (e) {}
+    try { document.exitPointerLock?.(); } catch (e) {}
     document.body.style.cursor = 'auto';
     const end = document.getElementById('end');
     end.className = 'overlay ' + (kind === 'win' ? 'win' : kind === 'burn' ? 'burn' : 'dead');

@@ -1029,7 +1029,8 @@ function boot(){
     const b = cv.getBoundingClientRect();
     return [(e.clientX - b.left) * (W / b.width), (e.clientY - b.top) * (H / b.height)];
   };
-  cv.addEventListener('mousemove', (e) => {
+  cv.style.touchAction='none';
+  cv.addEventListener('pointermove', (e) => {
     const [x, y] = at(e);
     if (State.started && !State.done && scene() && scene().key === 'room'){
       State.beam.x = x; State.beam.y = y;

@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<script src="../../shared/touch-controls.js" data-game="still-human"></script>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Still Human</title>
 <script>
@@ -2058,7 +2059,7 @@ function boot(){
   S.camera = new THREE.PerspectiveCamera(74, innerWidth/innerHeight, 0.06, 260);
   S.renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference:'high-performance' });
   S.renderer.setSize(innerWidth, innerHeight);
-  S.renderer.setPixelRatio(Math.min(devicePixelRatio, 1.6));
+  S.renderer.setPixelRatio(Math.min(devicePixelRatio, window.PalmTouch?.active ? 1 : 1.6));
   //  A torch pointed at a white cabinet from two metres is, physically, an
   //  enormous amount of light, and with no tone curve every pale surface in the
   //  lab clipped to flat white the moment you walked up to it. ACES rolls the
@@ -2146,12 +2147,12 @@ function bindInput(){
     Player.pitch = clamp(Player.pitch, -Math.PI/2 + 0.02, Math.PI/2 - 0.02);
   });
   document.addEventListener('pointerlockchange', () => {
-    S.locked = document.pointerLockElement === S.canvas;
+    S.locked = !!window.PalmTouch?.active || document.pointerLockElement === S.canvas;
     document.body.classList.toggle('locked', S.locked);
   });
 }
-function grabLock(){ try { S.canvas.requestPointerLock(); } catch (e){} }
-function releaseLock(){ try { document.exitPointerLock(); } catch (e){} }
+function grabLock(){ if(window.PalmTouch?.active){S.locked=true;document.getElementById('paused').classList.add('hide');return;} try { S.canvas.requestPointerLock?.(); } catch (e){} }
+function releaseLock(){ if(window.PalmTouch?.active){S.locked=false;return;} try { document.exitPointerLock?.(); } catch (e){} }
 
 function interact(){
   if (Game.place === 'yard'){

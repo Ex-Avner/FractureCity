@@ -3393,7 +3393,7 @@ function damagePlayer(amount){
 
 function onPlayerDeath(){
   $('death-overlay').classList.add('show');
-  document.exitPointerLock();
+  document.exitPointerLock?.();
   document.body.style.cursor = 'auto';
   State.ui.paused = true;
 }
@@ -4067,7 +4067,7 @@ const HACK_WORDPOOL = ['cipher','memex','protocol','daemon','kernel','runtime','
 function openMiniGame(terminal){
   if (terminal.used){ toast('Terminal already used.', 'info'); return; }
   State.ui.inMiniGame = true;
-  document.exitPointerLock();
+  document.exitPointerLock?.();
   document.body.style.cursor = 'auto';
   const card = $('minigame-card');
   const kind = Math.random() < 0.5 ? 'hack' : 'route';
@@ -4664,7 +4664,7 @@ function setupInput(){
   canvas.addEventListener('mousedown', (e) => {
     if (State.ui.inShiftPanel || State.ui.inDialogue) return;
     if (!State.ui.locked && !State.ui.inMiniGame && !State.ui.paused){
-      canvas.requestPointerLock();
+      canvas.requestPointerLock?.();
       return;
     }
     if (State.ui.locked && Player.mode === 'walk'){
@@ -4684,7 +4684,7 @@ function setupInput(){
   canvas.addEventListener('click', () => {
     if (State.ui.inShiftPanel || State.ui.inDialogue) return;
     if (!State.ui.locked && !State.ui.inMiniGame && !State.ui.paused){
-      canvas.requestPointerLock();
+      canvas.requestPointerLock?.();
     }
   });
   document.addEventListener('pointerlockchange', () => {
@@ -4695,7 +4695,7 @@ function setupInput(){
       $('lock-instruction').classList.remove('show');
     }
   });
-  $('lock-instruction').addEventListener('click', () => canvas.requestPointerLock());
+  $('lock-instruction').addEventListener('click', () => canvas.requestPointerLock?.());
   document.addEventListener('mousemove', e => {
     if (!State.ui.locked) return;
     Player.yaw -= e.movementX * 0.0025;
@@ -4717,7 +4717,7 @@ function toast(msg, kind='info'){
 
 function openMenu(){
   State.ui.paused = true;
-  document.exitPointerLock();
+  document.exitPointerLock?.();
   $('menu-overlay').classList.remove('hide');
   document.body.style.cursor = 'auto';
   $('menu-stats').innerHTML = `
@@ -6258,7 +6258,7 @@ function shOpenPanel(id){
   if (id && id.startsWith('cab:')){ shPlayCabinet(id.slice(4)); return; }
   Shift.panel = id;
   State.ui.inShiftPanel = true;
-  document.exitPointerLock();
+  document.exitPointerLock?.();
   document.body.style.cursor = 'auto';
   const card = $('shift-card');
   card.classList.remove('ink','wide');
@@ -7364,7 +7364,7 @@ function shTickShift(dt){
 
 function shShowClosing(){
   shCampaignEvent('shift');
-  document.exitPointerLock();
+  document.exitPointerLock?.();
   State.ui.paused = true;
   document.body.style.cursor = 'auto';
   $('shift-hud').classList.remove('show');
@@ -8412,7 +8412,7 @@ function shRefreshHotbar(){
 // ─── Inventory screen ───────────────────────────────────────────────────────
 function shOpenInventory(){
   State.ui.inInventory = true;
-  document.exitPointerLock();
+  document.exitPointerLock?.();
   document.body.style.cursor = 'auto';
   $('inv-overlay').classList.add('show');
   shRenderInventory();
@@ -9370,7 +9370,7 @@ function shSay(lines, onDone){
   Dialogue.onDone = onDone || null;
   Dialogue.active = true;
   State.ui.inDialogue = true;
-  document.exitPointerLock();
+  document.exitPointerLock?.();
   document.body.style.cursor = 'auto';
   $('dialogue').classList.add('show');
   document.body.classList.add('in-dialogue');
@@ -10324,7 +10324,7 @@ function shPlayCabinet(slug){
   const game = (SHIFT_WORLD.arcadeRoster || ARCADE_ROSTER).find(g => g.slug === slug);
   if (!game) return;
   State.ui.inArcade = true;
-  document.exitPointerLock();
+  document.exitPointerLock?.();
   document.body.style.cursor = 'auto';
 
   $('arcade-title').textContent = game.title;
@@ -10643,7 +10643,7 @@ function shIntrusionDifficulty(terminal){
 function openMiniGame(terminal){
   if (terminal.used){ toast('Terminal already used.', 'info'); return; }
   State.ui.inMiniGame = true;
-  document.exitPointerLock();
+  document.exitPointerLock?.();
   document.body.style.cursor = 'auto';
   const card = $('minigame-card');
   const diff = shIntrusionDifficulty(terminal);
@@ -11638,7 +11638,7 @@ function shPlayIntro(done){
   closeMenu();
   State.ui.paused = true;             // the sim holds; this loop draws
   State.ui.inIntro = true;
-  document.exitPointerLock();
+  document.exitPointerLock?.();
   document.body.style.cursor = 'none';
 
   Intro._fov = State.camera.fov;
@@ -13686,7 +13686,7 @@ function shOpenCompose(){
   wrap.classList.add('show');
   input.value = '';
   shUpdateComposeCount();
-  document.exitPointerLock();
+  document.exitPointerLock?.();
   setTimeout(() => input.focus(), 20);
 }
 
@@ -14358,7 +14358,7 @@ function shShowChapterCard(){
 
 function shShowChapterComplete(ch, grade){
   State.ui.paused = true;
-  document.exitPointerLock();
+  document.exitPointerLock?.();
   document.body.style.cursor = 'auto';
   const el = $('chapter-done');
   const gradeLine = grade === null || grade === undefined ? '' : grade
@@ -14379,7 +14379,7 @@ function shShowChapterComplete(ch, grade){
 
 function shShowCampaignEnd(){
   State.ui.paused = true;
-  document.exitPointerLock();
+  document.exitPointerLock?.();
   document.body.style.cursor = 'auto';
   const ending = shChapter() && shChapter().ending
     ? shChapter().ending
@@ -20992,7 +20992,7 @@ function shChoiceMade(id){ return Campaign.choices[id] || null; }
 function shChoice(id, prompt, options, then){
   if (Campaign.choices[id]){ if (then) then(Campaign.choices[id]); return; }
   State.ui.paused = true;
-  document.exitPointerLock();
+  document.exitPointerLock?.();
   document.body.style.cursor = 'auto';
   const el = $('chapter-done');
   if (!el){ Campaign.choices[id] = options[0].id; if (then) then(options[0].id); return; }
@@ -21370,7 +21370,7 @@ function shEndingFor(){
     if (!chosen) return origEnd.apply(this, arguments);
     const ending = shEndingFor();
     State.ui.paused = true;
-    document.exitPointerLock();
+    document.exitPointerLock?.();
     document.body.style.cursor = 'auto';
     const pattern = shChoiceMade('pattern'), tape = shChoiceMade('tape');
     const line = (label, v, map) => v ? `<p class="body" style="opacity:.7;margin:4px 0;">${label}: ${map[v]}</p>` : '';
@@ -23461,7 +23461,7 @@ function shRenderBench(){
 function shBenchOpen(){
   shBenchBuild();
   State.ui.inBench = true;
-  document.exitPointerLock();
+  document.exitPointerLock?.();
   document.body.style.cursor = 'auto';
   document.getElementById('bench-overlay').classList.add('show');
   shRenderBench();
@@ -24613,7 +24613,7 @@ function shSquareTunePanel(){
   });
 
   State.ui.inTune = true;
-  document.exitPointerLock();
+  document.exitPointerLock?.();
   document.body.style.cursor = 'auto';
   el.classList.add('show');
 }
@@ -25225,7 +25225,7 @@ function shStreamQuiet(){
 // =============================================================================
 
 // ─── The front door ─────────────────────────────────────────────────────────
-const SH_VERSION = '0.40.0';
+const SH_VERSION = '0.41.0';
 
 (function(){
   if (typeof shFrontHome !== 'function') return;
@@ -27002,6 +27002,7 @@ window.shFitUnreachable = shFitUnreachable;
 // =============================================================================
 
 function shArcadeStandalone(){
+  if(window.FC_FULL_WEB)return false;
   try {
     if (window.FC_STANDALONE === true) return true;
     //  No shell bridge to open apps through is the other honest signal: the
@@ -27027,7 +27028,7 @@ window.shArcadeStandalone = shArcadeStandalone;
     //  Everything the original does to put the player in front of a cabinet,
     //  minus the part that cannot work.
     State.ui.inArcade = true;
-    try { document.exitPointerLock(); } catch (e){}
+    try { document.exitPointerLock?.(); } catch (e){}
     document.body.style.cursor = 'auto';
 
     const $$ = (id) => document.getElementById(id);
@@ -27852,7 +27853,7 @@ const CITY_SCALE = {
 //  Reported as "it freezes when the chat bar opens". Nothing freezes. What
 //  happens is this:
 //
-//      shOpenCompose()  ->  document.exitPointerLock()
+//      shOpenCompose()  ->  document.exitPointerLock?.()
 //                       ->  pointerlockchange fires
 //                       ->  handler sees "lock lost, nothing open"
 //                       ->  #lock-instruction goes up, full screen, z-index 70
@@ -27943,7 +27944,7 @@ const CITY_SCALE = {
           !State.ui.inShiftPanel && !State.ui.inArcade &&
           !document.body.classList.contains('touch')){
         document.body.style.cursor = 'none';
-        try { State.renderer.domElement.requestPointerLock(); } catch (e){}
+        try { State.renderer.domElement.requestPointerLock?.(); } catch (e){}
       }
       return r;
     };
@@ -27999,7 +28000,7 @@ const CITY_SCALE = {
               || { title:'STILL HUMAN', sub:'WILD', color:0xff8a3d };
 
     State.ui.inArcade = true;
-    try { document.exitPointerLock(); } catch (e){}
+    try { document.exitPointerLock?.(); } catch (e){}
     document.body.style.cursor = 'auto';
 
     if ($$('arcade-title')) $$('arcade-title').textContent = game.title;
@@ -29043,7 +29044,7 @@ function hdPanelToggle(){
   hdPanelEl.classList.toggle('on', on);
   hdPanelSync();
   hdPanelStats();
-  if (on && document.pointerLockElement) document.exitPointerLock();
+  if (on && document.pointerLockElement) document.exitPointerLock?.();
 }
 
 // =============================================================================

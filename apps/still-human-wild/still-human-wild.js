@@ -4432,7 +4432,7 @@ function openMap(force){
   hud.lock.classList.toggle('hide', want || locked || St.phase !== 'play');
   if (want){
     cancelGather();
-    document.exitPointerLock();
+    document.exitPointerLock?.();
     St.mapSpan = St.mapSpan || 420;
     //  Keep the frame inside the world. Opening the map next to the eastern
     //  ridge should not spend half the screen on the void beyond it.
@@ -4490,7 +4490,7 @@ function renderMapList(){
 //  open on top of the cabinet.
 
 const keys = new Set();
-let locked = false;
+let locked = !!window.PalmTouch?.active;
 let listeners = [];
 
 function on(target, type, fn, opts){
@@ -4527,7 +4527,7 @@ function bindInput(){
       if (St.mapOpen){ openMap(false); return; }
       if (St.benchOpen){ toggleBench(false); return; }
       if (St.invOpen){ toggleInv(); return; }
-      if (locked){ document.exitPointerLock(); return; }
+      if (locked && !window.PalmTouch?.active){ document.exitPointerLock?.(); return; }
       leave();
       return;
     }
@@ -4573,7 +4573,7 @@ function bindInput(){
 
   on(cv, 'mousedown', ev => {
     if (St.phase !== 'play') return;
-    if (!locked){ cv.requestPointerLock(); return; }
+    if (!locked){ cv.requestPointerLock?.(); return; }
     ev.preventDefault();
     if (St.mode === 'fight'){
       //  Hold on a node to take it; otherwise the button is a swing.
@@ -4602,7 +4602,7 @@ function bindInput(){
   }, { passive: false });
 
   on(document, 'pointerlockchange', () => {
-    locked = document.pointerLockElement === cv;
+    locked = !!window.PalmTouch?.active || document.pointerLockElement === cv;
     hud.lock.classList.toggle('hide',
       locked || St.phase !== 'play' || St.invOpen || St.benchOpen || St.mapOpen);
     if (!locked) keys.clear();
@@ -4636,7 +4636,7 @@ function bindInput(){
     paintBigMap();
   }, { passive: false });
 
-  hud.lock.onclick = () => cv.requestPointerLock();
+  hud.lock.onclick = () => cv.requestPointerLock?.();
   hud.root.querySelector('#shw-new').onclick  = () => start(true);
   hud.root.querySelector('#shw-cont').onclick = () => start(false);
 }
@@ -4645,7 +4645,7 @@ function toggleInv(){
   St.invOpen = !St.invOpen;
   hud.inv.classList.toggle('show', St.invOpen);
   hud.lock.classList.toggle('hide', St.invOpen || locked || St.phase !== 'play');
-  if (St.invOpen){ renderInv(); document.exitPointerLock(); }
+  if (St.invOpen){ renderInv(); document.exitPointerLock?.(); }
 }
 
 //  Rest at the bench: skip to dawn, but only if nothing is standing near you.
@@ -5072,7 +5072,7 @@ function unmount(){
   cancelAnimationFrame(SHW.raf);
   offAll();
   keys.clear();
-  try { if (document.pointerLockElement) document.exitPointerLock(); } catch (e){}
+  try { if (document.pointerLockElement) document.exitPointerLock?.(); } catch (e){}
   clearWorld();
   try { SHW.renderer.dispose(); } catch (e){}
   SHW.renderer = null; SHW.scene = null; SHW.camera = null;
@@ -5101,7 +5101,7 @@ function backToTitle(){
   if (hud.dead) hud.dead.classList.remove('show');
   if (hud.lock) hud.lock.classList.add('hide');
   if (hud.title) hud.title.classList.remove('hide');
-  try { document.exitPointerLock(); } catch (e){}
+  try { document.exitPointerLock?.(); } catch (e){}
   const cont = hud.root && hud.root.querySelector('#shw-cont');
   if (cont){ cont.style.display = ''; cont.textContent = 'Continue · day ' + St.day; }
 }
@@ -5613,7 +5613,7 @@ function toggleBench(force, site){
   St.benchOpen = want;
   hud.bench.classList.toggle('show', want);
   hud.lock.classList.toggle('hide', want || locked || St.phase !== 'play');
-  if (want){ cancelGather(); renderBench(); document.exitPointerLock(); }
+  if (want){ cancelGather(); renderBench(); document.exitPointerLock?.(); }
 }
 
 function craftTool(which){

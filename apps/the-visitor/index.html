@@ -798,6 +798,7 @@ async function pickFromBank(opts={}){
   }
 }
 async function generateImage(prompt, opts={}){
+  if(window.FC_WEB_EDITION && window.visitorWebArt)return visitorWebArt(prompt,opts);
   // 1. Try the local bank first if the call specified bankKind + bankSlug.
   if (opts.bankKind && opts.bankSlug){
     const banked = await pickFromBank(opts);
@@ -2118,6 +2119,7 @@ function hideLoading(){ $('loading').classList.remove('show'); }
     $('api-provider').value = State.provider;
   }
   updateProviderUI();
+  if(window.FC_WEB_EDITION){$('setup-step-1').style.display='none';$('setup-step-2').style.display='block';$('welcome-step-label').textContent='WEB EDITION · BUILT-IN ILLUSTRATIONS';}
   if (ok && State.apartmentImg && State.playerName){
     enterApartment();
   }

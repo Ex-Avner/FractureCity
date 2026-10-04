@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<script src="../../shared/touch-controls.js" data-game="coherence-game"></script>
 <title>Coherence</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;}
@@ -641,15 +642,15 @@ CVS.addEventListener('keyup',e=>onK(e,false));
 // First-person look needs relative motion, so the Weave grabs pointer lock on
 // the GL canvas rather than reading absolute cursor position.
 document.addEventListener('pointerlockchange',()=>{
-  WEAVE.locked=(document.pointerLockElement===document.getElementById('wv'));
+  WEAVE.locked=!!window.PalmTouch?.active||(document.pointerLockElement===document.getElementById('wv'));
 });
 document.addEventListener('mousemove',e=>{
-  if(!WEAVE.active||!WEAVE.locked)return;
+  if(!WEAVE.active||!(WEAVE.locked||window.PalmTouch?.active))return;
   WEAVE.yaw+=e.movementX*.0022;
   WEAVE.pitch=clamp(WEAVE.pitch-e.movementY*.0022,-1.55,1.55);
 });
 document.addEventListener('mousedown',e=>{
-  if(!WEAVE.active||phase!=='weave'||!WEAVE.locked)return;
+  if(!WEAVE.active||phase!=='weave'||!(WEAVE.locked||window.PalmTouch?.active))return;
   if(e.button===0)wvBreak(); else if(e.button===2)wvPlace();
   e.preventDefault();
 });
@@ -8727,11 +8728,11 @@ function enterWeave(fresh){
   if(typeof SFX!=='undefined'){SFX.stopAmbient&&SFX.stopAmbient();SFX.unlock&&SFX.unlock();}
   wvToast('THE WEAVE — click to look · nothing here wants anything from you');
   const cv=document.getElementById('wv');
-  cv.onclick=()=>{if(WEAVE.active&&!WEAVE.locked)cv.requestPointerLock();};
+  cv.onclick=()=>{if(WEAVE.active&&!(WEAVE.locked||window.PalmTouch?.active))cv.requestPointerLock?.();};
 }
 function exitWeave(){
   wvSave();
-  if(document.pointerLockElement)document.exitPointerLock();
+  if(document.pointerLockElement)document.exitPointerLock?.();
   WEAVE.active=false;
   document.getElementById('wv').classList.remove('on');
   phase='start';
@@ -8988,7 +8989,7 @@ function wvHUD(){
     CTX.fillText(p[1],W*.5,H*.70+31);
     CTX.globalAlpha=1;CTX.textAlign='left';
   }
-  if(!WEAVE.locked){
+  if(!(WEAVE.locked||window.PalmTouch?.active)){
     CTX.textAlign='center';
     CTX.fillStyle='rgba(255,255,255,.85)';CTX.font='11px Courier New';
     CTX.fillText('click to look around',W/2,H*.62);

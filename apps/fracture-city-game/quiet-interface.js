@@ -10,6 +10,7 @@ body.fc-compact #fx-scanlines,body.fc-compact #fx-grain,body.fc-compact #fx-chro
 #fc-tools .tray{margin-top:8px;padding:14px;background:#101921f5;border:1px solid #56626c;border-radius:12px;width:245px;box-shadow:0 12px 35px #0008}
 #fc-tools button{font:inherit;color:inherit;background:#293641;border:1px solid #60707b;border-radius:6px;padding:9px;cursor:pointer}
 #fc-tools .row{display:flex;gap:7px;margin:9px 0}#fc-tools .row button{flex:1}#fc-tools p{line-height:1.6;color:#b9c3cb}#fc-tools .track{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#efc57c}
+@media(pointer:coarse){#fc-tools{top:60px;right:8px}#fc-tools summary{padding:7px 10px}#fc-tools .tray{max-height:60vh;overflow:auto}#pm-panel .in{max-height:90dvh;overflow:auto}}
 #pm-panel.radio-only section:not(:first-of-type){display:none}#pm-panel.radio-only .in{max-width:680px}
 body.fc-compact #pm-now{max-width:280px;font-size:11px}
 `;document.head.appendChild(style);

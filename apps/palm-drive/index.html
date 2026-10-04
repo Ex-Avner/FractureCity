@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<script src="../../shared/touch-controls.js" data-game="palm-drive"></script>
 <title>Palm Drive</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;}
@@ -1211,7 +1212,7 @@ function loop(now){
 }
 function fit(){
   const s=Math.min(innerWidth/W,innerHeight/H);
-  document.getElementById('wrap').style.transform=`scale(${Math.max(.4,Math.min(s,2))})`;
+  document.getElementById('wrap').style.transform=`scale(${Math.max(.2,Math.min(s,2))})`;
 }
 addEventListener('resize',fit);
 

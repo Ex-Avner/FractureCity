@@ -48,7 +48,15 @@ function savePrefs(){
 
 // ─── What there is ──────────────────────────────────────────────────────────
 async function refresh(){
-  if (!PM.inShell) return;
+  if (!PM.inShell){
+    if(window.FC_RADIO_URL && !PM.bundledLoaded){
+      try { const response=await fetch(window.FC_RADIO_URL); if(!response.ok)throw Error('playlist');
+        const list=await response.json(); const base=new URL(window.FC_RADIO_URL,location.href);
+        PM.music=list.tracks.map(t=>({kind:'music',title:t.title,album:'Final Collection',url:new URL(t.file,base).href}));
+        PM.bundledLoaded=true;reshuffle(false);renderPanel();
+      }catch(e){console.warn('[radio] Could not load bundled soundtrack',e.message)}
+    }return;
+  }
   for (const kind of ['music', 'images', 'videos']){
     try {
       const r = await shellMedia.list(kind);
@@ -75,9 +83,10 @@ function audio(){
   if (PM.audio) return PM.audio;
   const a = new Audio();
   a.crossOrigin = 'anonymous';
-  a.preload = 'auto';
+  a.preload = 'metadata';
   a.addEventListener('ended', () => next());
-  a.addEventListener('error', () => { if (PM.music.length > 1) setTimeout(() => next(), 400); });
+  a.addEventListener('playing',()=>{PM.failedTracks=0});
+  a.addEventListener('error',()=>{PM.failedTracks=(PM.failedTracks||0)+1;if(PM.failedTracks<PM.music.length)setTimeout(()=>next(),400);else hint('Radio unavailable. Check your connection, then press Play.');});
   PM.audio = a;
   return a;
 }
@@ -97,6 +106,7 @@ function playAt(pos){
 function next(){ PM.prefs.radio=true;savePrefs();playAt(PM.pos + 1); }
 function prev(){ PM.prefs.radio=true;savePrefs();playAt(PM.pos - 1); }
 function toggle(){
+  PM.failedTracks=0;
   if (!PM.music.length){ hint(PM.inShell ? 'No music yet. Press H, then Open music folder.' : 'No music yet. Press H to add some.'); return; }
   const a = audio();
   if (!PM.started || !a.src) { PM.prefs.radio = true; savePrefs(); playAt(PM.pos < 0 ? 0 : PM.pos); return; }
