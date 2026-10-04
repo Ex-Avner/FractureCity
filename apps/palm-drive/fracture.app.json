@@ -1,16 +1,16 @@
 {
   "slug": "palm-drive",
   "name": "Palm Drive",
-  "version": "3.0.0",
+  "version": "3.1.0",
   "icon": "icon.png",
   "entry": "index.html",
   "runtime": "html5",
-  "description": "Pseudo-3D arcade racer in the Pole Position / OutRun lineage. Four circuits with their own skies, six named rivals with distinct racecraft (blocking, slipstreaming, late-race pace, punishing your mistakes), three difficulty tiers, and a narrated championship campaign. Newsman Ned calls the race live in the register of a civic bulletin, and a nemesis emerges from whoever actually keeps beating you. Persistent career remembers every lap record, trophy and season in progress.",
+  "description": "Pseudo-3D arcade racer in the Pole Position / OutRun lineage. Four circuits with their own skies, six named rivals with distinct racecraft (blocking, slipstreaming, late-race pace, punishing your mistakes), three difficulty tiers, and a narrated championship campaign. Newsman Ned calls the race live in the register of a civic bulletin, and a nemesis emerges from whoever actually keeps beating you. Persistent career remembers every lap record, trophy and season in progress. Sculpted 3D cars, limited nitro, slipstream charging, live race gaps and stronger overtaking AI.",
   "inputs": [],
   "outputs": [
     {
       "type": "game.run.v1",
-      "description": "Race record — circuit, finishing position, best lap, championship points."
+      "description": "Race record \u2014 circuit, finishing position, best lap, championship points."
     }
   ],
   "tags": [

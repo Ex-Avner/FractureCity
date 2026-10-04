@@ -50,11 +50,11 @@ globalThis.PDHost = HOST;
 const TIERS = {
   rookie:   { key:'rookie',   label:'ROOKIE',   pace:0.88, aggression:0.35, catchup:0.30,
               blurb:'The field will wait for you. Learn the circuits here.' },
-  pro:      { key:'pro',      label:'PRO',      pace:1.00, aggression:0.75, catchup:0.55,
+  pro:      { key:'pro',      label:'PRO',      pace:1.08, aggression:0.75, catchup:0.55,
               blurb:'They defend their line and they punish a scruffy lap.' },
   // 1.045 puts the quickest rival at ~0.90 — level with a near-ideal human lap.
   // Winning is possible, but only just, and only on circuits that suit you.
-  fracture: { key:'fracture', label:'FRACTURE', pace:1.045, aggression:1.00, catchup:0.75,
+  fracture: { key:'fracture', label:'FRACTURE', pace:1.16, aggression:1.00, catchup:0.75,
               blurb:'Race clean or finish sixth. No allowances are made.' },
 };
 const DEFAULT_TIER = 'pro';
@@ -138,9 +138,9 @@ const PROFILE = {
                tag:'never beaten on the last lap' },
   'ODA':     { skill:0.760, temperament:'opportunist', bias:{ nightgate:1.04 },
                tag:'waits for you to get it wrong' },
-  'BRAKE':   { skill:0.700, temperament:'metronome',   bias:{ palmcoast:1.02 },
+  'BRAKE':   { skill:0.745, temperament:'metronome',   bias:{ palmcoast:1.02 },
                tag:'the same lap, every lap' },
-  'PALOMA':  { skill:0.660, temperament:'wildcard',    bias:{ thecollapse:1.06, meridian:0.96 },
+  'PALOMA':  { skill:0.720, temperament:'wildcard',    bias:{ thecollapse:1.06, meridian:0.96 },
                tag:'brilliant or nowhere' },
 };
 
@@ -227,7 +227,7 @@ function updateRivals2(dt){
     const newLap = r.lap !== r.lastLapSeen;
     const temp = TEMPERAMENTS[r.temperament];
     if (temp && temp.onLap){
-      temp.onLap(r, { finalLap, firstLap: r.lap === 1, newLap });
+      temp.onLap(r, { finalLap:r.lap >= G.laps, firstLap: r.lap === 1, newLap });
     }
     r.lastLapSeen = r.lap;
 
@@ -275,25 +275,35 @@ function updateRivals2(dt){
     const form = 1 + Math.sin(r.wob) * (r.wobAmp || 0.04);
     const targetSpd = HOST.MAX_SPEED * r.skill * r.paceMod * form
                       * (1 - Math.min(0.42, bend * 0.085));
-    r.speed = HOST.interp(r.speed, targetSpd, 0.02);
+    r.speed = HOST.interp(r.speed, targetSpd, 1-Math.exp(-1.7*dt));
 
     // ── line: racing line, unless the temperament asked for a defence ────
     const racingLine = HOST.limit(-ahead.curve * 0.16, -0.7, 0.7);
-    const wanted = (r.targetOffset === null || r.targetOffset === undefined)
+    let wanted = (r.targetOffset === null || r.targetOffset === undefined)
       ? racingLine : r.targetOffset;
-    r.offset = HOST.interp(r.offset, wanted, 0.02 * r.skill);
+    // Choose a passing lane before reaching a slower car, including the player.
+    const obstacles=rl.filter(o=>o!==r&&!o.finished).map(o=>({prog:(o.lap-1)*HOST.trackLength+o.z,offset:o.offset,speed:o.speed}));
+    obstacles.push({prog:playerProg,offset:G.playerX,speed:G.speed});
+    const blocker=obstacles.filter(o=>o.prog>prog&&o.prog-prog<HOST.SEG_LEN*9&&Math.abs(o.offset-r.offset)<.4&&o.speed<r.speed*1.06).sort((a,b)=>a.prog-b.prog)[0];
+    if(blocker){
+      const choices=[-.72,.72].sort((a,b)=>Math.abs(a-r.offset)-Math.abs(b-r.offset));
+      const lane=choices.find(x=>!obstacles.some(o=>Math.abs(o.prog-prog)<HOST.SEG_LEN*4&&Math.abs(o.offset-x)<.35));
+      if(lane!==undefined)wanted=lane;
+      else r.speed=Math.min(r.speed,Math.max(0,blocker.speed*.98));
+    }
+    r.offset = HOST.interp(r.offset, wanted, 1-Math.exp(-1.9*r.skill*dt));
 
     // don't stack on each other
     for (const o of rl){
       if (o === r || o.finished) continue;
       if (Math.abs(o.z - r.z) < HOST.SEG_LEN*2 && Math.abs(o.offset - r.offset) < 0.35)
-        r.offset += (r.offset > o.offset ? 1 : -1) * 0.02;
+        r.offset += (r.offset > o.offset ? 1 : -1) * 1.2*dt;
     }
     // and don't plough through traffic
     for (const c of seg.cars)
       if (Math.abs(c.offset - r.offset) < 0.4){
-        r.offset += (r.offset > c.offset ? 1 : -1) * 0.05;
-        r.speed *= 0.995;
+        r.offset += (r.offset > c.offset ? 1 : -1) * 3*dt;
+        r.speed *= Math.exp(-.3*dt);
       }
     r.offset = HOST.limit(r.offset, -0.92, 0.92);
 

@@ -85,7 +85,7 @@ h1{font-size:58px;letter-spacing:16px;color:#ffd9f2;margin-bottom:6px;font-weigh
     <button class="btn" id="btn-st-menu">M E N U</button>
   </div>
 
-  <div id="hint">arrow keys · shift for boost</div>
+  <div id="hint">arrows / WASD · space drift · shift nitro · P pause</div>
 </div>
 
 <script>
@@ -379,6 +379,8 @@ function startRace(trackIdx,mode){
   G.lapStart=0;G.bestLap=0;G.lastLap=0;
   G.finished=false;G.finishOrder=[];G.place=1;
   G.dist=0;G.topSpeed=0;G.shake=0;G.boost=0;
+  G.nitro=1;G.drafting=false;G.boostLocked=false;
+  G.drift=0;G.driftCharge=0;G.driftBoost=0;G.driftHold=0;G.driftYaw=0;
   G.countdown=3.2;
   G.running=true;G.paused=false;
   hideAll();
@@ -543,7 +545,15 @@ function update(dt){
   updateCars(dt,playerSeg);
   updateRivals(dt);
 
-  const boosting=(K.ShiftLeft||K.ShiftRight)&&G.speed>MAX_SPEED*.35;
+  const shift=!!(K.ShiftLeft||K.ShiftRight);
+  if(!shift)G.boostLocked=false;
+  G.drafting=!G.offroad&&rivals.some(r=>{
+    const gap=(r.lap-1)*trackLength+r.z-playerProgress();
+    return !r.finished&&gap>SEG_LEN*1.5&&gap<SEG_LEN*12&&Math.abs(r.offset-G.playerX)<.24;
+  });
+  const boosting=shift&&!G.boostLocked&&G.nitro>0&&G.speed>MAX_SPEED*.35&&!G.offroad;
+  G.nitro=limit(G.nitro+dt*(boosting?-.25:G.offroad?0:G.drafting?.16:.035),0,1);
+  if(boosting&&G.nitro===0)G.boostLocked=true;
   G.boost=interp(G.boost,boosting?1:0,.08);
 
   let steerInput=0;
@@ -569,8 +579,10 @@ function update(dt){
   } else if(G.drift<=.15){
     if(G.driftCharge>0.12){                            // released — cash it in
       G.driftBoost=Math.min(1.6,G.driftCharge*1.6);
+      G.nitro=limit(G.nitro+G.driftCharge*.15,0,1);
       G.bestDrift=Math.max(G.bestDrift,G.driftHold);
       flash(G.driftCharge>.85?'PERFECT DRIFT':'DRIFT +'+Math.round(G.driftCharge*100),'#7fe8ff');
+      G.driftCharge=0;
     }
     G.driftCharge=Math.max(0,G.driftCharge-dt*0.9);
     G.driftHold=0;
@@ -598,7 +610,7 @@ function update(dt){
     G.playerX=limit(G.playerX,-2.2,2.2);
   } else G.shake*=.88;
 
-  G.speed=limit(G.speed,0,MAX_SPEED*(boosting?BOOST_MUL:1));
+  G.speed=limit(G.speed,0,MAX_SPEED*(boosting?BOOST_MUL:G.driftBoost>0?1.18:G.drafting?1.06:1));
   G.topSpeed=Math.max(G.topSpeed,G.speed);
 
   // traffic contact
@@ -1278,6 +1290,7 @@ refreshCareerLine();
 
 <!-- Newsman Ned — announcer + campaign story. Requires rivals.js (PDHost). -->
 <script src="ned.js"></script>
+<script src="race-upgrade.js"></script>
 
 <script>
 /* Difficulty selector on the title screen. */
