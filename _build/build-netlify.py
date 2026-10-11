@@ -2,8 +2,8 @@
 """Build a complete static arcade, soundtrack and game for Netlify Drop."""
 from pathlib import Path
 import json,shutil,zipfile,importlib.util,re
-ROOT=Path(__file__).resolve().parents[1];OUT=ROOT/'_build/netlify-mobile';VERSION='0.41.0'
-slugs=['fracture-city-game','palm-drive','coherence-game','still-human','still-human-wild','sun-fall','light-bearer','the-visitor','works','character-forge']
+ROOT=Path(__file__).resolve().parents[1];OUT=ROOT/'_build/netlify-mobile';VERSION='0.53.0'
+slugs=['fracture-city-game','palm-drive','coherence-game','still-human','still-human-wild','sun-fall','light-bearer','the-visitor','works','character-forge','backroom']
 if OUT.exists():shutil.rmtree(OUT)
 OUT.mkdir(parents=True)
 shutil.copytree(ROOT/'shared',OUT/'shared')
@@ -30,7 +30,7 @@ spec=importlib.util.spec_from_file_location('beta',ROOT/'_build/build-beta.py');
 (OUT/'_redirects').write_text('/play /apps/fracture-city-game/index.html 302\n')
 (OUT/'404.html').write_text('<!doctype html><title>Not found</title><h1>This street is closed.</h1><a href="/">Return to the arcade</a>')
 (OUT/'index.html').write_text((ROOT/'_build/netlify-home.html').read_text())
-(OUT/'DEPLOY.txt').write_text('''FRACTURE CITY MOBILE WEB 0.41.0
+(OUT/'DEPLOY.txt').write_text('''FRACTURE CITY MOBILE WEB 0.53.0
 1. Unzip this download.
 2. Sign into Netlify and visit https://app.netlify.com/drop
 3. Drop the folder containing index.html, apps, shared and media onto Netlify.
@@ -38,12 +38,28 @@ spec=importlib.util.spec_from_file_location('beta',ROOT/'_build/build-beta.py');
 4. Open the HTTPS link on your phone. Landscape is recommended for action games.
 5. To update an existing site, use that site's Deploys upload area, retaining its address.
 
+Choose Enter Makers’ Mile on the main menu for Own the Block: a new saved
+artist city with your studio, commissions, gallery and rooftop Signal Run.
+Walk to Studio 01 and press E to claim the key, then use B to start creating.
+The neighborhood board saves your progress and can take you to Civic Core.
+
 13 soundtrack tracks are included. Music begins after a tap. Songs load on demand.
 Use Radio & menu in the city, or the music player on the home page.
-All nine arcade cabinet destinations are included, plus the main game.
+All ten arcade cabinet destinations are included, plus the main game.
+Room workshop: press B in the city, choose Creative supplies, a finish and a piece.
+Return to place. T rotates, right-click places, E opens your doorways.
+On phones use the touch Build and Place controls, and catalogue Rotate button.
+Fine art: B > Fine art & interiors opens the live 3D inspector.
+Drag the city view to orbit; scroll to zoom. Switch Click view to PLACE to
+stamp a shape. Use SELECT to edit it. Try the Midnight listening room.
+Art saves locally per city; Export artwork creates a reusable blueprint file.
 The Visitor web edition uses built-in illustrations, not an AI image service.
 Saves live in each browser. Clearing browser data deletes them; another phone
 or a different site address has separate saves. No server-side accounts here.
+Common Ground gallery: walk to the displays beside the Makers’ Mile garden.
+The static edition saves private drafts. Shared publishing and responses require
+the Districts server; open /city/ on that server and sign in at a display.
+
 Netlify hosts the game and music. It does not run the separate Districts server.
 For online 12-player Districts, deploy the persistent server separately and
 enter its HTTPS address in the game's Online districts menu.

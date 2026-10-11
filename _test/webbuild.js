@@ -36,7 +36,7 @@ const DIST = path.join(ROOT, '_build', 'webbeta-dist');
   //  check that a sibling module the build does not know about will fail.
   const html = fs.existsSync(path.join(DIST, 'index.html')) ? fs.readFileSync(path.join(DIST, 'index.html'), 'utf8') : '';
   const srcs = [...html.matchAll(/<script[^>]+src="([^"]+)"/g)].map(m => m[1]).filter(s => !/^https?:/.test(s));
-  const missing = srcs.filter(s => !fs.existsSync(path.join(DIST, s)));
+  const missing = srcs.filter(s => !fs.existsSync(path.join(DIST, new URL(s, 'http://local/').pathname)));
   c.eq('every local <script src> is in the dist', missing.length, 0, missing.join(', '));
   if (missing.length) console.log('  missing from dist: ' + missing.join(', '));
 

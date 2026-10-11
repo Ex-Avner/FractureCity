@@ -1,4 +1,4 @@
-FRACTURE CITY — public beta build 0.29.0
+FRACTURE CITY — public beta build 0.39.0
 ========================================
 
 DROP THIS FOLDER ON A HOST. THAT IS THE WHOLE INSTALL.
@@ -12,14 +12,27 @@ localStorage and some fetches on file://, and the game saves to localStorage.
 Any of `npx serve`, `python3 -m http.server`, or a phone pointed at your laptop
 will do for a local look.
 
+TONIGHT
+-------
+One night, five repairs, one hundred Turned. Follow the gold target. Hold E
+for field work; J opens the field journal. V switches first/third person.
+Weapons use 1/2/3, R picks up a weapon, Q uses your class ability, and Shift+S mounts
+the skateboard. Saves stay in this browser. No ChatGPT connection is needed.
+
+NEIGHBORHOOD STORIES AND ONLINE DISTRICTS
+---------------------------------------
+K opens six optional neighborhood stories. Their choices are saved with your city.
+Online Districts opens a separate 12-player social/PvP server in your browser.
+It needs the dedicated server package or a deployed HTTPS server address.
+It does not synchronize this single-player city or its saves.
+
 WHAT IS IN HERE
 ---------------
-  index.html                    the entire game, one file
+  index.html + sibling .js files   game entry and local game modules
   shared/vendor/three.min.js    three.js r158, vendored — no CDN, no network
   _headers / _redirects         caching + SPA fallback for Cloudflare/Netlify
 
-There is no build step, no bundler and no dependency install. Two files and
-two host config files.
+There is no build step, no bundler and no dependency install. Keep all included game modules and host configuration files together.
 
 NO SHELL REQUIRED
 -----------------
@@ -61,7 +74,7 @@ TELEMETRY, AND HOW TO TURN IT OFF
 This build can report anonymously on how it runs, because four separate faults
 in this game were found only because somebody typed "it froze" and I spent an
 afternoon guessing. It is built from `--key`; with no key the build loads no
-analytics script and makes no off-origin request at all.
+analytics script and makes no analytics requests. Optional public feeds still use the internet.
 
 What it sends, when a key is set:
 

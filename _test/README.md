@@ -90,3 +90,7 @@ mesher's output did not change is the digest, not this.
 - `boot.js` tests the source tree and `webbuild.js` tests the deploy. Neither
   substitutes for the other, which is the lesson section 64 of the game file
   already paid for.
+
+## 0.37.1 campaign and equipment
+
+Run `node outbreak.test.js` for the accelerated five-chapter path, `node campaign-polish.test.js` for field gates, choices and attack timing, `node resident-motion.test.js` for movement/attachments, and `node equipment-state.test.js` for all weapon models and equipment visibility. The focused visual checks use installed Google Chrome. Browser checks do not establish human comprehension or pacing; see the game’s PLAYTEST.md.

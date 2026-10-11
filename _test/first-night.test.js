@@ -78,7 +78,11 @@ const EXE = process.env.PW_CHROMIUM || undefined;
         //  Walk to wherever the marker is.
         let t = P.target; if (typeof t === 'function') t = t(); if (Array.isArray(t)) t = { x: t[0], z: t[1] };
         if (t){
-          const s2 = shFindOpenSpot(t.x + 1.2, t.z + 1.2, 0.4, 1.8, 14);
+          // Approach from the nearest clear side; the widened pavement means the
+          // old fixed diagonal can land on a kerb and search far from the speaker.
+          const s2 = [[1.2,1.2],[-1.2,1.2],[1.2,-1.2],[-1.2,-1.2],[0,1.2],[0,-1.2]]
+            .map(([dx,dz])=>shFindOpenSpot(t.x+dx,t.z+dz,.4,1.8,14)).filter(Boolean)
+            .sort((a,b)=>Math.hypot(a.x-t.x,a.z-t.z)-Math.hypot(b.x-t.x,b.z-t.z))[0];
           if (s2){ Player.position.set(s2.x, s2.y + Player.height, s2.z); }
         }
         if (FN._nearPickup){ o.took = FN._nearPickup.wid; document.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyR', key: 'r' })); }
@@ -119,7 +123,7 @@ const EXE = process.env.PW_CHROMIUM || undefined;
       if (s.card){ seen.cards++; if (s.card === 'choice') seen.choices.push(s.step); }
       if (s.took) seen.took.push(s.took);
       if (s.dialogue) seen.dialogue++;
-      if (s.campaign && !s.step && seen.cards > 3) done = true;
+      if (s.campaign && !s.step && seen.cards >= 3) done = true;
       await page.waitForTimeout(s.card || s.dialogue ? 150 : 60);
       if (i === 60) await shot('prologue-early');
     }
@@ -129,21 +133,21 @@ const EXE = process.env.PW_CHROMIUM || undefined;
       campaign: Campaign.active, chapter: Campaign.chapter, choicesSaved: typeof Campaign.choices['fn.state'] === 'string',
       loadout: FN.state.loadout, heat: FN.heat,
     }));
-    c.ok('prologue walked every beat', ['walk', 'fracture', 'break', 'arrangement', 'end'].every(k => seen.steps.has(k)), [...seen.steps].join(' → '));
-    c.eq('three prologue choices recorded', Object.keys(after.choices || {}).length, 3);
+    c.ok('prologue walked every beat', ['walk', 'fracture', 'break', 'end'].every(k => seen.steps.has(k)), [...seen.steps].join(' → '));
+    c.eq('two prologue choices recorded', Object.keys(after.choices || {}).length, 2);
     c.ok('took the crowbar from the street', seen.took.includes('crowbar'), seen.took.join(','));
     c.ok('prologue finished', after.done && !after.prologue);
     c.ok('a lore class was chosen', !!after.cls, after.cls);
     c.ok('class kit applied', after.loadout && !!after.loadout[1] && after.loadout[1] !== 'fists', JSON.stringify(after.loadout));
-    c.ok('the case began at the First Movement', after.campaign && after.chapter === 0);
+    c.ok('the outbreak began at Chapter One', after.campaign && after.chapter === 0);
     c.ok('first-night state survives the campaign reset', after.choicesSaved);
-    c.eq('heat cleared after a year', after.heat, 0);
+    c.eq('heat cleared for the campaign', after.heat, 0);
 
     c.gt('background narration injected throughout the prologue',seen.injections,20);
     c.ok('ambient narration never enters the scene queue',!seen.leaked);
-    c.ok('every scene line names its location, speaker role and next action',seen.context&&seen.lines.length>20);
-    c.ok('scene sequence visited in order exactly once',seen.beats.every((n,i)=>n===i)&&seen.beats.length===10,seen.beats.join(','));
-    c.ok('all scene text was individually acknowledged',seen.lines.some(t=>t.includes('back after a short break'))&&seen.lines.some(t=>t.includes('carrier tone')));
+    c.ok('every scene line names its location, speaker role and next action',seen.context&&seen.lines.length>=14);
+    c.ok('scene sequence visited in order exactly once',seen.beats.every((n,i)=>n===i)&&seen.beats.length===8,seen.beats.join(','));
+    c.ok('all scene text was individually acknowledged',seen.lines.some(t=>t.includes('Incoming Bureau file'))&&seen.lines.some(t=>t.includes('Every screen in the city')));
     c.ok('no background line leaks into the case',await page.evaluate(()=>!JSON.stringify([Narr.line,Narr.queue,Narr.pending]).includes('SENTINEL')));
     const rails=await page.evaluate(()=>{
       const list=[...State.chunkMap.values()].filter(c=>!c._skatepark).flatMap(c=>c.rails||[]);

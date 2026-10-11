@@ -73,3 +73,17 @@ node server/load.test.cjs
 ```
 
 Tests use isolated memory or temporary databases. The account suite restarts the real HTTP server against a disk database and verifies recovery, session revocation, durable stats, reward uniqueness and a valid backup. Browser checks use installed Chrome and the repository Playwright setup. The twelve-client load test is local loopback, not a WAN benchmark.
+
+## Common Ground social gallery (0.49)
+
+The same server now serves the main game at `/city/` and the multiplayer lobby at `/`. In the main game, choose Enter Makers' Mile and walk to the gallery displays beside the garden. Sign in from a display to publish under your server account. Gallery content is shared with the multiplayer plazas. Main-city movement and campaign saves remain local; this does not merge the main city into a synchronized twelve-player simulation.
+
+Shared stories, painted murals, replies, appreciations, follows, mutes and reports use the existing database and its backups. Eight exhibition spaces are available, with at most two per artist. Nothing is populated with fake residents. The static Netlify ZIP has private local drafts only; deploy/run this Node server for real sharing. Netlify alone cannot run the account database.
+
+A server operator must review reports. On the server host, with the same DB_PATH as the game:
+
+- `node server/social-admin.cjs reports` lists reports and their current work text.
+- `node server/social-admin.cjs remove WORK_ID` removes an offending exhibit and its attached replies/appreciations.
+- `node server/social-admin.cjs resolve REPORT_ID` clears a handled report.
+
+These commands are local operator tools; no unauthenticated moderation API is exposed. Reporting never promises an automatic decision. The Docker allowlist includes the public game/apps/music and new social module, while excluding saves and account databases. Container build and public deployment are not yet verified on this Mac.

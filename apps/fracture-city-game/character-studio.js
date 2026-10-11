@@ -1,13 +1,14 @@
 /* Resident studio: a shared articulated cast, live fitting room, and shoulder camera. */
 (function(){
 'use strict';
-const defaults={jaw:.95,nose:1,shoulders:1,faceWidth:1,faceLength:1,eyes:'#69776d',outfit:'bomber'};
+const defaults={jaw:.95,nose:1,shoulders:1,faceWidth:1,faceLength:1,eyes:'#69776d',outfit:'bomber',tattoos:'none',piercings:'none'};
 Object.assign(SH_DEFAULT_AVATAR,defaults);
 Object.keys(defaults).forEach(k=>{if(Shift.avatar[k]===undefined)Shift.avatar[k]=defaults[k]});
 const cloth=new THREE.MeshStandardMaterial({vertexColors:true,roughness:.82,metalness:.02});
 const sphere=new THREE.SphereGeometry(1,12,8), cube=new THREE.BoxGeometry(1,1,1);
 const dark=0x171d25;
 let figureConfig=null;
+const faceCache=new Map();
 function loft(rows,segments=24,face=false){
  const p=[],ix=[];
  for(const [y,rx,rz,cz=0] of rows)for(let j=0;j<=segments;j++){
@@ -36,11 +37,12 @@ function bake(bone,parts){
  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.setAttribute('normal',new THREE.Float32BufferAttribute(norm,3));g.setAttribute('color',new THREE.Float32BufferAttribute(col,3));
  g.setIndex(indices);const m=new THREE.Mesh(g,cloth);m.castShadow=true;m.receiveShadow=true;m.userData.residentGeometry=true;bone.add(m);
 }
-function dispose(c){if(c)c.group.traverse(o=>{if(o.isMesh&&o.geometry)o.geometry.dispose()})}
+function dispose(c){if(c)c.group.traverse(o=>{if(o.isMesh&&o.geometry&&!o.userData.sharedEquipment)o.geometry.dispose()})}
 const build=shBuildCharacter;
 window.shBuildCharacter=function(arch,rng,cfg){
- const c=build.apply(this,arguments),f=Object.assign({},defaults,cfg,figureConfig||{});
- const skin=c.skinHex,hair=c.hairHex,coat=figureConfig?c.coatHex:new THREE.Color(c.coatHex).lerp(new THREE.Color(0x626973),.32).getHex(),pants=c.pantsHex,trim=c.accent;
+ cfg=Object.assign(figureConfig?{}:{coat:rng.pick([0x292632,0x754d5f,0x31534b,0x61517c,0x847c55,0x913c54]),pants:rng.pick([0x242530,0x414347,0x433144]),outfit:rng.pick(['bomber','biker','battle-vest','mesh','patchwork','longcoat']),tattoos:rng.pick(['bands','circuit','blackwork']),piercings:rng.pick(['rings','studs','none']),hair:rng.pick([0xe95293,0x72cec0,0xd5dc68,0x292331,0xd78a50,0xe1ddd5]),hairStyle:rng.pick(['mohawk','spiked','long','bun','crop']),faceWidth:rng.pick([.9,1,1.1]),faceLength:rng.pick([.92,1,1.08]),jaw:rng.pick([.82,1,1.18]),shoulders:rng.pick([.9,1,1.15])},cfg||{});
+ const c=build.call(this,arch,rng,cfg),f=Object.assign({},defaults,cfg,figureConfig||{});
+ const skin=c.skinHex,hair=c.hairHex,coat=c.coatHex,pants=c.pantsHex,trim=c.accent;
  // Preserve archetype, nameplate, role metadata and carried-object identity.
  const old=c.group;old.remove(c.plate);if(c.aura)old.remove(c.aura);dispose(c);
  const root=new THREE.Group();root.add(c.plate);if(c.aura)root.add(c.aura);
@@ -52,17 +54,24 @@ window.shBuildCharacter=function(arch,rng,cfg){
  function ell(b,x,y,z,sx,sy,sz,color,r){buckets.get(b).push({geo:sphere,p:[x,y,z],s:[sx,sy,sz],c:color,r})}
  function shape(b,rows,color,face=false){const geo=loft(rows,24,face);buckets.get(b).push({geo,p:[0,0,0],s:[1,1,1],c:color,owned:true})}
  function box(b,x,y,z,sx,sy,sz,color,r){buckets.get(b).push({geo:cube,p:[x,y,z],s:[sx,sy,sz],c:color,r})}
- const body=bone(root,0,0,0),head=bone(root,0,1.61,0);
+ const torso=new THREE.Group();torso.position.y=1.43;root.add(torso);
+ const body=bone(torso,0,-1.43,0),head=bone(torso,0,.10,0);
  const shoulder=.235*Math.max(.85,Math.min(1.18,f.shoulders||1));
- const la=bone(root,-shoulder,1.43,0),ra=bone(root,shoulder,1.43,0);
+ const la=bone(torso,-shoulder,0,0),ra=bone(torso,shoulder,0,0);
  const ll=bone(root,-.105,.89,0),rl=bone(root,.105,.89,0);
- const elbows=[],knees=[];
+ const elbows=[],knees=[],fingers=[];
  // Chest, rib cage, waist and pelvis are distinct volumes with fitted clothing.
  shape(body,[[.965,.155,.104],[.99,.172,.115],[1.12,.17,.112],[1.29,.202,.126],[1.41,.219,.109],[1.465,.175,.087],[1.49,.075,.066]],coat);
  shape(body,[[.84,.155,.105],[.90,.177,.118],[.965,.158,.105]],pants);
  const outfit=f.outfit||'bomber';
+ if(outfit==='mesh')for(let i=0;i<8;i++)box(body,(i-3.5)*.045,1.28,.132,.009,.27,.007,trim);
+ if(outfit==='biker'||outfit==='battle-vest'){
+  for(const side of [-1,1]){box(body,side*.08,1.35,.137,.075,.22,.015,shade(coat,1.4),side*.35);for(let i=0;i<5;i++)ell(body,side*(.09+i*.024),1.455,.057,.008,.012,.009,0xc5cbd0)}
+  box(body,.09,1.12,.124,.095,.09,.013,trim);box(body,-.085,1.25,.134,.08,.025,.01,0xdad2c2);
+ }
+ if(outfit==='patchwork')for(let i=0;i<5;i++)box(body,(i%2?1:-1)*.105,1.08+i*.072,.137,.088,.063,.012,i%2?trim:shade(pants,1.7));
  if(outfit==='longcoat'){shape(body,[[.72,.218,.143],[.85,.211,.14],[.99,.174,.118],[1.08,.172,.114]],coat);box(body,0,.91,.123,.008,.34,.008,shade(coat,.5))}
- shape(body,[[1.47,.064,.058],[1.57,.057,.055],[1.62,.055,.05]],skin);
+ shape(body,[[1.47,.064,.058],[1.54,.055,.05]],skin);
  box(body,0,1.305,.122,.009,.34,.006,shade(coat,.6));
  // Fine zip, collar, cuffs and lapels replace the old luminous body stripes.
  box(body,0,1.27,.132,.006,.38,.005,shade(trim,.7));
@@ -71,10 +80,15 @@ window.shBuildCharacter=function(arch,rng,cfg){
  if(outfit==='utility'){for(const side of [-1,1]){box(body,side*.115,1.29,.123,.09,.10,.024,shade(coat,.8));box(body,side*.115,1.335,.139,.09,.016,.009,shade(coat,1.15))}}
  box(body,0,.972,.106,.31,.025,.018,dark);box(body,0,.972,.12,.035,.027,.01,shade(trim,.7));
  for(const [arm,side] of [[la,-1],[ra,1]]){
-  shape(arm,[[-.30,.052,.055],[-.23,.060,.063],[-.12,.073,.074],[-.025,.077,.071],[.04,.032,.036]],coat);const fore=bone(arm,0,-.285,0);elbows.push(fore);
-  shape(fore,[[-.248,.043,.044],[-.21,.047,.048],[-.11,.058,.060],[0,.054,.056]],coat);shape(fore,[[-.26,.044,.045],[-.238,.044,.045]],shade(coat,.65));
+  shape(arm,[[-.30,.052,.055],[-.23,.060,.063],[-.12,.073,.074],[-.025,.077,.071],[.04,.032,.036]],['battle-vest','mesh'].includes(outfit)?skin:coat);const fore=bone(arm,0,-.285,0);elbows.push(fore);
+  shape(fore,[[-.248,.043,.044],[-.21,.047,.048],[-.11,.058,.060],[0,.054,.056]],skin);shape(fore,[[-.26,.044,.045],[-.238,.044,.045]],shade(coat,.65));
+  if(f.tattoos!=='none')for(let i=0;i<6;i++){
+   const y=-.055-i*.029;box(fore,0,y,.058,.067,f.tattoos==='blackwork'?.022:.008,.006,0x27313b,f.tattoos==='circuit'?(i%2?.45:-.45):0);
+   if(f.tattoos==='bands')ell(fore,0,y,0,.059,.006,.062,0x27313b);
+  }
   ell(fore,0,-.296,.008,.042,.065,.028,skin);ell(fore,-side*.04,-.278,.021,.016,.037,.019,skin,-side*.4);
-  for(let i=0;i<4;i++)ell(fore,(i-1.5)*.018,-.352,.012,.010,.033-(Math.abs(i-1.5)*.006),.012,skin);
+  const digits=bone(fore,0,-.322,.012);fingers.push(digits);
+  for(let i=0;i<4;i++)ell(digits,(i-1.5)*.018,-.03,0,.010,.033-(Math.abs(i-1.5)*.006),.012,skin);
  }
  for(const leg of [ll,rl]){
   shape(leg,[[-.43,.063,.067],[-.34,.073,.079],[-.19,.086,.091],[-.025,.092,.10],[.04,.074,.085]],pants);const shin=bone(leg,0,-.415,0);knees.push(shin);
@@ -84,7 +98,10 @@ window.shBuildCharacter=function(arch,rng,cfg){
  }
  // Adult head proportions; sculpted cheek, jaw, sockets, nose and ears.
  const jaw=Math.max(.8,Math.min(1.2,f.jaw||1));
- const faceGeo=new THREE.BufferGeometry();const verts=FCResidentHead.position.slice();
+ const cacheKey=[jaw,f.faceWidth,f.faceLength,f.nose].join(':');
+ let cached=faceCache.get(cacheKey);
+ const faceGeo=cached?cached.face.clone():new THREE.BufferGeometry();const verts=cached?cached.verts:FCResidentHead.position.slice();
+ if(!cached){
  for(let i=0;i<verts.length;i+=3){
   const y=verts[i+1],x=verts[i],z=verts[i+2];
   verts[i]*=(f.faceWidth||1)*(1+(jaw-1)*Math.exp(-Math.pow((y+.046)/.065,2)));
@@ -92,6 +109,8 @@ window.shBuildCharacter=function(arch,rng,cfg){
   if(z>.08)verts[i+2]+=(f.nose-1)*.06*Math.exp(-Math.pow(x/.025,2)-Math.pow((y-.012)/.033,2));
  }
  faceGeo.setAttribute('position',new THREE.Float32BufferAttribute(verts,3));faceGeo.setIndex(FCResidentHead.index);faceGeo.computeVertexNormals();
+ cached={face:faceGeo.clone(),verts};faceCache.set(cacheKey,cached);if(faceCache.size>24){const key=faceCache.keys().next().value,old=faceCache.get(key);old.face.dispose();old.cap?.dispose();faceCache.delete(key)}
+ }
  buckets.get(head).push({geo:faceGeo,p:[0,0,0],s:[1,1,1],c:skin,owned:true,face:true});
  for(const side of [-1,1]){
   ell(head,side*.031*(f.faceWidth||1),.053*(f.faceLength||1),.085,.0135,.0135,.0135,0xb9b4a9);
@@ -101,15 +120,21 @@ window.shBuildCharacter=function(arch,rng,cfg){
  }
  const hs=c.hairStyle;
  if(hs!=='bald'){
+  let cap=cached.cap?cached.cap.clone():null;
+  if(!cap){
   const hp=verts.slice(),hi=[];
   const covered=i=>hp[i*3+1]>(hp[i*3+2]>.056?.125:.065);
   for(let i=0;i<FCResidentHead.index.length;i+=3){const ids=FCResidentHead.index.slice(i,i+3);if(ids.every(covered))hi.push(...ids)}
   for(let i=0;i<hp.length;i+=3){hp[i]*=1.035;hp[i+1]+=.004;hp[i+2]=hp[i+2]*1.035-.002}
-  const cap=new THREE.BufferGeometry();cap.setAttribute('position',new THREE.Float32BufferAttribute(hp,3));cap.setIndex(hi);cap.computeVertexNormals();buckets.get(head).push({geo:cap,p:[0,0,0],s:[1,1,1],c:hair,owned:true});
+  cap=new THREE.BufferGeometry();cap.setAttribute('position',new THREE.Float32BufferAttribute(hp,3));cap.setIndex(hi);cap.computeVertexNormals();cached.cap=cap.clone();
+  }
+  buckets.get(head).push({geo:cap,p:[0,0,0],s:[1,1,1],c:hair,owned:true});
   if(hs==='wave'||hs==='spiked')for(let i=0;i<7;i++){const x=(i-3)*.016;ell(head,x,.166-Math.abs(x)*.25,.061,.020,hs==='spiked'?.040:.023,.040,hair,-.35)}
   if(hs==='long')for(const side of [-1,1])ell(head,side*.076,.015,-.025,.022,.14,.069,hair,side*.06);
   if(hs==='bun')ell(head,0,.133,-.073,.047,.046,.033,hair);
-  if(hs==='mohawk')ell(head,0,.185,.012,.018,.042,.072,hair);
+  if(hs==='mohawk')for(let i=0;i<6;i++)ell(head,0,.23,-.08+i*.032,.015,.105,.023,hair);
+  if(hs==='spiked')for(let i=0;i<5;i++)ell(head,(i-2)*.047,.215,.005,.019,.09,.025,hair,-(i-2)*.26);
+  if(hs==='bun')for(const side of [-1,1])ell(head,side*.105,.15,-.025,.043,.048,.043,hair);
  }
  if(c.headgear==='cap'||c.headgear==='hat'){ell(head,0,.17,-.008,.113,.05,.105,dark);ell(head,0,.151,.091,c.headgear==='hat'?.15:.105,.009,.087,dark)}
  if(c.headgear==='hood'){ell(body,0,1.48,-.066,.142,.118,.094,coat)}
@@ -120,10 +145,14 @@ window.shBuildCharacter=function(arch,rng,cfg){
   box(body,-.13,1.23,.137,.025,.46,.019,dark,-.4);ell(body,.21,.99,-.025,.075,.14,.12,shade(coat,.55));
  }
  if(c.prop==='phone')box(elbows[1],0,-.285,.042,.049,.086,.012,dark);
- if(c.prop==='umbrella'){box(ra,0,-.19,.05,.014,.92,.014,dark);ell(ra,0,.33,.05,.37,.095,.37,shade(coat,.6))}
+ // Umbrellas use a hand socket in resident-motion.js; never bake into an upper arm.
  if(c.prop==='box'||c.prop==='crate')box(body,0,1.01,.24,.34,.25,.25,0x897661);
+ if(f.piercings!=='none')for(const side of [-1,1]){ell(head,side*.087,.004,.013,.012,.018,.009,0xc6cbd2);ell(head,side*.047,.083,.103,.007,.007,.004,0xc6cbd2)}
+ // Face rests at its old height, but pivots through the neck instead of its centre.
+ for(const part of buckets.get(head))part.p[1]+=.08;
+ shape(head,[[-.058,.054,.05],[.025,.055,.05],[.045,.051,.05]],skin);
  for(const [b,p] of buckets)if(p.length){bake(b,p);p.forEach(part=>{if(part.owned)part.geo.dispose()})}
- Object.assign(c,{group:root,head,leftArm:la,rightArm:ra,leftLeg:ll,rightLeg:rl,studio:{elbows,knees,height:1.82*height}});
+ Object.assign(c,{group:root,head,leftArm:la,rightArm:ra,leftLeg:ll,rightLeg:rl,studio:{torso,faceOffset:.08,outfit,tattoos:f.tattoos,piercings:f.piercings,elbows,knees,fingers,height:1.82*height}});
  c.gait.bob=.008;c.headTilt=0;return c;
 };
 const figure=shBuildFigure;
@@ -139,13 +168,13 @@ window.shRebuildMirror=function(){const old=SHIFT_WORLD.mirror;const result=mirr
 const panel=shPanelResident;
 window.shPanelResident=function(mode){
  let html=panel.apply(this,arguments);if(mode!=='avatar')return html;
- const options=(key,items)=>`<fieldset class="sh-swatches"><legend>${key==='outfit'?'Jacket cut':'Eye colour'}</legend><div class="sh-pills">${items.map(v=>`<button data-act="style" data-key="${key}" data-val="${v}" class="${Shift.avatar[key]===v?'sel':''}">${key==='eyes'?({'#69776d':'Sage','#5c738c':'Blue','#503c2c':'Brown','#9d8651':'Hazel'}[v]):v}</button>`).join('')}</div></fieldset>`;
+ const options=(key,items)=>`<fieldset class="sh-swatches"><legend>${({outfit:'Streetwear',eyes:'Eye colour',tattoos:'Tattoos',piercings:'Piercings'}[key]||key)}</legend><div class="sh-pills">${items.map(v=>`<button data-act="style" data-key="${key}" data-val="${v}" class="${Shift.avatar[key]===v?'sel':''}">${key==='eyes'?({'#69776d':'Sage','#5c738c':'Blue','#503c2c':'Brown','#9d8651':'Hazel'}[v]):v}</button>`).join('')}</div></fieldset>`;
  const ranges=[['Face width','faceWidth',.88,1.12],['Face length','faceLength',.9,1.1],['Jaw','jaw',.8,1.2],['Nose','nose',.8,1.25],['Shoulders','shoulders',.85,1.18]].map(([label,key,min,max])=>`<label class="sh-range">${label}<input aria-label="${label}" type="range" data-range="${key}" min="${min}" max="${max}" step=".01" value="${Shift.avatar[key]||defaults[key]}"><small>${Math.round((Shift.avatar[key]||defaults[key])*100)}%</small></label>`).join('');
  html=html.replace(shFigureHtml(),'<div id="resident-preview"><canvas aria-label="Live character preview. Drag to rotate."></canvas><button type="button" id="resident-portrait">Face / full body</button><p>Drag to turn • Changes preview live</p></div>');
  html=html.replace('grid-template-columns:200px 1fr','grid-template-columns:minmax(260px, .85fr) 1.15fr');
  html=html.replace('Resident configuration','Make your mark');
  html=html.replace('the figure in your doorway updates live','your look, in every street');
- html=html.replace('<div style="display:grid;gap:12px">',`<div style="display:grid;gap:12px"><div class="resident-extra"><fieldset class="sh-swatches"><legend>Wardrobe palettes</legend><div class="sh-pills">${['Midnight','Rust','Slate','Ivory'].map(name=>`<button type="button" data-resident-preset="${name}">${name}</button>`).join('')}</div></fieldset>${options('outfit',['bomber','tailored','utility','longcoat'])}${options('eyes',['#69776d','#5c738c','#503c2c','#9d8651'])}${ranges}</div>`);
+ html=html.replace('<div style="display:grid;gap:12px">',`<div style="display:grid;gap:12px"><div class="resident-extra"><fieldset class="sh-swatches"><legend>Wardrobe palettes</legend><div class="sh-pills">${['Midnight','Rust','Slate','Ivory'].map(name=>`<button type="button" data-resident-preset="${name}">${name}</button>`).join('')}</div></fieldset>${options('outfit',['bomber','tailored','utility','longcoat','biker','battle-vest','mesh','patchwork'])}${options('tattoos',['none','bands','circuit','blackwork'])}${options('piercings',['none','rings','studs'])}${options('eyes',['#69776d','#5c738c','#503c2c','#9d8651'])}${ranges}</div>`);
  return html;
 };
 document.addEventListener('click',e=>{const b=e.target.closest('[data-resident-preset]');if(!b)return;const palettes={Midnight:['#24313d','#171d25','#c6ab72'],Rust:['#75473b','#252d35','#c5b296'],Slate:['#64717b','#253039','#a8bec4'],Ivory:['#cbc4b2','#3b4148','#837354']};const [coat,pants,accent]=palettes[b.dataset.residentPreset];Object.assign(Shift.avatar,{coat,pants,accent});shRebuildMirror();shRenderPanel()});

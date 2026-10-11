@@ -30,5 +30,5 @@ else document.getElementById({view:'resident-view-toggle',journal:'campaign-case
 });
 document.addEventListener('keydown',e=>{if(/INPUT|TEXTAREA|SELECT/.test(e.target.tagName)||e.target.isContentEditable)return;if(e.code==='F2'||(e.code==='Escape'&&menu.open)){e.preventDefault();e.stopImmediatePropagation();menu.open=!menu.open;if(menu.open)hold();else release();}},true);
 setInterval(()=>{const available=!!State.citySeed&&!State.ui.inIntro&&!State.ui.inDialogue&&!State.ui.inMiniGame&&!State.ui.inInventory&&!State.ui.inShiftPanel&&!window.PalmMedia?.panelOpen&&!window.FN?.prologue;menu.hidden=!available;if(!available&&menu.open){menu.open=false;release();}const pm=window.PalmMedia,t=pm?.music[pm.order[pm.pos]];menu.querySelector('.track').textContent=t?.title||'13 tracks · choose Play';menu.querySelector('[data-act="play"]').textContent=pm?.audio&&!pm.audio.paused?'Pause':'Play';},400);
-window.FCQuietUI={get compact(){return compact},menu};
+window.FCQuietUI={get compact(){return compact},menu,close(){menu.open=false;release()}};
 })();

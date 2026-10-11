@@ -22,6 +22,7 @@ It does three things to apps/fracture-city-game/index.html and nothing else:
 Output: _build/webbeta-dist/  and  _build/fracture-city-beta-v<version>.zip
 """
 import argparse, json, os, re, shutil, sys, zipfile
+from urllib.parse import urlsplit
 
 ROOT   = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 GAME   = os.path.join(ROOT, 'apps', 'fracture-city-game', 'index.html')
@@ -269,6 +270,7 @@ def main():
     for src in re.findall(r'<script[^>]+src="([^"]+)"', html):
         if src.startswith(('http://', 'https://')) or src.startswith('shared/'):
             continue
+        src = urlsplit(src).path
         src_path = os.path.normpath(os.path.join(app_dir, src))
         dst_path = os.path.normpath(os.path.join(OUT, src))
         if not os.path.isfile(src_path):
@@ -276,6 +278,9 @@ def main():
         os.makedirs(os.path.dirname(dst_path), exist_ok=True)
         shutil.copy2(src_path, dst_path)
         print(f'  + {src}')
+    art_presets = os.path.join(app_dir, 'art-presets')
+    if os.path.isdir(art_presets):
+        shutil.copytree(art_presets, os.path.join(OUT, 'art-presets'), dirs_exist_ok=True)
     shutil.copy2(VENDOR, os.path.join(OUT, 'shared', 'vendor', 'three.min.js'))
     open(os.path.join(OUT, '_headers'), 'w').write(build_headers(args.key, args.host))
     open(os.path.join(OUT, '_redirects'), 'w').write(REDIRECTS)

@@ -48,7 +48,7 @@ const pick = a => a[Math.floor(Math.random() * a.length)];
 const FN_CLASSES = {
   witness: {
     name: 'FIELD WITNESS', color: 0xf4bb3d, css: '#f4bb3d',
-    who: 'Your world. The role the case was written for.',
+    who: 'Your world. You notice what people actually said.',
     tagline: 'Hears everyone. Forgets nothing.',
     desc: 'Balanced and hard to rattle. Your heat cools twice as fast, because you are good at being believed.',
     hp: 100, walkSpeed: 6.6, sprintSpeed: 11.2, jumpPower: 8.6, damageMult: 1.0, hackBonus: 1.2,
@@ -57,8 +57,8 @@ const FN_CLASSES = {
       desc: 'For eight seconds, every person and threat within 45 m shows through walls.' },
   },
   quarry: {
-    name: 'QUARRY HAND', color: 0xff8a3c, css: '#ff8a3c',
-    who: 'Marcus Vale’s world. Quarry 4, eighteen years.',
+    name: 'UTILITY HAND', color: 0xff8a3c, css: '#ff8a3c',
+    who: 'Marcus Vale’s world. City mains, night crew.',
     tagline: 'Carries more than anyone thinks.',
     desc: 'Slow and enormously tough. Every hit lands heavier. The Bureau finds you easy to see.',
     hp: 175, walkSpeed: 5.6, sprintSpeed: 9.4, jumpPower: 7.8, damageMult: 1.3, hackBonus: 0.8,
@@ -88,7 +88,7 @@ const FN_CLASSES = {
   },
   broadcaster: {
     name: 'NIGHT BROADCASTER', color: 0xff5268, css: '#ff5268',
-    who: 'FCN’s world. Ned’s people.',
+    who: 'FCN’s world. You work the floor under Ned.',
     tagline: 'Says it first, and loudest.',
     desc: 'The fastest on foot, with a long gun from the tower locker. People on the street recognise you.',
     hp: 85, walkSpeed: 7.8, sprintSpeed: 13.2, jumpPower: 9.5, damageMult: 1.0, hackBonus: 1.2,
@@ -123,7 +123,7 @@ const FN_WEAPONS = {
   cutter:     { slot:1, name:'BOX CUTTER',        short:'CUTTER',     type:'melee',  dmg:19, range:1.9, cooldown:0.20, color:0xd8d2b8, rarity:3 },
   crowbar:    { slot:1, name:'CROWBAR',           short:'CROWBAR',    type:'melee',  dmg:34, range:2.5, cooldown:0.46, color:0xb03050, rarity:4 },
   wrench:     { slot:1, name:'PIPE WRENCH',       short:'WRENCH',     type:'melee',  dmg:44, range:2.3, cooldown:0.70, color:0x6a3a2a, rarity:3 },
-  pick:       { slot:1, name:'QUARRY PICK',       short:'PICK',       type:'melee',  dmg:58, range:2.7, cooldown:0.95, color:0xff8a3c, rarity:2 },
+  pick:       { slot:1, name:'SLEDGEHAMMER',      short:'SLEDGE',       type:'melee',  dmg:58, range:2.7, cooldown:0.95, color:0xff8a3c, rarity:2 },
   axe:        { slot:1, name:'FIRE AXE',          short:'AXE',        type:'melee',  dmg:72, range:2.8, cooldown:1.10, color:0xd93c53, rarity:1 },
   revolver:   { slot:2, name:'SERVICE REVOLVER',  short:'REVOLVER',   type:'ranged', dmg:46, range:42, cooldown:0.62, spread:0.014, pellets:1, ammoMax:36, color:0xffd47a, rarity:3, ammo:6 },
   compliance: { slot:2, name:'COMPLIANCE PISTOL', short:'COMPLIANCE', type:'ranged', dmg:28, range:36, cooldown:0.30, spread:0.020, pellets:1, ammoMax:60, color:0x9aa2bb, rarity:3, ammo:15 },
@@ -423,13 +423,16 @@ function fnFeetY(p){ return (p.char.baseY != null ? p.char.baseY : p.pos.y); }
 //  Lying down, on the back, facing where they were facing.
 function fnPoseDown(c, yaw){
   const g = c.group;
+  if(c.fnb?.st==='dead'){g.visible=false;return}
   g.rotation.order = 'YXZ';
   if (yaw != null) g.rotation.y = yaw;
-  g.rotation.x = -Math.PI / 2;
-  g.position.y = (c.baseY || 0) + 0.26;
+  // A compact downed pose fits the same floor footprint as the living body.
+  if(c._downScale===undefined)c._downScale=g.scale.y;
+  g.rotation.x=0;g.scale.y=c._downScale*.55;
+  g.position.y=c.baseY||0;
   if (c.plate) c.plate.visible = false;
 }
-function fnPoseUp(c){ c.group.rotation.order = 'YXZ'; c.group.rotation.x = 0; }
+function fnPoseUp(c){if(c._downScale!==undefined){c.group.scale.y=c._downScale;delete c._downScale} c.group.rotation.order = 'YXZ'; c.group.rotation.x = 0; }
 
 function fnHurt(p, amount, head, fromX, fromZ){
   const b = fnBody(p);
@@ -642,6 +645,7 @@ function fnLookAtPlayer(c, pos, dir){
 function fnPoseOthers(dt){
   for (const p of fnPeople()){
     if (p.kind === 'street') continue;
+    if(p.kind!=='shop'&&window.FCActors&&(!p.char.fnb||p.char.fnb.st==='ok')){const body=p.owner._actorBody||(p.owner._actorBody={position:new THREE.Vector3()});body.position.set(p.pos.x,p.char.baseY??p.pos.y,p.pos.z);if(!FCActors.prepare(body,p.char,{r:.38}))continue;FCActors.finish(body,p.char,dt,{r:.38})}
     const b = p.char.fnb;
     if (!b || b.st === 'ok'){ if (b && b.flinch > 0) fnFlinch(p.char, b, dt); continue; }
     if (b.st === 'down' || b.st === 'dead'){
@@ -1020,9 +1024,9 @@ function fnTickBarks(dt){
 
 // ─── Street life: people talk to you ────────────────────────────────────────
 const GREET = {
- any:['The forecast has been postponed. Wear something uncertain.','My bus is due last Thursday.','The clock works; the appointment does not.','I live upstairs, according to the downstairs office.','That queue is for asking which queue.','They renewed the temporary notice. Better paper this time.','I have a forwarding address. It forwards to here.','The chemist is open until someone agrees it is closed.'],
+ any:['The forecast has been postponed. Wear something uncertain.','My bus is due last Thursday.','The clock works; the appointment does not.','I live upstairs, according to the downstairs office.','That queue is for asking which queue.','They renewed the temporary notice. Better paper this time.','I have a forwarding address. It forwards to here.','The chemist is open until someone agrees it is closed.','Have you seen my neighbour? He is walking very slowly toward the chemist.','Ned said my name tonight. Ned has never said my name.'],
  witness:['Put me down as present. I have receipts.','You taking statements? Mine has a correction to the correction.'],
- quarry:['Your coat has brought half the quarry home.','Good boots; the ground here takes an interest.'],
+ quarry:['You smell like a water main. I mean that kindly.','Good boots; the ground here takes an interest.'],
  tow:['Tow 12? My parking ticket has outlived the car.','Can you move a bus that officially already arrived?'],
  clerk:['Window Three sent me to Window Three. Different emphasis.','Is a photocopy of a stamp still legally damp?'],
  broadcaster:['If you hear Ned, tell him we kept the kettle.','Am I live? I would like a second attempt.'],
@@ -1305,7 +1309,7 @@ window.shCampaignStart = function(){
 //  The first movement opens with a line that knows who you were.
 const OPENERS = {
  witness:'I kept every account from that night. The folder agrees with itself only about the date.',
- quarry:'The keeper still uses the door I held shut. We have an understanding about hinges.',
+ quarry:'I work the city mains. If Ned runs on anything, it runs on something I have fixed.',
  tow:'I spent that night finding people somewhere to sit. A year later, the seats have become addresses.',
  clerk:'My name is right on the first page. I try to think of that as a foundation.',
  broadcaster:'I gave the corner a statement that night. They are still sending amendments.',
@@ -1389,6 +1393,18 @@ function fnExtra(x, z, rngSeed, cfg){
   fnBody({ char: c, kind: 'extra', pos: c.group.position, protect: true });
   return x0;
 }
+// A readable physical consequence of the repossession bulletin.
+function fnCollectionTicket(e){
+ const c=document.createElement('canvas');c.width=128;c.height=192;const g=c.getContext('2d');
+ g.fillStyle='#ffd55b';g.fillRect(0,0,128,192);g.fillStyle='#171e27';g.textAlign='center';
+ g.font='bold 19px monospace';g.fillText('UNPAID',64,30);g.fillText('RESIDENT',64,55);
+ g.font='12px monospace';g.fillText('TOW ON SIGHT',64,96);g.fillText('17:58 / FCN',64,116);
+ for(let x=14;x<114;x+=5)g.fillRect(x,143,x%3+1,29);
+ const map=new THREE.CanvasTexture(c);map.encoding=THREE.sRGBEncoding;
+ const tag=new THREE.Mesh(new THREE.PlaneGeometry(.3,.45),new THREE.MeshBasicMaterial({map,side:THREE.DoubleSide}));
+ tag.name='repossession-ticket';tag.position.set(.12,1.2,.33);tag.rotation.z=-.12;e.group.add(tag);
+}
+
 function fnSpawnAt(type, x, z){
   const def = ENEMY_TYPES[type];
   const s = shFindOpenSpot(x, z, 0.55, (def && def.height) || 1.8, 14); if (!s) return null;
@@ -1464,8 +1480,8 @@ function fnSay(lines,then){
   safe(()=>document.exitPointerLock());document.body.style.cursor='auto';
   const render=()=>{
     const l=scene.lines[scene.index],s=SPEAKERS[l.who]||SPEAKERS.self;
-    const role=l.who==='self'?'Civic Core resident':l.who==='ned'?'FCN evening anchor':s.role;
-    el.innerHTML=`<div class="scene-box" role="dialog" aria-modal="true" aria-label="The Minute"><div class="where">${esc(P.where)}</div><div class="who">${esc(l.who==='self'?'YOU':s.name)} <span class="role">· ${esc(role)}</span></div><p class="line">${esc(l.text)}</p><div class="next">Next: ${esc(P.objective)}</div><button id="fn-scene-next">N / click to continue <small>(${scene.index+1}/${scene.lines.length})</small></button></div>`;
+    const role=l.who==='self'?'Civic Core resident':l.who==='ned'?'FCN automated anchor':s.role;
+    el.innerHTML=`<div class="scene-box" role="dialog" aria-modal="true" aria-label="The Six O’Clock"><div class="where">${esc(P.where)}</div><div class="who">${esc(l.who==='self'?'YOU':s.name)} <span class="role">· ${esc(role)}</span></div><p class="line">${esc(l.text)}</p><div class="next">Next: ${esc(P.objective)}</div><button id="fn-scene-next">N / click to continue <small>(${scene.index+1}/${scene.lines.length})</small></button></div>`;
     el.classList.add('on');el.querySelector('button').onclick=advance;el.querySelector('button').focus();
   };
   function advance(){
@@ -1592,40 +1608,34 @@ function fnSequenceEnter(index){
 }
 function fnBeat1(){fnSequenceEnter(0);}
 const FN_BEATS=[
- {id:'arrival',step:'walk',clock:1076,where:'17:56 · CIVIC CORE · ONE YEAR BEFORE THE CASE',
+ {id:'arrival',step:'walk',clock:1076,where:'17:56 · CIVIC CORE · THE NIGHT OF THE ERROR',
   objective:'Walk to the FCN screen beneath the tower. Follow the gold marker.',
   enter(P,done){
-   fnPrologueCard('Civic Core · 17:56','The Minute','Two minutes before the bulletin, the city is keeping its usual appointment. Nobody has brought an overnight bag.',()=>fnSay([
-    {who:'ned',text:'Good evening from FCN. Your six o’clock bulletin is almost ready.'},
-    {who:'self',text:'Dad used to turn this up in the kitchen. I still reach for the volume.'},
-    {who:'ned',text:'While we wait, the clock above the chemist is correct again. Please enjoy it responsibly.'},
-   ],()=>{P.target=P_SPOTS.screen;done();}));
+   fnSay([
+    {who:'ned',text:'Good evening. City Hall has sold the emergency broadcast system to a parking company. The mayor says this will improve emergencies.'},
+   ],()=>{P.target=P_SPOTS.screen;done();});
   },exit:P=>P.ready&&dist2(Player.position.x,Player.position.z,...P_SPOTS.screen)<4.2},
  {id:'fracture',step:'fracture',clock:1078,where:'17:58 · CIVIC CORE · FCN CROSSROADS',
-  objective:'Listen to the three witnesses, then choose what you do first.',
+  objective:'Watch Ned’s bulletin fail. Choose how to help the street.',
   enter(P,done){
    const fx=-Math.sin(Player.yaw),fz=-Math.cos(Player.yaw);
    [-.9,0,.9].forEach((off,i)=>{const a=Math.atan2(fz,fx)+off,r=i===1?4.2:3.4;fnExtra(Player.position.x+Math.cos(a)*r,Player.position.z+Math.sin(a)*r,'stranger'+i,{coat:[0x586e79,0x2a2f3a,0x99775c][i]});});
    fnFracture();
    fnSay([
-    {who:'ned',text:'It is 17:58. Before the headlines, a brief message for everyone watching.'},
-    {who:'stranger_a',text:'He said the replacement bus has been replaced. I was on the first replacement.'},
-    {who:'stranger_b',text:'He said my brother is waiting downstairs. We buried him in February.'},
-    {who:'stranger_c',text:'He said this bicycle belongs to the council. They can start with the puncture.'},
-    {who:'self',text:'One sentence on every screen. Three people beside me, and none of us heard the same thing.'},
-    {who:'ned',text:'...back after a short break.'},
-    {who:'stranger_a',text:'That bit was the same. I would like the bus bit checked.'},
-   ],()=>fnChoice('first','17:58 · CIVIC CORE','Your first second','The carrier tone stays on; the people stay too. Choose what you can be useful for.',[
-    {id:'hold',label:'Offer a hand, without a theory.',note:'The shopping can look after itself.',cls:['witness','broadcaster']},
-    {id:'write',label:'Write it down before the corrections.',note:'For once, being early might help.',cls:['clerk','witness']},
-    {id:'wall',label:'Trust the wall with your back.',note:'Its account has been consistent so far.',cls:['quarry']},
-    {id:'run',label:'Find a vehicle with spare seats.',note:'A practical response to an impractical bulletin.',cls:['tow']},
+    {who:'ned',text:'Incoming Bureau file. Unpaid residents are now vehicles. Begin collection. Wait. That was an instruction?'},
+    {who:'stranger_a',text:'My husband has a parking ticket in his mouth. He’s asking me for exact change.'},
+    {who:'ned',text:'Do not pay your husband. Get off the road. Rook can cut the signal at the relay.'},
+   ],()=>fnChoice('first','17:58 · CIVIC CORE','Your first second','The man in the suit has stopped blinking. Every screen is still talking. Choose what you can be useful for.',[
+    {id:'hold',label:'Get the neighbors off the road.',note:'Organize a safe waiting point.',cls:['witness','broadcaster']},
+    {id:'write',label:'Record the original bulletin.',note:'Keep evidence before the Bureau edits it.',cls:['clerk','witness']},
+    {id:'wall',label:'Check the nearest shelter.',note:'Mark a solid place to take cover.',cls:['quarry']},
+    {id:'run',label:'Organize a way out.',note:'Mark a pickup point for stranded residents.',cls:['tow']},
    ],id=>fnSay([{who:'self',text:{
-    hold:'She takes my hand. The bag splits and neither of us looks down.',
-    write:'I put the time at the top. It is the last thing on the page I can verify.',
-    wall:'The wall holds my weight. I decide that counts as agreement.',
-    run:'The tow yard is three streets away. The shutters come down before the second.',
-   }[id]}],done)));
+    hold:'I move the queue off the road and mark the crossing as a safe waiting point.',
+    write:'I record 17:58 and the original instruction. FCN can no longer call this a rumor.',
+    wall:'I mark the sheltered entrance. People can wait here instead of standing in traffic.',
+    run:'I mark the crossing for pickups. For once, the parking company can wait for us.',
+   }[id]},{who:'self',text:'The man in the suit clamps his teeth around a bollard. Collection has begun.'}],done)));
   }},
  {id:'crowbar',step:'break',clock:1079,where:'17:59 · CIVIC CORE · ARMOURY GUTTER',
   objective:'Take the crowbar at the gold marker. Stand over it and press R.',
@@ -1633,23 +1643,22 @@ const FN_BEATS=[
    fnEndExtras();
    const k=fnExtra(...P_SPOTS.keeper,'keeper',{coat:0x454b52,headgear:'none'});
    if(k){P.keeperChar=k.char;const b=k.char.fnb;b.st='down';b.t=9999;b.lx=k.x;b.lz=k.z;fnPoseDown(k.char,0);}
-   P_SPOTS.loot.forEach(([x,z])=>{const e=fnSpawnAt('thug',x,z);if(e){e.state='patrol';e.hp=e.maxHp=40;}});
+   try{if(typeof shRegisterZombie==='function')shRegisterZombie();if(ENEMY_TYPES.zombie&&!ENEMY_TYPES.zombie.height)ENEMY_TYPES.zombie.height=1.8;if(typeof shHookSliding==='function')shHookSliding();if(typeof shHookAbsorbedHits==='function')shHookAbsorbedHits();}catch(e){}
+   P_SPOTS.loot.forEach(([x,z])=>{const e=fnSpawnAt(ENEMY_TYPES.zombie?'zombie':'thug',x,z);if(e){e.state='patrol';e.hp=e.maxHp=40;fnCollectionTicket(e);}});
    for(const [wid,spot] of [['crowbar',P_SPOTS.crowbar],['revolver',P_SPOTS.revolver]]){const s=fnSpot(...spot,1.2);if(s)fnDropWeapon(wid,s.x,s.y,s.z,{pid:'p:'+wid,ammo:12});}
    fnSay([
-    {who:'keeper',text:'They say the bulletin made everything free. Somehow that includes my knees.'},
-    {who:'self',text:'Can you stand?'},
-    {who:'keeper',text:'Not yet. I would appreciate someone staying.'},
-    {who:'keeper',text:'There is a crowbar in the gutter. Take it before someone applies the new price.'},
+    {who:'keeper',text:'Those bastards tried to tow me. I’m on foot. One of them made the reversing noise.'},
+    {who:'keeper',text:'Crowbar in the gutter. Take it. If anyone asks, it’s a medical device.'},
    ],()=>{P.target=()=>{const p=FN.pickups.find(q=>q.id==='p:crowbar');return p?{x:p.x,y:p.y,z:p.z}:null;};done();});
   },exit:P=>P.ready&&FN.state.loadout[1]==='crowbar'},
  {id:'looters',step:'break',clock:1079,where:'17:59 · CIVIC CORE · ARMOURY DOOR',
-  objective:'Drive off the looters. Face them and click to swing; the revolver nearby is optional.',
-  enter(P){P.target=P_SPOTS.armoury;for(const e of P.foes)if(e.state!=='dead'){e.state='alert';e.lastSeenPlayerPos=Player.position.clone();}},
-  exit:P=>P.foes.filter(e=>e.state!=='dead'&&!e.fnLeave).length<=1},
+  objective:'Put down the Turned. Face them and click to swing; the revolver nearby is optional.',
+  enter(P){P.target=P_SPOTS.armoury;for(const e of P.foes)if(e.state!=='dead'){e.state='attack';e.lastSeenPlayerPos=Player.position.clone();fnBarkEnemy(e,'PLEASE VACATE YOURSELF.');}},
+  exit:P=>P.foes.filter(e=>e.state!=='dead'&&e.hp>0).length===0},
  {id:'keeper-approach',step:'break',clock:1081,where:'18:01 · CIVIC CORE · ARMOURY DOOR',
   objective:'Go to the keeper at the gold marker.',
   enter(P){
-   for(const e of P.foes)if(e.state!=='dead'){e.fnLeave=true;e.state='patrol';e.attackTimer=999;fnBarkEnemy(e,'Keep it. The warranty sounded complicated.');}
+   for(const e of P.foes)if(e.state!=='dead'){e.fnLeave=true;e.state='patrol';e.attackTimer=999;fnBarkEnemy(e,'...');}
    const kb=P.keeperChar&&P.keeperChar.fnb;if(kb){kb.st='ok';kb.hp=kb.max;fnPoseUp(P.keeperChar);P.keeperChar.group.position.y=P.keeperChar.baseY;}
    P.target=P.keeperChar?()=>({x:P.keeperChar.group.position.x,z:P.keeperChar.group.position.z}):null;
   },exit:P=>!P.keeperChar||dist2(P.keeperChar.group.position.x,P.keeperChar.group.position.z,Player.position.x,Player.position.z)<3.2},
@@ -1657,55 +1666,26 @@ const FN_BEATS=[
   objective:'Choose how to help the keeper and the people waiting outside.',
   enter(P,done){
    fnSay([
-    {who:'keeper',text:'You stayed. I thought everyone had decided I was furniture.'},
-    {who:'self',text:'The furniture had a harder time.'},
-    {who:'keeper',text:'Twelve people saw it happen. So far I have been robbed, rescued and promoted.'},
-   ],()=>fnChoice('keeper','18:02 · THE ARMOURY','What needs doing?','The keeper can stand now; the door cannot. The people outside are waiting for someone to begin.',[
+    {who:'keeper',text:'They put a boot on my leg. Not a shoe. A fucking wheel clamp.'},
+    {who:'keeper',text:'There are people stuck outside. Help me get this door open before someone feeds coins into them.'},
+   ],()=>fnChoice('keeper','18:02 · THE ARMOURY','What needs doing?','The keeper can stand now; the door cannot. More of them are coming up Market Street, slowly, like a queue.',[
     {id:'pull',label:'Be the replacement door.',note:'No qualifications, broad shoulders.',cls:['quarry','tow']},
     {id:'count',label:'Ask for all twelve accounts.',note:'Bring enough paper to be wrong twelve ways.',cls:['witness']},
     {id:'say',label:'Give the corner a public statement.',note:'Attendance includes a corrections department.',cls:['broadcaster']},
     {id:'log',label:'File a report while the shop still has an address.',note:'The Bureau will appreciate the order of events.',cls:['clerk'],standing:1},
    ],id=>fnSay([
-    {who:'self',text:{pull:'The keeper sits behind me. For ten minutes my job is simply to be difficult to move.',count:'Four witnesses remember me arriving twice. I leave room in the margin for the other me.',say:'Everyone listens until I say what happened. Then the meeting becomes productive.',log:'The damage fits in three boxes. The keeper does not.'}[id]},
+    {who:'self',text:{pull:'The keeper sits behind me. For ten minutes my job is simply to be difficult to move.',count:'Four witnesses remember me arriving twice. I leave room in the margin for the other me.',say:'I tell the corner what is happening. Half of them believe me. The other half heard something else.',log:'The damage fits in three boxes. The bite marks do not.'}[id]},
     {who:'keeper',text:'Keep the crowbar. I have changed the price back, but you qualify for a discount.'},
    ],done)));
   }},
- {id:'wardens-approach',step:'arrangement',clock:1084,where:'18:04 · CIVIC CORE · BUREAU CROSSING',
-  objective:'Meet the Wardens at the gold marker. They have come to take names.',
-  enter(P){
-   P.escorts=[];for(const [x,z] of P_SPOTS.wardens){const e=fnSpawnAt('warden',x,z);if(e){e.fnEscort=true;e.state='patrol';P.escorts.push(e);}}
-   P.target=()=>{const e=P.escorts.find(e=>e.state!=='dead');return e?{x:e.position.x,y:e.position.y,z:e.position.z}:null;};
-  },exit:P=>!P.escorts.some(e=>e.state!=='dead')||P.escorts.some(e=>e.state!=='dead'&&dist2(e.position.x,e.position.z,Player.position.x,Player.position.z)<4.5)},
- {id:'name-choice',step:'arrangement',clock:1084,where:'18:04 · CIVIC CORE · BUREAU CROSSING',
-  objective:'Choose what name, if any, goes into the Bureau file.',
-  enter(P,done){
-   if(!P.escorts.some(e=>e.state!=='dead')){FN.state.standing-=2;fnSay([{who:'self',text:'Two Wardens down. Someone will have to tell their families before they finish telling the file.'}],done);return;}
-   fnSay([
-    {who:'warden',text:'Bureau of Narrative Mitigation. A temporary arrangement has applied throughout the city since 17:58.'},
-    {who:'self',text:'Can I go home?'},
-    {who:'warden',text:'Within the district, certainly. Departures beyond it are waiting for a definition of arrival.'},
-    {who:'self',text:'My family is beyond it.'},
-    {who:'warden',text:'I understand. Please give your name slowly; the carbon paper is our last sheet.'},
-   ],()=>fnChoice('name','18:04 · THE BUREAU','The first entry','The Warden has left a careful space for your name. Decide what belongs there.',[
-    {id:'give',label:'Give your name, including the awkward letter.',note:'At least one part of this can be accurate.',cls:['clerk'],standing:1},
-    {id:'false',label:'Use a name with fewer administrative needs.',note:'Someone imaginary can receive the circulars.',cls:['broadcaster'],standing:-1},
-    {id:'ask',label:'Ask for the expiry date of temporary.',note:'Leave a generous space for the answer.',cls:['witness']},
-    {id:'walk',label:'Offer the back of your coat.',note:'It contains no spelling errors.',cls:['tow','quarry'],standing:-1},
-   ],id=>{
-    if(id==='give'&&FN.heat>0){FN.heat=0;FN.pending.length=0;fnHeatHud();}
-    const replies={give:[{who:'warden',text:'Thank you for the clarification. The other spelling is already three people.'}],false:[{who:'warden',text:'A very legible name. Please continue to answer to it until we have better stationery.'}],ask:[{who:'warden',text:'The end date will appear on the permanent notice. We have ordered a temporary frame.'},{who:'self',text:'I leave the space.'}],walk:[{who:'warden',text:'Blue-grey, approximately knee-length. Thank you; the description field is compulsory.'}]};
-    for(const e of P.escorts)e.fnEscort=false;fnSay(replies[id],done);
-   }));
-  }},
  {id:'role',step:'end',clock:1086,where:'18:06 · CIVIC CORE · THE FIRST NIGHT',
-  objective:'Choose who you were that night. The marked role reflects your decisions.',
+  objective:'Choose who you are tonight. The marked role reflects your decisions.',
   enter(P,done){fnSay([
-   {who:'self',text:'The carrier tone keeps going. I wait for Ned to breathe.'},
-   {who:'keeper',text:'You can wait inside. The door position has recently become available.'},
-   {who:'self',text:'For now, people still need things done.'},
-  ],()=>fnClassCard('Civic Core · 18:06','Who were you that night?','Your decisions suggest the marked role; you can choose any of the five. Your starting kit comes with it.',done));}},
- {id:'year',step:'end',clock:1080,where:'ONE YEAR LATER · RESIDENCE 14 · 18:00',
-  objective:'Continue to the case at Residence 14.',
+   {who:'self',text:'Every screen in the city is still talking. I would like it to stop.'},
+   {who:'self',text:'Rook. Relay. Kill the signal before the six-thirty repossession.'},
+  ],()=>fnClassCard('Civic Core · 18:06','Who are you tonight?','Your decisions suggest the marked role; you can choose any of the five. Your kit comes with it.',done));}},
+ {id:'year',step:'end',clock:1090,where:'18:10 · THE SAME NIGHT',
+  objective:'Continue to the crossroads.',
   enter(P){fnPrologueFinish();}},
 ];
 FN.beats=FN_BEATS.map(b=>({id:b.id,step:b.step}));
@@ -1739,8 +1719,8 @@ function fnPrologueFinish(){
   FN.state.prologueDone = true; FN.state.inPrologue = false;
   //  A year passes. Nobody's file is still warm.
   FN.heat = 0; FN.pending.length = 0; fnHeatHud();
-  fnPrologueCard('One year later', 'The eve of the anniversary',
-    'Ned never came back; nobody has left the city, and the temporary arrangement is still in force. Tomorrow marks a year since 17:58; tonight an old recording turns on your wall.',
+  fnPrologueCard('The same night · 18:10', 'One hundred',
+    'Ned is still on every screen, and he is still wrong. One hundred people heard the sentence that was not meant for people. Rook says Ned can be fixed. Rook has said that about a lot of things.',
     () => { fnEndPrologueWorld(); shCampaignStart(true); fnSave(); });
 }
 
@@ -1751,8 +1731,8 @@ function fnPrologueSkip(){
   if (FN.scene || (Dialogue && Dialogue.active)) return;
   fnMarkerAt(null);
   const o = document.getElementById('fn-obj'); if (o) o.classList.remove('on');
-  fnClassCard('Skipping the Minute', 'Who were you that night?',
-    'At 17:58 every screen spoke together, and everyone heard it differently. Choose the work you did after that.',
+  fnClassCard('Skipping the prologue', 'Who are you tonight?',
+    'At 17:58 Ned threw an error. Every screen spoke at once, everyone heard something different, and some people stopped being people. Choose the work you do tonight.',
     () => fnPrologueFinish());
 }
 
@@ -1778,8 +1758,8 @@ const _restore2 = window.shSlotRestore;
 window.shSlotRestore = async function(){
   const r = await _restore2.apply(this, arguments);
   if (r !== false && FN.state.inPrologue && !FN.state.prologueDone){
-    fnClassCard('The Minute', 'Who were you that night?',
-      'Your record of the first night ends here. Choose your role to continue to the case.',
+    fnClassCard('The Six O’Clock', 'Who are you tonight?',
+      'Your record of the prologue ends here. Choose your role to continue to the crossroads.',
       () => { FN.state.prologueDone = true; FN.state.inPrologue = false; if (!Campaign.active){ shCampaignStart(true); } fnSave(); });
   }
   return r;

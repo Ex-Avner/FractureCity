@@ -12,7 +12,7 @@ Enemy.prototype.makeMesh=function(rng){
  if(!organic.has(this.type))return enemyMesh.apply(this,arguments);
  const type=this.type,def=this.def,col=def.colors||{},infected=!['thug','heavy'].includes(type),large=type==='husk'||type==='heavy';
  const arch=CHAR_ARCHETYPES.find(a=>a.key==='worker')||CHAR_ARCHETYPES[0];
- const c=shBuildCharacter(arch,rng,{skin:infected?rng.pick([0x9c9983,0x858c80,0xa89b87,0x7e8275]):rng.pick(SKIN_TONES),coat:col.coat||col.jacket||col.armor||0x39454a,pants:0x252a2b,hair:0x34352f,hairStyle:infected?rng.pick(['bald','crop','long']):'crop',headgear:'none',prop:'none',handle:def.name,build:large?'solid':'lean',heightScale:def.height/1.82,widthScale:large?1.22:type==='stalker'?.86:1,accent:0x807664});
+ const c=shBuildCharacter(arch,rng,{skin:infected?rng.pick([0x9c9983,0x858c80,0xa89b87,0x7e8275]):rng.pick(SKIN_TONES),coat:col.coat||col.jacket||col.armor||0x39454a,pants:0x252a2b,hair:rng.pick([0x6d947b,0xa05278,0xb4a663,0x34352f]),hairStyle:infected?rng.pick(['mohawk','spiked','bun','long']):'crop',headgear:'none',prop:'none',handle:def.name,build:large?'solid':'lean',heightScale:def.height/1.82,widthScale:large?1.22:type==='stalker'?.86:1,accent:0x807664});
  c.plate.visible=false;if(c.aura){c.group.remove(c.aura);c.aura=null}
  // Every hostile owns its flash material; damage must not recolour the street.
  const materials=new Map();c.group.traverse(o=>{if(o.isMesh){if(!materials.has(o.material))materials.set(o.material,o.material.clone());o.material=materials.get(o.material)}});
@@ -21,7 +21,7 @@ Enemy.prototype.makeMesh=function(rng){
   c.head.rotation.z=rng.range(-.07,.07);
   // Discolouration is painted into the same anatomical face, not luminous cubes.
   c.head.traverse(o=>{if(!o.geometry||!o.geometry.attributes.color)return;const p=o.geometry.attributes.position,a=o.geometry.attributes.color;
-   for(let i=0;i<p.count;i++){const x=p.getX(i),y=p.getY(i),z=p.getZ(i);const socket=z>.08&&Math.abs(Math.abs(x)-.032)<.023&&Math.abs(y-.055)<.026;const mottled=z>.035&&Math.sin(x*137+y*93)*Math.cos(y*173-z*65)>.65;if(socket||mottled){a.setXYZ(i,a.getX(i)*.64,a.getY(i)*.66,a.getZ(i)*.68)}}a.needsUpdate=true;
+   for(let i=0;i<p.count;i++){const x=p.getX(i),y=p.getY(i)-(c.studio.faceOffset||0),z=p.getZ(i);const socket=z>.08&&Math.abs(Math.abs(x)-.032)<.023&&Math.abs(y-.055)<.026;const mottled=z>.035&&Math.sin(x*137+y*93)*Math.cos(y*173-z*65)>.65;if(socket||mottled){a.setXYZ(i,a.getX(i)*.64,a.getY(i)*.66,a.getZ(i)*.68)}}a.needsUpdate=true;
   });
  }
  if(type==='zombie'){
@@ -30,7 +30,7 @@ Enemy.prototype.makeMesh=function(rng){
  }
  if(type==='stalker'){c.leftArm.scale.y=1.14;c.rightArm.scale.y=1.14;c.head.position.z=.04;c.head.rotation.x=.14}
  if(type==='spitter'){
-  this.sac=new THREE.Group();this.sac.position.set(0,1.30,-.20);c.group.add(this.sac);oval(this.sac,0x6d7860,0,0,0,.155,.22,.15);oval(c.head,0x737662,0,-.074,.043,.046,.043,.045);
+  this.sac=new THREE.Group();this.sac.position.set(0,1.30,-.20);c.group.add(this.sac);oval(this.sac,0x6d7860,0,0,0,.155,.22,.15);oval(c.head,0x737662,0,.006,.043,.046,.043,.045);
  }
  if(type==='howler'){
   this.horn=new THREE.Group();this.horn.position.set(0,1.53,.061);c.group.add(this.horn);oval(this.horn,0x7d7569,0,0,0,.066,.065,.059);c.head.rotation.x=-.16;
@@ -39,7 +39,7 @@ Enemy.prototype.makeMesh=function(rng){
   const plate=new THREE.Mesh(cityRoundGeometry(.35,.36,.08,.035),new THREE.MeshStandardMaterial({color:0x3a403c,roughness:.7}));plate.position.set(0,1.25,.13);c.group.add(plate);this.plate=plate;
   for(const side of [-1,1])oval(c.group,0x454b46,side*.23,1.435,0,.093,.07,.105);
  }
- if(type==='heavy'){oval(c.head,0x46515b,0,.135,-.008,.096,.064,.09)}
+ if(type==='heavy'){oval(c.head,0x46515b,0,.215,-.008,.096,.064,.09)}
  if(type==='thug'||type==='heavy'){
   const weapon=new THREE.Mesh(new THREE.BoxGeometry(.065,.075,type==='heavy'?.52:.34),new THREE.MeshStandardMaterial({color:0x30383b,metalness:.65,roughness:.4}));weapon.position.set(0,-.31,.12);c.studio.elbows[1].add(weapon);
  }
@@ -97,7 +97,7 @@ window.shFitArcade=function(chunk){
  for(const z of [-16.8,-7.2])box(room,10,.09,.16,36,6.7,z,0xc1b696);
  const light=new THREE.PointLight(0xdbe4ed,2.8,18);light.position.set(35,6.1,-12);room.add(light);chunk.lights.push(light);
  const warm=new THREE.PointLight(0xffd6a2,1.5,10);warm.position.set(30.8,5.3,-12);room.add(warm);chunk.lights.push(warm);
- const slots=[{x:32.4,z:-16.6,rot:0},{x:34.6,z:-16.6,rot:0},{x:36.8,z:-16.6,rot:0},{x:32.4,z:-7.4,rot:Math.PI},{x:34.6,z:-7.4,rot:Math.PI},{x:36.8,z:-7.4,rot:Math.PI},{x:40.6,z:-16,rot:-Math.PI/2},{x:40.6,z:-12.8,rot:-Math.PI/2},{x:40.6,z:-9.6,rot:-Math.PI/2}];
+ const slots=[{x:32.4,z:-16.6,rot:0},{x:34.6,z:-16.6,rot:0},{x:36.8,z:-16.6,rot:0},{x:32.4,z:-7.4,rot:Math.PI},{x:34.6,z:-7.4,rot:Math.PI},{x:36.8,z:-7.4,rot:Math.PI},{x:40.6,z:-16,rot:-Math.PI/2},{x:40.6,z:-12.8,rot:-Math.PI/2},{x:40.6,z:-9.6,rot:-Math.PI/2},{x:30.8,z:-9.6,rot:Math.PI/2}];
  SH_ARCADE_HOTSPOTS.length=0;ARCADE.cabinets=[];
  const roster=(SHIFT_WORLD.arcadeRoster||ARCADE_ROSTER).slice(0,slots.length);
  roster.forEach((game,i)=>{

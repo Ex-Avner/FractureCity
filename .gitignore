@@ -51,9 +51,18 @@ apps/*/index.v*-backup.html
 
 # Applied patch sources for a single app; the result lives in index.html.
 apps/*/_patches/
+# Your own music, art and clips (Palm Radio, billboards)
+media/
 
 # Private online accounts, sessions, saves and database backups
 server/data/
 server/**/*.sqlite
 server/**/*.sqlite-wal
 server/**/*.sqlite-shm
+
+# Generated release archives and deploy trees
+_build/*.zip
+_build/netlify-mobile/
+
+# Device-local saves, drafts, profiles and cached feeds
+/data/

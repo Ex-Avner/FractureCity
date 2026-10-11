@@ -26,9 +26,9 @@
   function draw(html){const root=document.getElementById('front-root');if(!root)return;root.innerHTML=html;root.querySelectorAll('[data-action]').forEach(b=>b.onclick=()=>act(b.dataset.action));}
   window.shFrontHome=function(){
     const live=State.chunkMap.size>0, recent=Slots.index[0];
-    draw(`<p class="fc-intro">A city full of secrets. A story shaped by your choices.</p><div class="fc-actions">`+
+    draw(`<p class="fc-intro">The news is becoming the problem. A Bureau test hijacks Ned’s bulletin. Take back five city systems before his next broadcast makes it worse.</p><div class="fc-actions">`+
       (live?action('resume','Resume game','Return to the city you are playing.',true):recent?action('continue','Continue game',esc(recent.name||'Your latest save'),true):'')+
-      action('new-campaign',recent||live?'Start a new story':'Start story','Begin the main adventure. Recommended for your first visit.',!recent&&!live)+
+      action('new-campaign',recent||live?'Start a new story':'Start story','Watch the bulletin. Hit the streets. Make the correction.',!recent&&!live)+
       action('saves','Load a saved game',`${Slots.index.length} saved ${Slots.index.length===1?'city':'cities'}`)+
       `</div><div class="fc-links"><button class="fc-link" data-action="modes">Other ways to play</button><button class="fc-link" data-action="help">How to play</button><button class="fc-link" data-action="resident">Edit resident</button></div>`);
   };
@@ -37,7 +37,7 @@
     if(id==='home'){Slots.view='home';shFrontHome();return;}
     if(id==='resident'){closeMenu();shOpenPanel('avatar');return;}
     if(id==='modes')return draw(`<p class="fc-intro">Choose your pace.</p><div class="fc-actions">${action('new-free','Explore freely','Build and explore without story objectives or a timer.')}${action('shift','Daily shift','A timed, twenty-minute visit to the city.')}</div><div class="fc-links"><button class="fc-link" data-action="home">Back to main menu</button></div>`);
-    if(id==='help')return draw(`<p class="fc-intro">Your first steps</p><div class="fc-controls">Move with <b>W A S D</b> and look with the mouse.<br>Click the game to control the camera.<br><b>E</b> — interact with people and objects<br><b>Space</b> — jump<br><b>N</b> — finish or continue Ned’s message<br><b>J</b> — open your casebook<br><b>Esc</b> — release the mouse and open the menu<p>In Story mode, follow the gold objective marker. Your progress saves automatically while playing.</p></div><div class="fc-links"><button class="fc-link" data-action="home">Back to main menu</button></div>`);
+    if(id==='help')return draw(`<p class="fc-intro">Your first steps</p><div class="fc-controls">Move with <b>W A S D</b> and look with the mouse.<br>Click the game to control the camera.<br><b>E</b> — interact; hold at marked repair boxes<br><b>1 / 2 / 3</b> — weapons · left click attacks<br><b>R</b> — pick up a weapon · <b>Q</b> — role ability<br><b>V</b> — first / third person · <b>F</b> — graphics<br><b>Space</b> — jump<br><b>N</b> — dismiss a radio message<br><b>J</b> — open your field journal<br><b>Esc</b> — release the mouse and open the menu<p>In Story mode, follow the gold objective marker. Your progress saves automatically while playing.</p></div><div class="fc-links"><button class="fc-link" data-action="home">Back to main menu</button></div>`);
     shFrontAct(id);
   }
   let busy=false;

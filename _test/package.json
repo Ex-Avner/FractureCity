@@ -16,7 +16,20 @@
     "campaign": "node campaign-flow.test.js",
     "city-visual": "node city-rounded.test.js",
     "city-grounding": "node city-grounding.test.js",
-    "first-night": "node first-night.test.js"
+    "first-night": "node first-night.test.js",
+    "city-media": "node city-media.test.js",
+    "outbreak": "node outbreak.test.js",
+    "world": "node world.test.js",
+    "mobile": "node mobile.test.js",
+    "city-build": "node city-build.test.cjs",
+    "city-art": "node city-art.test.cjs",
+    "own-the-block": "node own-the-block.test.cjs",
+    "art-collection": "node art-collection.test.cjs",
+    "social-world": "node social-world.test.cjs",
+    "body-lifecycle": "node body-lifecycle.test.cjs",
+    "neighborhood-audit": "node neighborhood-audit.test.cjs",
+    "foundation": "node foundation-release.test.cjs",
+    "exploration-profile": "node exploration-profile.cjs"
   },
   "devDependencies": {
     "playwright": "^1.47.0"

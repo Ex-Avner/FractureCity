@@ -1,11 +1,11 @@
 {
   "slug": "fracture-city-game",
-  "name": "Fracture City // Shift",
-  "version": "0.41.0",
+  "name": "Fracture City",
+  "version": "0.53.0",
   "icon": "icon.png",
   "entry": "index.html",
   "runtime": "html5",
-  "description": "First-person voxel Fracture City. A new story opens with The Minute, a playable prologue set one year before the case at 17:58, when every screen said one sentence and everyone heard a different one; your three choices there point to one of five roles (Field Witness, Quarry Hand, Tow Driver, Bureau Clerk, Night Broadcaster), each with its own kit and Q ability. Thirteen real weapons lie in the streets (R to take). Everyone can be hit, knocked down and killed; witnesses report, and Bureau Attention sends Compliance Wardens. Then the twelve-movement campaign adapted from The Collapse of Meaning. Over one night, a temporary field witness carries Marcus and Clara Vale's impossible loan through the Quarry and the Bureau, rides Leon's tow route, acts through HOLD's seven unresolved cases, and crosses Flooded East Road during the Fourth Watch. Ned Halloran converts each lived event into clean civic language as the player learns to act without pretending contradiction has disappeared. The Second Light arrives at dawn, but the city does not heal or become whole. Free roam, building, mining, driving, combat, businesses, character customisation, terminal games, the connected Present Palm arcade, greenbelt districts, and the municipal rink remain intact outside the campaign. The main world now renders procedural surfaces per pixel, a sun that moves and casts, and a bloom composite, across four quality tiers on F; the street answers E with switches, shutters, standpipes, screens, payphones, breakers, bins, notices and meters, and every block has a supply that can be cut.",
+  "description": "One night. Five repairs. One hundred Turned. Restore power, tune a signal, carry Leon\u2019s battery, expose the Bureau\u2019s test file and keep the final broadcast alive. First- and third-person play, customizable residents, readable combat, a persistent field journal and checkpoints. Free exploration, building, driving and the Present Palm arcade remain available.",
   "inputs": [
     {
       "type": "person.v1",

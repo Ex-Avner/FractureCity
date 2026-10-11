@@ -33,8 +33,8 @@ function shCampaignCheckpoint(){
   const id = Slots.activeId, seed = State.citySeed;
   campaignCheckpointChain = campaignCheckpointChain.catch(() => {}).then(async () => {
     if (Slots.activeId !== id || State.citySeed !== seed) return;
-    try { await shSlotSave(id, null); }
-    catch (e){ console.warn('[campaign] checkpoint failed', e); toast('Checkpoint could not save. Use Save in the menu to retry.', 'warn'); }
+    try { await shSlotSave(id, null); return true; }
+    catch (e){ console.warn('[campaign] checkpoint failed', e); toast('Checkpoint could not save. Use Save in the menu to retry.', 'warn'); return false; }
   });
   return campaignCheckpointChain;
 }

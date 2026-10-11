@@ -1391,9 +1391,9 @@ body.in-intro #hud-peace{opacity:0;}
 </div>
 
 <script src="../../shared/vendor/three.min.js"></script>
-<script src="campaign-guide.js"></script>
-<script src="city-rounded.js"></script>
-<script src="city-grounding.js"></script>
+<script src="campaign-guide.js?v=0.53.0"></script>
+<script src="city-rounded.js?v=0.53.0"></script>
+<script src="city-grounding.js?v=0.53.0"></script>
 <script>
 //  If the vendored copy is not there, fall back to the CDN before anything
 //  else parses. document.write is the one pattern that still blocks the parser
@@ -1834,32 +1834,9 @@ function makeHoloBillboardTexture(text, accentRgb){
   return tex;
 }
 function createHoloBillboards(scene){
-  const ads = [
-    { text: 'NEON',     col: '255,96,208' },
-    { text: 'PALM',     col: '128,255,255' },
-    { text: 'WIRED',    col: '255,212,122' },
-    { text: 'COHERE',   col: '160,80,255' },
-    { text: 'TRANSIT',  col: '120,255,160' },
-    { text: 'OFFLINE',  col: '255,80,100' },
-  ];
-  const group = new THREE.Group();
-  for (let i = 0; i < ads.length; i++){
-    const a = ads[i];
-    const tex = makeHoloBillboardTexture(a.text, a.col);
-    const mat = new THREE.SpriteMaterial({
-      map: tex, transparent: true, opacity: 0.85, fog: false,
-      blending: THREE.AdditiveBlending, depthWrite: false,
-    });
-    const sp = new THREE.Sprite(mat);
-    const ang = (i / ads.length) * Math.PI * 2 + 0.4;
-    const r = 220 + Math.random() * 40;
-    sp.position.set(Math.cos(ang) * r, 45 + Math.random() * 25, Math.sin(ang) * r);
-    sp.scale.set(40, 20, 1);
-    sp.userData = { angle: ang, radius: r, baseY: sp.position.y, phase: Math.random() * 100, flickerRate: 0.5 + Math.random() * 1.5 };
-    group.add(sp);
-  }
-  scene.add(group);
-  return group;
+  // Unanchored orbital sprites crossed buildings and empty lots. Advertising now
+  // belongs to the generated facade and roof fixtures instead.
+  const group = new THREE.Group();group.name='anchored-advertising-only';scene.add(group);return group;
 }
 
 // =============================================================================
@@ -2623,11 +2600,17 @@ class Chunk {
         case 2: sx = b.cx - b.w/2 - 0.1; break;
         case 3: sz = b.cz - b.d/2 - 0.1; break;
       }
+      const normal=[[1,0,0],[0,0,1],[-1,0,0],[0,0,-1]][orient];
+      const halfDepth=orient%2===0?.35:.35;
+      sx=orient===0?x1+halfDepth+.04:orient===2?x0-halfDepth-.04:(x0+x1)/2;
+      sz=orient===1?z1+halfDepth+.04:orient===3?z0-halfDepth-.04:(z0+z1)/2;
+      sy=Math.max(GROUND+signH/2,Math.min(top-signH/2,sy));
       sign.position.set(sx, sy, sz);
+      sign.userData.fcSupport={type:'facade',points:[-.4,0,.4].map(t=>[sx-normal[0]*(halfDepth+.1),sy+signH*t,sz-normal[2]*(halfDepth+.1)])};
       this.group.add(sign);
       // Add light (will be enabled only when chunk is near player)
       const sLight = new THREE.PointLight(color, 1.5, 8);
-      sLight.position.set(sx, sy, sz);
+      sLight.position.set(sx, sy, sz);sign.userData.fcSupport.light=sLight;
       sLight.visible = false; // toggled by light manager
       this.group.add(sLight);
       this.lights.push(sLight);
@@ -2638,22 +2621,12 @@ class Chunk {
       const bbColor = rng.pick(NEON_COLORS);
       const bbW = b.w * 0.75;
       const bbH = rng.range(2.5, 4.0);
+      const rig=new THREE.Group();rig.position.set(b.cx,roofTop,b.cz);this.group.add(rig);
+      rig.userData.fcRoofRig={feet:[-bbW/2+.3,bbW/2-.3]};
       const bb = makeBoxMesh(bbW, bbH, 0.25, makeNeonMat(bbColor));
-      bb.position.set(b.cx, b.h + bbH/2 + 1.2, b.cz);
-      // Random rotation around Y
-      bb.rotation.y = rng.range(0, TAU * 0.1) - TAU * 0.05;
-      this.group.add(bb);
-      // Supports
-      [-bbW/2 + 0.3, bbW/2 - 0.3].forEach(off => {
-        const sup = makeBoxMesh(0.3, 1.2, 0.3, M.metal);
-        sup.position.set(b.cx + off, b.h + 0.6, b.cz);
-        this.group.add(sup);
-      });
-      const bbLight = new THREE.PointLight(bbColor, 1.2, 16);
-      bbLight.position.set(b.cx, b.h + bbH + 1, b.cz);
-      bbLight.visible = false;
-      this.group.add(bbLight);
-      this.lights.push(bbLight);
+      bb.position.set(0,1.2+bbH/2,0);rig.add(bb);
+      for(const off of rig.userData.fcRoofRig.feet){const sup=makeBoxMesh(.3,1.2,.3,M.metal);sup.position.set(off,.6,0);rig.add(sup)}
+      const bbLight=new THREE.PointLight(bbColor,1.2,16);bbLight.position.set(0,1.2+bbH,0);bbLight.visible=false;rig.add(bbLight);this.lights.push(bbLight);rig.userData.fcRoofRig.light=bbLight;
       // ── Register as holo ad for color cycling ──
       if (rng.bool(0.4)){
         State.holoAds.push({
@@ -2677,13 +2650,17 @@ class Chunk {
           wallFace % 2 === 1 ? 0.05 : tagW,
           makeNeonMat(color)
         );
-        const tagY = rng.range(0.5, 2.5);
+        const tagY = GROUND + rng.range(0.7, 2.5);
         switch (wallFace){
           case 0: tag.position.set(b.cx + b.w/2 + 0.06, tagY, b.cz + rng.range(-b.d/3, b.d/3)); break;
           case 1: tag.position.set(b.cx + rng.range(-b.w/3, b.w/3), tagY, b.cz + b.d/2 + 0.06); break;
           case 2: tag.position.set(b.cx - b.w/2 - 0.06, tagY, b.cz + rng.range(-b.d/3, b.d/3)); break;
           case 3: tag.position.set(b.cx + rng.range(-b.w/3, b.w/3), tagY, b.cz - b.d/2 - 0.06); break;
         }
+        const tn=[[1,0,0],[0,0,1],[-1,0,0],[0,0,-1]][wallFace];
+        if(wallFace===0)tag.position.x=x1+.035;if(wallFace===2)tag.position.x=x0-.035;
+        if(wallFace===1)tag.position.z=z1+.035;if(wallFace===3)tag.position.z=z0-.035;
+        tag.userData.fcSupport={type:'facade',points:[[-.3,0],[.3,0],[0,-.3],[0,.3]].map(([u,v])=>[tag.position.x-tn[0]*.1+(wallFace%2?tagW*u:0),tag.position.y+tagH*v,tag.position.z-tn[2]*.1+(wallFace%2?0:tagW*u)])};
         this.group.add(tag);
       }
     }
@@ -3259,6 +3236,7 @@ class Enemy {
     }
   }
   die(){
+    if(this.state === 'dead')return;
     this.state = 'dead';
     // Reward player
     const r = ENEMY_TYPES[this.type].rewardCredits;
@@ -3266,9 +3244,8 @@ class Enemy {
     grantCredits(reward);
     Player.kills++;
     toast(`${ENEMY_TYPES[this.type].name} eliminated · +${reward}c`, 'success');
-    // Death animation: tip over
-    this.group.rotation.z = Math.PI / 2;
-    this.group.position.y = this.flying ? 0.3 : 0.3;
+    // Retain the actual floor height; a horizontal body must not pivot into walls.
+    this.group.visible = false;
     // Schedule removal
     this.deadTimer = 5;
   }
@@ -3675,7 +3652,7 @@ function updateChunks(){
     const e = State.enemies[i];
     const d = Math.hypot(e.position.x - px, e.position.z - pz);
     if (d > CHUNK_SIZE * (RENDER_RADIUS + 2)){
-      State.scene.remove(e.group);
+      e.group.removeFromParent();
       State.enemies.splice(i, 1);
     }
   }
@@ -4742,6 +4719,8 @@ function closeMenu(){
 //  CINEMATIC AMBIENT — drift billboards, flicker neon strips, blink beacons
 // =============================================================================
 function updateSkylineAndBillboards(dt){
+  // Horizon scenery must follow travel, never occupy playable city coordinates.
+  for(const backdrop of [State.skyline,State.farSkyline])if(backdrop&&State.camera)backdrop.position.set(State.camera.position.x,0,State.camera.position.z);
   const t = performance.now() * 0.001;
   // Skyline tower window strips — flicker each strip's opacity
   if (State.skyline){
@@ -4809,6 +4788,9 @@ function tick(){
 
     // Update NPCs
     for (const npc of State.globalNPCs){ npc.update(dt); }
+    for(let i=State.globalNPCs.length-1;i>=0;i--)if(State.globalNPCs[i].char?.fnb?.st==='dead'){
+      FCActors.remove(State.globalNPCs[i],State.globalNPCs[i].char);State.globalNPCs.splice(i,1);
+    }
     // Update mobile cars
     for (const car of State.globalCars){ car.update(dt); }
     // Update enemies
@@ -4816,9 +4798,9 @@ function tick(){
       const e = State.enemies[i];
       e.update(dt);
       if (e.state === 'dead'){
-        e.deadTimer -= dt;
+        e.deadTimer = (Number.isFinite(e.deadTimer)?e.deadTimer:0) - dt;
         if (e.deadTimer <= 0){
-          State.scene.remove(e.group);
+          e.group.removeFromParent();
           State.enemies.splice(i, 1);
         }
       }
@@ -4977,7 +4959,8 @@ function newGame(seed){
   // Steam
   State.steam = new SteamSystem(State.scene);
 
-  // Distant skyline ring of voxel silhouettes (reduced from 80 to 40)
+  // Camera-relative horizon silhouettes.
+  State.farSkyline=new THREE.Group();State.farSkyline.name="distant-horizon";State.scene.add(State.farSkyline);
   for (let i = 0; i < 40; i++){
     const angle = (i / 40) * TAU;
     const r = 220 + State.rng.range(0, 40);
@@ -4988,7 +4971,7 @@ function newGame(seed){
     const dColor = State.rng.pick([0x18141f, 0x100c18, 0x201824, 0x14101c]);
     const distant = makeBoxMesh(w, h, w, new THREE.MeshBasicMaterial({ color: dColor }));
     distant.position.set(x, h/2, z);
-    State.scene.add(distant);
+    State.farSkyline.add(distant);
     // Random lit window
     if (State.rng.bool(0.5)){
       const winC = State.rng.pick([0xffd47a, 0x80ffff, 0xffac50, 0xff60d0]);
@@ -5003,7 +4986,7 @@ function newGame(seed){
         z + Math.sin(inwardAngle) * w/2 - 0.05 * Math.sin(angle)
       );
       win.lookAt(0, winY, 0);
-      State.scene.add(win);
+      State.farSkyline.add(win);
     }
   }
 
@@ -8519,14 +8502,11 @@ function shSurfaceY(x, z, from){
 // solid geometry? Samples the four corners of the footprint rather than the
 // whole box, which is both cheaper and kinder about doorways.
 function shBodyBlocked(x, feetY, z, r, h){
-  const y0 = Math.floor(feetY + 0.05);
-  const y1 = Math.floor(feetY + h - 0.05);
-  for (let y = y0; y <= y1; y++){
-    if (isSolid(getBlock(Math.floor(x - r), y, Math.floor(z - r)))) return true;
-    if (isSolid(getBlock(Math.floor(x + r), y, Math.floor(z - r)))) return true;
-    if (isSolid(getBlock(Math.floor(x - r), y, Math.floor(z + r)))) return true;
-    if (isSolid(getBlock(Math.floor(x + r), y, Math.floor(z + r)))) return true;
-  }
+  // Check every occupied cell, including the centre of broad characters.
+  for(let ix=Math.floor(x-r+.001);ix<=Math.floor(x+r-.001);ix++)
+    for(let iz=Math.floor(z-r+.001);iz<=Math.floor(z+r-.001);iz++)
+      for(let iy=Math.floor(feetY+.025);iy<=Math.floor(feetY+h-.025);iy++)
+        if(isSolid(getBlock(ix,iy,iz)))return true;
   return false;
 }
 
@@ -10023,6 +10003,18 @@ function shUpdateShopFolk(dt){
 
   for (let i = State.shopFolk.length - 1; i >= 0; i--){
     const f = State.shopFolk[i];
+    if(f.char.fnb?.st==='dead'){
+      f.char.group.removeFromParent();
+      const at=f.shop?.patrons?.indexOf(f);if(at>=0)f.shop.patrons.splice(at,1);
+      State.shopFolk.splice(i,1);continue;
+    }
+    const body=f._groundBody||(f._groundBody={position:new THREE.Vector3()});
+    body.position.set(f.x??f.char.group.position.x,f.char.baseY??SHOP.floor,f.z??f.char.group.position.z);
+    if(!FCActors.prepare(body,f.char,{r:.38}))continue;
+    f.char.group.position.copy(body.position);
+    if(f.x!==undefined){f.x=body.position.x;f.z=body.position.z;f.y=body.position.y}
+    if(f.char.fnb?.st==='down')continue;
+    const move=(dx,dz)=>{const moved=shGroundMove(body,dx,dz,.38,f.char.studio?.height||1.85);f.x=body.position.x;f.z=body.position.z;f.y=body.position.y;f.char.baseY=f.y;return moved};
     const dist = Math.hypot((f.x !== undefined ? f.x : f.char.group.position.x) - px,
                             (f.z !== undefined ? f.z : f.char.group.position.z) - pz);
     if (dist > 44){
@@ -10051,15 +10043,14 @@ function shUpdateShopFolk(dt){
           continue;
         }
         f.dir = Math.atan2(dz, dx);
-        f.x += Math.cos(f.dir) * 1.1 * dt;
-        f.z += Math.sin(f.dir) * 1.1 * dt;
-        moving = true;
+        moving=move(Math.cos(f.dir)*1.1*dt,Math.sin(f.dir)*1.1*dt);
+        if(!moving){f.dir+=Math.PI/2;moving=move(Math.cos(f.dir)*.7*dt,Math.sin(f.dir)*.7*dt)}
       } else if (f.pause <= 0){
         const g = f.shop.g;
         const nx = f.x + Math.cos(f.dir) * 0.7 * dt;
         const nz = f.z + Math.sin(f.dir) * 0.7 * dt;
         if (nx > g.x0 + 0.8 && nx < g.x1 - 0.8 && nz > g.z0 + 0.8 && nz < g.z1 - 0.8){
-          f.x = nx; f.z = nz; moving = true;
+          moving=move(nx-f.x,nz-f.z);if(!moving)f.dir+=Math.PI/2;
         } else {
           f.dir += Math.PI * (0.5 + Math.random() * 0.6);
         }
@@ -10075,6 +10066,7 @@ function shUpdateShopFolk(dt){
       shAnimateCharacter(f.char, dt, false, t);
       shUpdateNameplate(f.char, dist);
     }
+    FCActors.finish(body,f.char,dt,{r:.38});
   }
 }
 
@@ -10221,6 +10213,7 @@ function shFitArcade(chunk){
     //  A ninth plinth. shFitArcade slices the roster to slots.length, so a
     //  roster longer than this list drops its tail without saying so.
     { x: 40.6, z: -17.4, rot: -Math.PI/2 },
+    { x: 30.8, z: -10.0, rot: Math.PI/2 },
   ];
 
   roster.slice(0, slots.length).forEach((game, i) => {
@@ -14526,6 +14519,7 @@ async function shSlotSave(id, name){
       yaw: Player.yaw, pitch: Player.pitch,
       classKey: Player.classKey, hp: Player.hp,
     },
+    sideQuests: window.FCSideQuests ? FCSideQuests.serialize() : null,
     dayTime: State.dayTime,
     hud: Object.assign({}, State.hud),
     inventory: [...Inventory].map(([k, v]) => k + ':' + v),
@@ -19677,9 +19671,9 @@ function shBuildClouds(){
   //  is weather; two layers drifting at different speeds is depth.
   const spec = [
     //  Broken cumulus, close, fast, opaque.
-    { r: 368, theta: 0.52, seed: 7,  cover: 0.34, soft: 0.05, scale: 5, speed: 1.0,  rep: 2, op: 0.82 },
+    { r: 368, theta: 0.47, seed: 7,  cover: 0.34, soft: 0.05, scale: 5, speed: 1.0,  rep: 2, op: 0.82 },
     //  High thin stuff behind it, slower and barely there.
-    { r: 356, theta: 0.55, seed: 23, cover: 0.42, soft: 0.09, scale: 3, speed: 0.38, rep: 1, op: 0.30 },
+    { r: 356, theta: 0.46, seed: 23, cover: 0.42, soft: 0.09, scale: 3, speed: 0.38, rep: 1, op: 0.30 },
   ];
   for (const s of spec){
     const tex = shCloudCanvas(s.seed, s.cover, s.scale, s.soft);
@@ -25225,7 +25219,7 @@ function shStreamQuiet(){
 // =============================================================================
 
 // ─── The front door ─────────────────────────────────────────────────────────
-const SH_VERSION = '0.41.0';
+const SH_VERSION = '0.53.0';
 
 (function(){
   if (typeof shFrontHome !== 'function') return;
@@ -29998,15 +29992,41 @@ if (typeof NED_LINES !== 'undefined'){
 
 document.addEventListener('DOMContentLoaded', init);
 </script>
-<script src="front-menu.js"></script>
-<script src="first-night.js"></script>
-<script src="visual-cohesion.js"></script>
-<script src="city-media.js"></script>
-<script src="quiet-interface.js"></script>
-<script src="resident-head.js"></script>
-<script src="character-studio.js"></script>
-<script src="arcade-previews.js"></script>
-<script src="enemies-arcade.js"></script>
-<script src="outbreak.js"></script>
+<script src="front-menu.js?v=0.53.0"></script>
+<script src="first-night.js?v=0.53.0"></script>
+<script src="visual-cohesion.js?v=0.53.0"></script>
+<script src="city-media.js?v=0.53.0"></script>
+<script src="quiet-interface.js?v=0.53.0"></script>
+<script src="resident-head.js?v=0.53.0"></script>
+<script src="character-studio.js?v=0.53.0"></script>
+<script src="arcade-previews.js?v=0.53.0"></script>
+<script src="enemies-arcade.js?v=0.53.0"></script>
+<script src="outbreak.js?v=0.53.0"></script>
+<script src="wilds.js?v=0.53.0"></script>
+<script src="architecture.js?v=0.53.0"></script>
+<script src="malls.js?v=0.53.0"></script>
+<script src="street-life.js?v=0.53.0"></script>
+<script src="campaign-polish.js?v=0.53.0"></script>
+<script src="resident-motion.js?v=0.53.0"></script>
+<script src="mobile.js?v=0.53.0"></script>
+<script src="dispatch-content.js?v=0.53.0"></script>
+<script src="side-quests.js?v=0.53.0"></script>
+<script src="story-refresh.js?v=0.53.0"></script>
+<script src="opening-block.js?v=0.53.0"></script>
+<script src="backroom-door.js?v=0.53.0"></script>
+<script src="city-build.js?v=0.53.0"></script>
+<script src="city-art.js?v=0.53.0"></script>
+<script src="art-direct.js?v=0.53.0"></script>
+<script src="movement-flow.js?v=0.53.0"></script>
+<script src="own-the-block.js?v=0.53.0"></script>
+<script src="art-collection.js?v=0.53.0"></script>
+<script>window.FC_ACCOUNTS_OPTIONAL=true;</script>
+<script src="accounts.js?v=0.53.0"></script>
+<script src="social-world.js?v=0.53.0"></script>
+<script src="social-city.js?v=0.53.0"></script>
+<script src="physical-support.js?v=0.53.0"></script>
+<script src="screen-zombies.js?v=0.53.0"></script>
+<script src="world-foundation.js?v=0.53.0"></script>
+<script src="neighborhood-signal.js?v=0.53.0"></script>
 </body>
 </html>

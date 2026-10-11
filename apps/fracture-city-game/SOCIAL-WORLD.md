@@ -1,0 +1,15 @@
+# Common Ground — an in-world social foundation
+
+The social surface is a street of eight physical exhibits in Makers' Mile, repeated in the protected plazas of Districts. It is one gallery shared by this server, not eight separate feeds per player. Walk near a display and press E or tap the contextual prompt. Stories and selected 16×16 murals appear on its front; the authenticated artist's bio is on its back. Responses occupy a neighboring panel. Followed artists' work gains green framing. Nothing invents users, replies or engagement.
+
+Publishing uses a small writing form while the world remains visible. Accounts are required for shared work. The main city is now available at `/city/` on the Districts server and uses its existing account cookies. Existing main-city saves remain local; shared gallery content belongs to the server. The static Netlify edition can save private drafts, but cannot host the social database. Drafts never publish automatically after login. Select a mural in Atelier before approaching a gallery space to attach it.
+
+The eight spaces are deliberately limited for this first implementation. Each account can occupy two; publishing into another artist's occupied space fails without replacing their work. Artists can remove their exhibits, and artists or response writers can remove a response. Up to 40 responses are retained per exhibit; three are drawn at a time and the contextual action cycles through older ones. Responses, appreciations, follows, blocks, reports and artwork persist in the existing SQLite database. Appreciations are idempotent. No engagement ranking, follower-count leaderboard, paid boosts, direct messages, image uploads or event scheduler is claimed.
+
+Mute hides the artist's gallery content, prevents gallery interaction in both directions, removes mutual follows, and hides their multiplayer speech bubbles. It can be undone at any display. Reports enter a private server-operator queue, with explicit UI wording that reporting does not automatically hide work. Operators can inspect the queue and remove a work using `server/social-admin.cjs`; public launch still requires an actual moderation owner and operating process.
+
+Multiplayer room messages appear as temporary speech above their author's avatar for nearby residents (18 metres / 12 seconds). Enter opens only the writing input; the persistent flat chat panel is hidden during play. Existing lobby chat and saved room history remain. The main city does not yet have synchronized multiplayer movement; real-time avatars and gathering remain in Districts. Main-city visitors share the durable gallery, not a live physical instance.
+
+## Verification
+
+`server/social.test.cjs` tests authenticated ownership, shared visibility, slot conflicts, malformed murals, once-only appreciations, moderation permissions, mute/unmute, origin checks and complete server restart. `_test/social-world.test.cjs` uses two real browser accounts: publishing from `/city/`, discovering/responding/following from a multiplayer plaza, visible speech, mute/unmute, page reload, and touch-only private drafts. Temporary databases keep tests separate from user accounts.
