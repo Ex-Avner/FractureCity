@@ -29,7 +29,9 @@
     "body-lifecycle": "node body-lifecycle.test.cjs",
     "neighborhood-audit": "node neighborhood-audit.test.cjs",
     "foundation": "node foundation-release.test.cjs",
-    "exploration-profile": "node exploration-profile.cjs"
+    "exploration-profile": "node exploration-profile.cjs",
+    "zombie-combat": "node zombie-combat.test.cjs",
+    "cast-studio": "node cast-studio.test.cjs"
   },
   "devDependencies": {
     "playwright": "^1.47.0"

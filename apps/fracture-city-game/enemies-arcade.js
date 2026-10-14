@@ -12,7 +12,7 @@ Enemy.prototype.makeMesh=function(rng){
  if(!organic.has(this.type))return enemyMesh.apply(this,arguments);
  const type=this.type,def=this.def,col=def.colors||{},infected=!['thug','heavy'].includes(type),large=type==='husk'||type==='heavy';
  const arch=CHAR_ARCHETYPES.find(a=>a.key==='worker')||CHAR_ARCHETYPES[0];
- const c=shBuildCharacter(arch,rng,{skin:infected?rng.pick([0x9c9983,0x858c80,0xa89b87,0x7e8275]):rng.pick(SKIN_TONES),coat:col.coat||col.jacket||col.armor||0x39454a,pants:0x252a2b,hair:rng.pick([0x6d947b,0xa05278,0xb4a663,0x34352f]),hairStyle:infected?rng.pick(['mohawk','spiked','bun','long']):'crop',headgear:'none',prop:'none',handle:def.name,build:large?'solid':'lean',heightScale:def.height/1.82,widthScale:large?1.22:type==='stalker'?.86:1,accent:0x807664});
+ const c=shBuildCharacter(arch,rng,{skin:infected?rng.pick([0x9c9983,0x858c80,0xa89b87,0x7e8275]):rng.pick(SKIN_TONES),coat:infected?rng.pick([0x493442,0x374e49,0x64503b,0x303744,0x5e3848]):col.coat||col.jacket||col.armor||0x39454a,pants:0x252a2b,hair:rng.pick([0x6d947b,0xa05278,0xb4a663,0x34352f]),hairStyle:infected?rng.pick(['mohawk','spiked','bun','long']):'crop',headgear:'none',prop:'none',handle:def.name,build:large?'solid':'lean',heightScale:(def.height||1.82)/1.82,widthScale:large?1.22:type==='stalker'?.86:1,accent:0x807664});
  c.plate.visible=false;if(c.aura){c.group.remove(c.aura);c.aura=null}
  // Every hostile owns its flash material; damage must not recolour the street.
  const materials=new Map();c.group.traverse(o=>{if(o.isMesh){if(!materials.has(o.material))materials.set(o.material,o.material.clone());o.material=materials.get(o.material)}});

@@ -88,3 +88,11 @@ A gold target and a contextual instruction identify the current action. J opens 
 ## Movement and equipment
 
 V switches first/third person. Characters bend knees and elbows, shift their torso while moving, and crouch/balance on the skateboard. The deck is 0.84 m long and 0.236 m wide and follows the player in world space. Weapons have modeled grips, barrels and distinguishing parts, with hand attachments and first-person sway/recoil. Umbrellas attach to the hand and stay upright. Melee enemy attacks have a visible wind-up; stepping away avoids the committed hit and landing a hit interrupts it.
+
+## Zombie combat refresh — 0.54
+
+Infected use a single grounded pursuit controller with bounded, cached obstacle routes. Siege and story infected keep hunting around corners; attacks still require a clear lane and have interruptible wind-ups. The zombie definition now includes an explicit body height. Phones face their owner's head and remain anchored to the left palm; the right arm stays free to attack. Stride follows real displacement.
+
+Shift+Z starts the optional horde mode. Four infected arrive initially, with a living cap rising from 10 to 28. Pick up the nearby salvage weapons using R (or the mobile Take control): Parking Enforcer cleaves at close range, Comment Section chains a stunning arc through up to four visible targets, and Public Nuisance pushes a cone of enemies away. Weapon selection uses the existing 1/2/3 and touch slots. Ordinary pickups also include these weapons. Every six siege kills restore eight health and some equipped ammunition. The compact mode display tracks waves, short kill chains and the next resupply. Stopping removes all siege variants.
+
+New procedural details include cracked phone feeds, stitched patches, torn hems, hardware and varied clothing palettes. This remains the game's procedural character style, not photorealistic scanned art.

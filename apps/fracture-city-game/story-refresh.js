@@ -73,8 +73,8 @@ S.makeBoss=function(e,st){
 };
 S.inZone=function(ep,dx,dz){const d=Math.hypot(dx,dz);return ep.pattern==='ring'?d>=2&&d<ep.radius:ep.pattern==='cross'?Math.abs(dx)<ep.radius&&Math.abs(dz)<ep.radius&&(Math.abs(dx)<1||Math.abs(dz)<1):d<ep.radius};
 const updateEnemy=Enemy.prototype.update;
-Enemy.prototype.update=function(dt){
- const r=updateEnemy.apply(this,arguments),b=this.fcBoss;if(!b||this.hp<=0||this.state==='dead'||State.ui.paused||State.ui.inDialogue)return r;
+S.tickBoss=function(dt){
+ const b=this.fcBoss;if(!b||this.hp<=0||this.state==='dead'||State.ui.paused||State.ui.inDialogue)return;
  const step=Math.min(.1,dt||0),ep=b.ep;b.vulnerable=Math.max(0,b.vulnerable-step);
  if(b.wind>0){b.wind-=step;if(b.wind<=0){const dx=Player.position.x-b.target.x,dz=Player.position.z-b.target.z;
   if(S.inZone(ep,dx,dz)&&shLineOfSight(this.position.x,this.position.y+1.3,this.position.z,Player.position.x,Player.position.y-.2,Player.position.z))damagePlayer(ep.damage);
@@ -85,8 +85,9 @@ Enemy.prototype.update=function(dt){
 
   }
  }
- return r;
+ return;
 };
+Enemy.prototype.update=function(dt){const r=updateEnemy.apply(this,arguments);S.tickBoss.call(this,dt);return r};
 const take=Enemy.prototype.takeDamage;
 Enemy.prototype.takeDamage=function(amount,head){return take.call(this,this.fcBoss?.vulnerable>0?amount*1.65:amount,head)};
 const die=Enemy.prototype.die;

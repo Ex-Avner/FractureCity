@@ -118,6 +118,9 @@ for (const k of FN_CLASS_ORDER){
 // =============================================================================
 const SLOT_KEY = { 1: 'baton', 2: 'pistol', 3: 'shotgun' };
 const FN_WEAPONS = {
+  parkingmeter: {slot:1,name:'PARKING ENFORCER',short:'METER',type:'melee',dmg:64,range:3.1,cooldown:.9,color:0xffbd66,rarity:1},
+  arcwelder: {slot:2,name:'COMMENT SECTION',short:'ARC WELDER',type:'ranged',dmg:32,range:22,cooldown:.62,spread:0,pellets:1,ammoMax:80,ammo:30,color:0x7be8e0,rarity:1},
+  megaphone: {slot:3,name:'PUBLIC NUISANCE',short:'MEGAPHONE',type:'ranged',dmg:38,range:9,cooldown:1.1,spread:0,pellets:1,ammoMax:40,ammo:14,color:0xffc578,rarity:1},
   fists:      { slot:1, name:'BARE HANDS',        short:'HANDS',      type:'melee',  dmg:12, range:1.9, cooldown:0.42, color:0xe7e2ff, rarity:0 },
   baton:      { slot:1, name:'BUREAU BATON',      short:'BATON',      type:'melee',  dmg:26, range:2.4, cooldown:0.34, color:0x9aa2bb, rarity:2 },
   cutter:     { slot:1, name:'BOX CUTTER',        short:'CUTTER',     type:'melee',  dmg:19, range:1.9, cooldown:0.20, color:0xd8d2b8, rarity:3 },
