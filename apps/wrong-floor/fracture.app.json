@@ -1,0 +1,22 @@
+{
+  "slug": "wrong-floor",
+  "name": "Wrong Floor",
+  "version": "0.1.0",
+  "icon": "icon.svg",
+  "entry": "index.html",
+  "runtime": "html5",
+  "description": "An endless one-button elevator arcade. Brake, land, risk your streak. Daily buildings and same-route friend challenges.",
+  "inputs": [],
+  "outputs": [],
+  "tags": [
+    "arcade",
+    "game",
+    "endless",
+    "timing",
+    "fracture-city"
+  ],
+  "author": "Present Palm",
+  "license": "personal-use",
+  "window_width": 1280,
+  "window_height": 800
+}

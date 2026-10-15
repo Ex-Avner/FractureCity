@@ -2,8 +2,8 @@
 """Build a complete static arcade, soundtrack and game for Netlify Drop."""
 from pathlib import Path
 import json,shutil,zipfile,importlib.util,re
-ROOT=Path(__file__).resolve().parents[1];OUT=ROOT/'_build/netlify-mobile';VERSION='0.57.0'
-slugs=['fracture-city-game','palm-drive','coherence-game','still-human','still-human-wild','sun-fall','light-bearer','the-visitor','works','character-forge','backroom']
+ROOT=Path(__file__).resolve().parents[1];OUT=ROOT/'_build/netlify-mobile';VERSION='0.58.0'
+slugs=['fracture-city-game','wrong-floor','palm-drive','coherence-game','still-human','still-human-wild','sun-fall','light-bearer','the-visitor','works','character-forge','backroom']
 if OUT.exists():shutil.rmtree(OUT)
 OUT.mkdir(parents=True)
 shutil.copytree(ROOT/'shared',OUT/'shared')
@@ -30,7 +30,7 @@ spec=importlib.util.spec_from_file_location('beta',ROOT/'_build/build-beta.py');
 (OUT/'_redirects').write_text('/play /apps/fracture-city-game/index.html 302\n')
 (OUT/'404.html').write_text('<!doctype html><title>Not found</title><h1>This street is closed.</h1><a href="/">Return to the arcade</a>')
 (OUT/'index.html').write_text((ROOT/'_build/netlify-home.html').read_text())
-(OUT/'DEPLOY.txt').write_text('''FRACTURE CITY WEB 0.57.0
+(OUT/'DEPLOY.txt').write_text('''FRACTURE CITY WEB 0.58.0
 1. Unzip this download.
 2. Sign into Netlify and visit https://app.netlify.com/drop
 3. Drop the folder containing index.html, apps, shared and media onto Netlify.
@@ -45,7 +45,7 @@ The neighborhood board saves your progress and can take you to Civic Core.
 
 13 soundtrack tracks are included. Music begins after a tap. Songs load on demand.
 Use Radio & menu in the city, or the music player on the home page.
-All ten arcade cabinet destinations are included, plus the main game.
+All eleven arcade cabinet destinations are included, plus the main game.
 Room workshop: press B in the city, choose Creative supplies, a finish and a piece.
 Return to place. T rotates, right-click places, E opens your doorways.
 On phones use the touch Build and Place controls, and catalogue Rotate button.

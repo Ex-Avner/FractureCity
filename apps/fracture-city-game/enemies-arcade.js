@@ -71,7 +71,11 @@ function screenArt(game){
  const canvas=document.createElement('canvas');canvas.width=512;canvas.height=384;const c=canvas.getContext('2d'),accent='#'+game.color.toString(16).padStart(6,'0');
  c.fillStyle='#080f19';c.fillRect(0,0,512,384);
  const gradient=c.createLinearGradient(0,0,0,300);gradient.addColorStop(0,'#172c48');gradient.addColorStop(1,'#050910');c.fillStyle=gradient;c.fillRect(0,0,512,300);
- if(game.slug==='palm-drive'){
+ if(game.slug==='wrong-floor'){
+  c.fillStyle='#263831';c.fillRect(150,85,212,215);c.strokeStyle='#6ef8cc';c.lineWidth=4;c.strokeRect(128,157,256,34);
+  c.fillStyle='#d7ff62';c.fillRect(190,207,132,80);c.fillStyle='#496658';c.fillRect(200,223,112,54);c.fillStyle='#eee9d8';c.fillRect(175,249,162,4);
+  c.strokeStyle='#9fb48d';c.beginPath();c.moveTo(226,85);c.lineTo(226,207);c.moveTo(286,85);c.lineTo(286,207);c.stroke();
+ }else if(game.slug==='palm-drive'){
   c.fillStyle='#b08875';c.beginPath();c.moveTo(0,140);c.lineTo(512,140);c.lineTo(512,180);c.lineTo(0,180);c.fill();
   c.fillStyle='#333949';c.beginPath();c.moveTo(225,140);c.lineTo(290,140);c.lineTo(480,310);c.lineTo(35,310);c.fill();
   c.strokeStyle='#e3c57f';c.lineWidth=4;for(let i=0;i<4;i++){let y=165+i*35;c.beginPath();c.moveTo(256,y);c.lineTo(256,y+18);c.stroke()}
@@ -97,7 +101,7 @@ window.shFitArcade=function(chunk){
  for(const z of [-16.8,-7.2])box(room,10,.09,.16,36,6.7,z,0xc1b696);
  const light=new THREE.PointLight(0xdbe4ed,2.8,18);light.position.set(35,6.1,-12);room.add(light);chunk.lights.push(light);
  const warm=new THREE.PointLight(0xffd6a2,1.5,10);warm.position.set(30.8,5.3,-12);room.add(warm);chunk.lights.push(warm);
- const slots=[{x:32.4,z:-16.6,rot:0},{x:34.6,z:-16.6,rot:0},{x:36.8,z:-16.6,rot:0},{x:32.4,z:-7.4,rot:Math.PI},{x:34.6,z:-7.4,rot:Math.PI},{x:36.8,z:-7.4,rot:Math.PI},{x:40.6,z:-16,rot:-Math.PI/2},{x:40.6,z:-12.8,rot:-Math.PI/2},{x:40.6,z:-9.6,rot:-Math.PI/2},{x:30.8,z:-9.6,rot:Math.PI/2}];
+ const slots=[{x:32.4,z:-16.6,rot:0},{x:34.6,z:-16.6,rot:0},{x:36.8,z:-16.6,rot:0},{x:32.4,z:-7.4,rot:Math.PI},{x:34.6,z:-7.4,rot:Math.PI},{x:36.8,z:-7.4,rot:Math.PI},{x:40.6,z:-16,rot:-Math.PI/2},{x:40.6,z:-12.8,rot:-Math.PI/2},{x:40.6,z:-9.6,rot:-Math.PI/2},{x:30.8,z:-9.6,rot:Math.PI/2},{x:30.8,z:-13,rot:Math.PI/2}];
  SH_ARCADE_HOTSPOTS.length=0;ARCADE.cabinets=[];
  const roster=(SHIFT_WORLD.arcadeRoster||ARCADE_ROSTER).slice(0,slots.length);
  roster.forEach((game,i)=>{

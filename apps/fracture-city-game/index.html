@@ -10147,6 +10147,7 @@ function shOpenShops(chunk){
 
 //  Curated order; anything else the registry reports is appended after these.
 const ARCADE_ROSTER = [
+  { slug:'wrong-floor', title:'WRONG FLOOR', sub:'ENDLESS ELEVATOR', color:0xd7ff62 },
   { slug:'palm-drive',   title:'PALM DRIVE',   sub:'PSEUDO-3D RACER',    color:0xff60d0, hero:true },
   { slug:'still-human',  title:'STILL HUMAN',  sub:'ROUND SURVIVAL',     color:0x66ffcc },
   { slug:'still-human-wild', title:'STILL HUMAN', sub:'WILD // CLAY OPEN WORLD',
@@ -10216,6 +10217,7 @@ function shFitArcade(chunk){
     //  roster longer than this list drops its tail without saying so.
     { x: 40.6, z: -17.4, rot: -Math.PI/2 },
     { x: 30.8, z: -10.0, rot: Math.PI/2 },
+    { x: 30.8, z: -13.6, rot: Math.PI/2 },
   ];
 
   roster.slice(0, slots.length).forEach((game, i) => {
