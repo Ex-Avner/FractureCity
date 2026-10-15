@@ -2,7 +2,7 @@
 """Build a complete static arcade, soundtrack and game for Netlify Drop."""
 from pathlib import Path
 import json,shutil,zipfile,importlib.util,re
-ROOT=Path(__file__).resolve().parents[1];OUT=ROOT/'_build/netlify-mobile';VERSION='0.55.0'
+ROOT=Path(__file__).resolve().parents[1];OUT=ROOT/'_build/netlify-mobile';VERSION='0.56.0'
 slugs=['fracture-city-game','palm-drive','coherence-game','still-human','still-human-wild','sun-fall','light-bearer','the-visitor','works','character-forge','backroom']
 if OUT.exists():shutil.rmtree(OUT)
 OUT.mkdir(parents=True)
@@ -30,7 +30,7 @@ spec=importlib.util.spec_from_file_location('beta',ROOT/'_build/build-beta.py');
 (OUT/'_redirects').write_text('/play /apps/fracture-city-game/index.html 302\n')
 (OUT/'404.html').write_text('<!doctype html><title>Not found</title><h1>This street is closed.</h1><a href="/">Return to the arcade</a>')
 (OUT/'index.html').write_text((ROOT/'_build/netlify-home.html').read_text())
-(OUT/'DEPLOY.txt').write_text('''FRACTURE CITY MOBILE WEB 0.55.0
+(OUT/'DEPLOY.txt').write_text('''FRACTURE CITY WEB 0.56.0
 1. Unzip this download.
 2. Sign into Netlify and visit https://app.netlify.com/drop
 3. Drop the folder containing index.html, apps, shared and media onto Netlify.
@@ -61,8 +61,8 @@ The static edition saves private drafts. Shared publishing and responses require
 the Districts server; open /city/ on that server and sign in at a display.
 
 Netlify hosts the game and music. It does not run the separate Districts server.
-For online 12-player Districts, deploy the persistent server separately and
-enter its HTTPS address in the game's Online districts menu.
+Choose Play Online on the website or game menu to open
+https://fracture-city-online.onrender.com/ for accounts and 12-player Districts.
 Music delivery uses your Netlify bandwidth/credits; check your account usage.
 Mobile browser emulation is tested; physical iPhone/iPad testing remains needed.
 ''')

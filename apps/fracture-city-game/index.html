@@ -6,8 +6,10 @@
 <title>Fracture City // Shift</title>
 <script>
 (function(){
+  if(location.pathname.startsWith('/city/')){window.FC_FULL_WEB=true;window.FC_WEB_EDITION=true;window.FC_RADIO_URL='/media/music/playlist.json';}
   if (window.fracture && window.fracture.shell) return;
-  const prefix = 'fracture::fracture-city-game::';
+  const onlineRoom=new URLSearchParams(location.search).get('online');
+  const prefix = onlineRoom && /^[A-F0-9]{10}$/.test(onlineRoom) ? 'fracture::online-city::'+onlineRoom+'::' : 'fracture::fracture-city-game::';
   window.fracture = {
     shell:false, appSlug:'fracture-city-game', received:null,
     save(k,v){ try{ localStorage.setItem(prefix+k, JSON.stringify(v)); }catch(e){} return Promise.resolve(true); },
@@ -4919,7 +4921,7 @@ function newGame(seed){
   applyClass(Player.classKey || 'operative');
   shOnNewGame();
 
-  State.citySeed = seed || ('fc-' + Math.random().toString(36).slice(2, 8));
+  State.citySeed = window.FC_ONLINE_SEED || seed || ('fc-' + Math.random().toString(36).slice(2, 8));
   State.rng = new RNG(State.citySeed);
   State.hud = { credits: 0, tasksDone: 0, distanceWalked: 0, distanceDriven: 0, playTime: 0,
                 blocksMined: 0, blocksPlaced: 0 };
@@ -10325,7 +10327,7 @@ function shPlayCabinet(slug){
   $('arcade-card').style.setProperty('--cab', '#' + game.color.toString(16).padStart(6, '0'));
 
   const frame = $('arcade-frame');
-  frame.src = '../' + slug + '/index.html';
+  frame.src = (location.pathname.startsWith('/city/')?'/apps/':'../') + slug + '/index.html';
   $('arcade-overlay').classList.add('show');
   document.body.classList.add('in-arcade');
 
@@ -10334,7 +10336,7 @@ function shPlayCabinet(slug){
   // Name the app and the path we actually tried, so the panel is diagnostic
   // rather than a template with an unfilled placeholder in it.
   $('arcade-fb-name').textContent = game.title;
-  $('arcade-fb-path').textContent = '../' + slug + '/index.html';
+  $('arcade-fb-path').textContent = (location.pathname.startsWith('/city/')?'/apps/':'../') + slug + '/index.html';
   $('arcade-fallback').classList.remove('show');
   clearTimeout(shPlayCabinet._t);
 
@@ -26967,7 +26969,7 @@ window.shFitUnreachable = shFitUnreachable;
 //  could ever have caught it. `shPlayCabinet` loads the other Present Palm
 //  apps by relative path out of the game's own folder:
 //
-//      frame.src = '../' + slug + '/index.html';
+//      frame.src = (location.pathname.startsWith('/city/')?'/apps/':'../') + slug + '/index.html';
 //
 //  In the shell that resolves to apps/sun-fall/index.html and works. In the
 //  hosted beta the deploy is FLAT — index.html, shared/vendor/three.min.js,
@@ -30031,5 +30033,6 @@ document.addEventListener('DOMContentLoaded', init);
 <script src="cast-studio.js?v=0.55.0"></script>
 <script src="world-foundation.js?v=0.55.0"></script>
 <script src="neighborhood-signal.js?v=0.55.0"></script>
+<script src="city-online.js?v=0.56.0"></script>
 </body>
 </html>
