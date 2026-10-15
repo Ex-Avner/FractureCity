@@ -4,8 +4,8 @@ from pathlib import Path
 import zipfile
 ROOT=Path(__file__).resolve().parents[1]
 WEB=ROOT/'_build/netlify-mobile'
-VERSION='0.55.0'
-SERVER=['server.cjs','store.cjs','social.cjs','social-admin.cjs','start.cjs','database.cjs','Dockerfile','dockerignore','fly.toml','README.md']
+VERSION='0.57.0'
+SERVER=['server.cjs','store.cjs','social.cjs','social-admin.cjs','start.cjs','database.cjs','city-build-store.cjs','Dockerfile','dockerignore','fly.toml','README.md']
 archive=ROOT/'_build'/f'fracture-city-social-server-v{VERSION}.zip'
 readme='''FRACTURE CITY / COMMON GROUND
 

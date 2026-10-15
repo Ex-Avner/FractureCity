@@ -4,7 +4,7 @@ const maps=[
 {id:'signal',name:'Signal District',accent:0x9eb9cf,description:'Radio yards, narrow cover and a quiet frequency at the center.',quests:['quiet-frequency','carbon-copy'],boxes:[[-30,-28,14,18,18],[30,28,14,16,18],[-30,28,18,4,8],[30,-28,18,4,8],[-42,0,8,3,14],[42,0,8,3,14],[0,-42,14,3,8],[0,42,14,3,8]]},
 {id:'nightshift',name:'The Night Shift',accent:0xc76861,description:'Warehouse lanes surround a warm, neutral gathering place.',quests:['spare-wheel','names-on-air'],boxes:[[-34,-30,22,9,14],[34,30,22,9,14],[-34,30,16,14,20],[34,-30,16,14,20],[-22,0,4,2,10],[22,0,4,2,10],[0,-25,10,2,4],[0,25,10,2,4]]}
 ];
-maps.push({id:'city',name:'Fracture City · Makers’ Mile',city:true,seed:'fc-online-makers-v1',description:'The real city, with its studio, streets, rooftop routes and live residents. Social free roam; building and NPCs are local for now.',quests:[],boxes:[]});
+maps.push({id:'city',name:'Fracture City · Makers’ Mile',city:true,seed:'fc-online-makers-v1',description:'The real city, with its studio, streets, rooftop routes and live residents. Social free roam with shared furniture, sculptures, signs and murals. Structural edits and NPCs remain local.',quests:[],boxes:[]});
 const limit=56,safeRadius=14,speed=6,sprint=9,radius=.35;
 function safe(p){return Math.hypot(p.x,p.z)<safeRadius}
 function blocked(map,x,z){return Math.abs(x)>limit-radius||Math.abs(z)>limit-radius||map.boxes.some(b=>Math.abs(x-b[0])<b[2]/2+radius&&Math.abs(z-b[1])<b[4]/2+radius)}
