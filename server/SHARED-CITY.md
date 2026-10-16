@@ -1,4 +1,4 @@
-# Main-city multiplayer · 0.61
+# Main-city multiplayer · 0.62
 
 Choose Fracture City · Makers’ Mile in the lobby, ready, then Open district.
 The lobby hands off to /city/?online=ROOM using the existing account cookie.
@@ -118,3 +118,40 @@ and door states are stored in the existing persistent SQLite database.
 
 The two-browser regression verifies collision, undo/redo, visitor door use,
 chunk unloading/reloading, and recovery after a complete server restart.
+
+
+## Common Ground / v0.62
+
+Makers’ Mile now has a sheltered news pavilion at (184, 26), a landscaped
+resident gallery along z=36, garden seating, modern wayfinding and a consistent
+jade/stone/bronze architectural palette. The peaceful square holsters the
+first-person weapon and hides combat HUD; inventory and combat elsewhere are
+unchanged. The existing private mural showcase is on the garden wall.
+
+Approach the news pavilion and press E or tap the prompt. The wire shows real
+publisher headlines with dates, bylines and original article links. The Residents
+filter shows existing shared posts, photographs and engagement counts, and gives
+walking directions to the actual exhibit. Publishing, responses, follows,
+appreciations, muting, reporting and music listening remain at the physical work.
+The gallery still has eight shared exhibits and existing per-author limits.
+
+GET /api/news reads fixed public RSS sources: Global Voices (CC BY 3.0,
+https://globalvoices.org/about/) and NASA (https://www.nasa.gov/rss-feeds/).
+Only headline metadata is retained; no full articles, third-party images, cookies,
+or visitor identifiers are sent upstream. Original sources and attribution are
+shown in the reader. This curated feed is not comprehensive news coverage.
+Ned’s fiction is separate from these publisher reports.
+
+The server coalesces concurrent refreshes, polls each source at most once per
+ten minutes, applies an eight-second timeout and 1 MiB size limit, refuses
+redirects and non-allowlisted article hosts, and stores last-good results in
+SQLite. Failed sources retain their cached headlines with a stale indicator.
+There are no synthetic fallback news items. Static/offline downloads explain
+that live headlines require the online city. No API key or extra paid service
+is needed. Deploy the latest Render commit for the news endpoint and city assets;
+upload the matching Netlify package to update its offline game appearance.
+
+Checks: news metadata sanitization/URL filtering, cache coalescing, outage and
+restart retention; source-linked desktop and phone-width reader; physical gallery
+publishing and resident directions; two-player photo/music rendering, responses
+and restart persistence. Live feed retrieval verified with both publishers.

@@ -18,7 +18,7 @@ function clearActors(){dispose(trail);trail=null;for(const a of actors){a.char.g
 function build(){for(const k of KEYS)shBuildChunk(k)}
 const generate=Chunk.prototype.generate;
 Chunk.prototype.generate=function(){if(!KEYS.has(this.key)||!(A.state.enabled||pendingStart))return generate.apply(this,arguments);this._maker=true;this.__cityFitted=1;this.landmark='makers';const b=(x,y,z,w,h,d,id)=>this.stampBox(x,y,z,x+w,y+h,z+d,id);
- b(this.originX,0,this.originZ,24,1,24,B_ASPHALT);
+ b(this.originX,0,this.originZ,24,1,24,133);
  // Continuous promenade, studio, gallery deck and a stair-to-roof-to-studio circuit.
  b(145,0,-22,3,1,69,133);b(188,0,-22,3,1,69,133);b(145,0,23,46,1,5,127);
  b(148,1,4,16,1,16,129);b(148,2,4,1,5,16,120);b(163,2,4,1,5,16,120);b(148,2,4,16,5,1,120);b(148,2,19,6,5,1,120);b(158,2,19,6,5,1,120);b(154,6,19,4,1,1,120);
@@ -29,8 +29,9 @@ Chunk.prototype.generate=function(){if(!KEYS.has(this.key)||!(A.state.enabled||p
  b(173,5,5,15,1,10,133);for(const x of [173,187])for(const z of [5,14])b(x,1,z,1,4,1,136);
  for(let i=0;i<5;i++)b(175,1,19-i,3,i+1,1,133);
  // A sculpture garden and a shallow canal with a safe solid bed.
- b(181,1,22,7,7,1,121);b(148,0,31,16,1,11,123);b(182,0,31,5,1,13,125);
- for(const x of [149,154,159]){b(x,1,33,2,1,2,120);b(x,2,33,1,2,1,135)}
+ b(181,1,22,7,7,1,136);b(148,0,30,39,1,15,133);
+ b(182,0,42,5,1,3,125);
+ // Keep the gallery approach clear: sculpture and seating live on the garden edge.
  // Rehearsal warehouse and open radio stage give the north end actual places to enter.
  b(149,1,-20,14,1,15,131);b(149,2,-20,1,6,15,131);b(162,2,-20,1,6,15,131);b(149,2,-20,14,6,1,131);b(149,2,-6,5,6,1,131);b(158,2,-6,5,6,1,131);b(149,8,-20,14,1,15,134);b(154,7,-6,4,1,1,131);
  b(149,3,-17,1,3,8,141);b(162,3,-17,1,3,8,141);
@@ -38,11 +39,13 @@ Chunk.prototype.generate=function(){if(!KEYS.has(this.key)||!(A.state.enabled||p
  b(178,2,-17,5,1,4,136);b(178,2,-5,5,1,1,128);
  const root=new THREE.Group();root.name='makers-mile-architecture';this.group.add(root);const batches=new Map();
  const box=(x,y,z,w,h,d,color,glow=false)=>{if(chunkCoordOf(x)!==this.cx||chunkCoordOf(z)!==this.cz)return;const key=color+':'+glow;if(!batches.has(key))batches.set(key,[]);batches.get(key).push([x,y,z,w,h,d])};
- const sign=(x,y,z,title,sub,w=7,h=1.3,rot=0)=>{if(chunkCoordOf(x)!==this.cx||chunkCoordOf(z)!==this.cz)return;const m=shSignPlane(title,sub,'#76f5df','#101922',w,h);m.name='maker-sign:'+title;m.position.set(x,y,z);m.rotation.y=rot;const anchors={'YOUR ROOM / NO. 01':[[150,6,19],[156,6,19],[162,6,19]],'THE ECHO ROOM':[[153,7,-6],[156,7,-6],[159,7,-6]],'RADIO WITHOUT PERMISSION':[[179,5,-19],[181,5,-19],[183,5,-19]],'OPEN SESSION':[[154,5,-20],[156,5,-20],[158,5,-20]],'COMMON GROUND':[[182,7,22],[186,7,22]]};if(anchors[title])m.userData.fcSupport={type:'facade',points:anchors[title]};root.add(m)};
- sign(156,6,20.07,'YOUR ROOM / NO. 01','MAKE SOMETHING THEY CANNOT DEMOLISH',12,1.1);
- sign(179,8,5,'MAKERS’ MILE','THE CITY IS NOT FINISHED',12,2);
- sign(169,3,23,'CITY SIGNAL / LOCAL DESK','STUDIO KEYS / COMMISSIONS / LOCAL EVENTS',5,1.7);
- sign(184.5,7.4,23.06,'COMMON GROUND','RESIDENT WORK / STORIES / RESPONSES',6,.8);
+ const sign=(x,y,z,title,sub,w=7,h=1.3,rot=0)=>{if(chunkCoordOf(x)!==this.cx||chunkCoordOf(z)!==this.cz)return;const canvas=document.createElement('canvas');canvas.width=1200;canvas.height=Math.max(150,Math.round(1200*h/w));const g=canvas.getContext('2d');g.fillStyle='#173b36';g.fillRect(0,0,canvas.width,canvas.height);g.fillStyle='#eaf0d5';g.textAlign='center';let fs=Math.min(canvas.height*.43,100);g.font='600 '+fs+'px system-ui';while(g.measureText(title).width>1120){fs-=2;g.font='600 '+fs+'px system-ui'}g.fillText(title,600,canvas.height*.48);g.fillStyle='#adc5a8';g.font=Math.min(canvas.height*.18,26)+'px system-ui';g.fillText(sub,600,canvas.height*.79);const texture=new THREE.CanvasTexture(canvas);texture.encoding=THREE.sRGBEncoding;const m=new THREE.Mesh(new THREE.PlaneGeometry(w,h),new THREE.MeshBasicMaterial({map:texture}));m.name='maker-sign:'+title;m.position.set(x,y,z);m.rotation.y=rot;const anchors={'ATELIER / 01':[[150,6,19],[156,6,19],[162,6,19]],'THE ECHO ROOM':[[153,7,-6],[156,7,-6],[159,7,-6]],'RADIO WITHOUT PERMISSION':[[179,5,-19],[181,5,-19],[183,5,-19]],'OPEN SESSION':[[154,5,-20],[156,5,-20],[158,5,-20]],'COMMON GROUND':[[182,7,22],[186,7,22]]};if(anchors[title])m.userData.fcSupport={type:'facade',points:anchors[title]};root.add(m)};
+ sign(156,6,20.07,'ATELIER / 01','YOUR STUDIO. YOUR RULES.',12,1.1);
+ sign(180.5,7.1,14.08,'MAKERS’ MILE','STUDIOS / COMMON GROUND / RADIO',12,1.15);
+ b(173,6,14,15,2,1,136);
+ sign(169,2.5,21.3,'01 STUDIO   /   02 THE WIRE','GALLERY + LISTENING GARDEN  →',4.2,.85);
+ b(167,1,21,4,2,1,120);
+ sign(184.5,7.35,23.11,'COMMON GROUND','THE WIRE / PEOPLE / CULTURE',6.5,.65);
  sign(182,3,36,'PREMIUM SEA','DO NOT FEED THE SUBSCRIPTION',4,.9);
  sign(156,7.48,-4.94,'THE ECHO ROOM','REHEARSALS / OPEN SESSIONS',6,.8);
  sign(181,5,-17.94,'RADIO WITHOUT PERMISSION','THE AIR BETWEEN US',5,1.2);
@@ -64,7 +67,7 @@ Chunk.prototype.generate=function(){if(!KEYS.has(this.key)||!(A.state.enabled||p
  // Keep all floor fixtures inside existing walls/stage footprints or on the verge.
  box(156,6.1,19.96,12.3,1.35,.12,0x263c46);
  for(const x of [173,185])box(x,6.7,5,.12,4.3,.12,0x526c70);
- for(const x of [166.6,171.4])box(x,3.15,23,.10,4.3,.10,0xb0986b);
+
  for(const x of [180.1,183.9])box(x,1.85,36,.10,1.7,.10,0xb0986b);
  // Rehearsal room: mixing bench, amplifier stacks, wall absorbers and cable runs.
  for(const x of [150.6,161.4]){
@@ -88,8 +91,60 @@ Chunk.prototype.generate=function(){if(!KEYS.has(this.key)||!(A.state.enabled||p
  sign(162,3,20.07,'01','STUDIO / MAKE YOURSELF AT HOME',1.3,.7);
  sign(161,4,-4.94,'02','THE ECHO ROOM',1.3,.7);
  sign(174.07,4,-8,'03','RADIO / ON AIR',1.3,.7,Math.PI/2);
+ // Sun-washed facades and a planted verge replace bare industrial walls.
+ box(156,1.018,25.5,24,.025,8,0x71847b);
+ box(180,1.018,25.5,24,.025,8,0x71847b);
+ for(const x of [150.5,161.5]){box(x,4.5,20.02,5,4.9,.05,0xc4c3ae);}
+ for(let x=149;x<164;x+=.5)box(x,6.8,20.12,.075,.32,.09,0x9ba78d);
+ // Rounded tree crowns soften the skyline; trunks have matching collision cells.
+ for(const [x,z]of [[146,32],[190,32],[146,44],[190,44]]){
+  b(x,1,z,1,3,1,128);
+  if(chunkCoordOf(x)!==this.cx||chunkCoordOf(z)!==this.cz)continue;
+  const trunk=new THREE.Mesh(new THREE.CylinderGeometry(.18,.28,3,8),new THREE.MeshStandardMaterial({color:0x5f6250,roughness:1}));trunk.position.set(x+.5,2.5,z+.5);root.add(trunk);
+  const leaves=new THREE.MeshStandardMaterial({color:0x719675,roughness:1,emissive:0x405b3b,emissiveIntensity:.22});
+  for(const [dx,y,dz,r]of [[0,4.6,0,1.9],[-1,4.2,.1,1.2],[.8,5,.4,1.15]]){const leaf=new THREE.Mesh(new THREE.IcosahedronGeometry(r,1),leaves);leaf.position.set(x+.5+dx,y,z+.5+dz);leaf.scale.y=.8;root.add(leaf)}
+ }
+ // Common Ground architectural kit: stone, dark bronze, muted jade and warm light.
+ // All large masses are voxel-backed; thin facade details share batched materials.
+ for(let x=148;x<188;x+=2)for(let z=29;z<45;z+=2){
+  box(x+.95,1.012,z+.95,1.88,.018,1.88,(Math.round(x+z)%4===0)?0x747f78:0x5f716a);
+ }
+ // The news wall becomes a sheltered pavilion with a plinth, frame and reading bench.
+ box(184.5,4.55,23.045,6.55,4.04,.10,0x102b28);
+ box(184.5,4.55,23.01,7.05,6.9,.06,0x244b40);
+ for(const x of [181.22,187.78])box(x,4.55,23.14,.10,4.2,.12,0xe2c59d);
+ for(const y of [2.48,6.62])box(184.5,y,23.14,6.65,.09,.12,0xe2c59d);
+ box(184.5,8.12,23.05,7.8,.22,3.1,0x163b35);
+ box(184.5,7.96,24.5,7.4,.045,.045,0xd9eaa8,true);
+ b(181,1,24,1,7,1,120);b(187,1,24,1,7,1,120);
+ for(const x of [181.5,187.5]){box(x,4.5,25.015,1.02,7.02,.04,0xb0b59d);box(x,4.5,23.985,1.02,7.02,.04,0xb0b59d);}
+ box(184.5,1.2,23.18,6.6,.4,.25,0x273d36);
+ // A continuous clerestory gives Atelier a finished silhouette without closing its roof.
+ for(const x of [148.45,163.55]){box(x,7.28,12,.24,.48,16.8,0xc8c7b1);box(x,2.25,12,.14,.45,15.6,0x173b36);}
+ for(const z of [4.45,19.55])box(156,7.28,z,16.8,.48,.24,0xc8c7b1);
+ for(const x of [150.3,161.7]){box(x,4.1,20.04,2.5,3.65,.08,0x173b36);for(let y=2.5;y<5.8;y+=.22)box(x,y,20.13,2.45,.065,.10,0x8c9a83);}
+ box(156,2.04,21.3,4.2,.04,2.4,0xbdbaa2);
+ box(156,6.73,21.8,5.1,.08,.08,0xefddb5,true);
+ // Three garden rooms frame the exhibits, leaving a broad pedestrian lane.
+ for(const x of [150,165,180]){
+  b(x,1,41,4,1,2,136);box(x+2,2.05,42,4.1,.16,2.15,0xc6c5ad);
+  for(let k=0;k<7;k++)box(x+.2+k*.56,2.18,42,.38,.10,1.9,0x81947a);
+  b(x,1,44,4,1,1,120);box(x+2,2.08,44.5,3.7,.2,.8,0x345f48);
+  for(let k=0;k<4;k++){box(x+.5+k,2.48,44.5,.65,.65,.7,0x527a55);box(x+.5+k,2.82,44.5,.4,.35,.45,0x719866);}
+ }
+ // Gallery fascia and thin roof beams are supported on the outer verge.
+ for(const x of [145,190]){b(x,1,30,1,6,1,136);b(x,1,40,1,6,1,136);box(x+.5,7.12,35.5,.4,.25,11,0x173b36);}
+ box(168,7.12,40.5,46,.25,.4,0x173b36);
+ for(let x=146;x<191;x+=3)box(x,7.24,39.7,.09,.10,2.3,0x8e9d87);
+ sign(168,6.3,40.72,'THE PEOPLE’S GALLERY','PHOTOS / STORIES / SONGS — WALK UP TO SHARE',13,1.05);
+ // Warm floor guides connect the wire, gallery, studio and listening stage.
+ for(let z=27;z<34;z+=1.4)box(177,1.04,z,.06,.025,.65,0xe0c295);
+ for(let x=149;x<185;x+=2)box(x,1.04,32.4,.6,.025,.055,0xe0c295);
+ sign(146.1,2.25,28,'MAKE','ATELIER 01',2,.6);
+ sign(176.5,2.25,28,'MEET','GALLERY + SONGS',2.8,.6);
+ for(const x of [146.1,176.5]){box(x,1.5,28,.06,1,.06,0xb0b89e);box(x,1.03,28,.6,.06,.4,0x173b36);}
  // Intentionally no new point lights; trim is emissive and detail is batched.
- for(const [key,parts]of batches){const [color,glow]=key.split(':'),mat=glow==='true'?new THREE.MeshBasicMaterial({color:+color}):new THREE.MeshStandardMaterial({color:+color,roughness:.55,metalness:.25}),mesh=new THREE.InstancedMesh(new THREE.BoxGeometry(1,1,1),mat,parts.length),obj=new THREE.Object3D();mesh.frustumCulled=false;parts.forEach((p,i)=>{obj.position.set(...p.slice(0,3));obj.scale.set(...p.slice(3));obj.updateMatrix();mesh.setMatrixAt(i,obj.matrix)});root.add(mesh)}
+ for(const [key,parts]of batches){const [color,glow]=key.split(':'),mat=glow==='true'?new THREE.MeshBasicMaterial({color:+color}):new THREE.MeshStandardMaterial({color:+color,roughness:.8,metalness:.12,emissive:+color,emissiveIntensity:.16}),mesh=new THREE.InstancedMesh(new THREE.BoxGeometry(1,1,1),mat,parts.length),obj=new THREE.Object3D();mesh.frustumCulled=false;parts.forEach((p,i)=>{obj.position.set(...p.slice(0,3));obj.scale.set(...p.slice(3));obj.updateMatrix();mesh.setMatrixAt(i,obj.matrix)});root.add(mesh)}
 };
 const oldDestroy=Chunk.prototype.destroy;Chunk.prototype.destroy=function(){if(this._maker)this.group.traverse(o=>o.material?.map?.dispose());return oldDestroy.apply(this,arguments)};
 function claim(){if(!A.ready||!A.state.enabled||A.state.owned)return false;A.state.owned=true;State.ui.freeBuild=true;A.state.rep+=10;persist();toast('Studio 01 is yours. Press B to build with creative supplies. Moss has commissions at the street board.','success');return true}
@@ -143,8 +198,8 @@ function actorsTick(dt){
 function available(){return A.state.enabled&&A.ready&&!FN.prologue&&!State.ui.inIntro}
 function interact(){if(!available()||State.ui.paused||State.ui.inDialogue||State.ui.inArcade)return false;for(const q of records)if(!A.state.recordings.includes(q.id)&&Math.hypot(Player.position.x-q.x,Player.position.y-Player.height-q.y,Player.position.z-q.z)<2.6)return collect(q.id);if(Math.hypot(Player.position.x-155,Player.position.z-21)<3&&!A.state.owned)return claim();if(Math.hypot(Player.position.x-181,Player.position.z+5)<3){PalmMedia.play();return true}if(Math.hypot(Player.position.x-168,Player.position.z-22)<3){board();return true}if(Math.hypot(Player.position.x-171,Player.position.z-25)<2.4){if(!A.race)startRace();return true}return false}
 const interaction=handleInteract;window.handleInteract=function(){if(interact())return true;return interaction.apply(this,arguments)};
-function goal(){const tour=window.FCOnlineTour?.goal();if(tour)return tour;if(window.FCStructures?.inYard()){const plot=FCStructures.goal();if(plot)return plot;}if(A.race){const p=route[A.race.index];return {p,text:'Signal Run · '+(A.race.index+1)+'/'+route.length+' · '+A.race.time.toFixed(1)+'s'}}if(!A.state.owned)return{p:[155,1,21],text:'Claim Studio 01 · approach the doorway and press E'};if(A.state.commissions.length<3){const s=stats(),q=commissions.find(q=>!A.state.commissions.includes(q.id));return{p:q.check(s)?[168,1,22]:[155,2,14],text:q.name+' · '+(q.check(s)?'Ready: return to Moss':'Create in your studio · B opens the workshop')}}if(!A.state.celebrated)return{p:[168,1,22],text:A.state.openHouse?'Open studio · '+A.state.guests.length+'/3 neighbors inside':'Talk to Moss to open your studio'};return{p:[171,1,25],text:'Your block · '+A.state.rep+' rep · '+A.state.recordings.length+'/5 fragments · run, explore, create'}}
-function drawWorld(){if(!nearDistrict())return;const g=goal();if(!marker){marker=new THREE.Group();const ring=new THREE.Mesh(new THREE.TorusGeometry(1.15,.035,6,36),new THREE.MeshBasicMaterial({color:0xb2ffd2}));ring.rotation.x=Math.PI/2;marker.add(ring);const arrow=new THREE.Mesh(new THREE.OctahedronGeometry(.22),new THREE.MeshBasicMaterial({color:0xffd080}));arrow.position.y=1.5;marker.add(arrow);State.scene.add(marker)}marker.position.set(g.p[0],g.p[1]+.08,g.p[2]);marker.children[1].rotation.y=elapsed;const sig=A.state.recordings.join(',')+'|'+JSON.stringify(A.state.showcase)+'|'+A.state.celebrated;if(sig!==lastArt){lastArt=sig;for(const m of recordMeshes)dispose(m);recordMeshes=[];for(const q of records)if(!A.state.recordings.includes(q.id)){const m=new THREE.Mesh(new THREE.OctahedronGeometry(.2),new THREE.MeshStandardMaterial({color:0xffcc88,emissive:0x9b6024,emissiveIntensity:.5,metalness:.5}));m.position.set(q.x,q.y+.8,q.z);State.scene.add(m);recordMeshes.push(m)}dispose(showcaseMesh);showcaseMesh=null;if(A.state.showcase){const c=document.createElement('canvas');c.width=c.height=256;const ctx=c.getContext('2d');A.state.showcase.forEach((v,i)=>{ctx.fillStyle=v;ctx.fillRect(i%16*16,Math.floor(i/16)*16,16,16)});const tex=new THREE.CanvasTexture(c);tex.encoding=THREE.sRGBEncoding;tex.magFilter=THREE.NearestFilter;showcaseMesh=new THREE.Mesh(new THREE.PlaneGeometry(5,5),new THREE.MeshBasicMaterial({map:tex,side:THREE.DoubleSide}));showcaseMesh.position.set(184.5,4.2,23.025);State.scene.add(showcaseMesh)}if(A.state.celebrated){const s=shSignPlane('THIS BLOCK IS YOURS','OPEN STUDIO / RESIDENT MADE','#b2ffd2','#122a28',8,1.4);s.position.set(157,8.8,20);State.scene.add(s);recordMeshes.push(s)}}for(const m of recordMeshes)if(m.geometry?.type==='OctahedronGeometry')m.rotation.y=elapsed}
+function goal(){const socialGoal=window.FCNewsHub?.goal();if(socialGoal)return socialGoal;const tour=window.FCOnlineTour?.goal();if(tour)return tour;if(window.FCStructures?.inYard()){const plot=FCStructures.goal();if(plot)return plot;}if(A.race){const p=route[A.race.index];return {p,text:'Signal Run · '+(A.race.index+1)+'/'+route.length+' · '+A.race.time.toFixed(1)+'s'}}if(!A.state.owned)return{p:[155,1,21],text:'Claim Studio 01 · approach the doorway and press E'};if(A.state.commissions.length<3){const s=stats(),q=commissions.find(q=>!A.state.commissions.includes(q.id));return{p:q.check(s)?[168,1,22]:[155,2,14],text:q.name+' · '+(q.check(s)?'Ready: return to Moss':'Create in your studio · B opens the workshop')}}if(!A.state.celebrated)return{p:[168,1,22],text:A.state.openHouse?'Open studio · '+A.state.guests.length+'/3 neighbors inside':'Talk to Moss to open your studio'};return{p:[171,1,25],text:'Your block · '+A.state.rep+' rep · '+A.state.recordings.length+'/5 fragments · run, explore, create'}}
+function drawWorld(){if(!nearDistrict())return;const g=goal();if(!marker){marker=new THREE.Group();const ring=new THREE.Mesh(new THREE.TorusGeometry(1.15,.035,6,36),new THREE.MeshBasicMaterial({color:0xb2ffd2}));ring.rotation.x=Math.PI/2;marker.add(ring);const arrow=new THREE.Mesh(new THREE.OctahedronGeometry(.22),new THREE.MeshBasicMaterial({color:0xffd080}));arrow.position.y=1.5;marker.add(arrow);State.scene.add(marker)}marker.position.set(g.p[0],g.p[1]+.08,g.p[2]);marker.children[1].rotation.y=elapsed;const sig=A.state.recordings.join(',')+'|'+JSON.stringify(A.state.showcase)+'|'+A.state.celebrated;if(sig!==lastArt){lastArt=sig;for(const m of recordMeshes)dispose(m);recordMeshes=[];for(const q of records)if(!A.state.recordings.includes(q.id)){const m=new THREE.Mesh(new THREE.OctahedronGeometry(.2),new THREE.MeshStandardMaterial({color:0xffcc88,emissive:0x9b6024,emissiveIntensity:.5,metalness:.5}));m.position.set(q.x,q.y+.8,q.z);State.scene.add(m);recordMeshes.push(m)}dispose(showcaseMesh);showcaseMesh=null;if(A.state.showcase){const c=document.createElement('canvas');c.width=c.height=256;const ctx=c.getContext('2d');A.state.showcase.forEach((v,i)=>{ctx.fillStyle=v;ctx.fillRect(i%16*16,Math.floor(i/16)*16,16,16)});const tex=new THREE.CanvasTexture(c);tex.encoding=THREE.sRGBEncoding;tex.magFilter=THREE.NearestFilter;showcaseMesh=new THREE.Mesh(new THREE.PlaneGeometry(5,5),new THREE.MeshBasicMaterial({map:tex,side:THREE.DoubleSide}));showcaseMesh.position.set(177,3.5,40.3);showcaseMesh.rotation.y=Math.PI;State.scene.add(showcaseMesh)}if(A.state.celebrated){const s=shSignPlane('THIS BLOCK IS YOURS','OPEN STUDIO / RESIDENT MADE','#b2ffd2','#122a28',8,1.4);s.position.set(157,8.8,20);State.scene.add(s);recordMeshes.push(s)}}for(const m of recordMeshes)if(m.geometry?.type==='OctahedronGeometry')m.rotation.y=elapsed}
 function close(){if(!modal)return;modal.remove();modal=null;A.modal=false;State.ui.paused=priorPause;State.keys.clear();document.body.style.cursor=priorPause?'auto':'none'}
 function board(){if(!available())return;CityArt.close();CityBuild.close();FCQuietUI.close();if(!modal){priorPause=State.ui.paused;State.ui.paused=true;document.exitPointerLock?.();State.keys.clear();modal=document.createElement('section');modal.id='maker-board';modal.setAttribute('role','dialog');modal.setAttribute('aria-modal','true');modal.setAttribute('aria-label','Own the Block');document.body.appendChild(modal);A.modal=true}const s=stats();modal.innerHTML=`<small>OWN THE BLOCK / MAKERS’ MILE</small><h2>A city becomes yours when you leave something in it.</h2><p>Moss: “The previous tenant was an algorithm. No taste. Thirty-seven identical chairs facing a wall.”</p><p><b>${A.state.rep} neighborhood rep</b> · ${A.state.recordings.length}/5 street fragments · ${A.state.owned?'Studio 01 is yours':'Studio 01 is waiting'}</p><div class="maker-actions"><button data-act="close">Back to street</button><button data-act="studio">Go to your studio</button><button data-act="art">Create in Atelier</button><button data-act="feature">Feature a mural locally</button><button data-act="save">Save city</button><button data-act="civic">Visit Civic Core</button></div><article><h3>Your block, your broadcast</h3><p>Ned: “The Bureau has labelled this block VACANT. You are standing in it. Give us something they cannot edit out.”</p><p>Choose what this neighborhood welcomes. The studio and public bulletin will reflect your choice.</p><button data-act="signal-art" ${!A.state.owned?'disabled':''}>Open gallery${A.state.signalChoice==='art'?' · ON AIR':''}</button><button data-act="signal-music" ${!A.state.owned?'disabled':''}>Listening room${A.state.signalChoice==='music'?' · ON AIR':''}</button></article><h3>Make a place. Give it a voice.</h3>${commissions.map(q=>`<article><h3>${q.name}${A.state.commissions.includes(q.id)?' · COMPLETED':''}</h3><p>${q.brief}</p><button data-commission="${q.id}" ${!A.state.owned||A.state.commissions.includes(q.id)||!q.check(s)?'disabled':''}>Submit · ${q.reward} credits</button></article>`).join('')}<p class="maker-note">Studio now: ${s.parts} parts · ${s.kinds} shape types · ${s.colors} colours · ${s.finishes} finishes. Submissions check the artwork in your actual studio; they do not judge artistic taste.</p><article><h3>Signal Run / street to roof</h3><p>Follow ${route.length} rings in order. Walk, sprint, jump or skate. Gold under 19s; silver under 30s. Best: ${A.state.best===null?'not yet run':A.state.best.toFixed(2)+'s'}.</p><button data-act="race">${A.race?'Restart':'Start'} run</button><button data-act="cancel-race">Cancel run</button></article><article><h3>Open studio</h3><p>Complete the three commissions, then invite three local neighbors to see your room. Keep the doorway and stairs clear.</p><button data-act="open-house" ${A.state.commissions.length<3||A.state.celebrated?'disabled':''}>${A.state.celebrated?'Your first open studio is complete':'Invite the neighbors'}</button></article>${A.state.guestNotes.length?'<article><h3>What your visitors noticed</h3>'+A.state.guestNotes.map(n=>'<p>'+esc(n)+'</p>').join('')+'</article>':''}<article><h3>Street fragments</h3>${records.map(q=>`<p>${A.state.recordings.includes(q.id)?'✓':'◇'} ${q.name}${A.state.recordings.includes(q.id)?' — '+q.line:''}</p>`).join('')}</article><p class="maker-note">Your studio, local showcase, best time and neighborhood progress save with this city. Your story and creative work belong to this same saved city. Online play requires joining an online room.</p>`;modal.querySelectorAll('[data-commission]').forEach(b=>b.onclick=()=>{submit(b.dataset.commission);board()});modal.querySelectorAll('[data-act]').forEach(b=>b.onclick=()=>{switch(b.dataset.act){case'signal-art':selectSignal('art');board();return;case'signal-music':selectSignal('music');board();return;case'close':return close();case'studio':close();return visitStudio();case'art':close();visitStudio();CityArt.open();return;case'feature':if(!feature())toast('Create a painted mural in the studio first, or select one in Atelier.','info');return;case'race':visitRace();return;case'cancel-race':A.race=null;board();return;case'open-house':openHouse();return;case'civic':close();A.race=null;for(const k of ['0,0','0,-1','-1,0','-1,-1'])shBuildChunk(k);{const p=shFindOpenSpot(0,5,.35,Player.height,8);if(p){Player.position.set(p.x,p.y+Player.height,p.z);Player.velocity.set(0,0,0)}}return;case'save':shSlotSave(Slots.activeId).then(()=>toast('Your city and creative career are saved.','success'));return}});document.body.style.cursor='auto';modal.querySelector('button').focus()}
 function visitStudio(){if(!A.state.owned){toast('Claim your key at the studio doorway first.','info');return false}A.race=null;build();const p=shFindOpenSpot(154,15,.35,Player.height,8);if(!p){toast('Clear space in your studio before returning.','info');return false}Player.position.set(p.x,p.y+Player.height,p.z);Player.velocity.set(0,0,0);Player.yaw=0;Player.pitch=0;return true}

@@ -3,6 +3,7 @@ const http=require('node:http'),crypto=require('node:crypto'),fs=require('node:f
 const ROOT=path.resolve(__dirname,'..'),GAME=path.join(ROOT,'apps/fracture-city-game'),W=require(path.join(GAME,'dispatch-world.js')),C=require(path.join(GAME,'dispatch-content.js'));
 const {createStore}=require('./store.cjs');
 const {createStructures}=require('./structure-store.cjs');
+const {createNews}=require('./news-feed.cjs');
 const {createSocial}=require('./social.cjs');
 const {createMedia}=require('./gallery-media.cjs');
 const {createCityBuildStore}=require('./city-build-store.cjs');
@@ -10,6 +11,7 @@ const clean=(s,n)=>String(s||'').replace(/[\x00-\x1f\x7f<>]/g,'').trim().slice(0
 function createServer(opts={}){
 const rooms=new Map(),tokens=new Map(),limits=new Map(),now=opts.now||Date.now;let tickTimer,tickCount=0;const store=createStore(opts.dbPath||process.env.DB_PATH||path.join(__dirname,'data','districts.sqlite'),now);
 const media=createMedia(store.db,now),social=createSocial(store.db,now,media),cityBuild=createCityBuildStore(store.db),structures=createStructures(store.db);
+const news=createNews(store.db,{fetcher:opts.newsFetch,now});
 function accountToken(req){return (req.headers.cookie||'').split(';').map(s=>s.trim()).find(s=>s.startsWith('fc_account='))?.slice(11)||''}
 function account(req){const a=store.account(accountToken(req));if(!a)fail(401,'Please sign in to your resident account.');return a}
 function cookie(res,token){res.setHeader('Set-Cookie','fc_account='+token+'; Path=/; HttpOnly; SameSite=Lax; Max-Age='+(token?2592000:0)+(process.env.NODE_ENV==='production'||opts.secureCookies?'; Secure':''))}
@@ -29,6 +31,7 @@ function shoot(r,p){if(r.map.city)return;const t=now();if(r.phase!=='live'||p.hp
 const server=http.createServer(async(req,res)=>{res.setHeader('X-Content-Type-Options','nosniff');res.setHeader('Referrer-Policy','no-referrer');try{const u=new URL(req.url,'http://localhost');if(u.pathname==='/health'){res.setHeader('Content-Type','application/json');return res.end(JSON.stringify({ok:true,rooms:rooms.size,players:tokens.size,capacity:12}))}
 if(u.pathname.startsWith('/api/')){res.setHeader('Cache-Control','no-store');
 const origin=req.headers.origin;if(origin&&!(opts.publicOrigin||process.env.PUBLIC_ORIGIN?[opts.publicOrigin||process.env.PUBLIC_ORIGIN]:['http://'+req.headers.host,'https://'+req.headers.host]).includes(origin))fail(403,'Use this server’s own game page.');
+if(u.pathname==='/api/news'&&req.method==='GET'){rate('news:'+req.socket.remoteAddress,90,60000);return json(res,await news.read())}
 if(u.pathname==='/api/events'&&req.method==='GET'){const {r,p}=auth(req);p.stream?.end();res.writeHead(200,{'Content-Type':'text/event-stream','Cache-Control':'no-store','X-Accel-Buffering':'no'});p.stream=res;p.seen=now();req.on('close',()=>{if(p.stream===res){p.stream=null;p.seen=now()}});publish(r);return}
 if(u.pathname==='/api/account/me'&&req.method==='GET'){const a=account(req);return json(res,{account:a,rooms:store.recent(a.id)})}
 if(u.pathname==='/api/social'&&req.method==='GET'){const a=account(req);rate('social-read:'+a.id,60,60000);return json(res,social.snapshot(a.id))}
