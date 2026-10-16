@@ -6,6 +6,12 @@
 !server/social-admin.cjs
 !server/start.cjs
 !server/database.cjs
+!server/city-build-store.cjs
+!server/structure-store.cjs
+!server/gallery-media.cjs
+!server/news-feed.cjs
+!server/main-beta.cjs
+!server/public-music/**
 !server/Dockerfile
 !apps/
 !apps/fracture-city-game/**

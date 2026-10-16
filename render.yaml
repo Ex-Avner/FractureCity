@@ -26,5 +26,16 @@ services:
         value: /var/data/districts.sqlite
       - key: BACKUP_DIR
         value: /var/data/backups
+      # The Main Beta keeps one reserved slot; private invite rooms share the rest.
       - key: MAX_ROOMS
+        value: '3'
+      # Your account username(s), comma separated. Only these accounts can
+      # /remove or /allow residents in the Main Beta. Render asks for the value.
+      - key: OWNER_USERNAMES
+        sync: false
+      - key: BACKUP_KEEP
+        value: '7'
+      # Render's proxy fronts every request; key rate limits by the client
+      # address it forwards, not by the proxy's own address.
+      - key: TRUST_PROXY
         value: '1'

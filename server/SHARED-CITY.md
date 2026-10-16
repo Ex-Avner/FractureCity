@@ -155,3 +155,59 @@ Checks: news metadata sanitization/URL filtering, cache coalescing, outage and
 restart retention; source-linked desktop and phone-width reader; physical gallery
 publishing and resident directions; two-player photo/music rendering, responses
 and restart persistence. Live feed retrieval verified with both publishers.
+
+## The Main Beta (0.63)
+
+One permanent public city room that needs no invite code. Anyone with a
+resident account presses Play the Main Beta in the lobby, or opens
+/?main=1, and lands in Makers' Mile at Common Ground. There is no ready-up
+and no host: the room is always live and always peaceful.
+
+- Identity. The room code is fixed (MAIN_ROOM_CODE, or a built-in default
+  derived from a constant), so restarts and deploys keep the same city,
+  artwork, plots and saved positions. It is a normal 10-character hex code,
+  so ?online= and ?room= links still validate.
+- Capacity. 12 residents, same as any room. The 13th sees "The Main Beta is
+  full (12 residents). Try again in a few minutes." A second main room is
+  never created. MAX_ROOMS counts the Main Beta: it always keeps one
+  reserved slot and private invite rooms share the rest. render.yaml sets 3
+  (Main Beta + 2 private rooms). MAX_ROOMS=1 means Main Beta only.
+- Moderation. The first visitor gets no powers. Only accounts listed in
+  OWNER_USERNAMES (comma separated) can moderate, by typing in chat:
+  /remove @username (removes and bars the account from the Main Beta) and
+  /allow @username (lets them back). Failed commands are never broadcast.
+  Private rooms keep the existing host, ready and kick rules.
+- Idle release (Main Beta plots, server-wide gallery). When all 12 Main
+  Beta plots are owned and a newcomer asks for one, the plot of the
+  longest-idle owner (no sign-in or visit for IDLE_RELEASE_DAYS, default 30,
+  and not currently present) is released. When all 8 gallery spaces are
+  full, exhibits by idle artists are released on a 10-minute sweep. Released
+  work is copied to city_structures_archive and social_works_archive first,
+  including blocks, doors, replies and appreciation counts; uploaded photos
+  and audio stay in the database. Owner accounts are never released. A
+  returning resident gets a new empty plot; restoring an archive is a
+  manual operator task for now.
+- Backups. start.cjs keeps the newest BACKUP_KEEP (default 7) daily copies
+  and deletes older ones, so database copies cannot fill the 1 GB disk.
+- Common Ground. common-ground-library.js adds two kiosks between the
+  arrival point and the gallery: the theory library (The Collapse of
+  Meaning, read from apps/works/data/book.json) and the listening booth (the
+  13 soundtrack tracks on each player's own Palm Radio). They also appear in
+  the solo and Netlify editions.
+- Status. GET /api/main returns {players, capacity, full}; /health adds main.
+
+Tests: server/main-beta.test.cjs (identity across restart, admission,
+capacity, owner-only moderation, private rooms alongside, idle release with
+archives, backup retention) and _test/main-beta.test.cjs (lobby button,
+?main=1 link, two residents, library and booth on desktop and touch).
+
+Deploy: push, then in Render set OWNER_USERNAMES to your username and confirm
+MAX_ROOMS is 3 in the service's Environment tab (dashboard values override
+render.yaml), then Manual Deploy > Deploy latest commit.
+
+Rate limits and Render's proxy: set TRUST_PROXY=1 (render.yaml does) so
+per-address limits (sign-in, sign-up, joins) key on each player's address as
+forwarded by Render, using the last X-Forwarded-For entry. Without it every
+player shares the proxy's address, and 30 sign-in/sign-up requests per 10
+minutes would apply to the whole server at once. Leave it unset when the
+server is reached directly, without a proxy.
