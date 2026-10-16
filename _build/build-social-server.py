@@ -4,7 +4,7 @@ from pathlib import Path
 import zipfile
 ROOT=Path(__file__).resolve().parents[1]
 WEB=ROOT/'_build/netlify-mobile'
-VERSION='0.58.0'
+VERSION='0.59.0'
 SERVER=['server.cjs','store.cjs','social.cjs','social-admin.cjs','start.cjs','database.cjs','city-build-store.cjs','Dockerfile','dockerignore','fly.toml','README.md']
 archive=ROOT/'_build'/f'fracture-city-social-server-v{VERSION}.zip'
 readme='''FRACTURE CITY / COMMON GROUND
@@ -17,7 +17,7 @@ LOCAL TRYOUT (Node 24 or newer required)
 1. Unzip into a folder you can keep.
 2. From that folder run: node server/start.cjs
 3. Open http://127.0.0.1:8787/city/ for the main game.
-4. Choose Enter Makers’ Mile. Walk to the gallery beside the garden.
+4. Begin story, then explore east to Makers’ Mile and its gallery.
 5. Sign in or create an account from a display to share work.
 6. Open http://127.0.0.1:8787/ for the 12-player Districts lobby.
    Exhibits and responses are shared between both experiences.

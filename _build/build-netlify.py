@@ -2,7 +2,7 @@
 """Build a complete static arcade, soundtrack and game for Netlify Drop."""
 from pathlib import Path
 import json,shutil,zipfile,importlib.util,re
-ROOT=Path(__file__).resolve().parents[1];OUT=ROOT/'_build/netlify-mobile';VERSION='0.58.0'
+ROOT=Path(__file__).resolve().parents[1];OUT=ROOT/'_build/netlify-mobile';VERSION='0.59.0'
 slugs=['fracture-city-game','wrong-floor','palm-drive','coherence-game','still-human','still-human-wild','sun-fall','light-bearer','the-visitor','works','character-forge','backroom']
 if OUT.exists():shutil.rmtree(OUT)
 OUT.mkdir(parents=True)
@@ -30,7 +30,7 @@ spec=importlib.util.spec_from_file_location('beta',ROOT/'_build/build-beta.py');
 (OUT/'_redirects').write_text('/play /apps/fracture-city-game/index.html 302\n')
 (OUT/'404.html').write_text('<!doctype html><title>Not found</title><h1>This street is closed.</h1><a href="/">Return to the arcade</a>')
 (OUT/'index.html').write_text((ROOT/'_build/netlify-home.html').read_text())
-(OUT/'DEPLOY.txt').write_text('''FRACTURE CITY WEB 0.58.0
+(OUT/'DEPLOY.txt').write_text('''FRACTURE CITY WEB 0.59.0
 1. Unzip this download.
 2. Sign into Netlify and visit https://app.netlify.com/drop
 3. Drop the folder containing index.html, apps, shared and media onto Netlify.
@@ -38,10 +38,12 @@ spec=importlib.util.spec_from_file_location('beta',ROOT/'_build/build-beta.py');
 4. Open the HTTPS link on your phone. Landscape is recommended for action games.
 5. To update an existing site, use that site's Deploys upload area, retaining its address.
 
-Choose Enter Makers’ Mile on the main menu for Own the Block: a new saved
-artist city with your studio, commissions, gallery and rooftop Signal Run.
-Walk to Studio 01 and press E to claim the key, then use B to start creating.
-The neighborhood board saves your progress and can take you to Civic Core.
+Choose Begin story. Ned’s bulletin leads into the city’s first objective.
+Walk east to discover Makers’ Mile in the same saved city. Follow its street
+signs, approach Studio 01 and press E for your key, then B opens the workshop.
+Studio ownership, artwork and story progress save with that city. Older
+studio saves remain in Saved cities; no existing cities are deleted or merged.
+The neighborhood board can take you back to Civic Core.
 
 13 soundtrack tracks are included. Music begins after a tap. Songs load on demand.
 Use Radio & menu in the city, or the music player on the home page.

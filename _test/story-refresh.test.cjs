@@ -1,7 +1,7 @@
 const {chromium}=require('playwright'),{serve}=require('./lib/harness'),path=require('path');
 (async()=>{const site=await serve(path.resolve(__dirname,'..')),browser=await chromium.launch({channel:'chrome'}),page=await browser.newPage({viewport:{width:1440,height:900}}),errors=[];let failed=0;const ok=(n,v)=>{console.log(v?'PASS':'FAIL',n);if(!v)failed++};page.on('pageerror',e=>errors.push(e.message));try{
 await page.goto(site.origin+'/apps/fracture-city-game/index.html');await page.waitForTimeout(2000);
-ok('Menu has broadcast identity',await page.locator('.fc-onair').count()===1);
+ok('Menu has broadcast identity',await page.locator('.fc-cover').innerText().then(t=>t.includes('news broke reality')));
 await page.screenshot({path:path.join(__dirname,'out/story-menu.png')});
 await page.evaluate(()=>{HD.locked=true;HD.setTier('perf',true);newGame('story-refresh-check');closeMenu()});await page.waitForTimeout(2500);
 ok('Ten optional quests with unique IDs',await page.evaluate(()=>FCSideQuests.content.length===10&&new Set(FCSideQuests.content.map(q=>q.id)).size===10));

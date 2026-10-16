@@ -101,13 +101,6 @@ const extras=[
 ];
 for(const [id,title,who,reward,a,b,intro,verb,evidence,c1,c2,end] of extras)FCDispatchContent.quests.push({id,title,who,reward,intro:[intro],steps:[{at:a,verb:'Talk to '+who,lines:[intro],choices:['I will look into it.','How did this become my evening?'],reply:['Start at the gold marker. Bring back the record.','You made eye contact. That counts as volunteering here.']},{at:b,verb,lines:[evidence]},{at:a,verb:'Return to '+who,lines:[who+': What goes in the correction?'],choices:[c1,c2],reply:[end,end+' Your decision is entered in the record.']}]});
 const css=document.createElement('style');css.textContent=`
-#menu-overlay{background:radial-gradient(ellipse at 85% 20%,#72153d66,transparent 50%),linear-gradient(150deg,#070d19,#142e3a 65%,#050a11)!important;isolation:isolate;}
-#menu-overlay:before{content:'';position:absolute;inset:0;z-index:-1;opacity:.23;pointer-events:none;background:repeating-linear-gradient(90deg,transparent 0 72px,#3edbd9 73px 74px,transparent 75px 110px);mask-image:linear-gradient(transparent 10%,black 100%);}
-#menu-overlay .title{font-size:clamp(42px,7vw,88px)!important;letter-spacing:-3px!important;line-height:.95;text-shadow:3px 2px #f04b8544;margin-bottom:20px!important;}
-#front-root{width:min(720px,100%)!important}.fc-intro{max-width:570px!important;font-size:16px!important}
-#front-root .fc-action{border-radius:2px;border-color:#617b864f;background:#07131ddb!important;padding:17px 21px;transition:transform .15s,border-color .15s}
-#front-root .fc-action:hover{transform:translateX(3px);border-color:#63e4dc}#front-root .fc-primary{border-left:5px solid #67e9d1!important;color:#f2fffd!important;background:linear-gradient(110deg,#185b59,#142934)!important}#front-root .fc-primary small{color:#b1d7d3!important}
-.fc-onair{font:12px/1.8 monospace;color:#73ecdc;letter-spacing:3px;margin-bottom:16px}.fc-onair b{background:#ff527f;color:#fff;padding:4px 8px;margin-right:12px}.fc-bulletin{font:12px/1.6 monospace;color:#bac8d0;border-top:1px solid #68808a55;margin-top:22px;padding-top:13px}
 #narr{left:50%!important;right:auto!important;bottom:28px!important;transform:translateX(-50%);width:min(520px,calc(100vw - 32px))!important;max-width:none!important;padding:10px 14px!important;grid-template-columns:1fr auto!important;background:#09131ee8!important;border-radius:8px;pointer-events:none!important}
 #narr-portrait,#narr-who i{display:none!important}#narr-text{font:13px/1.5 system-ui!important}#narr-more{pointer-events:auto}#narr-who{margin-bottom:3px!important}
 #ob-ned{display:none!important}body.fc-compact #campaign-hud,body.fc-compact #ob-hud,body.fc-compact #fc-field:not(:has(progress)){display:none!important}
@@ -117,7 +110,6 @@ body.fn-prologue #fc-story-goal,body.fn-prologue #fc-boss{display:none}#fn-scene
 @media(pointer:coarse){#narr{bottom:145px!important;max-width:65vw!important}#fc-story-goal{top:48px;max-width:45vw;font-size:11px}#fc-boss{top:8px;left:auto;right:8px;transform:none;width:40vw}#fn-scene .scene-box{max-height:65dvh;overflow:auto}#front-root .fc-action{padding:12px 16px}#menu-overlay .title{font-size:42px!important}}
 @media(prefers-reduced-motion:reduce){#front-root .fc-action{transition:none}}
 `;document.head.appendChild(css);
-const home=shFrontHome;window.shFrontHome=function(){const r=home.apply(this,arguments),root=document.getElementById('front-root');if(root){root.insertAdjacentHTML('afterbegin','<div class="fc-onair"><b>FCN LIVE</b> THE SIX O’CLOCK INCIDENT</div>');root.insertAdjacentHTML('beforeend','<p class="fc-bulletin">TONIGHT · Five civic disasters. One very bad bulletin.<br>Solo story · Neighborhood jobs · Arcade · Your soundtrack</p>')}return r};
 function ui(id){let e=document.getElementById(id);if(!e){e=document.createElement('div');e.id=id;document.body.appendChild(e)}return e}
 setInterval(()=>{
  if(S.boss&&(S.boss.st!==Outbreak.st||!State.enemies.includes(S.boss.enemy)))clearBoss();
