@@ -2,13 +2,14 @@
 const http=require('node:http'),crypto=require('node:crypto'),fs=require('node:fs'),path=require('node:path');
 const ROOT=path.resolve(__dirname,'..'),GAME=path.join(ROOT,'apps/fracture-city-game'),W=require(path.join(GAME,'dispatch-world.js')),C=require(path.join(GAME,'dispatch-content.js'));
 const {createStore}=require('./store.cjs');
+const {createStructures}=require('./structure-store.cjs');
 const {createSocial}=require('./social.cjs');
 const {createMedia}=require('./gallery-media.cjs');
 const {createCityBuildStore}=require('./city-build-store.cjs');
 const clean=(s,n)=>String(s||'').replace(/[\x00-\x1f\x7f<>]/g,'').trim().slice(0,n),hash=s=>crypto.createHash('sha256').update(s).digest('hex'),id=()=>crypto.randomBytes(16).toString('hex');
 function createServer(opts={}){
 const rooms=new Map(),tokens=new Map(),limits=new Map(),now=opts.now||Date.now;let tickTimer,tickCount=0;const store=createStore(opts.dbPath||process.env.DB_PATH||path.join(__dirname,'data','districts.sqlite'),now);
-const media=createMedia(store.db,now),social=createSocial(store.db,now,media),cityBuild=createCityBuildStore(store.db);
+const media=createMedia(store.db,now),social=createSocial(store.db,now,media),cityBuild=createCityBuildStore(store.db),structures=createStructures(store.db);
 function accountToken(req){return (req.headers.cookie||'').split(';').map(s=>s.trim()).find(s=>s.startsWith('fc_account='))?.slice(11)||''}
 function account(req){const a=store.account(accountToken(req));if(!a)fail(401,'Please sign in to your resident account.');return a}
 function cookie(res,token){res.setHeader('Set-Cookie','fc_account='+token+'; Path=/; HttpOnly; SameSite=Lax; Max-Age='+(token?2592000:0)+(process.env.NODE_ENV==='production'||opts.secureCookies?'; Secure':''))}
@@ -16,7 +17,7 @@ function json(res,value){res.setHeader('Cache-Control','no-store');res.setHeader
 function revokePlayers(id){for(const r of [...rooms.values()])for(const p of [...r.players.values()])if(p.accountId===id)remove(r,p)}
 function fail(code,message){throw Object.assign(Error(message),{status:code})}
 function rate(key,max,period){let r=limits.get(key),t=now();if(!r||t-r.t>=period){r={t,n:0};limits.set(key,r)}if(++r.n>max)fail(429,'Please slow down and try again.')}
-function state(r){return {code:r.code,artRevision:r.map.city?cityBuild.revision(r.code):0,map:r.map.id,phase:r.phase,host:r.host,time:now(),players:[...r.players.values()].map(p=>({id:p.id,accountId:p.accountId,name:p.name,color:p.color,x:p.x,y:p.y||0,z:p.z,yaw:p.yaw,pitch:p.pitch,hp:p.hp,ammo:p.ammo,reloading:p.reloadUntil>now(),ready:p.ready,connected:!!p.stream,kills:p.kills,deaths:p.deaths,score:p.score,moving:p.moving,sprint:p.sprint,safe:W.safe(p),protected:p.protectUntil>now(),respawnAt:p.respawnAt,emote:p.emoteUntil>now()?p.emote:null,seq:p.seq})),quests:r.quests,chat:r.chat,events:r.events.slice(-10)}}
+function state(r){return {code:r.code,structureRevision:r.map.city?structures.revision(r.code):0,artRevision:r.map.city?cityBuild.revision(r.code):0,map:r.map.id,phase:r.phase,host:r.host,time:now(),players:[...r.players.values()].map(p=>({id:p.id,accountId:p.accountId,name:p.name,color:p.color,x:p.x,y:p.y||0,z:p.z,yaw:p.yaw,pitch:p.pitch,hp:p.hp,ammo:p.ammo,reloading:p.reloadUntil>now(),ready:p.ready,connected:!!p.stream,kills:p.kills,deaths:p.deaths,score:p.score,moving:p.moving,sprint:p.sprint,safe:W.safe(p),protected:p.protectUntil>now(),respawnAt:p.respawnAt,emote:p.emoteUntil>now()?p.emote:null,seq:p.seq})),quests:r.quests,chat:r.chat,events:r.events.slice(-10)}}
 function publish(r){const message='data: '+JSON.stringify(state(r))+'\n\n';for(const p of r.players.values())if(p.stream){if(p.stream.writableLength>131072){p.stream.destroy();p.stream=null}else p.stream.write(message)}}
 function system(r,text){r.chat.push({id:id(),name:'Dispatch',text,at:now()});r.chat=r.chat.slice(-30)}
 function spawn(p){p.x=(p.seat%4-1.5)*2;p.z=(Math.floor(p.seat/4)-1)*2;p.hp=100;p.ammo=6;p.respawnAt=0;p.protectUntil=now()+5000;p.input={x:0,z:0};p.reloadUntil=0}
@@ -32,6 +33,7 @@ if(u.pathname==='/api/events'&&req.method==='GET'){const {r,p}=auth(req);p.strea
 if(u.pathname==='/api/account/me'&&req.method==='GET'){const a=account(req);return json(res,{account:a,rooms:store.recent(a.id)})}
 if(u.pathname==='/api/social'&&req.method==='GET'){const a=account(req);rate('social-read:'+a.id,60,60000);return json(res,social.snapshot(a.id))}
 if(u.pathname==='/api/profiles'&&req.method==='GET'){account(req);return json(res,{profiles:store.leaders()})}
+if(u.pathname==='/api/city-structures'){const {r,p}=auth(req);if(!r.map.city||r.phase!=='live')fail(409,'Enter the shared city first.');structures.ensure(r.code,p.accountId);if(req.method==='GET'){rate('structure-read:'+p.accountId,120,60000);return json(res,structures.snapshot(r.code,p.accountId))}if(req.method!=='POST')fail(405,'Use GET or POST.');if(!String(req.headers['content-type']||'').startsWith('application/json'))fail(415,'Send JSON.');rate('structure-write:'+p.accountId,60,60000);const b=await body(req,180000);if(b.travel===true){rate('plot-travel:'+p.accountId,12,60000);const snapshot=structures.snapshot(r.code,p.accountId),own=snapshot.owners.find(o=>o.author===p.accountId);if(!own)fail(409,'No free building plot in this city.');p.x=own.plot.x+3.5;p.y=1;p.z=own.plot.z-1;p.yaw=Math.PI;p.pitch=0;p.moving=false;p.poseAt=now();p.seq++;store.checkpoint(r);json(res,{...snapshot,arrival:{x:p.x,y:p.y,z:p.z}});publish(r);return}const result=structures.save(r.code,p.accountId,b,[...r.players.values()]);json(res,result);publish(r);return;}
 if(u.pathname==='/api/city-art'){
  const {r,p}=auth(req);if(!r.map.city||r.phase!=='live')fail(409,'Enter the shared city first.');
  if(req.method==='GET'){rate('art-read:'+p.accountId,120,60000);return json(res,cityBuild.snapshot(r.code,p.accountId))}

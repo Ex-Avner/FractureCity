@@ -1,4 +1,4 @@
-# Main-city multiplayer · 0.57
+# Main-city multiplayer · 0.61
 
 Choose Fracture City · Makers’ Mile in the lobby, ready, then Open district.
 The lobby hands off to /city/?online=ROOM using the existing account cookie.
@@ -13,7 +13,7 @@ The 13 owned soundtrack tracks are included in server/public-music.
 ## Explicit limits
 
 This is social free roam in the real world, not full simulation replication.
-NPCs, zombies, quests, vehicles, structural voxel edits (including doors) and
+NPCs, zombies, quests, vehicles and
 custom characters remain local. The initial shared-city avatar carries the account name and coat color;
 it does not yet publish every customized appearance field. Shared gallery posts
 still use the existing authenticated social service. Competitive PvP is disabled
@@ -21,7 +21,7 @@ in city rooms; existing arena maps retain authoritative combat. Position reports
 are authenticated and bounded, but terrain collision runs on the client. Do not
 use city presence as an authority for rewards, competitive combat or purchases.
 
-Next: shared structural block/door operations, shared actor simulation,
+Next: shared actor simulation,
 terrain collision authority, and player combat in the same world.
 
 ## Deployment
@@ -38,8 +38,9 @@ Use B > Fine art & interiors. The normal editor, presets, imports, move,
 duplicate, paint, delete and undo operations now publish to the current room.
 There is no separate publishing panel. A resident can change only their own
 pieces; copies receive new IDs. The room supports 1,200 pieces total, up to 300
-per resident, and 24 signs/murals total. Structural room-workshop blocks are
-still local; these limits apply to the art workshop's shapes and furnishings.
+per resident, and 24 signs/murals total. These limits apply to the art workshop's
+shapes and furnishings. Structural room-workshop blocks use the separate owned
+online plots described below; ordinary city terrain cannot be edited online.
 
 SQLite stores each author's payload with a revision. Writes replace only that
 author's collection in a transaction; other authors are preserved. Stale
@@ -89,3 +90,31 @@ Real shared uploads require the running Render server’s /city/ page.
 The media test restarts an isolated database; the browser test uses two actual
 city clients, uploads files through the form, renders/plays them for a second
 resident, and re-enters after a full server restart. No live player data is used.
+
+
+## Persistent building plots (0.61)
+
+Inside an online city, open the Online panel and choose My building plot.
+This is server-authorized travel to a fixed paved site east of Makers’ Mile.
+Press B, choose a wall, floor, staircase or door, then return to place it.
+Each city has twelve permanent, account-owned 8×8 plots, sixteen blocks high.
+Each plot holds up to 1,000 blocks and fifty doorways. New visitors can still
+join and use the gallery after every plot has an owner. Plots are not recycled
+when a player disconnects.
+
+All workshop structures inside those plots use server-validated ownership and
+revisions. Accepted blocks become real collision voxels for everyone. Undo
+and redo synchronize; stale changes are rejected. Nearby visitors can open
+and close doors, but cannot alter someone else’s building. Building or closing
+a door onto a server-known resident position is rejected. Player movement
+remains client-simulated and bounded; this is not yet server-authoritative city PvP.
+
+Ordinary city terrain is protected in online sessions; demolition and building
+outside the shared plots are not synchronized and are disabled through the
+recorded block-edit path. Fine-art sculptures, furniture, photos, music and
+gallery responses retain their existing shared systems. Offline story cities
+keep their ordinary local construction tools. Structural blocks, plot ownership
+and door states are stored in the existing persistent SQLite database.
+
+The two-browser regression verifies collision, undo/redo, visitor door use,
+chunk unloading/reloading, and recovery after a complete server restart.
