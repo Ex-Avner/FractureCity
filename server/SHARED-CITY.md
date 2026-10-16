@@ -59,3 +59,33 @@ Validation: server/shared-art.test.cjs exercises ownership, independent authors,
 conflicts, idempotent retries, invalid data, deletion and full-server restart.
 _test/shared-art.test.cjs uses two real Chrome clients in Makers’ Mile to check
 creation, edits, undo, failed saves, reconnect, reload and arcade access.
+
+
+## Real photos and music in Common Ground (0.60)
+
+Join an online city, walk to a gallery display on Makers’ Mile’s promenade,
+press E and choose Publish here. Add a title and story, optionally choose a
+photo and an MP3/WAV, then publish. Other signed-in residents can see the
+photo, listen beside the display and respond to the work. The gallery is
+shared across this server’s cities, with eight spaces and two per artist.
+
+Photos are resized to at most 1600 pixels and converted to PNG before upload.
+Audio uploads accept MP3/WAV up to 12 MB. Audio starts only after Listen,
+fades with distance, and stops beyond 12 metres. This is individual listening,
+not synchronized performance playback. Tools → Online first-visit guide
+tracks arriving at the gallery, publishing, and claiming Studio 01.
+
+Files and gallery references live in the persistent SQLite database and
+are included in its backups. No external bucket or additional account is needed.
+Default quotas are 64 MB per account and 128 MB for the server; MEDIA_QUOTA_MB
+changes the server quota. Monitor the persistent disk and backup growth before
+raising this limit. Unpublished uploads expire after 24 hours at the next upload.
+Removing an exhibit deletes its media if no other exhibit references it.
+Only the owner can publish their uploaded files. Unpublished files are private;
+published files require a signed-in account and respect artist blocking.
+
+Local Netlify downloads continue to support private text/mural drafts.
+Real shared uploads require the running Render server’s /city/ page.
+The media test restarts an isolated database; the browser test uses two actual
+city clients, uploads files through the form, renders/plays them for a second
+resident, and re-enters after a full server restart. No live player data is used.
