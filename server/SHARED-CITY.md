@@ -211,3 +211,14 @@ forwarded by Render, using the last X-Forwarded-For entry. Without it every
 player shares the proxy's address, and 30 sign-in/sign-up requests per 10
 minutes would apply to the whole server at once. Leave it unset when the
 server is reached directly, without a proxy.
+
+## Sodium noir, NPC voices and the wire (0.64)
+
+sodium-noir.js and npc-voices.js load last and only adjust what the existing
+systems produce, so either can be removed by deleting its script tag. The grade
+switches off from the Display panel (F). NPC memory is browser-local
+(localStorage, key fc-npc-memory:<username>), capped at 300 residents.
+Real headlines reach NPCs only through /api/news on this server, so the static
+Netlify edition never shows them. Feed sources are in server/news-feed.cjs;
+check /api/news after deploying: a source with available:false is not
+answering and is simply skipped.
