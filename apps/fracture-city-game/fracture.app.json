@@ -1,7 +1,7 @@
 {
   "slug": "fracture-city-game",
   "name": "Fracture City",
-  "version": "0.64.0",
+  "version": "0.64.1",
   "icon": "icon.png",
   "entry": "index.html",
   "runtime": "html5",

@@ -93,7 +93,7 @@ function grade(hour){
  if (State.hemi){
   //  Coloured sky against warm ground: that difference is what gives shapes
   //  their depth. Brighter overall, so "noir" never means "can't see".
-  State.hemi.color.lerp(TMP.set(h.hemi), 0.75 * day).lerp(TMP.set(NIGHT.hemi), 0.85 * night);
+  State.hemi.color.lerp(TMP.set(h.hemi), 0.75 * day).lerp(TMP.set(NIGHT.hemi), 0.7 * night);
   State.hemi.groundColor.lerp(TMP.set(h.ground), 0.6 * day).lerp(TMP.set(NIGHT.ground), 0.85 * night);
   //  Well lit at night: the city glows back at the sky.
   State.hemi.intensity *= 1.0 + 0.85 * night;
@@ -115,12 +115,12 @@ function grade(hour){
 function canvasTex(w, h, paint){ const c = document.createElement('canvas'); c.width = w; c.height = h; paint(c.getContext('2d'), w, h); const t = new THREE.CanvasTexture(c); t.encoding = THREE.sRGBEncoding; return t; }
 const POOL_TEX = canvasTex(128, 128, (g, w) => { const r = g.createRadialGradient(w/2, w/2, 0, w/2, w/2, w/2); r.addColorStop(0, 'rgba(255,190,110,1)'); r.addColorStop(0.35, 'rgba(255,150,60,.55)'); r.addColorStop(1, 'rgba(255,120,40,0)'); g.fillStyle = r; g.fillRect(0, 0, w, w); });
 const SHEEN_TEX = canvasTex(128, 64, (g, w, h) => { g.translate(w/2, h/2); g.scale(1, 0.42); const r = g.createRadialGradient(0, 0, 0, 0, 0, w/2); r.addColorStop(0, 'rgba(255,255,255,.9)'); r.addColorStop(0.5, 'rgba(255,255,255,.35)'); r.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = r; g.beginPath(); g.arc(0, 0, w/2, 0, Math.PI * 2); g.fill(); });
+POOL_TEX.wrapS = POOL_TEX.wrapT = THREE.ClampToEdgeWrapping;
 const MAT = {
  pool:  new THREE.MeshBasicMaterial({ map: POOL_TEX, color: SODIUM, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }),
  sheen: new THREE.MeshBasicMaterial({ map: SHEEN_TEX, color: 0xffffff, transparent: true, opacity: 0, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3 }),
 };
 const GEO = {
- pool: new THREE.PlaneGeometry(7.5, 7.5).rotateX(-Math.PI / 2),
  sheen: new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2),
 };
 //  A pool under every light a chunk owns: street lamps, plaza lamps, shop and
@@ -136,32 +136,77 @@ function poolMat(hex){
  return m;
 }
 const WP = new THREE.Vector3();
+//  Pools live in the scene, not the chunk, so they go when their light goes.
+const OWNERS = new Set();
+function inScene(o){ for (let a = o; a; a = a.parent) if (a === State.scene) return true; return false; }
+function sweepOwners(){
+ for (const l of OWNERS){
+  if (inScene(l)) continue;
+  for (const m of l.userData.gritOwned || []){ m.parent?.remove(m); if (m.geometry !== GEO.sheen) m.geometry.dispose(); }
+  l.userData.gritOwned = []; l.userData.gritPool = false; OWNERS.delete(l); Grit.lampPools = Math.max(0, Grit.lampPools - 1);
+ }
+}
+function groundTop(x, z, from){
+ for (let y = Math.min(48, Math.floor(from)); y >= 0; y--) if (isSolid(getBlock(Math.floor(x), y, Math.floor(z)))) return y + 1;
+ return null;
+}
+function drapeGeometry(cx, cz, R, near){
+ const pos = [], uv = [], idx = [];
+ for (let bx = Math.floor(cx - R); bx <= Math.floor(cx + R); bx++){
+  for (let bz = Math.floor(cz - R); bz <= Math.floor(cz + R); bz++){
+   //  Skip columns wholly outside the circle.
+   const nx = Math.max(bx, Math.min(cx, bx + 1)), nz = Math.max(bz, Math.min(cz, bz + 1));
+   if (Math.hypot(nx - cx, nz - cz) > R) continue;
+   const h = groundTop(bx + 0.5, bz + 0.5, near + 2);
+   //  Only ground within a step of the lamp's own footing: not rooftops, not pits.
+   if (h === null || Math.abs(h - near) > 1.01) continue;
+   const y = h + 0.03, base = pos.length / 3;
+   for (const [x, z] of [[bx, bz], [bx + 1, bz], [bx + 1, bz + 1], [bx, bz + 1]]){
+    pos.push(x, y, z); uv.push((x - cx) / (2 * R) + 0.5, (z - cz) / (2 * R) + 0.5);
+   }
+   idx.push(base, base + 2, base + 1, base, base + 3, base + 2);
+  }
+ }
+ //  A lone column (a lamp on a ledge) would read as a lit square, not a pool.
+ if (idx.length < 6 * 6) return null;
+ const g = new THREE.BufferGeometry();
+ g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+ g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+ g.setIndex(idx);
+ return g;
+}
 function dressLight(chunk, light){
- if (!light || light.userData.gritPool || !light.isPointLight) return;
+ if (!light || light.userData.gritPool || !light.isPointLight || !inScene(light)) return;
  light.userData.gritPool = true;
  light.getWorldPosition(WP);
  if (typeof getBlock !== 'function' || typeof isSolid !== 'function') return;
  let top = null;
  for (let y = Math.min(40, Math.floor(WP.y)); y >= 0; y--) if (isSolid(getBlock(Math.floor(WP.x), y, Math.floor(WP.z)))){ top = y + 1; break; }
  if (top === null || WP.y - top > 9) return;
- const size = Math.max(3, Math.min(7, (light.distance || 8) * 0.75));
- const pool = new THREE.Mesh(GEO.pool, poolMat(light.color.getHex()));
- pool.scale.set(size / 7.5, 1, size / 7.5);
- pool.position.set(WP.x, top + 0.03, WP.z); pool.renderOrder = 2; pool.userData.grit = true;
- //  Parented to whatever owns the light, so the pool leaves when it does.
- const parent = light.parent || chunk?.group || State.scene;
- parent.updateMatrixWorld?.(true);
- parent.worldToLocal(pool.position);
+ //  The pool drapes over the blocks below it, one quad per column at that
+ //  column's own height, so it lies on kerbs, steps and road alike instead of
+ //  hanging flat at the height of whatever was directly under the lamp.
+ const R = Math.max(2, Math.min(3.5, (light.distance || 8) * 0.38));
+ const geo = drapeGeometry(WP.x, WP.z, R, top);
+ if (!geo) return;
+ const pool = new THREE.Mesh(geo, poolMat(light.color.getHex()));
+ pool.renderOrder = 2; pool.userData.grit = true; pool.frustumCulled = false;
+ //  Geometry is in world space; parent at the scene so it never inherits an offset.
+ const parent = State.scene;
  parent.add(pool);
+ (light.userData.gritOwned = light.userData.gritOwned || []).push(pool);
+ OWNERS.add(light);
  //  Two puddles that catch the sky, offset so they read as wet patches.
  const s = Math.abs(hash(light.uuid));
  for (let i = 0; i < 2; i++){
-  const sh = new THREE.Mesh(GEO.sheen, MAT.sheen);
   const a = (s % 628) / 100 + i * 2.4, r = 1.2 + ((s >> (i + 3)) % 16) / 10;
-  sh.position.set(WP.x + Math.cos(a) * r, top + 0.04 + i * 0.002, WP.z + Math.sin(a) * r);
-  parent.worldToLocal(sh.position);
-  sh.rotation.y = a; sh.scale.set(1.5 + i * 0.7, 1, 0.8 + i * 0.3); sh.renderOrder = 2; sh.userData.grit = true;
-  parent.add(sh);
+  const px = WP.x + Math.cos(a) * r, pz = WP.z + Math.sin(a) * r, h = groundTop(px, pz, top + 2);
+  //  Only where the ground is level for the whole puddle; never on an edge.
+  if (h === null || groundTop(px + 0.7, pz, h + 1) !== h || groundTop(px - 0.7, pz, h + 1) !== h || groundTop(px, pz + 0.7, h + 1) !== h || groundTop(px, pz - 0.7, h + 1) !== h) continue;
+  const sh = new THREE.Mesh(GEO.sheen, MAT.sheen);
+  sh.position.set(px, h + 0.04 + i * 0.002, pz);
+  sh.rotation.y = a; sh.scale.set(1.2 + i * 0.5, 1, 0.7 + i * 0.25); sh.renderOrder = 2; sh.userData.grit = true;
+  parent.add(sh); light.userData.gritOwned.push(sh);
  }
  Grit.lampPools++;
 }
@@ -243,7 +288,7 @@ if (typeof updateDayNight === 'function'){
  window.updateDayNight = function(dt){ const r = origDay.apply(this, arguments); try { tintSky(); } catch (e){} return r; };
 }
 //  Pools follow chunks as they stream in.
-setInterval(() => { try { if (State.chunkMap) for (const [, c] of State.chunkMap) dressChunk(c); dressNearby(); } catch (e){} }, 1500);
+setInterval(() => { try { sweepOwners(); if (State.chunkMap) for (const [, c] of State.chunkMap) dressChunk(c); dressNearby(); } catch (e){} }, 1500);
 
 // ─── Switch, in the Display panel (F) ──────────────────────────────────────
 Grit.set = function(on){
