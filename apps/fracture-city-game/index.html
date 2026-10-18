@@ -18282,7 +18282,7 @@ function shBoardInput(dt){
   if (space && !Board.air && !Board.charging){ Board.charging = true; Board.charge = 0; }
   if (Board.charging){
     Board.charge = Math.min(1, Board.charge + BOARD.chargeRate * dt * 0.2);
-    if (!space || Board.charge >= 1){
+    if (!space){
       const pop = BOARD.ollie + (BOARD.ollieMax - BOARD.ollie) * Board.charge;
       if (Board.grind) shBoardLeaveGrind(pop, true);
       else if (!Board.air){ Board.vy = pop; Board.air = true; }
@@ -18328,7 +18328,9 @@ function shBoardFreeStep(dt){
 
     // ── vertical, against the ramp surface first and the field second ──
     const rampY = shRampAt(p.x, p.z);
-    if (rampY != null && feet <= rampY + 0.75 && feet >= rampY - 3.5){
+    if (rampY != null && feet <= rampY + 0.60 && feet >= rampY - 0.35 && (Board.vy <= 0 || !Board.air)){
+      if(Board.air)shBoardLand(Math.max(0,-Board.vy));
+      if(Board.bail>0)return;
       const prev = Board.rampPrevY;
       const dy = (prev == null) ? 0 : (rampY - prev);
       feet = rampY;
@@ -18361,10 +18363,10 @@ function shBoardFreeStep(dt){
           Board.vy = 0;
           Board.air = false;
           Board.groundT += sdt;
-        } else { Board.air = true; Board.airT += sdt; }
+        } else { Board.air = true; }
       } else {
         if (blockedAt(p.x, nf, p.z, r, h)){ nf = feet; Board.vy = 0; }
-        Board.air = true; Board.airT += sdt;
+        Board.air = true;
       }
       if (nf < 0){ nf = 0; if (Board.air) shBoardLand(-Board.vy); Board.vy = 0; Board.air = false; }
       feet = nf;
@@ -18805,7 +18807,7 @@ function shBuildSkate(chunk, buildings, district){
   const parts = [];
 
   if (shIsSkatepark(chunk)) shSkatepark(chunk, rng, parts);
-  else if (!chunk.landmark && rng.bool(0.22)) shStreetKicker(chunk, rng, parts);
+  // Skate fixtures belong on dedicated pads. Traffic lanes remain clear.
 
   if (parts.length){
     const solid = shBakeParts(parts, false);
@@ -18895,30 +18897,8 @@ function shSkatepark(chunk, rng, parts){
 
 // ─── Somebody left a ramp in the road ───────────────────────────────────────
 function shStreetKicker(chunk, rng, parts){
-  const ox = chunk.originX, oz = chunk.originZ;
-  //  On the street strip, not on the pavement — the two lanes this chunk owns
-  //  are the four metres nearest its origin.
-  const alongX = rng.bool(0.5);
-  const x = alongX ? ox + rng.range(6, VOX_W - 6) : ox + 3.0;
-  const z = alongX ? oz + 3.0 : oz + rng.range(6, VOX_W - 6);
-  const g = shSurfaceY(x, z, 6);
-  if (!Number.isFinite(g) || g > 2) return;
-  //  Facing along the street, so you meet it head on while travelling.
-  const ang = alongX ? (rng.bool(0.5) ? 0 : Math.PI) : (rng.bool(0.5) ? Math.PI/2 : -Math.PI/2);
-  //  Half-width 1.6 rather than 2.3, so a ten-metre road still has a lane past
-  //  it. A ramp you cannot drive round is a roadblock.
-  const r = shMakeRamp(x, z, g, ang, 4.2, 1.6, 2.6, 'kick');
-  chunk.ramps.push(r);
-  shBakeRamp(parts, r, 0x5a4b40, 0xf4bb3d);
-  //  Hazard stripes on the lip, and a scaffold plank underneath, because this
-  //  is scavenged rather than built.
-  const lx = x + r.ax * r.len, lz = z + r.az * r.len;
-  for (let i = -2; i <= 2; i++){
-    parts.push({ w: 0.42, h: 0.06, d: 0.5,
-                 x: lx - r.az * i * 0.9, y: g + r.h + 0.16, z: lz + r.ax * i * 0.9,
-                 ry: Math.atan2(r.ax, r.az),
-                 color: (i % 2) ? 0x1a1a1a : 0xf4bb3d, emit: !(i % 2) });
-  }
+  // Kept as a compatibility hook for older modules; never obstruct a road.
+  return;
 }
 
 // =============================================================================
@@ -18953,7 +18933,7 @@ function shBoardTrickStep(dt){
 
   //  A flip is a tap of A or D in the air — deliberate, and not something you
   //  get for free by holding the direction you were already carving.
-  const held = State.keys.has('a') || State.keys.has('d');
+  const held = false; // Explicit trick inputs are handled by skate-lines.js.
   if (held && !Board._flipWas && Board.airT > 0.12){ Board.flip++; shSfxBoardFlip(); }
   Board._flipWas = held;
 }
@@ -18972,14 +18952,14 @@ function shBoardLand(fallSpeed){
   const sp = shBoardSpeed();
   const cy = Math.cos(Player.yaw), sy = Math.sin(Player.yaw);
   const dot = sp > 0.6 ? (Board.vx * -sy + Board.vz * -cy) / sp : 1;
-  const clean = dot > 0.42 || sp < 4;
+  const clean = Math.abs(dot) > 0.50 || sp < 4;
 
   const halves = Math.round(Math.abs(Board.spun) / Math.PI);
   const spinPts = halves >= 1 ? halves * 250 : 0;
   const flipPts = Board.flip * 180;
   const airPts  = Math.round(air * 220);
 
-  if (!clean && (spinPts + flipPts) > 0){
+  if (!clean){
     shBoardBail();
     Board.airT = 0; Board.spun = 0; Board.flip = 0;
     return;
@@ -18998,7 +18978,11 @@ function shBoardLand(fallSpeed){
                               (Board.flip > 1 ? Board.flip + 'x FLIP' : 'KICKFLIP');
   if (air > 1.4) label = 'BIG ' + label;
 
-  const total = spinPts + flipPts + airPts;
+  if(dot < -.5) label = 'FAKIE ' + label;
+  const precision=Math.abs(dot)>.94 && fallSpeed<18;
+  if(precision)label='CLEAN '+label;
+  else if(sp>=4){Board.vx*=.82;Board.vz*=.82;}
+  const total = Math.round((spinPts + flipPts + airPts)*(precision?1.2:1));
   if (total > 0) shBoardTrick(label, total, false);
 
   shSfxBoardLand(Math.min(1, fallSpeed / 18));
@@ -19291,6 +19275,7 @@ function shBoardControls(on){
     c.innerHTML =
       '<kbd>W</kbd> push · <kbd>A</kbd><kbd>D</kbd> carve · <kbd>MOUSE</kbd> steer<br>' +
       '<kbd>SHIFT</kbd> rockets · <kbd>SPACE</kbd> hold to load the ollie<br>' +
+      '<kbd>X</kbd> kickflip · <kbd>Z</kbd> shove-it · <kbd>C</kbd> hold manual / A-D balance<br>' +
       '<kbd>S</kbd> brake · <kbd>SHIFT</kbd>+<kbd>S</kbd> step off, once you are slow';
   } else if (Board._ctrl0 != null){
     c.innerHTML = Board._ctrl0;
@@ -30013,7 +29998,7 @@ document.addEventListener('DOMContentLoaded', init);
 <script src="malls.js?v=0.55.0"></script>
 <script src="street-life.js?v=0.55.0"></script>
 <script src="campaign-polish.js?v=0.55.0"></script>
-<script src="resident-motion.js?v=0.62.0"></script>
+<script src="resident-motion.js?v=0.67.0"></script>
 <script src="mobile.js?v=0.55.0"></script>
 <script src="dispatch-content.js?v=0.55.0"></script>
 <script src="side-quests.js?v=0.59.0"></script>
@@ -30051,5 +30036,6 @@ document.addEventListener('DOMContentLoaded', init);
 <script src="npc-voices.js?v=0.66.0"></script>
 <script src="city-wildlife.js?v=0.65.0"></script>
 <script src="the-seam.js?v=0.66.0"></script>
+<script src="skate-lines.js?v=0.67.0"></script>
 </body>
 </html>

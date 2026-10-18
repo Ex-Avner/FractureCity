@@ -2,7 +2,7 @@
 """Build a complete static arcade, soundtrack and game for Netlify Drop."""
 from pathlib import Path
 import json,shutil,zipfile,importlib.util,re
-ROOT=Path(__file__).resolve().parents[1];OUT=ROOT/'_build/netlify-mobile';VERSION='0.66.0'
+ROOT=Path(__file__).resolve().parents[1];OUT=ROOT/'_build/netlify-mobile';VERSION='0.67.0'
 slugs=['fracture-city-game','wrong-floor','palm-drive','coherence-game','still-human','still-human-wild','sun-fall','light-bearer','the-visitor','works','character-forge','backroom']
 if OUT.exists():shutil.rmtree(OUT)
 OUT.mkdir(parents=True)
