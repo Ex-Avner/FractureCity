@@ -15,7 +15,7 @@
    The creatures in the Seam can be tamed by feeding them the crop they love,
    then set to guard the farm or follow you around the city.
 
-   Farm state is per account and kept on this device (localStorage). Growth
+   Signed-in server players save farm state to their account; anonymous/offline play stays on this device. Growth
    runs on the real clock, so it continues while you are away. */
 (function(){'use strict';
 if (typeof THREE === 'undefined' || typeof State === 'undefined' || typeof Chunk === 'undefined') return;
@@ -25,7 +25,7 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': 
 const rnd = (a, b) => a + Math.random() * (b - a);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 let SKEW = 0;
-const now = () => Date.now() + SKEW;
+const now = () => (window.FCResidentLife?.now() ?? Date.now()) + (window.FCResidentLife?.enabled ? 0 : SKEW);
 const hour = () => (((State.dayTime || 0) / 60) % 24 + 24) % 24;
 const isNight = () => { const h = hour(); return h >= 20 || h < 5; };
 const fmt = ms => { ms = Math.max(0, ms); const m = Math.floor(ms / 60000), s = Math.floor(ms / 1000) % 60; return m >= 60 ? Math.floor(m / 60) + 'h ' + (m % 60) + 'm' : m + ':' + String(s).padStart(2, '0'); };
@@ -219,16 +219,25 @@ function load(){
  if (!Array.isArray(S.plots) || S.plots.length !== BEDS.length) S.plots = fresh().plots;
  if (!Array.isArray(S.wards) || S.wards.length !== WARDS.length) S.wards = fresh().wards;
  for (const id of CROP_IDS){ S.crate[id] |= 0; S.packets[id] |= 0; }
+ if(window.FCResidentLife?.enabled && FCResidentLife.ready){
+  try{if(!localStorage.getItem('fc-seam-before-cloud:'+k))localStorage.setItem('fc-seam-before-cloud:'+k,JSON.stringify(S))}catch{}
+  // First migration retains elapsed crop growth even if this device clock differs.
+  const delta=now()-Date.now();
+  for(const p of S.plots)if(p.crop)p.crop.t0+=delta;
+  if(S.lastSim)S.lastSim+=delta;
+  S.credits ??= State.hud?.credits || 0;
+  S=FCResidentLife.get('seam',S);
+ }
  simulateAway();
  dirty = true;
  return S;
 }
 let saveT = 0;
-function save(){ if (!S) return; try { localStorage.setItem(sKey, JSON.stringify(S)); } catch (e){} }
+function save(){ if (!S) return; try { localStorage.setItem(sKey, JSON.stringify(S)); } catch (e){} if(window.FCResidentLife?.enabled)FCResidentLife.put('seam',S); }
 function rank(){ let r = 0; for (let i = 0; i < RANKS.length; i++) if (S.harvests >= RANKS[i].harvests) r = i; return r; }
-function credits(){ return State.hud?.credits || 0; }
-function spend(c){ if (credits() < c) return false; State.hud.credits -= c; try { grantCredits(0); } catch (e){} return true; }
-function earn(c){ try { grantCredits(c); } catch (e){ State.hud.credits += c; } }
+function credits(){ return window.FCResidentLife?.enabled ? (S.credits || 0) : State.hud?.credits || 0; }
+function spend(c){ if (credits() < c) return false; if(window.FCResidentLife?.enabled){S.credits=credits()-c;return true;} State.hud.credits -= c; try { grantCredits(0); } catch (e){} return true; }
+function earn(c){ if(window.FCResidentLife?.enabled){S.credits=credits()+c;return;} try { grantCredits(c); } catch (e){ State.hud.credits += c; } }
 function progress(crop){ return crop ? clamp((now() - crop.t0) / crop.dur, 0, 1) : 0; }
 function wardFor(bed){ const [bx, bz] = BEDS[bed]; return WARDS.some(([wx, wz], i) => S.wards[i] > 0 && Math.hypot(bx - wx, bz - wz) <= WARD_RADIUS(S.wards[i]) + .01); }
 function guards(){ return S.pets.filter(p => p.mode === 'guard'); }
@@ -262,6 +271,7 @@ function simulateAway(){
 
 // ─── Actions ───────────────────────────────────────────────────────────────
 function plant(i, id){
+ if(window.FCResidentLife?.blocked)return 'Account progress is loading or needs recovery.';
  const p = S.plots[i], c = CROPS[id], a = almanac();
  if (!p || !p.open || p.crop || !c) return 'That plot is not ready.';
  if (c.needsWard && !wardFor(i)) return 'Sodium tubers only grow under a lamp-ward. Build one beside this plot first.';
@@ -276,6 +286,7 @@ function plant(i, id){
  return null;
 }
 function harvest(i){
+ if(window.FCResidentLife?.blocked)return null;
  const p = S.plots[i];
  if (!p?.crop || progress(p.crop) < 1) return null;
  const c = p.crop, n = c.yield;
@@ -284,6 +295,7 @@ function harvest(i){
  return { id: c.id, n, echo };
 }
 function sell(id, count){
+ if(window.FCResidentLife?.blocked)return 0;
  const have = S.crate[id] | 0; count = Math.min(have, count == null ? have : count);
  if (count <= 0) return 0;
  const a = almanac();
@@ -294,6 +306,7 @@ function sell(id, count){
  return total;
 }
 function unlockPlot(i){
+ if(window.FCResidentLife?.blocked)return 'Account save unavailable.';
  const r = RANKS[rank()], open = S.plots.filter(p => p.open).length, p = S.plots[i];
  if (!p || p.open) return 'Already open.';
  if (open >= r.plots) return 'Reach ' + (RANKS[rank() + 1]?.name || 'the next rank') + ' to clear more ground.';
@@ -301,6 +314,7 @@ function unlockPlot(i){
  p.open = true; dirty = true; save(); return null;
 }
 function buildWard(i){
+ if(window.FCResidentLife?.blocked)return 'Account save unavailable.';
  const r = RANKS[rank()], lvl = S.wards[i], next = lvl + 1, cost = WARD_COST[next];
  if (!cost) return 'That ward is at full strength.';
  if (!lvl && S.wards.filter(Boolean).length >= r.wards) return 'Your rank allows ' + r.wards + ' wards.';
@@ -310,6 +324,7 @@ function buildWard(i){
  S.ink -= cost.ink; S.wards[i] = next; dirty = true; save(); return null;
 }
 function raiseFence(){
+ if(window.FCResidentLife?.blocked)return 'Account save unavailable.';
  const next = S.fence + 1, cost = FENCE_COST[next], r = RANKS[rank()];
  if (!cost) return 'The fence is as high as it goes.';
  if (next > r.fence) return 'Reach ' + (RANKS.find(x => x.fence >= next)?.name || 'a higher rank') + ' first.';
@@ -661,6 +676,7 @@ function moveBody(o, tx, tz, dt, speed, t){
  return d;
 }
 function feed(w){
+ if(window.FCResidentLife?.blocked)return 'Account save unavailable.';
  const sp = speciesInfo(w.species), fav = sp.fav, a = almanac();
  if (S.pets.length >= 4) return 'You already keep four creatures. That is the most the Seam allows.';
  if (!S.crate[fav]) return 'The ' + sp.name.toLowerCase() + ' wants ' + CROPS[fav].name.toLowerCase() + '. Grow some here.';
@@ -831,7 +847,7 @@ function ledgerHTML(){
  const r = rank(), R = RANKS[r], nx = RANKS[r + 1], a = almanac();
  const tabs = [['market', 'Market'], ['build', 'Build'], ['creatures', 'Creatures'], ['almanac', 'Almanac'], ['report', 'While you were away']];
  const side = `<aside><small>THE SEAM</small><h2>The Ledger.</h2><small>${esc(R.name.toUpperCase())}${nx ? ' · ' + (nx.harvests - S.harvests) + ' HARVESTS TO ' + esc(nx.name.toUpperCase()) : ''}</small><nav>${tabs.map(([id, l]) => `<button data-tab="${id}" aria-current="${tab === id}">${l}</button>`).join('')}</nav><span style="flex:1"></span><button data-close style="border-color:#121018">Back to the Seam ×</button></aside>`;
- const stats = `<div class="stats"><span><b>${credits()}c</b>credits</span><span><b>${S.ink}</b>ink</span><span><b>${S.harvests}</b>harvests</span><span><b>${S.kills}</b>Misprints</span></div><p class="msg" role="status">${esc(msg)}</p>`;
+ const stats = `<div class="stats"><span><b>${credits()}c</b>${window.FCResidentLife?.enabled ? 'farm credits' : 'credits'}</span><span><b>${S.ink}</b>ink</span><span><b>${S.harvests}</b>harvests</span><span><b>${S.kills}</b>Misprints</span></div><p class="msg" role="status">${esc(msg)}</p>`;
  let body = '';
  if (tab === 'market'){
   const mk = market(), top = CROP_IDS.map(id => mk[id].top).find(Boolean);
@@ -878,6 +894,7 @@ function findNear(){
  return null;
 }
 function act(){
+ if(window.FCResidentLife?.blocked)return undefined;
  if (!near || panel) return;
  if (near.type === 'wild'){ toast(feed(near.w), 'info'); return; }
  if (near.type === 'ledger') return openPanel('ledger');
@@ -909,6 +926,7 @@ function tick(nowMs){
  const dt = Math.min(.05, Math.max(0, (nowMs - last) / 1000)); last = nowMs;
  try {
   if (!State.scene || !State.chunkMap?.size || State.ui.inIntro || window.FN?.prologue){ if (root) root.visible = false; prompt.hidden = true; hud.hidden = true; return; }
+  if(window.FCResidentLife?.blocked){prompt.hidden=true;hud.hidden=true;return;}
   load();
   const px = Player.position.x, pz = Player.position.z;
   const dist = Math.hypot(px - clamp(px, BOUNDS.x0, BOUNDS.x1), pz - clamp(pz, BOUNDS.z0, BOUNDS.z1));
@@ -970,6 +988,7 @@ function tick(nowMs){
 }
 requestAnimationFrame(tick);
 addEventListener('pagehide', save);
+addEventListener('fc-life-ready',()=>{S=null;sKey='';dirty=true;});
 
 window.FCSeam = {
  BOUNDS, BEDS, WARDS, LEDGER, CROPS, RANKS, EVENTS, FISSURE_CELLS,

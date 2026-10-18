@@ -1,11 +1,42 @@
-/* First-visit guidance uses the existing district objective, never a second HUD. */
-(function(){'use strict';let user=null,progress={visited:false,published:false,studio:false,hidden:false},panel=null,wasPaused=false;
-const steps=[['Find Common Ground','Walk to the gallery on the promenade. Approach a display and press E.',[148,1,33]],['Leave your first signal','Choose an empty display, press E, then Publish here. Add a title, story, photo or song. Shared exhibits remain here after you leave.',[148,1,33]],['Build for everyone','Open the Online panel and choose My building plot. Press B for walls, floors, stairs and doors. Place inside your paved square; the structure saves online for everyone.',[155,1,21]]];
-const flags=['visited','published','studio'];function key(){return 'fc-first-visit-v2-'+user}function save(){try{localStorage.setItem(key(),JSON.stringify(progress))}catch{}}
-function close(){if(!panel)return;panel.remove();panel=null;State.ui.paused=wasPaused;State.keys.clear()}
-function open(){if(!user){toast('Join an online city to start the first-visit guide.','info');return}if(panel)return;wasPaused=State.ui.paused;State.ui.paused=true;State.keys.clear();document.exitPointerLock?.();panel=document.createElement('section');panel.className='social-compose';panel.setAttribute('role','dialog');panel.setAttribute('aria-label','Your first visit');panel.innerHTML='<h2>Your first visit</h2>'+steps.map((s,i)=>'<p><b>'+(progress[flags[i]]?'✓ ':String(i+1)+'. ')+s[0]+'</b><br>'+s[1]+'</p>').join('')+'<p>Use the Online panel to copy your city invite. Music plays when you choose Listen at a display and fades as you walk away. Your profile is in the Online panel.</p><button data-follow>Guide me on the street</button><button data-hide>Explore on my own</button>';panel.querySelector('[data-follow]').onclick=()=>{progress.hidden=false;save();close()};panel.querySelector('[data-hide]').onclick=()=>{progress.hidden=true;save();close()};document.body.append(panel);panel.querySelector('button').focus()}
-window.addEventListener('keydown',e=>{if(!panel)return;if(e.code==='Escape'){e.preventDefault();close()}if(e.code==='Tab'){e.preventDefault();const bs=[...panel.querySelectorAll('button')];bs[(bs.indexOf(document.activeElement)+1)%bs.length].focus()}e.stopImmediatePropagation()},true);
-const tray=document.querySelector('#fc-tools .tray');if(tray){const b=document.createElement('button');b.textContent='Online first-visit guide';b.onclick=()=>{FCQuietUI.close();open()};tray.append(b)}
-setInterval(()=>{if(!window.FCCityOnline?.ready||!FCAccounts.user)return;const next=FCAccounts.user.id;if(next!==user){user=next;try{const stored=JSON.parse(localStorage.getItem(key())||'{}');for(const k of Object.keys(progress))progress[k]=stored[k]===true}catch{}}let changed=false;const mark=k=>{if(!progress[k]){progress[k]=true;changed=true}};if(CitySocial.nearest>=0)mark('visited');if(CitySocial.works.some(w=>w.artist.id===user))mark('published');if(window.FCStructures?.mine?.cells.length)mark('studio');if(changed)save()},500);
-window.FCOnlineTour={open,close,goal(){if(!user||progress.hidden||!FCCityOnline?.ready)return null;const i=flags.findIndex(k=>!progress[k]);if(i<0)return null;const slot=i===1?Array.from({length:8},(_,j)=>j).find(j=>!CitySocial.works.some(w=>w.slot===j)):null;return{p:i===2&&window.FCStructures?.mine?[FCStructures.mine.plot.x+3.5,1,FCStructures.mine.plot.z-1]:slot!=null?[148+slot*5,1,33]:steps[i][2],text:'FIRST VISIT '+(i+1)+'/3 · '+steps[i][0]+' · Tools for help'}}};
+/* One street objective, four optional first-visit milestones. No automatic modal. */
+(function(){'use strict';
+const css=document.createElement('style');css.textContent='body.touch .first-walk{width:94vw;font-size:clamp(16px,4vw,40px);max-height:80vh}body.touch .first-walk button{min-height:11vw}';document.head.append(css);
+const fresh=()=>({met:false,listened:false,planted:false,published:false,hidden:false});
+let user=null,progress=fresh(),panel=null,paused=false;
+const steps=[
+ ['met','Say hello to Moss','Moss keeps the corner at Common Ground. Walk over and press E, or tap the interaction prompt.',[168,1,22]],
+ ['listened','Find your city soundtrack','The listening booth is beside the theory library. Choose a track; U pauses and Y skips. Your volume stays yours.',[171,1,29.5]],
+ ['planted','Plant a little trouble','Follow the Seam sign east. Approach an empty raised bed and use a free wheat packet. It grows while you explore.',[249.5,2,17.5]],
+ ['published','Leave something that is yours','Return to the gallery. Publish a story, photo or song on an empty display, or place your first wall in your online building plot.',[148,1,33]]
+];
+function save(){try{localStorage.setItem('fc-first-walk:'+user,JSON.stringify(progress))}catch{}FCResidentLife?.put('tour',progress)}
+function mark(k){if(user&&!progress[k]){progress[k]=true;save()}}
+function close(){if(!panel)return;panel.remove();panel=null;State.ui.paused=paused;State.keys.clear()}
+function open(welcome=false){
+ if(!user||window.FCResidentLife?.blocked){toast('Join the city and let your account finish loading first.','info');return}
+ if(panel)return;paused=State.ui.paused;State.ui.paused=true;State.keys.clear();document.exitPointerLock?.();
+ panel=document.createElement('section');panel.className='social-compose first-walk';panel.setAttribute('role','dialog');panel.setAttribute('aria-modal','true');panel.setAttribute('aria-label',welcome?'Meet Moss':'Your first ten minutes');
+ panel.innerHTML=welcome?'<small>COMMON GROUND / MOSS</small><h2>You exist. That complicates the paperwork.</h2><p>“Ned called this block vacant. The rent went up during the announcement.”</p><p>“Pick a song over there. Then take a free seed to the crack in the road. If anything grows, we are calling it infrastructure.”</p><button data-follow>Sounds like a place to start</button><button data-hide>I’ll find my own way</button>':'<h2>Your first ten minutes</h2>'+steps.map(([k,title,body])=>'<p><b>'+(progress[k]?'✓ ':'')+title+'</b><br>'+body+'</p>').join('')+'<p>The library beside the booth holds The Collapse of Meaning. Read whenever you like. Nothing here has a deadline.</p><button data-follow>Follow the street guide</button><button data-hide>Explore on my own</button>';
+ panel.querySelector('[data-follow]').onclick=()=>{if(welcome)progress.met=true;progress.hidden=false;save();close()};
+ panel.querySelector('[data-hide]').onclick=()=>{if(welcome)progress.met=true;progress.hidden=true;save();close()};
+ document.body.append(panel);panel.querySelector('button').focus();
+}
+addEventListener('keydown',e=>{if(!panel)return;if(e.code==='Escape'){e.preventDefault();close()}else if(e.code==='Tab'){e.preventDefault();const bs=[...panel.querySelectorAll('button')],i=bs.indexOf(document.activeElement);bs[(i+(e.shiftKey?-1:1)+bs.length)%bs.length].focus()}e.stopImmediatePropagation()},true);
+setInterval(()=>{
+ const tray=document.querySelector('#fc-tools .tray');if(tray&&!tray.querySelector('[data-first-walk]')){const b=document.createElement('button');b.dataset.firstWalk='1';b.textContent='Your first ten minutes';b.onclick=()=>{FCQuietUI.close();open()};tray.append(b)}
+ if(!window.FCCityOnline?.ready||!FCAccounts.user||window.FCResidentLife?.blocked)return;
+ if(user!==FCAccounts.user.id){user=FCAccounts.user.id;let stored={};try{stored=JSON.parse(localStorage.getItem('fc-first-walk:'+user)||'{}')}catch{}progress=FCResidentLife.get('tour',Object.assign(fresh(),stored));}
+ if(window.NPCVoices?.open)mark('met');
+ const p=Player.position;if(window.PalmMedia?.audio&&!PalmMedia.audio.paused&&Math.hypot(p.x-171,p.z-29.5)<9)mark('listened');
+ if(window.FCSeam?.state?.plots.some(p=>p.crop)||window.FCSeam?.state?.harvests>0)mark('planted');
+ if(window.CitySocial?.works.some(w=>w.artist.id===user)||window.FCStructures?.mine?.cells.length)mark('published');
+},500);
+window.FCOnlineTour={open,close,get progress(){return progress},meet(){if(user&&!progress.met&&!progress.hidden){open(true);return true}return false},goal(){
+ if(!user||progress.hidden||!FCCityOnline?.ready)return null;
+ const i=steps.findIndex(([k])=>!progress[k]);if(i<0)return null;
+ let p=steps[i][3];
+ if(i===2&&window.FCSeam){const bed=FCSeam.state.plots.findIndex(p=>p.open&&!p.crop);if(bed>=0)p=[FCSeam.BEDS[bed][0]+2,2,FCSeam.BEDS[bed][1]];}
+ if(i===3){const slot=Array.from({length:8},(_,i)=>i).find(i=>!CitySocial.works.some(w=>w.slot===i));if(slot!=null)p=[148+slot*5,1,33];else if(FCStructures?.mine)p=[FCStructures.mine.plot.x+3.5,1,FCStructures.mine.plot.z-1];}
+ return{p,text:'FIRST WALK '+(i+1)+'/4 · '+steps[i][1]+' · Tools: skip/help'};
+}};
 })();

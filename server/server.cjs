@@ -8,9 +8,11 @@ const {createSocial}=require('./social.cjs');
 const {createMedia}=require('./gallery-media.cjs');
 const {createCityBuildStore}=require('./city-build-store.cjs');
 const {createMainBeta}=require('./main-beta.cjs');
+const {createResidentLife}=require('./resident-life.cjs');
 const clean=(s,n)=>String(s||'').replace(/[\x00-\x1f\x7f<>]/g,'').trim().slice(0,n),hash=s=>crypto.createHash('sha256').update(s).digest('hex'),id=()=>crypto.randomBytes(16).toString('hex');
 function createServer(opts={}){
 const rooms=new Map(),tokens=new Map(),limits=new Map(),now=opts.now||Date.now;let tickTimer,tickCount=0;const store=createStore(opts.dbPath||process.env.DB_PATH||path.join(__dirname,'data','districts.sqlite'),now);
+const life=createResidentLife(store.db,now);
 const media=createMedia(store.db,now),social=createSocial(store.db,now,media),cityBuild=createCityBuildStore(store.db),structures=createStructures(store.db);
 const news=createNews(store.db,{fetcher:opts.newsFetch,now});
 const mb=createMainBeta(store.db,{now,code:opts.mainCode,owners:opts.owners,idleDays:opts.idleDays}),MAX=()=>Number(opts.maxRooms||process.env.MAX_ROOMS||4),privateRooms=()=>[...rooms.values()].filter(r=>!r.public).length,present=()=>new Set([...rooms.values()].flatMap(r=>[...r.players.values()].map(p=>p.accountId)));
@@ -44,6 +46,13 @@ const server=http.createServer(async(req,res)=>{res.setHeader('X-Content-Type-Op
 if(u.pathname.startsWith('/api/')){res.setHeader('Cache-Control','no-store');
 const origin=req.headers.origin;if(origin&&!(opts.publicOrigin||process.env.PUBLIC_ORIGIN?[opts.publicOrigin||process.env.PUBLIC_ORIGIN]:['http://'+req.headers.host,'https://'+req.headers.host]).includes(origin))fail(403,'Use this server’s own game page.');
 if(u.pathname==='/api/main'&&req.method==='GET'){rate('main:'+clientIp(req),600,60000);const n=rooms.get(mb.code)?.players.size||0;return json(res,{players:n,capacity:12,full:n>=12})}
+if(u.pathname==='/api/resident-life'){
+ const a=account(req);rate('life:'+a.id,120,60000);
+ if(req.method==='GET')return json(res,life.read(a.id));
+ if(req.method!=='POST')fail(405,'Use GET or POST.');
+ if(!String(req.headers['content-type']||'').startsWith('application/json'))fail(415,'Send JSON.');
+ return json(res,life.save(a.id,await body(req,110000)));
+}
 if(u.pathname==='/api/news'&&req.method==='GET'){rate('news:'+clientIp(req),90,60000);return json(res,await news.read())}
 if(u.pathname==='/api/events'&&req.method==='GET'){const {r,p}=auth(req);p.stream?.end();res.writeHead(200,{'Content-Type':'text/event-stream','Cache-Control':'no-store','X-Accel-Buffering':'no'});p.stream=res;p.seen=now();req.on('close',()=>{if(p.stream===res){p.stream=null;p.seen=now()}});publish(r);return}
 if(u.pathname==='/api/account/me'&&req.method==='GET'){const a=account(req);return json(res,{account:a,rooms:store.recent(a.id)})}

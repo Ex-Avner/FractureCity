@@ -6,7 +6,7 @@
    story told in three parts across visits, its own rumours, and its own take
    on Ned. They remember you: whether you have met, whether you told them your
    name, how you treated them, and how far into their story you got. Memory is
-   kept in this browser, per account.
+   kept on the account when signed in on the game server; offline memories stay in this browser.
 
    Real news. In the online city, couriers, broadcasters, clerks and vendors
    sometimes bring up a real headline from the Common Ground wire. The headline
@@ -294,6 +294,7 @@ let MEM = null, memFor = null;
 function memory(){
  const k = memKey();
  if (memFor !== k){ memFor = k; try { MEM = JSON.parse(localStorage.getItem(k) || '{}') || {}; } catch (e){ MEM = {}; } }
+ if(window.FCResidentLife?.enabled && FCResidentLife.ready)MEM=FCResidentLife.get('npcs',MEM);
  return MEM;
 }
 function saveMemory(){
@@ -302,10 +303,12 @@ function saveMemory(){
   //  Keep the 300 most recent acquaintances.
   if (keys.length > 300) keys.sort((a, b) => (m[a].last || 0) - (m[b].last || 0)).slice(0, keys.length - 300).forEach(k => delete m[k]);
   localStorage.setItem(memKey(), JSON.stringify(m));
+  if(window.FCResidentLife?.enabled)FCResidentLife.put('npcs',m);
  } catch (e){}
 }
 function playerName(){ return window.FCAccounts?.user?.displayName || (typeof Shift !== 'undefined' && Shift.profile && (Shift.profile.name || Shift.profile.handle)) || 'stranger'; }
 
+addEventListener('fc-life-ready',()=>{MEM=null;memFor=null;});
 // ─── The conversation ──────────────────────────────────────────────────────
 const css = document.createElement('style');
 css.textContent = `#npc-talk{position:fixed;left:50%;bottom:max(18px,env(safe-area-inset-bottom));transform:translateX(-50%);z-index:139000;width:min(760px,94vw);
@@ -340,6 +343,7 @@ function hashS(s){ let h = 0; for (const ch of String(s)) h = (h * 31 + ch.charC
 function rapportWord(r){ return r >= 3 ? 'WARM' : r <= -1 ? 'COLD' : r >= 1 ? 'FRIENDLY' : 'NEUTRAL'; }
 
 function start(person){
+ if(window.FCResidentLife?.blocked){toast('Your account progress is loading. Try again shortly.','info');return;}
  const role = roleOf(person), v = V[role], m = memory(), id = idOf(person);
  const me = m[id] || (m[id] = { met: 0, rapport: 0, step: 0, knowsName: false, rude: 0, topics: [] });
  const first = me.met === 0;

@@ -3,9 +3,9 @@ const root=require('node:path').resolve(__dirname,'..'),{chromium}=require(root+
 (async()=>{const dir=fs.mkdtempSync(path.join(os.tmpdir(),'fc-seam-')),day=new Date(Date.now()-3600000).toUTCString();
 const feed=host=>`<rss><channel><item><title>Grid operators expect record electricity demand this winter</title><link>https://${host}/a</link><pubDate>${day}</pubDate></item><item><title>Bakers say bread prices will hold steady</title><link>https://${host}/b</link><pubDate>${day}</pubDate></item></channel></rss>`;
 const app=createServer({dbPath:path.join(dir,'t.sqlite'),newsFetch:async url=>new Response(feed(new URL(url).hostname))});await new Promise(r=>app.server.listen(0,'127.0.0.1',r));const base='http://127.0.0.1:'+app.server.address().port,browser=await chromium.launch({channel:'chrome'}),errors=[];
-try{const ctx=await browser.newContext({viewport:{width:1280,height:800}});await ctx.request.post(base+'/api/account/register',{data:{username:'seam_tester',password:'seam farm test 123',displayName:'Sam'}});
+try{const ctx=await browser.newContext({viewport:{width:1280,height:800}});// Anonymous offline farm; authenticated cross-device behavior has its own test.
  const p=await ctx.newPage();p.on('pageerror',e=>errors.push(e.message));p.on('console',m=>{if(/\[seam\]|\[wildlife\]/.test(m.text()))errors.push(m.text())});
- await p.goto(base+'/city/');await p.waitForFunction(()=>window.OwnBlock&&window.FCSeam&&window.FCWildlife&&FCAccounts.user,null,{timeout:120000});
+ await p.goto(base+'/city/');await p.waitForFunction(()=>window.OwnBlock&&window.FCSeam&&window.FCWildlife ,null,{timeout:120000});
  await p.evaluate(async()=>{HD.locked=true;HD.setTier('perf',true);await OwnBlock.start();try{shSetPeaceful(false)}catch(e){}State.dayTime=13*60;Player.position.set(244,1+Player.height,24.5);updateChunks(true)});
  await p.waitForFunction(()=>['10,0','11,0','10,1','11,1'].every(k=>State.chunkMap.get(k)?.landmark==='seam'),null,{timeout:90000});
  // The ground: a road ring at street level, heaved ground inside, a glowing crack, raised beds.
@@ -69,7 +69,7 @@ try{const ctx=await browser.newContext({viewport:{width:1280,height:800}});await
  assert.ok(wl.pigeons>0,'pigeons land near you');
  console.log('PASS city wildlife: many-winged pigeons land near you'+(wl.moths?', lamp moths swarm the lights':''));
  // Saved per account.
- await p.evaluate(()=>FCSeam.save());await p.reload();await p.waitForFunction(()=>window.FCSeam&&FCAccounts.user,null,{timeout:120000});
+ await p.evaluate(()=>FCSeam.save());await p.reload();await p.waitForFunction(()=>window.FCSeam ,null,{timeout:120000});
  const kept=await p.evaluate(()=>({pets:FCSeam.state.pets.length,ward:FCSeam.state.wards[4],melon:FCSeam.state.plots[3].crop?.id}));
  assert.deepEqual(kept,{pets:1,ward:1,melon:'melon'});
  console.log('PASS the farm, wards and pets survive a reload');

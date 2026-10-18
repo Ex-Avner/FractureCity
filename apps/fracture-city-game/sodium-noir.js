@@ -93,8 +93,8 @@ function grade(hour){
  if (State.hemi){
   //  Coloured sky against warm ground: that difference is what gives shapes
   //  their depth. Brighter overall, so "noir" never means "can't see".
-  State.hemi.color.lerp(TMP.set(h.hemi), 0.75 * day).lerp(TMP.set(NIGHT.hemi), 0.7 * night);
-  State.hemi.groundColor.lerp(TMP.set(h.ground), 0.6 * day).lerp(TMP.set(NIGHT.ground), 0.85 * night);
+  State.hemi.color.lerp(TMP.set(h.hemi), 0.42 * day).lerp(TMP.set(NIGHT.hemi), 0.7 * night);
+  State.hemi.groundColor.lerp(TMP.set(h.ground), 0.32 * day).lerp(TMP.set(NIGHT.ground), 0.85 * night);
   //  Well lit at night: the city glows back at the sky.
   State.hemi.intensity *= 1.0 + 0.85 * night;
   if (night > 0.5) State.hemi.intensity = Math.max(State.hemi.intensity, 1.3 * (typeof LOOK !== 'undefined' ? LOOK.exposure : 1));
@@ -102,10 +102,10 @@ function grade(hour){
  if (State.ambient){
   //  Less flat fill, so faces turned from the light actually turn darker.
   State.ambient.intensity *= 0.82 + 0.3 * night;
-  State.ambient.color.lerp(TMP.set(h.hemi), 0.6 * day).lerp(TMP.set(NIGHT.amb), 0.7 * night);
+  State.ambient.color.lerp(TMP.set(h.hemi), 0.32 * day).lerp(TMP.set(NIGHT.amb), 0.7 * night);
  }
  if (State.sunLight){
-  State.sunLight.color.lerp(TMP.set(h.sun), 0.6 * day);
+  State.sunLight.color.lerp(TMP.set(h.sun), 0.32 * day);
   State.sunLight.intensity *= 1.0 + 0.12 * day;
  }
  if (State.neonFillA) State.neonFillA.intensity *= 1.25;
@@ -235,7 +235,7 @@ function dressNearby(){
 const overlay = document.createElement('div'); overlay.id = 'grit-grade';
 const css = document.createElement('style');
 css.textContent = `#grit-grade{position:fixed;inset:0;z-index:2;pointer-events:none;mix-blend-mode:soft-light;opacity:0;transition:opacity 1.2s}
-body.grit-contrast canvas.grit-main{filter:contrast(1.08) saturate(1.14)}
+body.grit-contrast canvas.grit-main{filter:contrast(1.08) saturate(0.98)}
 body.in-intro #grit-grade{opacity:0!important}`;
 document.head.append(css); document.body.append(overlay);
 
@@ -259,7 +259,7 @@ function frame(hour){
    ? 'radial-gradient(ellipse at 50% 120%, rgba(255,140,50,.55), transparent 60%), linear-gradient(180deg, rgba(30,90,110,.55), rgba(20,40,60,.25))'
    : `radial-gradient(ellipse at 50% -20%, ${Grit.hue.grade}, transparent 75%), linear-gradient(180deg, ${Grit.hue.grade}aa, ${Grit.hue.grade}33 55%, rgba(30,24,20,.5))`;
  }
- overlay.style.opacity = on ? String(0.8 + 0.15 * night) : '0';
+ overlay.style.opacity = on ? String(0.46 + 0.18 * night) : '0';
  if (State.renderer && !State.renderer.domElement.classList.contains('grit-main')) State.renderer.domElement.classList.add('grit-main');
  document.body.classList.toggle('grit-contrast', on && !!window.HD && HD.tier !== 'perf');
 }

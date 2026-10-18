@@ -28483,6 +28483,7 @@ function hdPatchVoxMaterial(mat){
   mat.__hdPatched = 1;
   mat.onBeforeCompile = function(shader){
     shader.uniforms.uSurfMode = HD_U.uSurfMode;
+    if(window.FCWorldMaterials) shader.uniforms.uWorldAtlas={value:FCWorldMaterials.texture};
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>', `#include <common>
 attribute vec2 aSurfUV;
@@ -28497,14 +28498,15 @@ vSurfMat = aMat;
 vSurfN = normal;
 vSurfW = (modelMatrix * vec4(transformed, 1.0)).xyz;`);
     shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>', '#include <common>\n' + HD_GLSL_COMMON)
+      .replace('#include <common>', '#include <common>\n' + HD_GLSL_COMMON + (window.FCWorldMaterials?.glsl || ''))
       .replace('#include <color_fragment>', `#include <color_fragment>
-diffuseColor.rgb *= hdSurface(vSurfUV, vSurfN, vSurfW, vSurfMat);`);
+diffuseColor.rgb *= hdSurface(vSurfUV, vSurfN, vSurfW, vSurfMat);
+${window.FCWorldMaterials ? "diffuseColor.rgb *= fcWeathered(vSurfW,vSurfN,vSurfMat);" : ""}`);
   };
   //  Without this three shares one compiled program between the patched and
   //  unpatched versions of the same material class and the injection is
   //  silently dropped on whichever one compiles second.
-  mat.customProgramCacheKey = function(){ return 'hd-surface-1'; };
+  mat.customProgramCacheKey = function(){ return 'hd-surface-weathered-2'; };
   mat.needsUpdate = true;
 }
 
@@ -30022,10 +30024,11 @@ document.addEventListener('DOMContentLoaded', init);
 <script src="city-art.js?v=0.55.0"></script>
 <script src="art-direct.js?v=0.55.0"></script>
 <script src="movement-flow.js?v=0.55.0"></script>
-<script src="own-the-block.js?v=0.62.0"></script>
+<script src="own-the-block.js?v=0.66.0"></script>
 <script src="art-collection.js?v=0.55.0"></script>
 <script>window.FC_ACCOUNTS_OPTIONAL=true;</script>
 <script src="accounts.js?v=0.61.2"></script>
+<script src="resident-life.js?v=0.66.0"></script>
 <script src="media-upload.js?v=0.60.0"></script>
 <script src="social-world.js?v=0.62.0"></script>
 <script src="social-city.js?v=0.62.0"></script>
@@ -30042,10 +30045,11 @@ document.addEventListener('DOMContentLoaded', init);
 <script src="city-structures.js?v=0.61.0"></script>
 <script src="city-online.js?v=0.63.0"></script>
 <script src="city-flow.js?v=0.59.0"></script>
-<script src="online-tour.js?v=0.62.0"></script>
-<script src="sodium-noir.js?v=0.64.1"></script>
-<script src="npc-voices.js?v=0.64.1"></script>
+<script src="online-tour.js?v=0.66.0"></script>
+<script src="world-materials.js?v=0.66.0"></script>
+<script src="sodium-noir.js?v=0.66.0"></script>
+<script src="npc-voices.js?v=0.66.0"></script>
 <script src="city-wildlife.js?v=0.65.0"></script>
-<script src="the-seam.js?v=0.65.0"></script>
+<script src="the-seam.js?v=0.66.0"></script>
 </body>
 </html>
