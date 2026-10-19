@@ -7,7 +7,7 @@ const steps=[
  ['met','Say hello to Moss','Moss keeps the corner at Common Ground. Walk over and press E, or tap the interaction prompt.',[168,1,22]],
  ['listened','Find your city soundtrack','The listening booth is beside the theory library. Choose a track; U pauses and Y skips. Your volume stays yours.',[171,1,29.5]],
  ['planted','Plant a little trouble','Follow the Seam sign east. Approach an empty raised bed and use a free wheat packet. It grows while you explore.',[249.5,2,17.5]],
- ['published','Leave something that is yours','Return to the gallery. Publish a story, photo or song on an empty display, or place your first wall in your online building plot.',[148,1,33]]
+ ['published','Leave something that is yours','Return to the gallery. Publish a story, photo or song on an empty display, or place your first wall in your online building plot.',[148,1,41]]
 ];
 function save(){try{localStorage.setItem('fc-first-walk:'+user,JSON.stringify(progress))}catch{}FCResidentLife?.put('tour',progress)}
 function mark(k){if(user&&!progress[k]){progress[k]=true;save()}}
@@ -36,7 +36,7 @@ window.FCOnlineTour={open,close,get progress(){return progress},meet(){if(user&&
  const i=steps.findIndex(([k])=>!progress[k]);if(i<0)return null;
  let p=steps[i][3];
  if(i===2&&window.FCSeam){const bed=FCSeam.state.plots.findIndex(p=>p.open&&!p.crop);if(bed>=0)p=[FCSeam.BEDS[bed][0]+2,2,FCSeam.BEDS[bed][1]];}
- if(i===3){const slot=Array.from({length:8},(_,i)=>i).find(i=>!CitySocial.works.some(w=>w.slot===i));if(slot!=null)p=[148+slot*5,1,33];else if(FCStructures?.mine)p=[FCStructures.mine.plot.x+3.5,1,FCStructures.mine.plot.z-1];}
+ if(i===3){const slot=Array.from({length:8},(_,i)=>i).find(i=>!CitySocial.works.some(w=>w.slot===i));if(slot!=null)p=[148+slot*5,1,41];else if(FCStructures?.mine)p=[FCStructures.mine.plot.x+3.5,1,FCStructures.mine.plot.z-1];}
  return{p,text:'FIRST WALK '+(i+1)+'/4 · '+steps[i][1]+' · Tools: skip/help'};
 }};
 })();

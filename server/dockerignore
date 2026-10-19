@@ -12,6 +12,8 @@
 !server/news-feed.cjs
 !server/main-beta.cjs
 !server/resident-life.cjs
+!server/classics.cjs
+!server/classics-text.cjs
 !server/public-music/**
 !server/Dockerfile
 !apps/

@@ -1,0 +1,423 @@
+{
+ "built": "2026-10-18",
+ "shelves": [
+  {
+   "name": "Novels",
+   "books": [
+    {
+     "id": 1342,
+     "title": "Pride and Prejudice",
+     "author": "Jane Austen",
+     "words": 126995,
+     "chapters": 62
+    },
+    {
+     "id": 98,
+     "title": "A Tale of Two Cities",
+     "author": "Charles Dickens",
+     "words": 135523,
+     "chapters": 46
+    },
+    {
+     "id": 1400,
+     "title": "Great Expectations",
+     "author": "Charles Dickens",
+     "words": 184340,
+     "chapters": 60
+    },
+    {
+     "id": 1260,
+     "title": "Jane Eyre",
+     "author": "Charlotte Brontë",
+     "words": 185316,
+     "chapters": 41
+    },
+    {
+     "id": 768,
+     "title": "Wuthering Heights",
+     "author": "Emily Brontë",
+     "words": 115815,
+     "chapters": 34
+    },
+    {
+     "id": 158,
+     "title": "Emma",
+     "author": "Jane Austen",
+     "words": 157321,
+     "chapters": 32
+    },
+    {
+     "id": 64317,
+     "title": "The Great Gatsby",
+     "author": "F. Scott Fitzgerald",
+     "words": 48199,
+     "chapters": 10
+    },
+    {
+     "id": 76,
+     "title": "Adventures of Huckleberry Finn",
+     "author": "Mark Twain",
+     "words": 110936,
+     "chapters": 44
+    },
+    {
+     "id": 33,
+     "title": "The Scarlet Letter",
+     "author": "Nathaniel Hawthorne",
+     "words": 82913,
+     "chapters": 26
+    },
+    {
+     "id": 2554,
+     "title": "Crime and Punishment",
+     "author": "Fyodor Dostoyevsky",
+     "words": 203392,
+     "chapters": 34
+    },
+    {
+     "id": 4300,
+     "title": "Ulysses",
+     "author": "James Joyce",
+     "words": 265000,
+     "chapters": 52
+    },
+    {
+     "id": 113,
+     "title": "The Secret Garden",
+     "author": "Frances Hodgson Burnett",
+     "words": 80533,
+     "chapters": 21
+    }
+   ]
+  },
+  {
+   "name": "Gothic and strange",
+   "books": [
+    {
+     "id": 84,
+     "title": "Frankenstein",
+     "author": "Mary Wollstonecraft Shelley",
+     "words": 74893,
+     "chapters": 28
+    },
+    {
+     "id": 345,
+     "title": "Dracula",
+     "author": "Bram Stoker",
+     "words": 160435,
+     "chapters": 40
+    },
+    {
+     "id": 174,
+     "title": "The Picture of Dorian Gray",
+     "author": "Oscar Wilde",
+     "words": 78897,
+     "chapters": 21
+    },
+    {
+     "id": 43,
+     "title": "The Strange Case of Dr. Jekyll and Mr. Hyde",
+     "author": "Robert Louis Stevenson",
+     "words": 25631,
+     "chapters": 6
+    },
+    {
+     "id": 7849,
+     "title": "The Trial",
+     "author": "Franz Kafka",
+     "words": 83663,
+     "chapters": 13
+    },
+    {
+     "id": 1952,
+     "title": "The Yellow Wallpaper",
+     "author": "Charlotte Perkins Gilman",
+     "words": 6085,
+     "chapters": 2
+    },
+    {
+     "id": 2852,
+     "title": "The Hound of the Baskervilles",
+     "author": "Arthur Conan Doyle",
+     "words": 59082,
+     "chapters": 16
+    }
+   ]
+  },
+  {
+   "name": "Adventure and wonder",
+   "books": [
+    {
+     "id": 2701,
+     "title": "Moby Dick",
+     "author": "Herman Melville",
+     "words": 211085,
+     "chapters": 125
+    },
+    {
+     "id": 11,
+     "title": "Alice's Adventures in Wonderland",
+     "author": "Lewis Carroll",
+     "words": 26317,
+     "chapters": 11
+    },
+    {
+     "id": 1661,
+     "title": "The Adventures of Sherlock Holmes",
+     "author": "Arthur Conan Doyle",
+     "words": 104432,
+     "chapters": 21
+    },
+    {
+     "id": 120,
+     "title": "Treasure Island",
+     "author": "Robert Louis Stevenson",
+     "words": 68573,
+     "chapters": 12
+    },
+    {
+     "id": 35,
+     "title": "The Time Machine",
+     "author": "H. G. Wells",
+     "words": 32388,
+     "chapters": 17
+    },
+    {
+     "id": 36,
+     "title": "The War of the Worlds",
+     "author": "H. G. Wells",
+     "words": 59931,
+     "chapters": 28
+    },
+    {
+     "id": 215,
+     "title": "The Call of the Wild",
+     "author": "Jack London",
+     "words": 31716,
+     "chapters": 7
+    },
+    {
+     "id": 829,
+     "title": "Gulliver's Travels",
+     "author": "Jonathan Swift",
+     "words": 104932,
+     "chapters": 23
+    },
+    {
+     "id": 55,
+     "title": "The Wonderful Wizard of Oz",
+     "author": "L. Frank Baum",
+     "words": 39474,
+     "chapters": 25
+    },
+    {
+     "id": 16,
+     "title": "Peter Pan",
+     "author": "J. M. Barrie",
+     "words": 47093,
+     "chapters": 15
+    },
+    {
+     "id": 219,
+     "title": "Heart of Darkness",
+     "author": "Joseph Conrad",
+     "words": 37904,
+     "chapters": 6
+    }
+   ]
+  },
+  {
+   "name": "Philosophy and ideas",
+   "books": [
+    {
+     "id": 1232,
+     "title": "The Prince",
+     "author": "Niccolò Machiavelli",
+     "words": 49861,
+     "chapters": 14
+    },
+    {
+     "id": 132,
+     "title": "The Art of War",
+     "author": "Sunzi",
+     "words": 54960,
+     "chapters": 15
+    },
+    {
+     "id": 2680,
+     "title": "Meditations",
+     "author": "Marcus Aurelius",
+     "words": 71921,
+     "chapters": 11
+    },
+    {
+     "id": 1497,
+     "title": "The Republic",
+     "author": "Plato",
+     "words": 216236,
+     "chapters": 30
+    },
+    {
+     "id": 4363,
+     "title": "Beyond Good and Evil",
+     "author": "Friedrich Nietzsche",
+     "words": 62166,
+     "chapters": 15
+    },
+    {
+     "id": 1998,
+     "title": "Thus Spake Zarathustra",
+     "author": "Friedrich Nietzsche",
+     "words": 109514,
+     "chapters": 164
+    },
+    {
+     "id": 205,
+     "title": "Walden",
+     "author": "Henry David Thoreau",
+     "words": 115809,
+     "chapters": 23
+    },
+    {
+     "id": 2500,
+     "title": "Siddhartha",
+     "author": "Hermann Hesse",
+     "words": 39157,
+     "chapters": 8
+    },
+    {
+     "id": 19942,
+     "title": "Candide",
+     "author": "Voltaire",
+     "words": 35513,
+     "chapters": 32
+    },
+    {
+     "id": 600,
+     "title": "Notes from the Underground",
+     "author": "Fyodor Dostoyevsky",
+     "words": 44069,
+     "chapters": 16
+    },
+    {
+     "id": 23,
+     "title": "Narrative of the Life of Frederick Douglass",
+     "author": "Frederick Douglass",
+     "words": 40690,
+     "chapters": 14
+    },
+    {
+     "id": 408,
+     "title": "The Souls of Black Folk",
+     "author": "W. E. B. Du Bois",
+     "words": 68522,
+     "chapters": 15
+    }
+   ]
+  },
+  {
+   "name": "Poetry and plays",
+   "books": [
+    {
+     "id": 1322,
+     "title": "Leaves of Grass",
+     "author": "Walt Whitman",
+     "words": 121487,
+     "chapters": 38
+    },
+    {
+     "id": 1524,
+     "title": "Hamlet",
+     "author": "William Shakespeare",
+     "words": 31647,
+     "chapters": 21
+    },
+    {
+     "id": 1533,
+     "title": "Macbeth",
+     "author": "William Shakespeare",
+     "words": 17969,
+     "chapters": 27
+    },
+    {
+     "id": 844,
+     "title": "The Importance of Being Earnest",
+     "author": "Oscar Wilde",
+     "words": 20672,
+     "chapters": 5
+    },
+    {
+     "id": 1001,
+     "title": "The Divine Comedy: Inferno",
+     "author": "Dante Alighieri",
+     "words": 38044,
+     "chapters": 8
+    },
+    {
+     "id": 1727,
+     "title": "The Odyssey",
+     "author": "Homer",
+     "words": 129276,
+     "chapters": 26
+    },
+    {
+     "id": 1065,
+     "title": "The Raven",
+     "author": "Edgar Allan Poe",
+     "words": 1075,
+     "chapters": 1
+    }
+   ]
+  }
+ ],
+ "giants": [
+  {
+   "id": 2600,
+   "title": "War and Peace",
+   "author": "Leo Tolstoy",
+   "online": true
+  },
+  {
+   "id": 1399,
+   "title": "Anna Karenina",
+   "author": "Leo Tolstoy",
+   "online": true
+  },
+  {
+   "id": 1184,
+   "title": "The Count of Monte Cristo",
+   "author": "Alexandre Dumas",
+   "online": true
+  },
+  {
+   "id": 135,
+   "title": "Les Misérables",
+   "author": "Victor Hugo",
+   "online": true
+  },
+  {
+   "id": 996,
+   "title": "Don Quixote",
+   "author": "Miguel de Cervantes Saavedra",
+   "online": true
+  },
+  {
+   "id": 28054,
+   "title": "The Brothers Karamazov",
+   "author": "Fyodor Dostoyevsky",
+   "online": true
+  },
+  {
+   "id": 145,
+   "title": "Middlemarch",
+   "author": "George Eliot",
+   "online": true
+  },
+  {
+   "id": 100,
+   "title": "The Complete Works of William Shakespeare",
+   "author": "William Shakespeare",
+   "online": true
+  }
+ ]
+}

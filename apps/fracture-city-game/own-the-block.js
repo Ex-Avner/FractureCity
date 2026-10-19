@@ -125,13 +125,7 @@ Chunk.prototype.generate=function(){if(!KEYS.has(this.key)||!(A.state.enabled||p
  for(const x of [150.3,161.7]){box(x,4.1,20.04,2.5,3.65,.08,0x173b36);for(let y=2.5;y<5.8;y+=.22)box(x,y,20.13,2.45,.065,.10,0x8c9a83);}
  box(156,2.04,21.3,4.2,.04,2.4,0xbdbaa2);
  box(156,6.73,21.8,5.1,.08,.08,0xefddb5,true);
- // Three garden rooms frame the exhibits, leaving a broad pedestrian lane.
- for(const x of [150,165,180]){
-  b(x,1,41,4,1,2,136);box(x+2,2.05,42,4.1,.16,2.15,0xc6c5ad);
-  for(let k=0;k<7;k++)box(x+.2+k*.56,2.18,42,.38,.10,1.9,0x81947a);
-  b(x,1,44,4,1,1,120);box(x+2,2.08,44.5,3.7,.2,.8,0x345f48);
-  for(let k=0;k<4;k++){box(x+.5+k,2.48,44.5,.65,.65,.7,0x527a55);box(x+.5+k,2.82,44.5,.4,.35,.45,0x719866);}
- }
+ // The plaza's middle is the Reading Garden (reading-garden.js); the gallery stands along its south edge.
  // Gallery fascia and thin roof beams are supported on the outer verge.
  for(const x of [145,190]){b(x,1,30,1,6,1,136);b(x,1,40,1,6,1,136);box(x+.5,7.12,35.5,.4,.25,11,0x173b36);}
  box(168,7.12,40.5,46,.25,.4,0x173b36);
@@ -139,7 +133,6 @@ Chunk.prototype.generate=function(){if(!KEYS.has(this.key)||!(A.state.enabled||p
  sign(168,6.3,40.72,'THE PEOPLE’S GALLERY','PHOTOS / STORIES / SONGS — WALK UP TO SHARE',13,1.05);
  // Warm floor guides connect the wire, gallery, studio and listening stage.
  for(let z=27;z<34;z+=1.4)box(177,1.04,z,.06,.025,.65,0xe0c295);
- for(let x=149;x<185;x+=2)box(x,1.04,32.4,.6,.025,.055,0xe0c295);
  sign(146.1,2.25,28,'MAKE','ATELIER 01',2,.6);
  sign(176.5,2.25,28,'MEET','GALLERY + SONGS',2.8,.6);
  for(const x of [146.1,176.5]){box(x,1.5,28,.06,1,.06,0xb0b89e);box(x,1.03,28,.6,.06,.4,0x173b36);}

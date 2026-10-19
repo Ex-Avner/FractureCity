@@ -9,12 +9,14 @@ const {createMedia}=require('./gallery-media.cjs');
 const {createCityBuildStore}=require('./city-build-store.cjs');
 const {createMainBeta}=require('./main-beta.cjs');
 const {createResidentLife}=require('./resident-life.cjs');
+const {createClassics}=require('./classics.cjs');
 const clean=(s,n)=>String(s||'').replace(/[\x00-\x1f\x7f<>]/g,'').trim().slice(0,n),hash=s=>crypto.createHash('sha256').update(s).digest('hex'),id=()=>crypto.randomBytes(16).toString('hex');
 function createServer(opts={}){
 const rooms=new Map(),tokens=new Map(),limits=new Map(),now=opts.now||Date.now;let tickTimer,tickCount=0;const store=createStore(opts.dbPath||process.env.DB_PATH||path.join(__dirname,'data','districts.sqlite'),now);
 const life=createResidentLife(store.db,now);
 const media=createMedia(store.db,now),social=createSocial(store.db,now,media),cityBuild=createCityBuildStore(store.db),structures=createStructures(store.db);
 const news=createNews(store.db,{fetcher:opts.newsFetch,now});
+const classics=createClassics({dir:opts.classicsDir||path.join(path.dirname(opts.dbPath||process.env.DB_PATH||path.join(__dirname,'data','districts.sqlite')),'classics'),shelfDir:path.join(GAME,'classics'),fetcher:opts.classicsFetch,now});
 const mb=createMainBeta(store.db,{now,code:opts.mainCode,owners:opts.owners,idleDays:opts.idleDays}),MAX=()=>Number(opts.maxRooms||process.env.MAX_ROOMS||4),privateRooms=()=>[...rooms.values()].filter(r=>!r.public).length,present=()=>new Set([...rooms.values()].flatMap(r=>[...r.players.values()].map(p=>p.accountId)));
 // The Main Beta always has a reserved slot; private rooms share the rest of MAX_ROOMS.
 function privateSlot(message){if(privateRooms()>=MAX()-1)fail(503,message)}
@@ -53,6 +55,8 @@ if(u.pathname==='/api/resident-life'){
  if(!String(req.headers['content-type']||'').startsWith('application/json'))fail(415,'Send JSON.');
  return json(res,life.save(a.id,await body(req,110000)));
 }
+if(u.pathname==='/api/classics/search'&&req.method==='GET'){rate('classics:'+clientIp(req),120,60000);return json(res,await classics.search(clean(u.searchParams.get('q'),120),clean(u.searchParams.get('lang')||'en',8)))}
+if(u.pathname.startsWith('/api/classics/book/')&&req.method==='GET'){rate('classics-book:'+clientIp(req),30,60000);return json(res,await classics.book(u.pathname.slice(19)))}
 if(u.pathname==='/api/news'&&req.method==='GET'){rate('news:'+clientIp(req),90,60000);return json(res,await news.read())}
 if(u.pathname==='/api/events'&&req.method==='GET'){const {r,p}=auth(req);p.stream?.end();res.writeHead(200,{'Content-Type':'text/event-stream','Cache-Control':'no-store','X-Accel-Buffering':'no'});p.stream=res;p.seen=now();req.on('close',()=>{if(p.stream===res){p.stream=null;p.seen=now()}});publish(r);return}
 if(u.pathname==='/api/account/me'&&req.method==='GET'){const a=account(req);return json(res,{account:a,rooms:store.recent(a.id)})}
