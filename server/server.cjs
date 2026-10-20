@@ -5,6 +5,7 @@ const {createStore}=require('./store.cjs');
 const {createStructures}=require('./structure-store.cjs');
 const {createNews}=require('./news-feed.cjs');
 const {createSocial}=require('./social.cjs');
+const {createChallenge}=require('./common-challenge.cjs');
 const {createMedia}=require('./gallery-media.cjs');
 const {createCityBuildStore}=require('./city-build-store.cjs');
 const {createMainBeta}=require('./main-beta.cjs');
@@ -15,6 +16,7 @@ function createServer(opts={}){
 const rooms=new Map(),tokens=new Map(),limits=new Map(),now=opts.now||Date.now;let tickTimer,tickCount=0;const store=createStore(opts.dbPath||process.env.DB_PATH||path.join(__dirname,'data','districts.sqlite'),now);
 const life=createResidentLife(store.db,now);
 const media=createMedia(store.db,now),social=createSocial(store.db,now,media),cityBuild=createCityBuildStore(store.db),structures=createStructures(store.db);
+const challenge=createChallenge(store.db,now);
 const news=createNews(store.db,{fetcher:opts.newsFetch,now});
 const classics=createClassics({dir:opts.classicsDir||path.join(path.dirname(opts.dbPath||process.env.DB_PATH||path.join(__dirname,'data','districts.sqlite')),'classics'),shelfDir:path.join(GAME,'classics'),fetcher:opts.classicsFetch,now});
 const mb=createMainBeta(store.db,{now,code:opts.mainCode,owners:opts.owners,idleDays:opts.idleDays}),MAX=()=>Number(opts.maxRooms||process.env.MAX_ROOMS||4),privateRooms=()=>[...rooms.values()].filter(r=>!r.public).length,present=()=>new Set([...rooms.values()].flatMap(r=>[...r.players.values()].map(p=>p.accountId)));
@@ -60,6 +62,8 @@ if(u.pathname.startsWith('/api/classics/book/')&&req.method==='GET'){rate('class
 if(u.pathname==='/api/news'&&req.method==='GET'){rate('news:'+clientIp(req),90,60000);return json(res,await news.read())}
 if(u.pathname==='/api/events'&&req.method==='GET'){const {r,p}=auth(req);p.stream?.end();res.writeHead(200,{'Content-Type':'text/event-stream','Cache-Control':'no-store','X-Accel-Buffering':'no'});p.stream=res;p.seen=now();req.on('close',()=>{if(p.stream===res){p.stream=null;p.seen=now()}});publish(r);return}
 if(u.pathname==='/api/account/me'&&req.method==='GET'){const a=account(req);return json(res,{account:a,rooms:store.recent(a.id)})}
+if(u.pathname==='/api/common-challenge'&&req.method==='GET'){const a=account(req);rate('challenge-read:'+a.id,30,60000);return json(res,challenge.snapshot(a.id))}
+if(u.pathname.startsWith('/api/common-challenge/')&&req.method==='POST'){const a=account(req);rate('challenge-write:'+a.id,10,60000);if(!String(req.headers['content-type']||'').startsWith('application/json'))fail(415,'Send JSON.');return json(res,challenge.action(a,u.pathname.split('/').pop(),await body(req,40000)))}
 if(u.pathname==='/api/social'&&req.method==='GET'){const a=account(req);rate('social-read:'+a.id,60,60000);return json(res,social.snapshot(a.id))}
 if(u.pathname==='/api/profiles'&&req.method==='GET'){account(req);return json(res,{profiles:store.leaders()})}
 if(u.pathname==='/api/city-structures'){const {r,p}=auth(req);if(!r.map.city||r.phase!=='live')fail(409,'Enter the shared city first.');if(!structures.ensure(r.code,p.accountId)&&r.public&&mb.releasePlot(r.code,present()))structures.ensure(r.code,p.accountId);if(req.method==='GET'){rate('structure-read:'+p.accountId,120,60000);return json(res,structures.snapshot(r.code,p.accountId))}if(req.method!=='POST')fail(405,'Use GET or POST.');if(!String(req.headers['content-type']||'').startsWith('application/json'))fail(415,'Send JSON.');rate('structure-write:'+p.accountId,60,60000);const b=await body(req,180000);if(b.travel===true){rate('plot-travel:'+p.accountId,12,60000);const snapshot=structures.snapshot(r.code,p.accountId),own=snapshot.owners.find(o=>o.author===p.accountId);if(!own)fail(409,'No free building plot in this city.');p.x=own.plot.x+3.5;p.y=1;p.z=own.plot.z-1;p.yaw=Math.PI;p.pitch=0;p.moving=false;p.poseAt=now();p.seq++;store.checkpoint(r);json(res,{...snapshot,arrival:{x:p.x,y:p.y,z:p.z}});publish(r);return}const result=structures.save(r.code,p.accountId,b,[...r.players.values()]);json(res,result);publish(r);return;}
