@@ -1247,7 +1247,7 @@ body.in-intro #hud-peace{opacity:0;}
 <div id="death-overlay">
   <div class="death-title">FLATLINED</div>
   <div class="death-sub">CONNECTION TERMINATED</div>
-  <button class="respawn-btn" id="respawn-btn">↻ RESPAWN AT ORIGIN</button>
+  <button class="respawn-btn" id="respawn-btn">↻ RETURN TO COMMON GROUND</button>
 </div>
 
 <div id="toast-stack"></div>
@@ -5043,7 +5043,7 @@ function init(){
       if (State.classSelectCallback) State.classSelectCallback();
     });
   }
-  $('respawn-btn').onclick = respawnPlayer;
+  $('respawn-btn').onclick = () => window.respawnPlayer();
   SHIFT_init();
   tick();
 }
@@ -11091,14 +11091,11 @@ PlateSweep.timer = setInterval(shSweepNameplates, PlateSweep.everyMs);
 
 const Respawn = { lastPoint: null, count: 0 };
 
-//  Where should this death send you? The flat is home once the campaign has
-//  started; before that, the origin crossroads.
+// Death always returns to the authored Common Ground arrival promenade.
 function shRespawnAnchor(){
-  const F = SHIFT_WORLD.flat;
-  if (F && typeof Campaign !== 'undefined' && Campaign.active){
-    return { x: F.centre.x, z: F.centre.z, y: F.floor + 1, where: 'your flat', indoors: true };
-  }
-  return { x: 0, z: 5, y: null, where: 'the crossroads', indoors: false };
+  if(window.OwnBlock)OwnBlock.state.enabled=true;
+  for(const key of ['6,0','7,0','6,1','7,1'])shBuildChunk(key);
+  return {x:167,z:24,y:1,where:'Common Ground',indoors:false};
 }
 
 //  Resolve an anchor to a place a body of this size actually fits.
@@ -11142,6 +11139,9 @@ function shClearAggro(point){
 //  is the intent. Nothing here calls the original, so there is no `const orig`
 //  to capture the override and recurse.
 function respawnPlayer(){
+  if(Player.mode === 'car')exitCar();
+  Player.mode = 'walk';
+  State.keys.clear();
   const anchor = shRespawnAnchor();
   const foot = shSafeFooting(anchor);
 
@@ -11153,6 +11153,8 @@ function respawnPlayer(){
   Player.damageFlash = 0;
 
   const calmed = shClearAggro(foot);
+  Player.yaw = Math.PI;
+  Player.pitch = 0;
   Respawn.lastPoint = foot;
   Respawn.count++;
 
@@ -30009,7 +30011,7 @@ document.addEventListener('DOMContentLoaded', init);
 <script src="city-art.js?v=0.55.0"></script>
 <script src="art-direct.js?v=0.55.0"></script>
 <script src="movement-flow.js?v=0.55.0"></script>
-<script src="own-the-block.js?v=0.68.0"></script>
+<script src="own-the-block.js?v=0.69.0"></script>
 <script src="art-collection.js?v=0.55.0"></script>
 <script>window.FC_ACCOUNTS_OPTIONAL=true;</script>
 <script src="accounts.js?v=0.61.2"></script>
@@ -30018,7 +30020,7 @@ document.addEventListener('DOMContentLoaded', init);
 <script src="social-world.js?v=0.62.0"></script>
 <script src="social-city.js?v=0.68.0"></script>
 <script src="news-hub.js?v=0.62.0"></script>
-<script src="common-ground-library.js?v=0.63.0"></script>
+<script src="common-ground-library.js?v=0.69.0"></script>
 <script src="physical-support.js?v=0.55.0"></script>
 <script src="screen-zombies.js?v=0.55.0"></script>
 <script src="zombie-combat.js?v=0.55.0"></script>
@@ -30028,7 +30030,7 @@ document.addEventListener('DOMContentLoaded', init);
 <script src="neighborhood-signal.js?v=0.62.0"></script>
 <script src="city-shared-build.js?v=0.57.0"></script>
 <script src="city-structures.js?v=0.61.0"></script>
-<script src="city-online.js?v=0.63.0"></script>
+<script src="city-online.js?v=0.69.1"></script>
 <script src="city-flow.js?v=0.59.0"></script>
 <script src="online-tour.js?v=0.68.0"></script>
 <script src="world-materials.js?v=0.66.0"></script>
@@ -30037,6 +30039,7 @@ document.addEventListener('DOMContentLoaded', init);
 <script src="city-wildlife.js?v=0.65.0"></script>
 <script src="the-seam.js?v=0.66.0"></script>
 <script src="skate-lines.js?v=0.67.0"></script>
-<script src="reading-garden.js?v=0.68.0"></script>
+<script src="reading-garden.js?v=0.69.0"></script>
+<script src="common-ground-atrium.js?v=0.69.0"></script>
 </body>
 </html>

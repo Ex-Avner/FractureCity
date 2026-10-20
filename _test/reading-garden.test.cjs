@@ -13,8 +13,13 @@ try{const p=await (await browser.newContext({viewport:{width:1280,height:800}}))
  await p.waitForFunction(()=>State.chunkMap.get('6,1')?.landmark==='makers'&&State.chunkMap.get('7,1')?.landmark==='makers',null,{timeout:90000});
  // The garden is built from blocks: lawn, water, the wall, trees, benches.
  const g=await p.evaluate(()=>({wall:[160,166,173].map(x=>shSurfaceY(x+.5,37.5,12)),water:getBlock(160,0,32),rim:shSurfaceY(158.5,31.5,4),lawn:getBlock(151,0,33),tree:shSurfaceY(152.5,33.5,12),bench:shSurfaceY(160.5,35.5,4),W:B_WATER,G:B_GRASS,path:shSurfaceY(166.5,32.5,4),lane:[148,160,175].map(x=>shSurfaceY(x+.5,41.5,6))}));
- assert.deepEqual(g.wall,[7,7,7]);assert.equal(g.water,g.W);assert.equal(g.rim,2);assert.equal(g.lawn,g.G);assert.ok(g.tree>=7);assert.equal(g.bench,2);assert.equal(g.path,1);assert.deepEqual(g.lane,[1,1,1],'the gallery lane is clear');
+ assert.deepEqual(g.wall,[5,5,5]);assert.equal(g.water,g.W);assert.equal(g.rim,1);assert.equal(g.lawn,g.G);assert.ok(g.tree===5);assert.equal(g.bench,2);assert.equal(g.path,1);assert.deepEqual(g.lane,[1,1,1],'the gallery lane is clear');
  console.log('PASS the garden is solid: lawn, pools with rims, trees, benches, the wall; the path and gallery lane are clear');
+ // Walk the full central approach with the real ground collision system.
+ const court=await p.evaluate(()=>{const e={position:new THREE.Vector3(167,1,25)};for(let i=0;i<100;i++)shGroundMove(e,0,.1,.3,1.7);return{z:e.position.z,y:e.position.y,posts:[[153,28],[181,28],[153,39],[181,39]].map(([x,z])=>isSolid(getBlock(x,5,z))),canopies:[...State.chunkMap.values()].flatMap(c=>c.group.children.filter(o=>o.name==='common-ground-atrium')).length}});
+ assert.ok(court.z>34.8);assert.equal(court.y,1);assert.ok(court.posts.every(Boolean));assert.equal(court.canopies,2);
+ for(const id of ['library','booth']){await p.evaluate(id=>{const k=FCCommonGround.kiosks.find(k=>k.id===id);Player.position.set(k.approach.x,Player.height+1,k.approach.z)},id);await p.waitForFunction(id=>FCCommonGround.near===id,id);await p.keyboard.press('KeyE');await p.waitForFunction(id=>FCCommonGround.isOpen&&FCCommonGround.kind===id,id);await p.keyboard.press('Escape');}
+ console.log('PASS open centre is walkable, supports are solid, and relocated theory/music kiosks open with E');
  // The People's Gallery stands along the south edge now; visitors stand in the lane.
  await p.evaluate(()=>Player.position.set(148,1+Player.height,41));
  await p.waitForFunction(()=>CitySocial.nearest===0,null,{timeout:60000,polling:250});

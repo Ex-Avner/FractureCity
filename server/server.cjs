@@ -35,9 +35,9 @@ function rate(key,max,period){let r=limits.get(key),t=now();if(!r||t-r.t>=period
 function state(r){return {code:r.code,public:!!r.public,structureRevision:r.map.city?structures.revision(r.code):0,artRevision:r.map.city?cityBuild.revision(r.code):0,map:r.map.id,phase:r.phase,host:r.host,time:now(),players:[...r.players.values()].map(p=>({id:p.id,accountId:p.accountId,name:p.name,color:p.color,x:p.x,y:p.y||0,z:p.z,yaw:p.yaw,pitch:p.pitch,hp:p.hp,ammo:p.ammo,reloading:p.reloadUntil>now(),ready:p.ready,connected:!!p.stream,kills:p.kills,deaths:p.deaths,score:p.score,moving:p.moving,sprint:p.sprint,safe:W.safe(p),protected:p.protectUntil>now(),respawnAt:p.respawnAt,emote:p.emoteUntil>now()?p.emote:null,seq:p.seq})),quests:r.quests,chat:r.chat,events:r.events.slice(-10)}}
 function publish(r){const message='data: '+JSON.stringify(state(r))+'\n\n';for(const p of r.players.values())if(p.stream){if(p.stream.writableLength>131072){p.stream.destroy();p.stream=null}else p.stream.write(message)}}
 function system(r,text){r.chat.push({id:id(),name:'Dispatch',text,at:now()});r.chat=r.chat.slice(-30)}
-function spawn(p){p.x=(p.seat%4-1.5)*2;p.z=(Math.floor(p.seat/4)-1)*2;p.hp=100;p.ammo=6;p.respawnAt=0;p.protectUntil=now()+5000;p.input={x:0,z:0};p.reloadUntil=0}
+function spawn(p,r){p.x=(p.seat%4-1.5)*2;p.z=(Math.floor(p.seat/4)-1)*2;p.hp=100;p.ammo=6;p.respawnAt=0;p.protectUntil=now()+5000;p.input={x:0,z:0};p.reloadUntil=0;if(r?.map.city){p.x=165+(p.seat%4)*1.2;p.z=24+Math.floor(p.seat/4)*1.2;p.y=1;p.yaw=Math.PI;p.pitch=0;p.moving=false;p.poseAt=now()}}
 function remove(r,p){store.checkpoint(r);p.stream?.end();r.players.delete(p.id);tokens.delete(p.tokenHash);if(r.host===p.id)r.host=r.players.keys().next().value||null;system(r,p.name+' left.');if(!r.players.size)rooms.delete(r.code);else publish(r)}
-function tick(){const t=now();tickCount++;for(const r of rooms.values()){for(const p of [...r.players.values()]){if(t-p.seen>45000){remove(r,p);continue}if(r.phase!=='live')continue;if(p.hp<=0){if(t>=p.respawnAt)spawn(p);continue}if(p.reloadUntil&&t>=p.reloadUntil){p.ammo=6;p.reloadUntil=0}if(r.map.city){p.moving=t-(p.poseAt||0)<300&&!!p.moving;continue}if(t-p.inputAt<300)W.move(p,p.input,.05,r.map);else p.moving=false;if(W.safe(p))p.hp=Math.min(100,p.hp+.15)}if(tickCount%100===0)store.checkpoint(r);if(tickCount%2===0)publish(r)}for(const [k,v]of limits)if(t-v.t>120000)limits.delete(k);if(tickCount%12000===1)sweep()}
+function tick(){const t=now();tickCount++;for(const r of rooms.values()){for(const p of [...r.players.values()]){if(t-p.seen>45000){remove(r,p);continue}if(r.phase!=='live')continue;if(p.hp<=0){if(t>=p.respawnAt)spawn(p,r);continue}if(p.reloadUntil&&t>=p.reloadUntil){p.ammo=6;p.reloadUntil=0}if(r.map.city){p.moving=t-(p.poseAt||0)<300&&!!p.moving;continue}if(t-p.inputAt<300)W.move(p,p.input,.05,r.map);else p.moving=false;if(W.safe(p))p.hp=Math.min(100,p.hp+.15)}if(tickCount%100===0)store.checkpoint(r);if(tickCount%2===0)publish(r)}for(const [k,v]of limits)if(t-v.t>120000)limits.delete(k);if(tickCount%12000===1)sweep()}
 function sweep(){try{mb.releaseGallery(present())}catch(e){console.error('Idle gallery release failed:',e.message)}}
 async function body(req,maxBytes=4096){let parts=[],size=0;for await(const c of req){size+=c.length;if(size>maxBytes)fail(413,'Message too large.');parts.push(c)}try{const v=JSON.parse(Buffer.concat(parts).toString()||'{}');if(!v||Array.isArray(v)||typeof v!=='object')fail(400,'Invalid message.');return v}catch{fail(400,'Invalid message.')}}
 function auth(req){const a=account(req);const t=(req.headers.authorization||'').replace(/^Bearer /,'');const v=tokens.get(hash(t));if(!v||v.p.accountId!==a.id)fail(401,'Session expired. Join a lobby again.');return v}
@@ -100,11 +100,17 @@ if(u.pathname==='/api/join'){
  for(const other of [...rooms.values()])if(other!==r)for(const p of [...other.players.values()])if(p.accountId===a.id)remove(other,p);
  const token=crypto.randomBytes(32).toString('base64url');let p=existing;
  if(p){p.stream?.end();tokens.delete(p.tokenHash);p.stream=null;p.seen=now()}
- else{const used=new Set([...r.players.values()].map(p=>p.seat));let seat=0;while(used.has(seat))seat++;p={id:id(),accountId:a.id,seat,name:a.displayName,color:a.color,ready:r.phase==='live',kills:0,deaths:0,score:0,seen:now(),inputAt:0,shotAt:0,yaw:0,pitch:0,seq:0};spawn(p);if(r.map.city){p.x=155+(seat%4)*1.2;p.z=24+Math.floor(seat/4)*1.2;p.y=1}const saved=store.visit(a.id,r.code);if(saved){Object.assign(p,saved);p.input={x:0,z:0};p.protectUntil=now()+5000;if(p.hp<=0)spawn(p)}r.players.set(p.id,p);if(!r.public)r.host ||= p.id;system(r,p.name+' arrived.')}
+ else{const used=new Set([...r.players.values()].map(p=>p.seat));let seat=0;while(used.has(seat))seat++;p={id:id(),accountId:a.id,seat,name:a.displayName,color:a.color,ready:r.phase==='live',kills:0,deaths:0,score:0,seen:now(),inputAt:0,shotAt:0,yaw:0,pitch:0,seq:0};spawn(p,r);const saved=store.visit(a.id,r.code);if(saved){Object.assign(p,saved);p.input={x:0,z:0};p.protectUntil=now()+5000;if(p.hp<=0)spawn(p,r)}r.players.set(p.id,p);if(!r.public)r.host ||= p.id;system(r,p.name+' arrived.')}
  p.tokenHash=hash(token);tokens.set(p.tokenHash,{r,p});store.checkpoint(r);return json(res,{token,id:p.id,code:r.code,owner:mb.isOwner(a.id),room:state(r)});
 }
 const {r,p}=auth(req);rate('player:'+p.id,80,1000);p.seen=now();
 switch(u.pathname){
+case '/api/city-respawn':{
+ if(!r.map.city||r.phase!=='live')fail(409,'Enter the shared city first.');
+ // Main-city hazards are client-simulated; only this fixed return point is allowed.
+ rate('city-respawn:'+p.accountId,3,10000);spawn(p,r);p.seq++;store.checkpoint(r);publish(r);
+ res.setHeader('Content-Type','application/json');res.end(JSON.stringify({ok:true,respawn:{x:p.x,y:p.y,z:p.z,yaw:p.yaw,pitch:p.pitch,seq:p.seq}}));return;
+}
 case '/api/city-pose':{
  if(!r.map.city||r.phase!=='live')fail(409,'Enter the shared city first.');
  if(!Number.isSafeInteger(b.seq)||b.seq<=p.seq)fail(409,'Outdated position.');

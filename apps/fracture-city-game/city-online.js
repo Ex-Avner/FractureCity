@@ -3,7 +3,7 @@
 const code=new URLSearchParams(location.search).get('online');
 if(!location.pathname.startsWith('/city/')||!code||! /^[A-F0-9]{10}$/.test(code))return;
 window.FC_ONLINE_SEED='fc-online-makers-v1';
-let session,room,ready=false,connected=false,closed=false,seq=0,busy=false,starting=false,abort,prior=0,lastChat='',lastSnapshot=0,reconnectPause=null;
+let session,room,ready=false,connected=false,closed=false,seq=0,busy=false,starting=false,abort,prior=0,lastChat='',lastSnapshot=0,reconnectPause=null,respawning=false;
 const peers=new Map(),panel=document.createElement('aside');panel.id='city-online';
 const style=document.createElement('style');style.textContent='#city-online{position:fixed;right:12px;top:12px;z-index:99990;max-width:min(340px,94vw);padding:10px;background:#101b25ed;color:#e4decf;border:1px solid #668184;border-radius:9px;font:13px/1.5 system-ui}#city-online summary{cursor:pointer}#city-online button,#city-online input{font:inherit;padding:7px;background:#20333f;color:#fff;border:1px solid #73868b;border-radius:5px}#city-online form{display:flex;gap:5px}#city-online input{min-width:0;flex:1}#city-online p{margin:8px 0}#city-online-log{max-height:140px;overflow:auto;overflow-wrap:anywhere}';document.head.append(style);
 panel.innerHTML='<details><summary id="city-online-status">Connecting to city…</summary><p id="city-online-note">Live residents, chat and shared artwork. Your furniture, sculptures, signs and murals save online. Walls, stairs and doors save online inside owned building plots. NPCs and story progress remain local. PvP stays in arena maps.</p><button id="city-online-plot">My building plot</button> <button id="city-online-invite">Copy invite</button> <button id="city-online-profile">Profile</button> <button id="city-online-draft">Download art draft</button> <button id="city-online-leave">Leave</button><div id="city-online-log" aria-live="polite"></div><form><input maxlength="240" aria-label="Message to city" placeholder="Say something"><button>Send</button></form></details>';document.body.append(panel);
@@ -26,7 +26,22 @@ for(const type of ['keydown','keyup','mousedown','pointerdown'])panel.addEventLi
 input.onfocus=()=>{document.exitPointerLock?.();State.keys.clear()};panel.querySelector('form').onsubmit=async e=>{e.preventDefault();try{await api('chat',{text:input.value});input.value=''}catch(e){say(e.message)}};
 setInterval(()=>{if(ready&&connected){FCCityBuild.refresh(room.artRevision).catch(e=>say(e.message));FCStructures.refresh(room.structureRevision).catch(e=>say(e.message))}},1000);
 setInterval(()=>{if(connected&&performance.now()-lastSnapshot>5000){connected=false;freeze();abort?.abort();status.textContent='Reconnecting · movement paused'}},1000);
-setInterval(async()=>{if(!ready||!connected||closed||busy)return;busy=true;try{await api('city-pose',{seq:++seq,x:Player.position.x,y:Player.position.y-Player.height,z:Player.position.z,yaw:Player.yaw,pitch:Player.pitch})}catch(e){if(e.status===409&&me()){Player.position.set(me().x,(me().y??1)+Player.height,me().z);Player.velocity.set(0,0,0);say('That move exceeded the online travel limit. Walk, skate or drive to stay together.')}else if(e.status===401){connected=false;freeze();say('Session ended. Return to the lobby.')}else{say(e.message);if(!e.status){connected=false;freeze();abort?.abort()}}}finally{busy=false}},100);
+setInterval(async()=>{if(!ready||!connected||closed||busy||respawning)return;busy=true;try{await api('city-pose',{seq:++seq,x:Player.position.x,y:Player.position.y-Player.height,z:Player.position.z,yaw:Player.yaw,pitch:Player.pitch})}catch(e){if(e.status===409&&me()){Player.position.set(me().x,(me().y??1)+Player.height,me().z);Player.velocity.set(0,0,0);say('That move exceeded the online travel limit. Walk, skate or drive to stay together.')}else if(e.status===401){connected=false;freeze();say('Session ended. Return to the lobby.')}else{say(e.message);if(!e.status){connected=false;freeze();abort?.abort()}}}finally{busy=false}},100);
+// Authorize the return before moving locally, so travel validation cannot snap us back.
+const localRespawn=window.respawnPlayer;
+window.respawnPlayer=async function(){
+ if(respawning)return;
+ if(!ready||!connected||closed){toast('Reconnect to the city, then return to Common Ground.','warn');return false}
+ respawning=true;const button=document.getElementById('respawn-btn');if(button)button.disabled=true;
+ try{
+  while(busy)await new Promise(r=>setTimeout(r,25));
+  const result=await api('city-respawn');seq=Math.max(seq,result.respawn.seq);
+  const value=localRespawn.apply(this,arguments),p=result.respawn;
+  Player.position.set(p.x,p.y+Player.height,p.z);Player.yaw=p.yaw;Player.pitch=p.pitch;Player.velocity.set(0,0,0);
+  Respawn.lastPoint={x:p.x,y:p.y,z:p.z};if(me())Object.assign(me(),p);return value;
+ }catch(e){toast('Could not return yet: '+e.message+' Try again.','warn');return false}
+ finally{respawning=false;if(button)button.disabled=false}
+};
 function dispose(p){p.group.removeFromParent();FCResident.dispose(p.char)}
 function frame(now){requestAnimationFrame(frame);const dt=Math.min(.1,(now-prior)/1000||.016);prior=now;if(!ready||!room)return;const ids=new Set();for(const p of room.players){if(p.id===session.id)continue;ids.add(p.id);let f=peers.get(p.id);const signature=p.name+'|'+p.color;if(f&&f.signature!==signature){dispose(f);peers.delete(p.id);f=null}if(!f){const char=shBuildFigure({...Shift.avatar,handle:p.name,coat:p.color,prop:'none',headgear:'none'},'online-'+p.accountId),group=new THREE.Group();group.add(char.group);char.baseY=0;group.position.set(p.x,p.y??1,p.z);State.scene.add(group);f={char,group,signature};peers.set(p.id,f)}if(f.group.parent!==State.scene)State.scene.add(f.group);const to=new THREE.Vector3(p.x,p.y??1,p.z);if(f.group.position.distanceTo(to)>12)f.group.position.copy(to);else f.group.position.lerp(to,1-Math.exp(-dt*12));f.char.group.rotation.y=p.yaw;const d=f.group.position.distanceTo(Player.position);f.group.visible=connected&&p.connected&&d<120&&p.hp>0;if(f.group.visible){shAnimateCharacter(f.char,dt,p.moving,now/1000);shUpdateNameplate(f.char,d)}}for(const [id,f]of peers)if(!ids.has(id)){dispose(f);peers.delete(id)}}requestAnimationFrame(frame);
 // A shared room must not load a local save over server-owned artwork.

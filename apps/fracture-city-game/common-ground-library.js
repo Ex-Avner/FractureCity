@@ -11,8 +11,8 @@
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 //  Between the Main Beta arrival (x≈155, z≈24) and the gallery (z=36), facing arrivals.
 const KIOSKS=[
- {id:'library',x:163,z:29.5,label:'E · Theory library / The Collapse of Meaning',kick:'COMMON GROUND  /  THEORY LIBRARY',title:'The Collapse of Meaning',sub:'Read the book, chapter by chapter.',bg:'#eeeade',ink:'#173b36',band:'#173b36',bandInk:'#f1e9cf'},
- {id:'booth',x:171,z:29.5,label:'E · Listening booth / original tracks',kick:'COMMON GROUND  /  LISTENING BOOTH',title:'Original music.',sub:'Choose a track. It plays on your own radio.',bg:'#14121c',ink:'#f1e9cf',band:'#e7bd78',bandInk:'#14121c'}
+ {id:'library',x:155,z:28.5,label:'E · Theory library / The Collapse of Meaning',kick:'COMMON GROUND  /  THEORY LIBRARY',title:'The Collapse of Meaning',sub:'Read the book, chapter by chapter.',bg:'#132632',ink:'#e2f2f3',band:'#254653',bandInk:'#90e6dc'},
+ {id:'booth',x:179,z:28.5,label:'E · Listening booth / original tracks',kick:'COMMON GROUND  /  LISTENING BOOTH',title:'Original music.',sub:'Choose a track. It plays on your own radio.',bg:'#232536',ink:'#f1e9cf',band:'#393c54',bandInk:'#d2c5ff'}
 ];
 const BOOK_URL=()=>location.pathname.startsWith('/city/')?'/apps/works/data/book.json':new URL('../works/data/book.json',location.href).href;
 let root=null,scene=null,visible=false,near=null,panel=null,kind=null,priorPause=false,oldFocus=null,book=null,bookError='',loadingBook=null,chapter=0;
@@ -56,7 +56,7 @@ body.cg-reading #city-online,body.cg-reading #maker-goal,body.cg-reading .social
 document.head.append(css);
 
 // ─── The kiosks ─────────────────────────────────────────────────────────────
-function sign(k){const c=document.createElement('canvas');c.width=900;c.height=620;const g=c.getContext('2d');g.fillStyle=k.bg;g.fillRect(0,0,900,620);g.fillStyle=k.band;g.fillRect(0,0,900,92);g.fillStyle=k.bandInk;g.font='26px monospace';g.fillText(k.kick,34,57);g.fillStyle=k.ink;g.font='600 74px Georgia, serif';let y=210,line='';for(const w of k.title.split(' ')){if(g.measureText(line+' '+w).width>820&&line){g.fillText(line,34,y);y+=82;line=''}line+=(line?' ':'')+w}g.fillText(line,34,y);g.font='32px system-ui';g.fillText(k.sub,34,y+80);g.fillStyle=k.band;g.fillRect(0,548,900,72);g.fillStyle=k.bandInk;g.font='26px monospace';g.fillText('WALK CLOSE  →  PRESS E',34,594);const t=new THREE.CanvasTexture(c);t.encoding=THREE.sRGBEncoding;return t}
+function sign(k){const c=document.createElement('canvas');c.width=900;c.height=620;const g=c.getContext('2d');g.fillStyle=k.bg;g.fillRect(0,0,900,620);g.fillStyle=k.band;g.fillRect(0,0,900,92);g.fillStyle=k.bandInk;g.font='26px monospace';g.fillText(k.kick,34,57);g.fillStyle=k.ink;g.font='500 68px system-ui';let y=210,line='';for(const w of k.title.split(' ')){if(g.measureText(line+' '+w).width>820&&line){g.fillText(line,34,y);y+=82;line=''}line+=(line?' ':'')+w}g.fillText(line,34,y);g.font='32px system-ui';g.fillText(k.sub,34,y+80);g.fillStyle=k.band;g.fillRect(0,548,900,72);g.fillStyle=k.bandInk;g.font='26px monospace';g.fillText('WALK CLOSE  →  PRESS E',34,594);const t=new THREE.CanvasTexture(c);t.encoding=THREE.sRGBEncoding;return t}
 function build(){if(!State.scene||scene===State.scene&&root?.parent)return;dispose();scene=State.scene;root=new THREE.Group();root.name='common-ground-library';
  for(const k of KIOSKS){const g=new THREE.Group();g.position.set(k.x,1,k.z);g.name='cg-'+k.id;
   const dark=new THREE.MeshStandardMaterial({color:0x1d2229,roughness:.8});
@@ -65,7 +65,7 @@ function build(){if(!State.scene||scene===State.scene&&root?.parent)return;dispo
   const board=new THREE.Mesh(new THREE.PlaneGeometry(2.25,1.55),new THREE.MeshBasicMaterial({map:sign(k)}));board.position.set(0,2.25,-.07);board.rotation.y=Math.PI;g.add(board);
   const back=new THREE.Mesh(new THREE.BoxGeometry(2.36,1.66,.08),dark);back.position.set(0,2.25,0);g.add(back);
   const lamp=new THREE.Mesh(new THREE.BoxGeometry(2.36,.08,.3),new THREE.MeshBasicMaterial({color:k.id==='booth'?0xe7bd78:0xd7f7aa}));lamp.position.set(0,3.1,-.1);g.add(lamp);
-  root.add(g)}
+  g.scale.setScalar(.82);root.add(g)}
  scene.add(root)}
 function dispose(){if(!root)return;root.removeFromParent();root.traverse(o=>{o.geometry?.dispose();o.material?.map?.dispose();o.material?.dispose()});root=null}
 

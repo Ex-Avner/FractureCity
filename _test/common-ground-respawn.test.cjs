@@ -1,0 +1,20 @@
+const root=require('path').resolve(__dirname,'..'),{chromium}=require('playwright'),{createServer}=require(root+'/server/server.cjs'),fs=require('fs'),path=require('path'),os=require('os'),assert=require('assert/strict');
+(async()=>{const dir=fs.mkdtempSync(path.join(os.tmpdir(),'fc-respawn-')),app=createServer({dbPath:path.join(dir,'test.sqlite'),newsFetch:async()=>new Response('<rss/>')});await new Promise(r=>app.server.listen(0,'127.0.0.1',r));const base='http://127.0.0.1:'+app.server.address().port,browser=await chromium.launch({channel:'chrome'}),errors=[];try{
+ const context=await browser.newContext(),p=await context.newPage();p.on('pageerror',e=>errors.push(e.message));
+ await p.goto(base+'/city/');await p.waitForFunction(()=>window.OwnBlock);await p.evaluate(async()=>{HD.locked=true;HD.setTier('perf',true);await OwnBlock.start();Player.position.set(430,20,-300);Player.hp=0;Player.velocity.set(8,-20,4);onPlayerDeath()});
+ await p.locator('#respawn-btn').click();await p.waitForFunction(()=>Player.hp>0&&!State.ui.paused);
+ const local=await p.evaluate(()=>({x:Player.position.x,z:Player.position.z,hp:Player.hp,max:Player.hpMax,yaw:Player.yaw,blocked:shBodyBlocked(Player.position.x,Player.position.y-Player.height,Player.position.z,Player.radius,Player.height)}));assert.ok(Math.hypot(local.x-167,local.z-24)<2);assert.equal(local.hp,local.max);assert.equal(local.yaw,Math.PI);assert.equal(local.blocked,false);console.log('PASS solo death button restores health at clear Common Ground footing, facing the court');
+ assert.equal((await context.request.post(base+'/api/city-respawn',{data:{}})).status(),401);
+ await context.request.post(base+'/api/account/register',{data:{username:'respawn_check',password:'respawn testing password'}});
+ const joined=await (await context.request.post(base+'/api/join',{data:{map:'city'}})).json(),token=joined.token,room=app.rooms.get(joined.code),player=room.players.get(joined.id),headers={Authorization:'Bearer '+token};
+ assert.equal((await context.request.post(base+'/api/city-respawn',{headers,data:{}})).status(),409);
+ await context.request.post(base+'/api/ready',{headers,data:{ready:true}});await context.request.post(base+'/api/start',{headers,data:{}});
+ await p.goto(base+'/city/?online='+joined.code);await p.waitForFunction(()=>window.FCCityOnline?.ready&&FCCityOnline.connected,null,{timeout:90000});
+ player.x=430;player.z=-300;player.y=1;player.poseAt=Date.now();
+ await p.evaluate(()=>{HD.locked=true;HD.setTier('perf',true);Player.position.set(430,1+Player.height,-300);Player.hp=0;onPlayerDeath()});await p.locator('#respawn-btn').click();await p.waitForFunction(()=>Player.hp>0&&!State.ui.paused);await p.waitForTimeout(1500);
+ const online=await p.evaluate(()=>({x:Player.position.x,z:Player.position.z,yaw:Player.yaw,hp:Player.hp,seq:FCCityOnline.self.seq}));assert.ok(Math.hypot(online.x-165,online.z-24)<1);assert.equal(online.yaw,Math.PI);assert.ok(Math.abs(player.x-online.x)<.1);assert.ok(Math.abs(player.z-online.z)<.1);assert.ok(online.seq>0);console.log('PASS real online death returns through server approval and subsequent position updates do not snap back');
+ headers.Authorization='Bearer '+await p.evaluate(()=>JSON.parse(sessionStorage.getItem('fc-district-session')).token);
+ const result=await (await context.request.post(base+'/api/city-respawn',{headers,data:{x:999,y:100,z:999}})).json();assert.equal(result.respawn.x,165);assert.equal(result.respawn.z,24);assert.equal(result.respawn.y,1);console.log('PASS return endpoint ignores arbitrary destinations');
+ await context.request.post(base+'/api/city-respawn',{headers,data:{}});assert.equal((await context.request.post(base+'/api/city-respawn',{headers,data:{}})).status(),429);console.log('PASS repeated returns are rate limited');
+ assert.deepEqual(errors,[]);console.log('PASS no browser exceptions');
+ }finally{await browser.close();await new Promise(r=>{app.server.once('close',r);app.close()});fs.rmSync(dir,{recursive:true,force:true})}})().catch(e=>{console.error(e);process.exitCode=1});

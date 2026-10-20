@@ -1,18 +1,18 @@
 /* The Reading Garden, at the centre of Common Ground.
 
-   A walled garden between the arrival promenade and the People's Gallery:
-   an arbour gate between the theory library and the listening booth, two
-   reflecting pools, lawns, voxel trees, flowers, lanterns, and at its heart
+   An open reading court between the arrival promenade and the People's Gallery:
+   an illuminated atrium between the theory library and the listening booth, two
+   reflecting pools, lawns, rounded trees, flowers, lanterns, and at its heart
    the Reading Wall, a freestanding bookcase with a different passage from
    the classics lit on it every day.
 
-   The wall opens a reader: fifty classics bundled with the game (the starter
+   The wall opens a reader: 49 classics bundled with the game (the starter
    shelf, classics/shelf.json, built by _build/build-classics.cjs from
    Project Gutenberg texts), and, online, the whole Gutenberg catalogue,
    searched and fetched by the server (server/classics.cjs).
 
    Solid things (lawn, hedges, trees, pools' rims, the wall, benches, the
-   arbour posts) are voxels stamped into the Makers' Mile chunks, so they
+   tree trunks) are voxels stamped into the Makers' Mile chunks, so they
    collide and sit in the city's own lighting. Everything that moves or
    glows is a mesh. */
 (function(){'use strict';
@@ -32,7 +32,7 @@ const dayKey = () => new Date().toISOString().slice(0, 10);
 //  middle; the gallery lane stays open at z 39.5–42 and the People's Gallery
 //  displays stand along the south edge at z 44 (social-city.js).
 const CX = 167;
-const WALL = { x0: 160, x1: 174, z: 37, top: 7 };            // voxel wall, front face at z 37
+const WALL = { x0: 160, x1: 174, z: 37, top: 5 };            // voxel wall, front face at z 37
 const POOLS = [{ x0: 158, x1: 164, z0: 31, z1: 35 }, { x0: 170, x1: 176, z0: 31, z1: 35 }];
 const TREES = [[152, 33], [156, 37], [182, 33], [178, 37]];
 const BENCHES = [[160, 35, 3], [172, 35, 3]];                  // x0, z, length
@@ -54,7 +54,7 @@ function stampGarden(chunk){
   const pool = POOLS.find(p => inRect(x, z, p));
   if (pool){
    const rim = x === pool.x0 || x === pool.x1 - 1 || z === pool.z0 || z === pool.z1 - 1;
-   set(x, 0, z, rim ? STONE : B_WATER); if (rim) set(x, 1, z, STONE);
+   set(x, 0, z, rim ? STONE : B_WATER); // Flush water edges keep the court open at walking height.
    continue;
   }
   const bed = FLOWERBEDS.find(b => inRect(x, z, b));
@@ -65,10 +65,7 @@ function stampGarden(chunk){
  //  Trees: a trunk and a rounded voxel canopy.
  for (const [tx, tz] of TREES){
   for (let y = 1; y <= 4; y++) set(tx, y, tz, B_TRUNK);
-  for (let dx = -2; dx <= 2; dx++) for (let dz = -2; dz <= 2; dz++) for (let dy = 4; dy <= 7; dy++){
-   const d = Math.hypot(dx, dz, (dy - 5.5) * 1.2);
-   if (d < 2.6 && !(dx === 0 && dz === 0 && dy === 4) && (d < 2.1 || (hash(tx + dx + ':' + (tz + dz) + ':' + dy) & 3))) set(tx + dx, dy, tz + dz, B_LEAF);
-  }
+
  }
  //  The Reading Wall: walnut body, brass cornice and plinth.
  for (let x = WALL.x0; x < WALL.x1; x++){
@@ -226,14 +223,14 @@ function build(){
  const W = WALL.x1 - WALL.x0, midY = 1.5 + (WALL.top - 2.5) / 2, H = WALL.top - 3;
  view.spines = [plane(root, W, H, front, (WALL.x0 + WALL.x1) / 2, midY, WALL.z - .02, Math.PI), plane(root, W, H, back, (WALL.x0 + WALL.x1) / 2, midY, WALL.z + 1.02, 0)];
  //  Shelf board edges catching the light, for depth.
- for (const z of [WALL.z - .06]) for (let k = 0; k <= 4; k++) box(root, W, .06, .12, mat('board', () => new THREE.MeshLambertMaterial({ color: 0x6a4a2c })), (WALL.x0 + WALL.x1) / 2, midY - H / 2 + k * H / 4, z);
+ for (const z of [WALL.z - .06]) for (let k = 0; k <= 4; k++) box(root, W, .06, .12, mat('board', () => new THREE.MeshLambertMaterial({ color: 0x334854 })), (WALL.x0 + WALL.x1) / 2, midY - H / 2 + k * H / 4, z);
  //  The plaque with today's passage, in a brass frame, lit from below.
- const pl = new THREE.Group(); pl.position.set(CX, 3.6, WALL.z - .14); root.add(pl);
- box(pl, 6.3, 3.5, .1, mat('brass', () => new THREE.MeshLambertMaterial({ color: 0xb08a48 })), 0, 0, .03);
- view.plaque = plane(pl, 6, 3.26, new THREE.MeshBasicMaterial({ color: 0xffffff }), 0, 0, -.03, Math.PI);
- box(pl, 6.6, .08, .5, mat('lampbar', () => new THREE.MeshBasicMaterial({ color: 0xffe2a8 })), 0, -1.85, -.25);
+ const pl = new THREE.Group(); pl.position.set(CX, 2.9, WALL.z - .14); root.add(pl);
+ box(pl, 5.6, 2.2, .1, mat('brass', () => new THREE.MeshLambertMaterial({ color: 0x779aab })), 0, 0, .03);
+ view.plaque = plane(pl, 5.3, 2, new THREE.MeshBasicMaterial({ color: 0xffffff }), 0, 0, -.03, Math.PI);
+ box(pl, 5.7, .06, .3, mat('lampbar', () => new THREE.MeshBasicMaterial({ color: 0xffe2a8 })), 0, -1.2, -.25);
  //  The title band along the cornice.
- const tb = plane(root, 11, 1.5, new THREE.MeshBasicMaterial({ map: titleTexture() }), CX, WALL.top + .15, WALL.z - .08, Math.PI); tb.name = 'reading-wall-title';
+ const tb = plane(root, 8, .85, new THREE.MeshBasicMaterial({ map: titleTexture() }), CX, WALL.top + .15, WALL.z - .08, Math.PI); tb.name = 'reading-wall-title';
  //  Reading lamps either side of the plaque.
  for (const s of [-1, 1]){
   const g = new THREE.Group(); g.position.set(CX + s * 4.3, 1, WALL.z - .7); root.add(g);
@@ -243,23 +240,11 @@ function build(){
   box(g, .36, .05, .22, mat('bulb', () => new THREE.MeshBasicMaterial({ color: 0xffd99a })), 0, 2.33, -.1);
   view.lanterns.push(g);
  }
- //  The arbour: a beam, a sign, vines and hanging lanterns over the gate.
- const ab = new THREE.Group(); root.add(ab);
- for (const x of [165.3, 168.7]){ box(ab, .28, 4.2, .28, mat('timber', () => new THREE.MeshLambertMaterial({ color: 0x5a3e28 })), x, 3.1, 30.5); box(ab, .5, .2, .5, mat('brass', null), x, 1.1, 30.5); }
- box(ab, 4.4, .25, .3, mat('timber', null), 167, 5.12, 30.5);
- box(ab, .25, .25, 1.6, mat('timber', null), 165.5, 4.95, 30.5); box(ab, .25, .25, 1.6, mat('timber', null), 168.5, 4.95, 30.5);
- const gate = typeof shSignPlane === 'function' ? shSignPlane('THE READING GARDEN', 'THE WALL OF CLASSICS · OPEN ALL HOURS', '#f1e2b0', '#1b2a26', 3, .62) : null;
- if (gate){ gate.position.set(167, 4.55, 30.32); gate.rotation.y = Math.PI; ab.add(gate); }
- for (const x of [165.9, 168.1]){ box(ab, .02, .5, .02, mat('chain', () => new THREE.MeshLambertMaterial({ color: 0x222222 })), x, 4.75, 30.5); const l = box(ab, .2, .28, .2, mat('lantern', () => new THREE.MeshBasicMaterial({ color: 0xffc070 })), x, 4.4, 30.5); view.lanterns.push(l); }
- //  Ivy on the arbour posts, the wall ends and the trees' trunks.
- const leafMat = mat('leaf', () => new THREE.MeshLambertMaterial({ color: 0x3d6a3a, side: THREE.DoubleSide }));
- const ivyAt = [];
- for (const x of [165.3, 168.7]) for (let k = 0; k < 30; k++) ivyAt.push([x + (Math.random() - .5) * .5, 1.2 + Math.random() * 4, 30.5 + (Math.random() - .5) * .5]);
- for (let k = 0; k < 30; k++) ivyAt.push([165 + Math.random() * 4, 5.1 + (Math.random() - .5) * .3, 30.5 + (Math.random() - .5) * .5]);
- for (const x of [WALL.x0 - .5, WALL.x1 + .5]) for (let k = 0; k < 40; k++) ivyAt.push([x + (Math.random() - .5) * 1.1, 1 + Math.random() * 5.6, WALL.z + .5 + (Math.random() - .5) * 1.15]);
- const ivy = new THREE.InstancedMesh(GEO.plane, leafMat, ivyAt.length), o = new THREE.Object3D();
- ivyAt.forEach(([x, y, z], i) => { o.position.set(x, y, z); o.rotation.set(Math.random() * 3, Math.random() * 3, 0); o.scale.setScalar(.22 + Math.random() * .12); o.updateMatrix(); ivy.setMatrixAt(i, o.matrix); });
- root.add(ivy);
+ // Rounded tree crowns sit above the walking volume; trunks remain solid voxels.
+ const crownMat=mat('crown',()=>new THREE.MeshStandardMaterial({color:0x578b7b,roughness:.9}));
+ for(const [x,z]of TREES)for(const [dx,y,dz,r]of [[0,5.8,0,1.9],[-1,5.3,.4,1.3],[.9,6.1,-.3,1.2]]){
+  const crown=new THREE.Mesh(new THREE.IcosahedronGeometry(r,2),crownMat);crown.position.set(x+.5+dx,y,z+.5+dz);crown.scale.y=.7;root.add(crown);
+ }
  //  Flowers: stems and heads in four colours, on the beds and along the lawn edges.
  const R = rand(4242), spots = [];
  for (const b of FLOWERBEDS) for (let k = 0; k < (b.x1 - b.x0) * (b.z1 - b.z0) * 5; k++) spots.push([b.x0 + .15 + R() * (b.x1 - b.x0 - .3), b.z0 + .15 + R() * (b.z1 - b.z0 - .3)]);
@@ -267,7 +252,7 @@ function build(){
  const stems = new THREE.InstancedMesh(GEO.box, mat('stem', () => new THREE.MeshLambertMaterial({ color: 0x4f7a3e })), spots.length);
  const COLORS = [0xe8b04a, 0xd85a6a, 0xf0ead8, 0x8a6ad8, 0xe07a3a];
  const heads = new THREE.InstancedMesh(GEO.box, mat('petal', () => new THREE.MeshLambertMaterial({ color: 0xffffff })), spots.length);
- const col = new THREE.Color();
+ const col = new THREE.Color(), o = new THREE.Object3D();
  spots.forEach(([x, z], i) => {
   const h = .25 + R() * .35;
   o.rotation.set(0, R() * 3, 0); o.position.set(x, 1 + h / 2, z); o.scale.set(.04, h, .04); o.updateMatrix(); stems.setMatrixAt(i, o.matrix);
@@ -277,14 +262,14 @@ function build(){
  root.add(stems, heads);
  //  Water over the pools: a moving sheen that picks up the sky's tint.
  for (const p of POOLS){
-  const w = plane(root, p.x1 - p.x0 - 2, p.z1 - p.z0 - 2, new THREE.MeshLambertMaterial({ color: 0x3a6a78, transparent: true, opacity: .78, emissive: 0x0c2630 }), (p.x0 + p.x1) / 2, 1.04, (p.z0 + p.z1) / 2);
+  const w = plane(root, p.x1 - p.x0 - 2, p.z1 - p.z0 - 2, new THREE.MeshLambertMaterial({ color: 0x388e9d, transparent: true, opacity: .78, emissive: 0x0c2630 }), (p.x0 + p.x1) / 2, 1.04, (p.z0 + p.z1) / 2);
   w.rotation.x = -Math.PI / 2; view.water.push(w);
  }
  //  Path lanterns along the central walk.
  for (const z of [31.5, 33.5]) for (const x of [164.75, 169.25]){
   const g = new THREE.Group(); g.position.set(x, 1, z); root.add(g);
   box(g, .08, .9, .08, mat('iron', null), 0, .45, 0);
-  const l = box(g, .22, .26, .22, mat('lantern', null), 0, 1, 0); view.lanterns.push(l);
+  const l = box(g, .22, .26, .22, mat('lantern', () => new THREE.MeshBasicMaterial({color:0xb6eee2})), 0, 1, 0); view.lanterns.push(l);
  }
  //  Fireflies over the lawns at night, and loose pages drifting around the wall.
  const n = 70, pos = new Float32Array(n * 3), seeds = [];
