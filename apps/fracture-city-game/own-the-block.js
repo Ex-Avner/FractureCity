@@ -24,6 +24,8 @@ Chunk.prototype.generate=function(){if(!KEYS.has(this.key)||!(A.state.enabled||p
  b(148,1,4,16,1,16,129);b(148,2,4,1,5,16,120);b(163,2,4,1,5,16,120);b(148,2,4,16,5,1,120);b(148,2,19,6,5,1,120);b(158,2,19,6,5,1,120);b(154,6,19,4,1,1,120);
  // Large glazing openings, an open atrium, accessible mezzanine and a four-step stair.
  b(148,3,8,1,2,7,B_AIR);b(163,3,7,1,2,6,B_AIR);b(150,3,4,10,2,1,141);
+ // Open exhibition bays retain solid sills and masonry piers.
+ b(149,3,19,4,3,1,B_AIR);b(159,3,19,4,3,1,B_AIR);
  b(158,5,5,5,1,10,128);for(let i=0;i<4;i++)b(160,2,18-i,2,i+1,1,128);
  b(164,5,8,10,1,3,135);b(163,6,8,1,2,3,B_AIR);
  b(173,5,5,15,1,10,133);for(const x of [173,187])for(const z of [5,14])b(x,1,z,1,4,1,136);
@@ -39,18 +41,17 @@ Chunk.prototype.generate=function(){if(!KEYS.has(this.key)||!(A.state.enabled||p
  b(178,2,-17,5,1,4,136);b(178,2,-5,5,1,1,128);
  const root=new THREE.Group();root.name='makers-mile-architecture';this.group.add(root);const batches=new Map();
  const box=(x,y,z,w,h,d,color,glow=false)=>{if(chunkCoordOf(x)!==this.cx||chunkCoordOf(z)!==this.cz)return;const key=color+':'+glow;if(!batches.has(key))batches.set(key,[]);batches.get(key).push([x,y,z,w,h,d])};
- const sign=(x,y,z,title,sub,w=7,h=1.3,rot=0)=>{if(chunkCoordOf(x)!==this.cx||chunkCoordOf(z)!==this.cz)return;const canvas=document.createElement('canvas');canvas.width=1200;canvas.height=Math.max(150,Math.round(1200*h/w));const g=canvas.getContext('2d');g.fillStyle='#173b36';g.fillRect(0,0,canvas.width,canvas.height);g.fillStyle='#eaf0d5';g.textAlign='center';let fs=Math.min(canvas.height*.43,100);g.font='600 '+fs+'px system-ui';while(g.measureText(title).width>1120){fs-=2;g.font='600 '+fs+'px system-ui'}g.fillText(title,600,canvas.height*.48);g.fillStyle='#adc5a8';g.font=Math.min(canvas.height*.18,26)+'px system-ui';g.fillText(sub,600,canvas.height*.79);const texture=new THREE.CanvasTexture(canvas);texture.encoding=THREE.sRGBEncoding;const m=new THREE.Mesh(new THREE.PlaneGeometry(w,h),new THREE.MeshBasicMaterial({map:texture}));m.name='maker-sign:'+title;m.position.set(x,y,z);m.rotation.y=rot;const anchors={'ATELIER / 01':[[150,6,19],[156,6,19],[162,6,19]],'THE ECHO ROOM':[[153,7,-6],[156,7,-6],[159,7,-6]],'RADIO WITHOUT PERMISSION':[[179,5,-19],[181,5,-19],[183,5,-19]],'OPEN SESSION':[[154,5,-20],[156,5,-20],[158,5,-20]],'COMMON GROUND':[[182,7,22],[186,7,22]]};if(anchors[title])m.userData.fcSupport={type:'facade',points:anchors[title]};root.add(m)};
- sign(156,6,20.07,'ATELIER / 01','YOUR STUDIO. YOUR RULES.',12,1.1);
- sign(180.5,7.1,14.08,'MAKERS’ MILE','STUDIOS / COMMON GROUND / RADIO',12,1.15);
- b(173,6,14,15,2,1,136);
- sign(169,2.5,21.3,'01 STUDIO   /   02 THE WIRE','GALLERY + LISTENING GARDEN  →',4.2,.85);
- b(167,1,21,4,2,1,120);
+ const sign=(x,y,z,title,sub,w=7,h=1.3,rot=0)=>{if(chunkCoordOf(x)!==this.cx||chunkCoordOf(z)!==this.cz)return;const canvas=document.createElement('canvas');canvas.width=1200;canvas.height=Math.max(150,Math.round(1200*h/w));const g=canvas.getContext('2d');g.fillStyle='#162936';g.fillRect(0,0,canvas.width,canvas.height);g.fillStyle='#dcf8f4';g.textAlign='center';let fs=Math.min(canvas.height*.43,100);g.font='600 '+fs+'px system-ui';while(g.measureText(title).width>1120){fs-=2;g.font='600 '+fs+'px system-ui'}g.fillText(title,600,canvas.height*.48);g.fillStyle='#9fb9c6';g.font=Math.min(canvas.height*.18,26)+'px system-ui';g.fillText(sub,600,canvas.height*.79);const texture=new THREE.CanvasTexture(canvas);texture.encoding=THREE.sRGBEncoding;const m=new THREE.Mesh(new THREE.PlaneGeometry(w,h),new THREE.MeshBasicMaterial({map:texture}));m.name='maker-sign:'+title;m.position.set(x,y,z);m.rotation.y=rot;const anchors={'ATELIER / 01':[[150,6,19],[156,6,19],[162,6,19]],'THE ECHO ROOM':[[153,7,-6],[156,7,-6],[159,7,-6]],'RADIO WITHOUT PERMISSION':[[179,5,-19],[181,5,-19],[183,5,-19]],'OPEN SESSION':[[154,5,-20],[156,5,-20],[158,5,-20]],'COMMON GROUND':[[182,7,22],[186,7,22]]};if(anchors[title])m.userData.fcSupport={type:'facade',points:anchors[title]};root.add(m)};
+ sign(156,6.45,20.18,'ATELIER / 01','MAKE SOMETHING THAT COULD ONLY BE YOURS',8,.8);
+ sign(183,7.1,15.08,'MAKERS’ MILE','ROOF WALK / RADIO / STUDIO',6,.85);
+ b(173,6,14,15,2,1,136);b(175,6,14,3,2,1,B_AIR);
+ // The arrival crosswalk stays open; directions are on the building fascia.
  sign(184.5,7.35,23.11,'COMMON GROUND','THE WIRE / PEOPLE / CULTURE',6.5,.65);
  // Canal fragment remains discoverable without a billboard in the garden.
  sign(156,7.48,-4.94,'THE ECHO ROOM','REHEARSALS / OPEN SESSIONS',6,.8);
  sign(181,5,-17.94,'RADIO WITHOUT PERMISSION','THE AIR BETWEEN US',5,1.2);
- for(const x of [148.5,163.5]){box(x,7.1,12,.12,.15,16,0xe1bd83);box(x,6.8,12,.06,.06,16,0x8be5c3,true)}
- box(156,7.1,4.5,16,.15,.15,0xe1bd83);box(156,7.1,19.5,16,.15,.15,0xe1bd83);
+ for(const x of [148.5,163.5]){box(x,7.1,12,.12,.15,16,0xa6bac3);box(x,6.8,12,.06,.06,16,0x8be5c3,true)}
+ box(156,7.1,4.5,16,.15,.15,0xa6bac3);box(156,7.1,19.5,16,.15,.15,0xa6bac3);
  // Slender reveals, tiled shopfronts and warm canopies frame the playable spaces.
  for(const x of [148.5,153.5,158.5,163.5]){box(x,4.4,20.03,.14,4.7,.16,0x365a60);box(x+.08,4.4,20.14,.035,4.6,.035,0xd4ad75)}
  box(156,6.75,20.6,5,.16,1.5,0x23414c);box(156,6.63,21.3,5,.05,.04,0x95f3d2,true);
@@ -58,14 +59,14 @@ Chunk.prototype.generate=function(){if(!KEYS.has(this.key)||!(A.state.enabled||p
  for(const x of [175,186]){box(x,2.6,-16,1.1,1.4,.6,0x19262f);box(x,3.5,-16,1.1,.3,.6,0x526465)}
  for(let x=174;x<188;x+=1.5)box(x,6.5,-18.5,.45,.035,.6,0xa4ecdd,true);
  for(const z of [-18,-6,6,18,30,42]){box(146,1.3,z,1.4,.6,1.4,0x65736a);box(146,2,z,.8,.8,.8,0x648b71);box(190,1.3,z,1.4,.6,1.4,0x65736a);box(190,2,z,.8,.8,.8,0x648b71)}
- for(let x=149;x<164;x+=1.2){box(x,2.05,20.3,.08,.08,1.7,0xe1bd83);box(x,7.4,19.5,.12,.6,.12,0x41525c)}
+
  for(const z of [8,10.9]){box(169,7,z,10,.08,.08,0x7ee2c0,true);for(let x=164;x<174;x+=2)box(x,6.5,z,.07,1,.07,0xbd9b6e)}
  for(const x of [146,190])for(let z=-18;z<44;z+=8){box(x,3,z,.09,4,.09,0x526c70);box(x,5,z,1,.06,.6,0xffd399,true)}
  for(let x=150;x<187;x+=3)box(x,1.025,25,.8,.025,.06,0xe3c390);
  for(const z of [32,41])box(184,1.02,z,5,.025,.08,0x8be5c3,true);
  // Supported public signage, sheltered rehearsal equipment and neighborhood traces.
  // Keep all floor fixtures inside existing walls/stage footprints or on the verge.
- box(156,6.1,19.96,12.3,1.35,.12,0x263c46);
+ box(156,6.48,20.04,8.4,.95,.18,0x263c46);
  for(const x of [173,185])box(x,6.7,5,.12,4.3,.12,0x526c70);
 
 
@@ -94,7 +95,7 @@ Chunk.prototype.generate=function(){if(!KEYS.has(this.key)||!(A.state.enabled||p
  // Sun-washed facades and a planted verge replace bare industrial walls.
  box(156,1.018,25.5,24,.025,8,0x465966);
  box(180,1.018,25.5,24,.025,8,0x465966);
- for(const x of [150.5,161.5]){box(x,4.5,20.02,5,4.9,.05,0xc4c3ae);}
+
  for(let x=149;x<164;x+=.5)box(x,6.8,20.12,.075,.32,.09,0x9ba78d);
  // Rounded tree crowns soften the skyline; trunks have matching collision cells.
  for(const [x,z]of [[146,32],[190,32],[146,44],[190,44]]){
@@ -113,18 +114,19 @@ Chunk.prototype.generate=function(){if(!KEYS.has(this.key)||!(A.state.enabled||p
  // The news wall becomes a sheltered pavilion with a plinth, frame and reading bench.
  box(184.5,4.55,23.045,6.55,4.04,.10,0x102b28);
  box(184.5,4.55,23.01,7.05,6.9,.06,0x244b40);
- for(const x of [181.22,187.78])box(x,4.55,23.14,.10,4.2,.12,0xe2c59d);
- for(const y of [2.48,6.62])box(184.5,y,23.14,6.65,.09,.12,0xe2c59d);
- box(184.5,8.12,23.05,7.8,.22,3.1,0x163b35);
- box(184.5,7.96,24.5,7.4,.045,.045,0xd9eaa8,true);
+ for(const x of [181.22,187.78])box(x,4.55,23.14,.10,4.2,.12,0xa6bac3);
+ for(const y of [2.48,6.62])box(184.5,y,23.14,6.65,.09,.12,0xa6bac3);
+ box(184.5,8.12,23.05,7.8,.22,3.1,0x334a5d);
+ box(184.5,7.96,24.5,7.4,.045,.045,0x92e8e1,true);
  b(181,1,24,1,7,1,120);b(187,1,24,1,7,1,120);
- for(const x of [181.5,187.5]){box(x,4.5,25.015,1.02,7.02,.04,0xb0b59d);box(x,4.5,23.985,1.02,7.02,.04,0xb0b59d);}
+ for(const x of [181.5,187.5]){box(x,4.5,25.015,1.02,7.02,.04,0x718c9e);box(x,4.5,23.985,1.02,7.02,.04,0x718c9e);}
  box(184.5,1.2,23.18,6.6,.4,.25,0x273d36);
  // A continuous clerestory gives Atelier a finished silhouette without closing its roof.
- for(const x of [148.45,163.55]){box(x,7.28,12,.24,.48,16.8,0xc8c7b1);box(x,2.25,12,.14,.45,15.6,0x173b36);}
- for(const z of [4.45,19.55])box(156,7.28,z,16.8,.48,.24,0xc8c7b1);
- for(const x of [150.3,161.7]){box(x,4.1,20.04,2.5,3.65,.08,0x173b36);for(let y=2.5;y<5.8;y+=.22)box(x,y,20.13,2.45,.065,.10,0x8c9a83);}
- box(156,2.04,21.3,4.2,.04,2.4,0xbdbaa2);
+ for(const x of [148.45,163.55]){box(x,7.28,12,.24,.48,16.8,0xa6bac3);box(x,2.25,12,.14,.45,15.6,0x173b36);}
+ for(const z of [4.45,19.55])box(156,7.28,z,16.8,.48,.24,0xa6bac3);
+
+ // A real entry landing meets the studio floor; no floating decorative step.
+ b(154,1,20,4,1,2,133);
  box(156,6.73,21.8,5.1,.08,.08,0xefddb5,true);
  // The plaza's middle is the Reading Garden (reading-garden.js); the gallery stands along its south edge.
  // Gallery fascia and thin roof beams are supported on the outer verge.
@@ -137,6 +139,30 @@ Chunk.prototype.generate=function(){if(!KEYS.has(this.key)||!(A.state.enabled||p
  sign(146.1,2.25,28,'MAKE','ATELIER 01',2,.6);
  sign(176.5,2.25,28,'MEET','GALLERY + SONGS',2.8,.6);
  for(const x of [146.1,176.5]){box(x,1.5,28,.06,1,.06,0xb0b89e);box(x,1.03,28,.6,.06,.4,0x173b36);}
+ // Atelier frontage: a floating-edge canopy attached to the existing solid lintel.
+ box(156,7.48,20.1,17.3,.26,3.8,0x334a5d);
+ box(156,7.29,21.95,16.6,.055,.07,0x92e8e1,true);
+ for(const x of [148.5,153.5,158.5,163.5]){
+  box(x,4.5,20.12,.25,5,.25,0x334a5d);
+  box(x-.10,4.5,20.26,.045,4.8,.035,0xa6bac3);
+ }
+ for(const x of [151,161]){
+  box(x,2.92,20.05,4,.12,.25,0xa6bac3);
+  box(x,5.98,20.05,4,.12,.25,0xa6bac3);
+ }
+ // Thin ceiling baffles frame the open studio without occupying the editable interior.
+ for(let z=5;z<20;z+=1.5){box(151,7.18,z,4,.12,.14,0x334a5d);}
+ for(const x of [149.2,162.8])box(x,6.85,12,.05,.04,13,0x92e8e1,true);
+ // Border inlay and a clear path from the court to the studio landing.
+ for(const z of [22.1,27.7])box(167,1.048,z,39,.02,.055,0xa6bac3);
+ for(const x of [154.2,157.8])box(x,1.052,24,.05,.02,4,0x92e8e1,true);
+ // Echo Room and radio keep their playable interiors, with a shared architectural trim.
+ box(156,8.25,-5.3,15,.22,2,0x334a5d);box(156,8.1,-4.32,14.5,.045,.045,0x92e8e1,true);
+ for(const x of [149.5,162.5])box(x,5,-5.92,.20,6,.14,0xa6bac3);
+ box(180.5,6.8,-18.5,15.5,.25,1.8,0x334a5d);
+ for(const x of [173.5,187.5])box(x,4,-18.95,.12,4,.08,0x92e8e1,true);
+ // Roof-walk edge rails line the existing slab; the stair mouth and bridge stay open.
+ for(const x of [173.1,187.9]){box(x,7,10,.08,.08,9,0xa6bac3);for(const z of [6,10,13])box(x,6.5,z,.07,1,.07,0x334a5d);}
  // Intentionally no new point lights; trim is emissive and detail is batched.
  for(const [key,parts]of batches){const [color,glow]=key.split(':'),mat=glow==='true'?new THREE.MeshBasicMaterial({color:+color}):new THREE.MeshStandardMaterial({color:+color,roughness:.8,metalness:.12,emissive:+color,emissiveIntensity:.04}),mesh=new THREE.InstancedMesh(new THREE.BoxGeometry(1,1,1),mat,parts.length),obj=new THREE.Object3D();window.FCWorldMaterials?.dress(mat);mesh.frustumCulled=false;parts.forEach((p,i)=>{obj.position.set(...p.slice(0,3));obj.scale.set(...p.slice(3));obj.updateMatrix();mesh.setMatrixAt(i,obj.matrix)});root.add(mesh)}
 };
@@ -148,7 +174,7 @@ function startRace(){if(!A.state.enabled||!A.ready)return false;close();A.race={
 function raceTick(dt){const r=A.race;if(!r)return;const feet=Player.position.y-Player.height;if(r.started){r.time+=dt;if(r.last.distanceTo(Player.position)>Math.max(4,dt*35))r.invalid=true}r.last.copy(Player.position);const p=route[r.index];if(Math.hypot(Player.position.x-p[0],Player.position.z-p[2])<1.6&&Math.abs(feet-p[1])<1.25){r.started=true;r.index++;if(r.index===route.length){const time=+r.time.toFixed(2);A.race=null;if(r.invalid){toast('Run unranked: a teleport or large position jump interrupted the route. Try again.','info');return}const medal=time<19?3:time<30?2:1;A.state.best=A.state.best===null?time:Math.min(A.state.best,time);if(medal>A.state.medal){A.state.rep+=(medal-A.state.medal)*30;A.state.medal=medal}persist();toast('Signal Run · '+time.toFixed(2)+'s · '+['','BRONZE','SILVER','GOLD'][medal],'success')}}}
 function collect(id){if(A.state.recordings.includes(id))return false;const q=records.find(q=>q.id===id);if(!q)return false;A.state.recordings.push(id);A.state.rep+=15;persist();toast(q.name+' · '+q.line,'info');return true}
 function makeActor(id,x,z,coat,routePoints){const char=shBuildFigure({...Shift.avatar,coat,prop:'none',headgear:'none',handle:id},'maker-'+id),a={id,char,position:new THREE.Vector3(x,1,z),route:routePoints,index:0,arrived:false};char.group.position.copy(a.position);State.scene.add(char.group);actors.push(a);return a}
-function ensureActors(){if(!actors.length)makeActor('Moss / caretaker',168,22,'#73938b',[]);if(A.state.openHouse&&!A.state.celebrated&&actors.length===1)for(let i=0;i<3;i++)makeActor(['Inez / neighbor','Leon / neighbor','Mara / neighbor'][i],169+i*2,26,'#'+['a96880','6d7d9a','b18e66'][i],[[155,1,22],[155,2,18],[151+i*3,2,12]])}
+function ensureActors(){if(!actors.length)makeActor('Moss / caretaker',168,22,'#73938b',[]);if(A.state.openHouse&&!A.state.celebrated&&actors.length===1)for(let i=0;i<3;i++)makeActor(['Inez / neighbor','Leon / neighbor','Mara / neighbor'][i],169+i*2,26,'#'+['a96880','6d7d9a','b18e66'][i],[[155,1,23],[155,2,18],[151+i*3,2,12]])}
 function selectSignal(choice){if(!A.state.owned||!['art','music'].includes(choice))return false;A.state.signalChoice=choice;persist();if(choice==='music')PalmMedia.play();toast(choice==='art'?'City Signal: your block is now an open gallery.':'City Signal: your block is now a listening room.','success');return true}
 function guestReaction(a){const s=stats(),name=a.id.split(' /')[0];const line=actors.indexOf(a)===1?`You used ${s.colors} colours. This room has its own voice.`:actors.indexOf(a)===2?(A.state.signalChoice==='music'?'A listening room. Leave me a place near the speakers.':`I counted ${s.kinds} kinds of shapes. It feels made by someone.`):A.state.showcase?'Your painting outside made this place easy to find.':'Put a piece outside next. Let the street know you are here.';const note=name+': '+line;A.state.guestNotes.push(note);A.state.guestNotes=A.state.guestNotes.slice(-3);return note}
 function openHouse(){if(A.state.commissions.length<3||A.state.celebrated)return false;A.state.openHouse=true;persist();ensureActors();close();toast('Open studio · three neighbors are walking over. Keep the doorway clear.','info');return true}

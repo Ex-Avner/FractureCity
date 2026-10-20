@@ -788,6 +788,15 @@ body.seam-near #maker-interact,body.seam-near #cg-approach{display:none!importan
 #seam-ledger .stats b{color:#eee6d4;font:600 16px Georgia,serif;display:block}
 @media(max-width:700px){#seam-ledger{inset:8px;grid-template-columns:1fr;grid-template-rows:auto 1fr;border-radius:16px}#seam-ledger aside{padding:12px 14px}#seam-ledger aside nav{flex-direction:row;flex-wrap:wrap}#seam-ledger aside nav button{min-height:34px;padding:4px 10px}#seam-ledger aside>small{display:none}#seam-ledger h2{font-size:22px}#seam-plot .seeds{grid-template-columns:1fr}#seam-hud{font-size:11px;gap:8px;top:6px}}
 @media(max-height:500px){#seam-hud{top:46px;font-size:11px;gap:8px;padding:5px 12px}}`;
+css.textContent += `
+body.seam-reading,body.seam-reading .seam-panel{cursor:auto!important}
+body.seam-reading #touch-layer{visibility:hidden;pointer-events:none!important}
+.seam-panel{touch-action:pan-y}
+#seam-plot{max-height:calc(100dvh - 24px);overflow-y:auto;overscroll-behavior:contain}
+#seam-ledger main{min-width:0;overflow-wrap:anywhere}
+@media(pointer:coarse){.seam-panel button{min-height:44px}#seam-ledger aside nav{flex-wrap:nowrap;overflow-x:auto;flex-shrink:0;padding-bottom:4px}#seam-ledger aside nav button{flex-shrink:0;min-height:44px}#seam-ledger .row{flex-wrap:wrap}#seam-plot{bottom:max(12px,env(safe-area-inset-bottom));}}
+@media(max-height:500px) and (min-width:601px){#seam-ledger{inset:6px;grid-template-columns:190px 1fr;grid-template-rows:1fr}#seam-ledger aside{overflow:auto;padding:12px}#seam-ledger aside nav{flex-direction:column;overflow:visible}#seam-ledger h2{font-size:22px}}
+`;
 document.head.append(css);
 const prompt = document.createElement('button'); prompt.id = 'seam-approach'; prompt.hidden = true; prompt.onclick = () => act(); document.body.append(prompt);
 const hud = document.createElement('div'); hud.id = 'seam-hud'; hud.hidden = true; hud.setAttribute('aria-live', 'polite'); document.body.append(hud);
@@ -798,16 +807,19 @@ function openPanel(k, arg){
  if (panel) closePanel();
  kind = k; msg = '';
  if (k === 'plot') plotI = arg; else if (arg) tab = arg;
+ document.body.classList.add('seam-reading');
  oldFocus = document.activeElement; priorPause = State.ui.paused; State.ui.paused = true; State.keys?.clear?.(); document.exitPointerLock?.();
  panel = document.createElement('section'); panel.className = 'seam-panel'; panel.id = k === 'plot' ? 'seam-plot' : 'seam-ledger';
  panel.setAttribute('role', 'dialog'); panel.setAttribute('aria-modal', 'true'); panel.setAttribute('aria-label', k === 'plot' ? 'Seam plot' : 'The Ledger');
+ for(const type of ['pointerdown','mousedown','click','wheel'])panel.addEventListener(type,e=>e.stopPropagation());
  document.body.append(panel); render();
  (panel.querySelector('button.go:not([disabled])') || panel.querySelector('button:not([disabled])'))?.focus();
  if (k === 'ledger'){ loadWire().then(() => kind === 'ledger' && tab === 'market' && render()); if (S.reportUnseen){ S.reportUnseen = false; save(); } }
 }
-function closePanel(){ if (!panel) return; panel.remove(); panel = null; kind = null; State.ui.paused = priorPause; State.keys?.clear?.(); oldFocus?.focus?.(); }
+function closePanel(){ if (!panel) return; panel.remove(); document.body.classList.remove('seam-reading'); panel = null; kind = null; State.ui.paused = priorPause; State.keys?.clear?.(); oldFocus?.focus?.(); }
 function render(){
  if (!panel) return;
+ const scroll=panel.querySelector('main')?.scrollTop||0,outerScroll=panel.scrollTop,navScroll=panel.querySelector('nav')?.scrollLeft||0;
  const focus = document.activeElement?.dataset ? { ...document.activeElement.dataset } : null;
  panel.innerHTML = kind === 'plot' ? plotHTML() : ledgerHTML();
  panel.querySelectorAll('[data-close]').forEach(b => b.onclick = closePanel);
@@ -819,7 +831,11 @@ function render(){
  panel.querySelectorAll('[data-ward]').forEach(b => b.onclick = () => { msg = buildWard(+b.dataset.ward) || 'The lamp-ward hums to life.'; render(); });
  panel.querySelectorAll('[data-fence]').forEach(b => b.onclick = () => { msg = raiseFence() || 'The Retraction fence goes up another line.'; render(); });
  panel.querySelectorAll('[data-pet]').forEach(b => b.onclick = () => { const p = S.pets.find(x => x.id === b.dataset.pet); if (p){ p.mode = b.dataset.mode; save(); msg = p.name + (p.mode === 'follow' ? ' will follow you.' : p.mode === 'guard' ? ' is guarding the Seam.' : ' is resting by the Ledger.'); } render(); });
- if (focus){ const k = Object.keys(focus)[0]; if (k){ const again = panel.querySelector(`[data-${k.replace(/[A-Z]/g, c => '-' + c.toLowerCase())}="${CSS.escape(focus[k])}"]`); again?.focus(); } }
+ if(focus&&Object.keys(focus).length){const again=[...panel.querySelectorAll('button')].find(el=>Object.entries(focus).every(([k,v])=>el.dataset[k]===v));again?.focus({preventScroll:true})}
+ if(panel.querySelector('main'))panel.querySelector('main').scrollTop=scroll;panel.scrollTop=outerScroll;
+ if(panel.querySelector('nav'))panel.querySelector('nav').scrollLeft=navScroll;
+ panel._ripe=kind==='plot'&&!!S.plots[plotI]?.crop&&progress(S.plots[plotI].crop)>=1;
+
 }
 function doHarvest(i){
  const r = harvest(i);
@@ -833,7 +849,7 @@ function plotHTML(){
  const head = `<div style="display:flex;justify-content:space-between;align-items:start;gap:10px"><div><small>THE SEAM · PLOT ${String(plotI + 1).padStart(2, '0')}</small><h2>${c ? esc(CROPS[c.id].name) : 'Empty bed'}</h2></div><button data-close aria-label="Close">×</button></div>`;
  if (c){
   const pr = progress(c), ripe = pr >= 1;
-  return head + `<p>${ripe ? 'Ripe. ' + c.yield + ' to pick.' : 'Ready in ' + fmt(c.t0 + c.dur - now()) + '.'}${c.bonus ? ' <small>' + esc(a.title.toUpperCase()) + ' BONUS</small>' : ''}</p><div class="bar"><i style="width:${Math.round(pr * 100)}%"></i></div><p class="msg">${esc(msg)}</p>${ripe ? '<button class="go" data-harvest>Harvest  (E)</button>' : ''}`;
+  return head + `<p><span data-crop-time>${ripe ? 'Ripe. ' + c.yield + ' to pick.' : 'Ready in ' + fmt(c.t0 + c.dur - now()) + '.'}</span>${c.bonus ? ' <small>' + esc(a.title.toUpperCase()) + ' BONUS</small>' : ''}</p><div class="bar"><i style="width:${Math.round(pr * 100)}%"></i></div><p class="msg">${esc(msg)}</p>${ripe ? '<button class="go" data-harvest>Harvest  (E)</button>' : ''}`;
  }
  const seeds = CROP_IDS.map((id, k) => {
   const cr = CROPS[id], free = S.packets[id] > 0, needs = cr.needsWard && !wardFor(plotI), fav = a.crop === id;
@@ -959,7 +975,7 @@ function tick(nowMs){
    const ripe = S.plots.filter(p => p.crop && progress(p.crop) >= 1).length;
    if (!nearSeam && ripe && performance.now() - ripeNote > 600000 && !State.ui.paused){ ripeNote = performance.now(); toast('Your Seam: ' + ripe + ' bed' + (ripe === 1 ? ' is' : 's are') + ' ripe.', 'info'); }
    if (here) loadWire();
-   if (panel && kind === 'plot') { const c = S.plots[plotI]?.crop; if (c) render(); }
+   if (panel && kind === 'plot') { const c = S.plots[plotI]?.crop; if(c){const ripe=progress(c)>=1;if(ripe!==panel._ripe)render();else{const label=panel.querySelector('[data-crop-time]');if(label&&!ripe)label.textContent='Ready in '+fmt(c.t0+c.dur-now())+'.';const bar=panel.querySelector('.bar i');if(bar)bar.style.width=Math.round(progress(c)*100)+'%';}} }
    saveT += .5; if (saveT > 10){ saveT = 0; save(); }
   }
   const t = nowMs / 1000;

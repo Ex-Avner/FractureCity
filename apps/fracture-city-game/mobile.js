@@ -29,14 +29,12 @@
   if (typeof Touch === 'undefined') return;
 
   // ─── 0 · The viewport ────────────────────────────────────────────────────
-  //  The page shipped with no viewport tag, so phones lay it out at 980 wide and
-  //  scale it down. Every HUD measurement in this game assumes that, so keep the
-  //  width; add cover (so the safe-area insets the stylesheet already uses are
-  //  real numbers) and stop pinch and double-tap from zooming a panel off screen.
+  // Keep controls and readers at native device width instead of shrinking a
+  // desktop layout. Safe-area insets remain available; browser zoom stays usable.
   (function(){
     let m = document.querySelector('meta[name="viewport"]');
     if (!m){ m = document.createElement('meta'); m.name = 'viewport'; document.head.appendChild(m); }
-    m.content = 'width=980, viewport-fit=cover, user-scalable=no';
+    m.content = 'width=device-width, initial-scale=1, viewport-fit=cover';
   })();
 
   // ─── 1 · Key events a handler can actually read ──────────────────────────

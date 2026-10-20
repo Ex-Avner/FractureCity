@@ -10,9 +10,9 @@ return fcLoad('Tuning in to FCN…',async()=>{
  await shSlotNew('campaign');FN.state.prologueDone=true;FN.state.inPrologue=false;
  shPlayIntro(()=>{shCampaignStart(true);fnSave();shCampaignCheckpointSoon()});
 });};
-// Use readable native-width menus; keep the legacy touch game's control coordinate system.
+// Keep menus and gameplay at the same readable native device width.
 if(matchMedia('(pointer:coarse)').matches){const menu=document.getElementById('menu-overlay'),meta=document.querySelector('meta[name="viewport"]');
- const fit=()=>{const value=menu.classList.contains('hide')?'width=980, viewport-fit=cover':'width=device-width, initial-scale=1, viewport-fit=cover';if(meta&&meta.content!==value)meta.content=value};
+ const fit=()=>{const value='width=device-width, initial-scale=1, viewport-fit=cover';if(meta&&meta.content!==value)meta.content=value};
  new MutationObserver(fit).observe(menu,{attributes:true,attributeFilter:['class']});fit();}
 const original=shBuildChunk;
 window.shBuildChunk=function(key){const result=original.apply(this,arguments),chunk=State.chunkMap.get(key);if(!chunk||chunk._districtWayfinding)return result;
