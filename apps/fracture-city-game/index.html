@@ -10159,6 +10159,7 @@ const ARCADE_ROSTER = [
   { slug:'the-visitor',  title:'THE VISITOR',  sub:'ONE STRANGER, DAILY',color:0x2cb8c7 },
   { slug:'works',        title:'WORKS',        sub:'3D GALLERY',         color:0x7956c9 },
   { slug:'character-forge', title:'FORGE',     sub:'CHARACTER MAKER',    color:0xff5268 },
+  { slug:'chainfire', title:'CHAINFIRE', sub:'ENDLESS CHAIN REACTIONS', color:0xffc94a },
 ];
 
 const ARCADE = { x0: 30, x1: 42, z0: -18, z1: -6, floor: 3, ceil: 8, cabinets: [] };
@@ -27004,7 +27005,7 @@ window.shArcadeStandalone = shArcadeStandalone;
   const orig = shPlayCabinet;
 
   window.shPlayCabinet = function(slug){
-    if (!shArcadeStandalone()) return orig.apply(this, arguments);
+    if (slug === 'chainfire' || !shArcadeStandalone()) return orig.apply(this, arguments);
 
     const roster = (typeof SHIFT_WORLD !== 'undefined' && SHIFT_WORLD.arcadeRoster)
                  || (typeof ARCADE_ROSTER !== 'undefined' ? ARCADE_ROSTER : []);
@@ -29994,7 +29995,7 @@ document.addEventListener('DOMContentLoaded', init);
 <script src="resident-head.js?v=0.55.0"></script>
 <script src="character-studio.js?v=0.55.0"></script>
 <script src="arcade-previews.js?v=0.55.0"></script>
-<script src="enemies-arcade.js?v=0.55.0"></script>
+<script src="enemies-arcade.js?v=0.72.0"></script>
 <script src="outbreak.js?v=0.55.0"></script>
 <script src="wilds.js?v=0.55.0"></script>
 <script src="architecture.js?v=0.55.0"></script>
@@ -30021,7 +30022,7 @@ document.addEventListener('DOMContentLoaded', init);
 <script src="media-upload.js?v=0.60.0"></script>
 <script src="social-world.js?v=0.62.0"></script>
 <script src="social-city.js?v=0.68.0"></script>
-<script src="news-hub.js?v=0.62.0"></script>
+<script src="news-hub.js?v=0.72.0"></script>
 <script src="common-ground-library.js?v=0.69.0"></script>
 <script src="physical-support.js?v=0.55.0"></script>
 <script src="screen-zombies.js?v=0.55.0"></script>
@@ -30043,5 +30044,6 @@ document.addEventListener('DOMContentLoaded', init);
 <script src="skate-lines.js?v=0.67.0"></script>
 <script src="reading-garden.js?v=0.69.0"></script>
 <script src="common-ground-atrium.js?v=0.69.0"></script>
+<script src="chainfire-cabinet.js?v=0.72.0"></script>
 </body>
 </html>

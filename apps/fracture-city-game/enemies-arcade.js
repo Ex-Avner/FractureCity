@@ -103,7 +103,7 @@ window.shFitArcade=function(chunk){
  const warm=new THREE.PointLight(0xffd6a2,1.5,10);warm.position.set(30.8,5.3,-12);room.add(warm);chunk.lights.push(warm);
  const slots=[{x:32.4,z:-16.6,rot:0},{x:34.6,z:-16.6,rot:0},{x:36.8,z:-16.6,rot:0},{x:32.4,z:-7.4,rot:Math.PI},{x:34.6,z:-7.4,rot:Math.PI},{x:36.8,z:-7.4,rot:Math.PI},{x:40.6,z:-16,rot:-Math.PI/2},{x:40.6,z:-12.8,rot:-Math.PI/2},{x:40.6,z:-9.6,rot:-Math.PI/2},{x:30.8,z:-9.6,rot:Math.PI/2},{x:30.8,z:-13,rot:Math.PI/2}];
  SH_ARCADE_HOTSPOTS.length=0;ARCADE.cabinets=[];
- const roster=(SHIFT_WORLD.arcadeRoster||ARCADE_ROSTER).slice(0,slots.length);
+ const roster=(SHIFT_WORLD.arcadeRoster||ARCADE_ROSTER).filter(game=>game.slug!=='chainfire').slice(0,slots.length);
  roster.forEach((game,i)=>{
   const s=slots[i],g=new THREE.Group();g.name=game.title;g.userData.cabinet=game.slug;g.position.set(s.x,y+.06,s.z);g.rotation.y=s.rot;room.add(g);
   const profile=new THREE.Shape();[[.45,0],[-.45,0],[-.59,.98],[-.59,1.13],[-.30,1.22],[-.34,1.90],[-.46,1.94],[-.46,2.2],[.45,2.2]].forEach(([x,y],i)=>i?profile.lineTo(x,y):profile.moveTo(x,y));profile.closePath();

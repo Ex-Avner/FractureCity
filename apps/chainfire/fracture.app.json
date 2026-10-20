@@ -1,0 +1,18 @@
+{
+  "slug": "chainfire",
+  "name": "Chainfire",
+  "version": "4.0.0",
+  "entry": "index.html",
+  "icon": "icon.svg",
+  "runtime": "html5",
+  "description": "Fling an orb into an adaptive swarm and build explosive chain reactions. Endless levels, bosses and a cosmetic shop.",
+  "inputs": [],
+  "outputs": [],
+  "tags": [
+    "arcade",
+    "game",
+    "touch"
+  ],
+  "window_width": 1000,
+  "window_height": 800
+}
