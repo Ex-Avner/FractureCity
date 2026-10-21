@@ -10,8 +10,11 @@ function cityBuildStreet(chunk){
     const g=new THREE.Group();g.position.set(chunk.worldX+sign*half,0,chunk.worldZ+sign*half);
     const pole=cityPole(.18,4.8,.18,M.metal);pole.position.y=2.4;g.add(pole);
     const arm=cityLampArm(sign,M.metal);arm.position.y=4.65;g.add(arm);
-    const head=cityRoundMesh(.50,.16,.34,M.headlight);head.position.set(-sign,4.85,0);g.add(head);
+    const head=cityRoundMesh(.85,.12,.30,M.headlight);head.position.set(-sign,4.85,0);g.add(head);
     const light=new THREE.PointLight(0xffe3ad,.65,9);light.position.set(-sign,4.65,0);light.visible=false;g.add(light);
+    // Slim illuminated collars and a service sleeve share the grounded lamp's lifetime.
+    for(const y of [1.1,4.38]){const ring=new THREE.Mesh(new THREE.TorusGeometry(.105,.016,5,16),M.headlight);ring.rotation.x=Math.PI/2;ring.position.y=y;g.add(ring)}
+    const sleeve=cityRoundMesh(.22,.38,.22,M.darkMetal);sleeve.position.y=.6;g.add(sleeve);
     chunk.lights.push(light);add(g,pole,'lamp');
   }
   // One bench on alternate blocks, parallel to the facade; no randomly stacked junk.
@@ -20,6 +23,8 @@ function cityBuildStreet(chunk){
     const seat=cityRoundMesh(1.8,.12,.45,M.darkMetal);seat.position.y=.48;g.add(seat);
     const back=cityRoundMesh(1.8,.48,.10,M.darkMetal);back.position.set(0,.76,-.17);g.add(back);
     for(const x of [-.68,.68]){const leg=cityPole(.09,.45,.32,M.metal);leg.position.set(x,.225,0);g.add(leg);}
+    for(const z of [-.14,0,.14]){const slat=cityRoundMesh(1.72,.035,.095,M.metal);slat.position.set(0,.56,z);g.add(slat)}
+    const edge=cityRoundMesh(1.6,.025,.025,M.headlight);edge.position.set(0,.89,-.11);g.add(edge);
     add(g,g,'bench');
   }
 }
