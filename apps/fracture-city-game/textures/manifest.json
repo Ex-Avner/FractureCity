@@ -1,0 +1,160 @@
+{
+ "version": 1,
+ "source": "ambientCG (CC0 1.0)",
+ "size": {
+  "1k": 1024,
+  "2k": 2048
+ },
+ "layers": [
+  {
+   "id": "Asphalt031",
+   "name": "asphalt",
+   "blocksPerRepeat": 4.0,
+   "url": "https://ambientcg.com/view?id=Asphalt031",
+   "gain": 1.0
+  },
+  {
+   "id": "PavingStones128",
+   "name": "pavement slabs",
+   "blocksPerRepeat": 3.0,
+   "url": "https://ambientcg.com/view?id=PavingStones128",
+   "gain": 1.0
+  },
+  {
+   "id": "Concrete042A",
+   "name": "cast concrete",
+   "blocksPerRepeat": 4.0,
+   "url": "https://ambientcg.com/view?id=Concrete042A",
+   "gain": 2.13
+  },
+  {
+   "id": "Concrete031",
+   "name": "roof concrete",
+   "blocksPerRepeat": 4.0,
+   "url": "https://ambientcg.com/view?id=Concrete031",
+   "gain": 1.34
+  },
+  {
+   "id": "Metal055A",
+   "name": "brushed steel",
+   "blocksPerRepeat": 2.0,
+   "url": "https://ambientcg.com/view?id=Metal055A",
+   "gain": 2.5
+  },
+  {
+   "id": "Bricks109A",
+   "name": "brick",
+   "blocksPerRepeat": 3.0,
+   "url": "https://ambientcg.com/view?id=Bricks109A",
+   "gain": 1.0
+  },
+  {
+   "id": "Metal022",
+   "name": "rusted steel",
+   "blocksPerRepeat": 3.0,
+   "url": "https://ambientcg.com/view?id=Metal022",
+   "gain": 1.0
+  },
+  {
+   "id": "RoofingTiles014A",
+   "name": "roof tile",
+   "blocksPerRepeat": 3.0,
+   "url": "https://ambientcg.com/view?id=RoofingTiles014A",
+   "gain": 1.0
+  },
+  {
+   "id": "Tiles107",
+   "name": "ceramic tile",
+   "blocksPerRepeat": 2.0,
+   "url": "https://ambientcg.com/view?id=Tiles107",
+   "gain": 1.84
+  },
+  {
+   "id": "Marble012",
+   "name": "marble",
+   "blocksPerRepeat": 3.0,
+   "url": "https://ambientcg.com/view?id=Marble012",
+   "gain": 1.58
+  },
+  {
+   "id": "Plaster003",
+   "name": "plaster",
+   "blocksPerRepeat": 3.0,
+   "url": "https://ambientcg.com/view?id=Plaster003",
+   "gain": 1.48
+  },
+  {
+   "id": "Terrazzo013",
+   "name": "terrazzo",
+   "blocksPerRepeat": 3.0,
+   "url": "https://ambientcg.com/view?id=Terrazzo013",
+   "gain": 1.0
+  },
+  {
+   "id": "WoodFloor043",
+   "name": "wood boards",
+   "blocksPerRepeat": 2.0,
+   "url": "https://ambientcg.com/view?id=WoodFloor043",
+   "gain": 1.0
+  },
+  {
+   "id": "CorrugatedSteel005",
+   "name": "fluted metal",
+   "blocksPerRepeat": 2.0,
+   "url": "https://ambientcg.com/view?id=CorrugatedSteel005",
+   "gain": 1.0
+  },
+  {
+   "id": "Metal047B",
+   "name": "copper",
+   "blocksPerRepeat": 3.0,
+   "url": "https://ambientcg.com/view?id=Metal047B",
+   "gain": 1.0
+  },
+  {
+   "id": "Fabric030",
+   "name": "felt",
+   "blocksPerRepeat": 1.5,
+   "url": "https://ambientcg.com/view?id=Fabric030",
+   "gain": 1.0
+  }
+ ],
+ "blocks": {
+  "1": 0,
+  "10": 0,
+  "2": 1,
+  "3": 2,
+  "133": 2,
+  "134": 2,
+  "6": 3,
+  "7": 4,
+  "82": 4,
+  "143": 4,
+  "11": 5,
+  "131": 5,
+  "132": 5,
+  "12": 6,
+  "83": 7,
+  "70": 8,
+  "86": 8,
+  "123": 8,
+  "124": 8,
+  "125": 8,
+  "126": 8,
+  "71": 9,
+  "120": 10,
+  "121": 10,
+  "122": 10,
+  "127": 11,
+  "74": 12,
+  "84": 12,
+  "128": 12,
+  "129": 12,
+  "130": 12,
+  "142": 12,
+  "135": 13,
+  "136": 13,
+  "137": 14,
+  "138": 15
+ }
+}
