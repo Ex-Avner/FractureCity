@@ -2,10 +2,10 @@
 (function(){'use strict';
 let root,scene,signature='',last=0;
 function clear(){if(!root)return;root.removeFromParent();root.traverse(o=>{o.geometry?.dispose();if(o.material){o.material.map?.dispose();o.material.dispose()}});root=null}
-function sign(x,y,z,title,sub,w,h,rotation=0){const m=shSignPlane(title,sub,'#76f5df','#101922',w,h);m.geometry=m.geometry.clone();m.position.set(x,y,z);m.rotation.y=rotation;if(x===162)m.userData.fcSupport={points:[[162,5,19]]};if(x===181)m.userData.fcSupport={points:[[181,5,-19]]};if(x===169)m.userData.fcSupport={points:[[169,0,23]]};root.add(m);return m}
+function sign(x,y,z,title,sub,w,h,rotation=0){const m=shSignPlane(title,sub,'#76f5df','#101922',w,h);m.geometry=m.geometry.clone();m.position.set(x,y,z);m.rotation.y=rotation;if(x===162)m.userData.fcSupport={points:[[162,6,19]]};if(x===181)m.userData.fcSupport={points:[[181,5,-19]]};if(x===169)m.userData.fcSupport={points:[[169,0,23]]};root.add(m);return m}
 function rebuild(){clear();root=new THREE.Group();root.name='neighborhood-signal';State.scene.add(root);const s=OwnBlock.state;
- sign(169,3.5,21.12,s.signalChoice==='music'?'LISTENING ROOM / ON AIR':s.signalChoice==='art'?'OPEN GALLERY / ON AIR':'THIS BLOCK IS NOT VACANT',s.signalChoice?'WEST / FCN NEWS   EAST / COMMON GROUND':'CLAIM YOUR ROOM / CHOOSE YOUR SIGNAL',5,1);
- sign(162,5.2,20.17,'01 / STUDIO',s.signalChoice==='music'?'MUSIC + MAKING':s.signalChoice==='art'?'ART + OPEN DOORS':'A ROOM WAITING FOR YOUR VOICE',1.6,.65);
+ sign(162,6.5,20.17,s.signalChoice==='music'?'LISTENING ROOM / ON AIR':s.signalChoice==='art'?'OPEN GALLERY / ON AIR':'STUDIO 01 / OPEN',s.signalChoice?'WEST / FCN NEWS   EAST / COMMON GROUND':'CLAIM YOUR ROOM / CHOOSE YOUR SIGNAL',1.6,.65);
+
  sign(181,5.9,-17.88,'CITY SIGNAL',s.signalChoice==='music'?'RESIDENT RADIO / YOUR SOUNDTRACK':'NEWS HAS A DESK. SO DO YOU.',4,.5);
  const core=[...State.chunkMap.values()].find(c=>c.landmark==='fcn');if(core){const x=core.worldX+7.18,z=core.worldZ;sign(x,4,z,'RESIDENT SIGNAL',s.signalChoice==='music'?'MAKERS’ MILE / LISTENING ROOM':s.signalChoice==='art'?'MAKERS’ MILE / OPEN GALLERY':'MAKERS’ MILE / STUDIO 01',3,.8,Math.PI/2)}
  scene=State.scene;

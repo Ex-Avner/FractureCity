@@ -11019,7 +11019,7 @@ function shDisposeMaterialFully(mat){
   if (!mat) return;
   for (const k of TEX_SLOTS){
     const t = mat[k];
-    if (t && t.dispose && !TEX_KEEP.has(t)){ t.dispose(); mat[k] = null; }
+    if (t && t.dispose && !t.userData?.shared && !TEX_KEEP.has(t)){ t.dispose(); mat[k] = null; }
   }
   mat.dispose && mat.dispose();
 }
@@ -11038,7 +11038,7 @@ Chunk.prototype.destroy = function(scene){
       if (!m || shared.has(m) || plates.has(m)) continue;
       for (const k of TEX_SLOTS){
         const t = m[k];
-        if (t && t.dispose && !TEX_KEEP.has(t)){ t.dispose(); m[k] = null; }
+        if (t && t.dispose && !t.userData?.shared && !TEX_KEEP.has(t)){ t.dispose(); m[k] = null; }
       }
     }
   });
@@ -16832,8 +16832,10 @@ function shRoofDetail(chunk, b, district){
                       Math.round(b.cx) + ',' + Math.round(b.cz) + ',' + Math.round(b.h));
   const parts = [];
   const P = (w, h, d, x, y, z, color, emit) => parts.push({ w, h, d, x, y, z, color, emit });
-  const cx = chunk.originX + b.cx, cz = chunk.originZ + b.cz;
-  const top = b.h;
+  // Building centres are already world coordinates; adding the chunk origin
+  // placed roof equipment over unrelated streets and Common Ground.
+  const cx = b.cx, cz = b.cz;
+  const top = Math.min(VOX_H - 2, 2 + Math.round(b.h)) + 1;
   const metal = 0x50565e, dark = 0x24282e;
 
   const roll = rng.next();
@@ -30013,15 +30015,15 @@ document.addEventListener('DOMContentLoaded', init);
 <script src="city-art.js?v=0.71.0"></script>
 <script src="art-direct.js?v=0.71.0"></script>
 <script src="movement-flow.js?v=0.55.0"></script>
-<script src="own-the-block.js?v=0.70.0"></script>
+<script src="own-the-block.js?v=0.75.0"></script>
 <script src="art-collection.js?v=0.55.0"></script>
 <script src="furniture-catalogue.js?v=0.71.0"></script>
 <script>window.FC_ACCOUNTS_OPTIONAL=true;</script>
 <script src="accounts.js?v=0.61.2"></script>
 <script src="resident-life.js?v=0.66.0"></script>
 <script src="media-upload.js?v=0.60.0"></script>
-<script src="social-world.js?v=0.62.0"></script>
-<script src="social-city.js?v=0.68.0"></script>
+<script src="social-world.js?v=0.75.0"></script>
+<script src="social-city.js?v=0.75.0"></script>
 <script src="news-hub.js?v=0.72.0"></script>
 <script src="common-ground-library.js?v=0.69.0"></script>
 <script src="physical-support.js?v=0.55.0"></script>
@@ -30030,12 +30032,12 @@ document.addEventListener('DOMContentLoaded', init);
 <script src="scrap-weapons.js?v=0.55.0"></script>
 <script src="cast-studio.js?v=0.55.0"></script>
 <script src="world-foundation.js?v=0.55.0"></script>
-<script src="neighborhood-signal.js?v=0.62.0"></script>
+<script src="neighborhood-signal.js?v=0.75.0"></script>
 <script src="city-shared-build.js?v=0.57.0"></script>
 <script src="city-structures.js?v=0.61.0"></script>
 <script src="city-online.js?v=0.69.1"></script>
 <script src="city-flow.js?v=0.70.0"></script>
-<script src="online-tour.js?v=0.68.0"></script>
+<script src="online-tour.js?v=0.75.0"></script>
 <script src="world-materials.js?v=0.66.0"></script>
 <script src="sodium-noir.js?v=0.66.0"></script>
 <script src="npc-voices.js?v=0.66.0"></script>
@@ -30043,9 +30045,9 @@ document.addEventListener('DOMContentLoaded', init);
 <script src="the-seam.js?v=0.70.0"></script>
 <script src="skate-lines.js?v=0.67.0"></script>
 <script src="reading-garden.js?v=0.69.0"></script>
-<script src="common-ground-atrium.js?v=0.69.0"></script>
+<script src="common-ground-atrium.js?v=0.75.0"></script>
 <script src="chainfire-cabinet.js?v=0.72.0"></script>
-<script src="common-challenge.js?v=0.73.0"></script>
+<script src="common-challenge.js?v=0.75.0"></script>
 <script src="future-city.js?v=0.74.0"></script>
 </body>
 </html>
