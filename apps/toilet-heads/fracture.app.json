@@ -1,0 +1,19 @@
+{
+  "slug": "toilet-heads",
+  "name": "Toilet Heads HD",
+  "version": "1.0.0",
+  "entry": "index.html",
+  "icon": "icon.svg",
+  "runtime": "html5",
+  "description": "Endless toilet jumper. Bounce, collect golden rolls, go bonkers.",
+  "inputs": [],
+  "outputs": [],
+  "tags": [
+    "arcade",
+    "game",
+    "touch",
+    "common-ground"
+  ],
+  "window_width": 1000,
+  "window_height": 800
+}

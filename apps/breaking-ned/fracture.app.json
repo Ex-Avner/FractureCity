@@ -1,0 +1,19 @@
+{
+  "slug": "breaking-ned",
+  "name": "Breaking Ned",
+  "version": "1.0.0",
+  "entry": "index.html",
+  "icon": "icon.svg",
+  "runtime": "html5",
+  "description": "One-tap flyer. Spell the headline, go LIVE.",
+  "inputs": [],
+  "outputs": [],
+  "tags": [
+    "arcade",
+    "game",
+    "touch",
+    "common-ground"
+  ],
+  "window_width": 1000,
+  "window_height": 800
+}

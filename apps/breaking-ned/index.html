@@ -1,0 +1,290 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px system-ui,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>Breaking Ned</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="fonts/fonts.css">
+<style>
+/* Layout: full-height broadcast frame; canvas fills it, lower-third HUD on top, newspaper front page on death */
+:root{
+  --night:#141a2b; --navy:#1F2638; --bone:#E9E3D5; --mustard:#C9A13B; --red:#C8312B; --ink:#151515; --paper:#EDE6D3;
+  --head:'Anton','Impact','Arial Narrow Bold',sans-serif;
+  --mono:'IBM Plex Mono',ui-monospace,Menlo,monospace;
+  --news:'Old Standard TT','Times New Roman',Georgia,serif;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{margin:0;background:var(--ink);color:var(--bone);font-family:var(--mono);overflow:hidden;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+#game{position:relative;height:100%;max-width:520px;margin:0 auto;overflow:hidden;cursor:pointer}
+canvas{display:block;width:100%;height:100%}
+.hud{position:absolute;inset:0 0 auto;pointer-events:none;display:flex;flex-direction:column;align-items:center;gap:8px;
+  padding-top:14px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.score{font-family:var(--head);font-size:64px;line-height:1;color:var(--bone);text-shadow:0 4px 0 var(--ink),0 0 24px #0008;font-variant-numeric:tabular-nums}
+.headline{display:flex;flex-wrap:wrap;justify-content:center;gap:2px 3px;max-width:100%;font-family:var(--head);font-size:20px;letter-spacing:.04em}
+.headline span{display:inline-block;min-width:.62em;text-align:center;padding:1px 2px;color:#e9e3d540;border-bottom:2px solid #e9e3d530}
+.headline span.got{color:var(--ink);background:var(--mustard);border-color:var(--mustard)}
+.headline span.next{color:var(--bone);border-color:var(--bone);animation:blink .6s steps(2) infinite}
+.headline span.sp{min-width:.5em;border:0}
+@keyframes blink{50%{border-color:transparent}}
+.live{font-family:var(--head);font-size:16px;letter-spacing:.12em;background:var(--red);color:#fff;padding:3px 10px 1px;display:flex;gap:6px;align-items:center}
+.live::before{content:"";width:8px;height:8px;border-radius:50%;background:#fff;animation:blink .8s steps(2) infinite}
+.carla{position:absolute;left:max(12px,env(safe-area-inset-left,0px));right:max(12px,env(safe-area-inset-right,0px));bottom:calc(64px + env(safe-area-inset-bottom,0px));
+  display:flex;justify-content:center;pointer-events:none;opacity:0;transform:translateY(8px);transition:opacity .25s,transform .25s}
+.carla.on{opacity:1;transform:none}
+.carla div{background:#141a2bee;border-left:4px solid var(--mustard);padding:8px 12px;font-size:13px;line-height:1.35;max-width:360px}
+.carla b{display:block;font-size:10px;letter-spacing:.2em;color:var(--mustard);margin-bottom:2px}
+.ticker{position:absolute;left:0;right:0;bottom:0;height:calc(30px + env(safe-area-inset-bottom,0px));padding-bottom:env(safe-area-inset-bottom,0px);background:var(--red);color:#fff;overflow:hidden;display:flex;align-items:center;pointer-events:none;font-weight:600;font-size:13px;letter-spacing:.06em}
+.ticker .tag{flex:none;background:var(--ink);height:100%;display:flex;align-items:center;padding:0 10px 0 max(10px,env(safe-area-inset-left,0px));font-family:var(--head);letter-spacing:.1em;z-index:1}
+.ticker .roll{white-space:nowrap;animation:roll 38s linear infinite;padding-left:100%}
+@keyframes roll{to{transform:translateX(-100%)}}
+.overlay{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;text-align:center;overflow-y:auto;
+  padding-block:24px 50px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.title{margin:0;font-family:var(--head);font-weight:400;line-height:.86;font-size:clamp(64px,22vw,110px);color:var(--bone);text-shadow:0 6px 0 var(--red),0 12px 0 var(--ink)}
+.title small{display:block;font-family:var(--mono);font-size:13px;letter-spacing:.32em;color:var(--mustard);text-shadow:none;margin-bottom:10px}
+.blurb{max-width:32ch;font-size:14px;line-height:1.5;color:var(--bone);margin:0;background:#141a2bcc;padding:10px 14px}
+.blurb em{font-style:normal;color:var(--mustard)}
+button{font:inherit;cursor:pointer}
+.go{font-family:var(--head);font-size:26px;letter-spacing:.08em;color:#fff;background:var(--red);border:0;padding:12px 30px 9px;box-shadow:0 5px 0 #7a1712;transition:transform .08s}
+.go:active{transform:translateY(3px);box-shadow:0 2px 0 #7a1712}
+.go:focus-visible,.mute:focus-visible{outline:3px solid var(--mustard);outline-offset:3px}
+.hint{font-size:12px;color:#e9e3d5aa;letter-spacing:.08em}
+.paper{background:var(--paper);color:var(--ink);width:min(360px,100%);padding:14px 16px 16px;box-shadow:0 18px 40px #000b;transform:rotate(-2deg);text-align:left;font-family:var(--news);
+  animation:spin .55s cubic-bezier(.2,1.3,.4,1)}
+@keyframes spin{from{transform:rotate(-200deg) scale(.1)}to{transform:rotate(-2deg) scale(1)}}
+.paper .mast{font-weight:700;font-size:30px;text-align:center;line-height:1;border-bottom:3px double var(--ink);padding-bottom:6px;letter-spacing:.01em}
+.paper .dl{display:flex;justify-content:space-between;font-size:10px;font-family:var(--mono);border-bottom:1px solid var(--ink);padding:4px 0;letter-spacing:.06em}
+.paper h2{font-family:var(--head);font-weight:400;font-size:32px;line-height:1;margin:10px 0 6px;text-transform:uppercase;text-wrap:balance}
+.paper p{margin:0;font-size:14px;line-height:1.35}
+.paper .cols{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px;border-top:1px solid var(--ink);padding-top:8px;font-family:var(--mono);font-size:10px;text-align:center}
+.paper .cols b{display:block;font-family:var(--head);font-weight:400;font-size:26px;line-height:1.1}
+.badge{font-family:var(--head);background:var(--mustard);color:var(--ink);padding:2px 10px;letter-spacing:.1em;font-size:16px}
+.mute{position:absolute;top:calc(12px + env(safe-area-inset-top,0px));right:max(12px,env(safe-area-inset-right,0px));z-index:5;background:#141a2bcc;border:1px solid #e9e3d540;color:var(--bone);font-size:10px;font-weight:600;letter-spacing:.14em;padding:6px 8px}
+@media (prefers-reduced-motion:reduce){.ticker .roll,.paper,.headline span.next,.live::before{animation:none}}
+</style>
+</head>
+<body>
+<div id="game">
+  <canvas id="c"></canvas>
+  <div class="hud" id="hud" hidden>
+    <div class="score" id="score">0</div>
+    <div class="headline" id="headline"></div>
+    <div class="live" id="live" hidden>LIVE · ×2</div>
+  </div>
+  <div class="carla" id="carla"><div><b>CARLA · EARPIECE</b><span id="carlaText"></span></div></div>
+  <div class="ticker"><span class="tag">FCN</span><span class="roll" id="roll">LETTERS CONTINUE TO FALL FROM THE CITY SIGN · OFFICIALS CONFIRM EVERYONE IS FINE · ANCHOR NED SEEN AIRBORNE OVER THE SURFACE SECTOR · WEATHER AT ELEVEN · RESIDENTS ADVISED TO REMAIN RESIDENTS · </span></div>
+  <button class="mute" id="mute" aria-label="Toggle sound">SOUND</button>
+
+  <div class="overlay" id="menu">
+    <h1 class="title"><small>FRACTURE CITY NEWS PRESENTS</small>BREAKING<br>NED</h1>
+    <p class="blurb">Tap to flap. Keep Ned in the air between the towers. Grab the <em>letters falling off the city sign</em> to spell tonight's headline. Finish it and Ned goes <em>LIVE</em>: double points.</p>
+    <button class="go" id="goBtn">GO LIVE</button>
+    <div class="hint">Tap, click, or press Space · Best <span id="menuBest">0</span></div>
+  </div>
+
+  <div class="overlay" id="over" hidden>
+    <div class="paper" role="group" aria-label="Final score">
+      <div class="mast">The Fracture City Ledger</div>
+      <div class="dl"><span>LATE EDITION</span><span id="pDate"></span><span>FREE</span></div>
+      <h2 id="pHead">Anchor falls</h2>
+      <p id="pDeck"></p>
+      <div class="cols"><div><b id="pScore">0</b>SCORE</div><div><b id="pBest">0</b>BEST</div><div><b id="pHeads">0</b>HEADLINES</div></div>
+    </div>
+    <div class="badge" id="pNew" hidden>NEW RECORD</div>
+    <button class="go" id="againBtn">BACK ON AIR</button>
+  </div>
+</div>
+
+<script>
+const $=s=>document.querySelector(s);
+const cv=$('#c'),ctx=cv.getContext('2d');
+const W=400;let H=720,S=1,DPR=1;
+function resize(){const r=cv.getBoundingClientRect();DPR=Math.min(2,devicePixelRatio||1);cv.width=Math.max(1,Math.round(r.width*DPR));cv.height=Math.max(1,Math.round(r.height*DPR));S=cv.width/W;H=cv.height/S;buildSky();}
+const store={get(k,d){try{const v=localStorage.getItem('ned_'+k);return v==null?d:JSON.parse(v)}catch(e){return d}},set(k,v){try{localStorage.setItem('ned_'+k,JSON.stringify(v))}catch(e){}}};
+const rnd=(a,b)=>a+Math.random()*(b-a),clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const C={night:'#141a2b',navy:'#1F2638',bone:'#E9E3D5',mustard:'#C9A13B',red:'#C8312B',ink:'#151515'};
+
+/* ---------- audio ---------- */
+let AC=null,muted=store.get('muted',false);
+function audio(){if(!AC){try{AC=new(window.AudioContext||window.webkitAudioContext)()}catch(e){}}if(AC&&AC.state==='suspended')AC.resume();}
+function tone(f0,f1,d,type='square',v=.06,delay=0){if(!AC||muted)return;const t=AC.currentTime+delay,o=AC.createOscillator(),g=AC.createGain();o.type=type;o.frequency.setValueAtTime(f0,t);o.frequency.exponentialRampToValueAtTime(Math.max(30,f1),t+d);g.gain.setValueAtTime(v,t);g.gain.exponentialRampToValueAtTime(.0001,t+d);o.connect(g).connect(AC.destination);o.start(t);o.stop(t+d+.05);}
+function noise(d,v=.15,f=800){if(!AC||muted)return;const n=AC.sampleRate*d|0,b=AC.createBuffer(1,n,AC.sampleRate),a=b.getChannelData(0);for(let i=0;i<n;i++)a[i]=(Math.random()*2-1)*(1-i/n);const s=AC.createBufferSource();s.buffer=b;const fl=AC.createBiquadFilter();fl.frequency.value=f;const g=AC.createGain();g.gain.value=v;s.connect(fl).connect(g).connect(AC.destination);s.start();}
+const sfx={flap(){tone(320,520,.08,'triangle',.07);noise(.06,.05,2500)},point(){tone(880,880,.05,'square',.03)},
+  letter(i){tone(660*Math.pow(1.06,i%12),1320*Math.pow(1.06,i%12),.12,'triangle',.08)},
+  hit(){noise(.35,.3,500);tone(200,40,.5,'sawtooth',.08)},
+  live(){[523,659,784,1047].forEach((f,i)=>tone(f,f,.22,'square',.05,i*.11));tone(1047,1568,.5,'square',.05,.44)},
+  sting(){[392,330,262].forEach((f,i)=>tone(f,f*.98,.25,'square',.05,i*.16))}};
+
+/* ---------- content ---------- */
+const HEADLINES=['EVERYONE IS FINE','STAY TUNED','TRUST THE GRID','WEATHER AT ELEVEN','REMAIN CALM','NO FIXED IDENTITY','PEOPLE WANT THE WEATHER','THE SIGN IS FINE'];
+const CARLA={start:['You\'re live in three, Ned. Flap like you mean it.','Smile. The city is watching. Mostly.','Don\'t look at the sign. Look at the camera.'],
+  letter:['Good. Keep spelling.','That\'s a letter, Ned. Not a snack.','Ratings ticked up. Again.','The sign wants that back.'],
+  live:['WE ARE LIVE. Do not say anything true.','Breaking news is you, Ned. Hold it together.','Double ratings. Don\'t blink.'],
+  milestone:['Ten towers. The board is impressed.','You\'re trending in the Surface Sector.','Network wants to know if you\'re a bird now.','Keep going. I told legal it\'s a bit.'],
+  death:['And we\'re off air.','Cut to weather.','I\'ll tell them it was planned.','Somebody get Ned a helmet.']};
+const PAPER=[['Anchor clears {n} towers; city unmoved','Witnesses describe the flight as "mostly arms."'],['Ned Newsman: {n} blocks, zero regrets','Producer calls the segment "on brand."'],['"Everyone is fine," says man who hit a tower','Ned remains confident. The tower declined to comment.'],
+  ['Local news goes airborne for {n} blocks','Officials remind residents that flapping is not a permit.'],['Breaking: Ned breaks','Station promises a full recovery by the eleven o\'clock broadcast.']];
+const pick=a=>a[Math.random()*a.length|0];
+
+/* ---------- world ---------- */
+let state='menu',T=0,ned,towers,letters,parts,falling,score,best=store.get('best',0),speed,spawnX,headline,hIdx,heads,liveT,shake,lastMile,flash,deadT;
+const GROUND=60;
+function newHeadline(){let h;do{h=pick(HEADLINES)}while(headline&&h===headline);headline=h;hIdx=0;skip();renderHeadline();}
+function skip(){while(hIdx<headline.length&&headline[hIdx]===' ')hIdx++;}
+function needLetter(){return hIdx<headline.length?headline[hIdx]:null;}
+function renderHeadline(){$('#headline').innerHTML=[...headline].map((c,i)=>c===' '?'<span class="sp"></span>':`<span class="${i<hIdx?'got':i===hIdx?'next':''}">${c}</span>`).join('');}
+function reset(){ned={x:120,y:H*.42,vy:0,rot:0,flapT:0,blink:0,papers:0};towers=[];letters=[];parts=[];falling=[];score=0;speed=150;spawnX=W+60;heads=0;liveT=0;shake=0;lastMile=0;flash=0;deadT=0;headline=null;newHeadline();}
+function gapSize(){return clamp(178-score*1.4,128,178);}
+function spawnTower(){const g=gapSize(),minY=90,maxY=H-GROUND-g-70;const cy=rnd(minY,maxY);
+  const t={x:spawnX,w:74,gy:cy,g,passed:false,move:score>18&&Math.random()<.35?rnd(18,40):0,ph:rnd(0,7),seed:Math.random()*1e4|0,kind:Math.random()<.5?'sign':'crane'};
+  towers.push(t);const L=needLetter();if(L)letters.push({x:t.x+t.w/2,t,ch:L,got:false,bob:rnd(0,7)});}
+
+/* ---------- background ---------- */
+let skyL=[];
+function buildSky(){skyL=[0,1,2].map(layer=>{const bs=[];let x=-40;while(x<W*2+80){const w=rnd(26,60)*(1+layer*.3),h=rnd(60,180)*(1+layer*.45);const wins=[];
+  for(let yy=10;yy<h-10;yy+=12)for(let xx=6;xx<w-8;xx+=10)if(Math.random()<.22)wins.push([xx,yy,Math.random()<.04]);bs.push({x,w,h,wins,ant:Math.random()<.3});x+=w+rnd(-4,8);}return{bs,span:x};});}
+function lerpC(a,b,t){const A=parseInt(a.slice(1),16),B=parseInt(b.slice(1),16);const r=(A>>16)+((B>>16)-(A>>16))*t,g=(A>>8&255)+((B>>8&255)-(A>>8&255))*t,bl=(A&255)+((B&255)-(A&255))*t;return`rgb(${r|0},${g|0},${bl|0})`;}
+const SKY=[['#e8a35a','#5a3f6b'],['#2b2f55','#0e1222'],['#0b0e1a','#1d2140'],['#3d4a7a','#d8a46c']];
+function drawSky(){const ph=(T/40)%SKY.length,i=Math.floor(ph),k=ph-i,a=SKY[i],b=SKY[(i+1)%SKY.length];
+  const g=ctx.createLinearGradient(0,0,0,H);g.addColorStop(0,lerpC(a[1],b[1],k));g.addColorStop(1,lerpC(a[0],b[0],k));ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+  // giant sign on the far skyline, shedding letters
+  const sx=((-T*6)%(W*1.6))+W*1.1,sy=H*.36;ctx.save();ctx.globalAlpha=.55;ctx.fillStyle='#0a0d18';ctx.fillRect(sx-4,sy+18,3,90);ctx.fillRect(sx+170,sy+18,3,90);
+  ctx.font="22px Anton, Impact, sans-serif";ctx.fillStyle=C.mustard;ctx.globalAlpha=.5+.15*Math.sin(T*3);const txt='FRACTURE CITY';let xx=sx;for(let j=0;j<txt.length;j++){if(!((j*7+Math.floor(T/3))%11===0))ctx.fillText(txt[j],xx,sy+18);xx+=ctx.measureText(txt[j]).width+2;}ctx.restore();
+  if(Math.random()<.02)falling.push({x:sx+rnd(0,170),y:sy+10,vy:0,ch:txt[Math.random()*txt.length|0],r:0});
+  for(const f of falling){f.vy+=60*1/60;f.y+=f.vy/60;f.r+=.03;ctx.save();ctx.globalAlpha=.45;ctx.translate(f.x-T*6%1,f.y);ctx.rotate(f.r);ctx.fillStyle=C.mustard;ctx.font="14px Anton, Impact, sans-serif";ctx.fillText(f.ch,-4,4);ctx.restore();}
+  falling=falling.filter(f=>f.y<H);
+  skyL.forEach((L,li)=>{const par=[.08,.18,.32][li],base=H-GROUND+[0,0,4][li];const off=-(T*speedNow()*par)%L.span;const col=['#1b2036','#151a2c','#10141f'][li];
+    for(let rep=0;rep<2;rep++)for(const b of L.bs){const x=b.x+off+rep*L.span;if(x>W||x+b.w<0)continue;ctx.fillStyle=col;ctx.fillRect(x,base-b.h,b.w,b.h);if(b.ant)ctx.fillRect(x+b.w/2-1,base-b.h-14,2,14);
+      for(const w of b.wins){ctx.fillStyle=w[2]?C.red:`rgba(201,161,59,${.25+li*.15})`;ctx.fillRect(x+w[0],base-b.h+w[1],4,6);}}});}
+function speedNow(){return state==='play'?speed*(liveT>0?1.15:1):60;}
+
+/* ---------- drawing: towers ---------- */
+function drawTower(t){const gy=t.gy+(t.move?Math.sin(T*1.6+t.ph)*t.move:0),x=t.x,w=t.w;
+  // lower: a building block with windows
+  const by=gy+t.g,bh=H-GROUND-by;ctx.fillStyle=C.navy;ctx.fillRect(x,by,w,bh+4);ctx.fillStyle='#2a3350';ctx.fillRect(x,by,8,bh);ctx.fillStyle='#161c2c';ctx.fillRect(x+w-8,by,8,bh);
+  let s=t.seed;const r=()=>(s=(s*16807)%2147483647)/2147483647;for(let yy=by+26;yy<H-GROUND-10;yy+=16)for(let xx=x+14;xx<x+w-14;xx+=12){const v=r();if(v<.42){ctx.fillStyle=v<.02?C.red:C.mustard;ctx.fillRect(xx,yy,6,9);}}
+  ctx.fillStyle=C.bone;ctx.fillRect(x-6,by,w+12,14);for(let i=0;i<w+12;i+=14){ctx.fillStyle=C.ink;ctx.beginPath();ctx.moveTo(x-6+i,by+14);ctx.lineTo(x-6+i+7,by);ctx.lineTo(x-6+i+14,by);ctx.lineTo(x-6+i+7,by+14);ctx.fill();}
+  // upper: hanging civic sign or crane block
+  const th=gy;ctx.fillStyle='#262b38';ctx.fillRect(x+w/2-3,0,6,th);
+  if(t.kind==='sign'){const ph=Math.min(110,th-8),py=th-ph;ctx.fillStyle=C.bone;ctx.fillRect(x-6,py,w+12,ph);ctx.strokeStyle=C.ink;ctx.lineWidth=3;ctx.strokeRect(x-2,py+4,w+4,ph-8);
+    ctx.fillStyle=C.ink;ctx.font="13px Anton, Impact, sans-serif";ctx.textAlign='center';ctx.fillText('PUBLIC',x+w/2,py+22);ctx.fillText('NOTICE',x+w/2,py+36);
+    ctx.font="9px 'IBM Plex Mono', monospace";ctx.fillText(['EVERYONE','REMAIN','STAY','TRUST'][t.seed%4],x+w/2,py+ph-24);ctx.fillText(['IS FINE.','CALM.','TUNED.','THE GRID.'][t.seed%4],x+w/2,py+ph-13);
+    for(let yy=py+44;yy<py+ph-32;yy+=7){ctx.fillRect(x+6,yy,w-12-((yy*3)%20),2);}ctx.textAlign='start';}
+  else{const ph=Math.min(70,th-8),py=th-ph;ctx.fillStyle=C.mustard;ctx.fillRect(x-6,py,w+12,ph);ctx.strokeStyle=C.ink;ctx.lineWidth=2;ctx.save();ctx.beginPath();ctx.rect(x-6,py,w+12,ph);ctx.clip();
+    for(let i=-ph;i<w+12;i+=16){ctx.beginPath();ctx.moveTo(x-6+i,py+ph);ctx.lineTo(x-6+i+ph,py);ctx.stroke();}ctx.restore();ctx.strokeRect(x-6,py,w+12,ph);
+    ctx.fillStyle=C.ink;ctx.fillRect(x-6,py+ph-6,w+12,6);}
+  t.gyNow=gy;}
+
+/* ---------- drawing: Ned (original character) ---------- */
+function drawNed(n,dead){ctx.save();ctx.translate(n.x,n.y);ctx.rotate(n.rot);ctx.scale(1.25,1.25);
+  const flap=Math.max(0,n.flapT),armA=-1.1*flap+.5*(1-flap)+Math.sin(T*20)*.05;
+  // legs
+  ctx.fillStyle=C.navy;ctx.save();ctx.translate(-5,16);ctx.rotate(.3+Math.sin(T*9)*.15);ctx.fillRect(-3,0,7,16);ctx.fillStyle=C.ink;ctx.fillRect(-4,14,11,5);ctx.restore();
+  ctx.save();ctx.fillStyle=C.navy;ctx.translate(5,16);ctx.rotate(-.2+Math.cos(T*9)*.15);ctx.fillRect(-3,0,7,16);ctx.fillStyle=C.ink;ctx.fillRect(-4,14,11,5);ctx.restore();
+  // back arm (papers)
+  ctx.save();ctx.translate(-10,-2);ctx.rotate(-armA-.3);ctx.fillStyle='#18203a';ctx.fillRect(-4,0,8,20);ctx.fillStyle='#f0e7d6';ctx.fillRect(-7,18,14,10);ctx.fillStyle='#9a9180';ctx.fillRect(-5,21,10,1.5);ctx.fillRect(-5,24,8,1.5);ctx.restore();
+  // torso: suit
+  ctx.fillStyle=C.navy;ctx.beginPath();ctx.moveTo(-14,-6);ctx.lineTo(14,-6);ctx.lineTo(11,19);ctx.lineTo(-11,19);ctx.closePath();ctx.fill();
+  ctx.fillStyle='#fff';ctx.beginPath();ctx.moveTo(-5,-6);ctx.lineTo(5,-6);ctx.lineTo(0,6);ctx.fill();
+  ctx.fillStyle=C.red;ctx.beginPath();ctx.moveTo(-2,-5);ctx.lineTo(2,-5);ctx.lineTo(3,10+Math.sin(T*14)*1.5);ctx.lineTo(0,14);ctx.lineTo(-3,10);ctx.fill();
+  ctx.fillStyle=C.mustard;ctx.fillRect(7,0,4,2);
+  // front arm with microphone
+  ctx.save();ctx.translate(11,-2);ctx.rotate(armA);ctx.fillStyle='#252e4c';ctx.fillRect(-4,0,8,19);ctx.fillStyle='#e8b896';ctx.beginPath();ctx.arc(0,21,4,0,7);ctx.fill();
+  ctx.fillStyle='#333';ctx.fillRect(-2,16,4,12);ctx.fillStyle='#777';ctx.beginPath();ctx.arc(0,30,5,0,7);ctx.fill();ctx.fillStyle=C.red;ctx.fillRect(-4,20,8,5);ctx.fillStyle='#fff';ctx.font="bold 4px sans-serif";ctx.fillText('FCN',-3.5,24);ctx.restore();
+  // head
+  ctx.save();ctx.translate(1,-20);
+  ctx.fillStyle='#e8b896';ctx.beginPath();ctx.moveTo(-11,-4);ctx.quadraticCurveTo(-12,10,-4,14);ctx.lineTo(7,14);ctx.quadraticCurveTo(14,10,12,-4);ctx.quadraticCurveTo(0,-14,-11,-4);ctx.fill();
+  ctx.fillStyle='#d49f7d';ctx.fillRect(-3,12,10,3);
+  // ear + Carla's earpiece wire
+  ctx.fillStyle='#e0aa88';ctx.beginPath();ctx.ellipse(-11,2,3,4,0,0,7);ctx.fill();ctx.strokeStyle='#d8d8d8';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(-12,4);ctx.bezierCurveTo(-16,10,-10,12,-14,18);ctx.stroke();ctx.fillStyle='#d8d8d8';ctx.beginPath();ctx.arc(-11,2,1.6,0,7);ctx.fill();
+  // hair: the anchor swoop
+  ctx.fillStyle='#3b2a1d';ctx.beginPath();ctx.moveTo(-13,0);ctx.quadraticCurveTo(-16,-14,-2,-17);ctx.quadraticCurveTo(14,-22,18,-9);ctx.quadraticCurveTo(10,-12,8,-6);ctx.quadraticCurveTo(0,-10,-8,-4);ctx.lineTo(-10,4);ctx.closePath();ctx.fill();
+  ctx.fillStyle='#6b4d34';ctx.beginPath();ctx.moveTo(-4,-15);ctx.quadraticCurveTo(8,-19,14,-12);ctx.quadraticCurveTo(6,-14,-4,-13);ctx.fill();
+  // face
+  if(dead){ctx.strokeStyle=C.ink;ctx.lineWidth=1.6;for(const ex of[1,8]){ctx.beginPath();ctx.moveTo(ex-2,-1);ctx.lineTo(ex+2,3);ctx.moveTo(ex+2,-1);ctx.lineTo(ex-2,3);ctx.stroke();}}
+  else{ctx.fillStyle='#fff';ctx.beginPath();ctx.ellipse(1,1,3,3.3,0,0,7);ctx.ellipse(8,1,3,3.3,0,0,7);ctx.fill();ctx.fillStyle=C.ink;const look=clamp(n.vy/600,-1,1);ctx.beginPath();ctx.arc(2,1+look*1.5,1.5,0,7);ctx.arc(9,1+look*1.5,1.5,0,7);ctx.fill();}
+  ctx.strokeStyle='#3b2a1d';ctx.lineWidth=1.8;ctx.beginPath();const br=flap>.3?-2:0;ctx.moveTo(-2,-3+br);ctx.lineTo(4,-4+br);ctx.moveTo(6,-4+br);ctx.lineTo(11,-3+br);ctx.stroke();
+  // mouth: anchor grin, or shouting on a flap
+  if(flap>.3||dead){ctx.fillStyle='#5a1a1a';ctx.beginPath();ctx.ellipse(5,9,3.5,3*flap+1.5,0,0,7);ctx.fill();}
+  else{ctx.fillStyle='#fff';ctx.beginPath();ctx.moveTo(0,7);ctx.quadraticCurveTo(5,12,11,7);ctx.closePath();ctx.fill();ctx.strokeStyle='#8a4a3a';ctx.lineWidth=1;ctx.stroke();}
+  ctx.restore();ctx.restore();}
+
+function drawLetter(l){if(l.got)return;const gy=l.t.gyNow??l.t.gy,y=gy+l.t.g/2+Math.sin(T*3+l.bob)*6;l.y=y;l.x=l.t.x+l.t.w/2;
+  ctx.save();ctx.translate(l.x,y);const pulse=1+Math.sin(T*6)*.06;ctx.scale(pulse,pulse);
+  const g=ctx.createRadialGradient(0,0,4,0,0,30);g.addColorStop(0,'rgba(201,161,59,.55)');g.addColorStop(1,'rgba(201,161,59,0)');ctx.fillStyle=g;ctx.beginPath();ctx.arc(0,0,30,0,7);ctx.fill();
+  ctx.rotate(Math.sin(T*2+l.bob)*.15);ctx.fillStyle=C.bone;ctx.fillRect(-14,-16,28,32);ctx.strokeStyle=C.ink;ctx.lineWidth=2;ctx.strokeRect(-14,-16,28,32);ctx.fillStyle=C.ink;ctx.font="26px Anton, Impact, sans-serif";ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(l.ch,0,2);ctx.restore();}
+
+function drawGround(){const y=H-GROUND;ctx.fillStyle='#232633';ctx.fillRect(0,y,W,GROUND);ctx.fillStyle=C.bone;const off=-(T*speedNow())%40;for(let x=off;x<W;x+=40)ctx.fillRect(x,y+24,20,3);
+  ctx.fillStyle='#3a3e4c';ctx.fillRect(0,y,W,5);}
+
+/* ---------- loop ---------- */
+let carlaT=null;
+function carla(kind){const el=$('#carla');$('#carlaText').textContent=pick(CARLA[kind]);el.classList.add('on');clearTimeout(carlaT);carlaT=setTimeout(()=>el.classList.remove('on'),2600);}
+function burst(x,y,n,cols,sp=200){for(let i=0;i<n;i++){const a=rnd(0,7),v=rnd(.3,1)*sp;parts.push({x,y,vx:Math.cos(a)*v,vy:Math.sin(a)*v-60,life:0,max:rnd(.5,1),c:cols[i%cols.length],s:rnd(2,5),paper:Math.random()<.3,r:rnd(0,6)});}}
+function flap(){audio();if(state==='menu'||state==='over')return;if(state==='ready'){state='play';$('#over').hidden=true;}
+  if(state!=='play')return;ned.vy=-430;ned.flapT=1;sfx.flap();if(Math.random()<.25)parts.push({x:ned.x-12,y:ned.y,vx:rnd(-80,-30),vy:rnd(-60,20),life:0,max:1.6,c:'#f0e7d6',s:6,paper:true,r:rnd(0,6)});}
+function start(){audio();reset();state='ready';$('#menu').hidden=true;$('#over').hidden=true;$('#hud').hidden=false;renderScore();carla('start');}
+function renderScore(){$('#score').textContent=score;$('#live').hidden=!(liveT>0);}
+function die(){if(state!=='play')return;state='dying';sfx.hit();shake=14;flash=1;burst(ned.x,ned.y,26,[C.bone,C.mustard,C.red,'#f0e7d6'],260);ned.vy=-300;}
+function gameOver(){state='over';const nb=score>best;if(nb){best=score;store.set('best',best);}sfx.sting();carla('death');
+  const [h,d]=pick(PAPER);$('#pHead').textContent=h.replace('{n}',score);$('#pDeck').textContent=d;$('#pScore').textContent=score;$('#pBest').textContent=best;$('#pHeads').textContent=heads;
+  $('#pDate').textContent=new Date().toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}).toUpperCase();$('#pNew').hidden=!nb;$('#hud').hidden=true;$('#over').hidden=false;
+  setTimeout(()=>$('#againBtn').focus({preventScroll:true}),50);}
+
+function update(dt){T+=dt;
+  for(const p of parts){p.life+=dt;p.vy+=(p.paper?120:600)*dt;p.vx*=p.paper?.98:1;p.x+=p.vx*dt;p.y+=p.vy*dt;p.r+=dt*4;}parts=parts.filter(p=>p.life<p.max);
+  shake*=Math.pow(.01,dt);flash=Math.max(0,flash-dt*3);ned.flapT=Math.max(0,ned.flapT-dt*4);
+  if(state==='menu'||state==='ready'){ned.y=H*.42+Math.sin(T*3)*10;ned.rot=Math.sin(T*3)*.08;if(state==='menu')ned.x=W/2;else ned.x=120;if(Math.sin(T*3)<-.95)ned.flapT=1;return;}
+  if(state==='dying'||state==='over'){ned.vy+=1500*dt;ned.y=Math.min(H-GROUND-14,ned.y+ned.vy*dt);ned.rot+=dt*8*(ned.y<H-GROUND-14?1:0);if(state==='dying'&&ned.y>=H-GROUND-14){deadT+=dt;if(deadT>.6)gameOver();}return;}
+  // play
+  ned.vy=Math.min(620,ned.vy+1350*dt);ned.y+=ned.vy*dt;ned.rot=clamp(ned.vy/900,-.45,1.1);
+  if(ned.y<16){ned.y=16;ned.vy=0;}
+  if(ned.y>H-GROUND-18){ned.y=H-GROUND-18;die();}
+  speed=Math.min(230,150+score*1.6);const sp=speedNow();
+  for(const t of towers)t.x-=sp*dt;spawnX-=sp*dt;
+  if(spawnX<W+60){spawnTower();spawnX+=clamp(250-score*1.2,205,250);}
+  towers=towers.filter(t=>t.x>-120);letters=letters.filter(l=>l.t.x>-120);
+  if(liveT>0){liveT-=dt;if(liveT<=0){renderScore();}}
+  const mult=liveT>0?2:1;
+  for(const t of towers){
+    if(!t.passed&&t.x+t.w<ned.x-14){t.passed=true;score+=mult;sfx.point();renderScore();
+      if(score>=lastMile+10){lastMile=Math.floor(score/10)*10;carla('milestone');}}
+    const gy=t.gyNow??t.gy,r=14;
+    if(ned.x+r>t.x-6&&ned.x-r<t.x+t.w+6){if(ned.y-r<gy||ned.y+r>gy+t.g){die();break;}}
+  }
+  for(const l of letters){if(l.got||l.y==null)continue;if(Math.hypot(l.x-ned.x,l.y-ned.y)<30&&l.ch===needLetter()){l.got=true;hIdx++;skip();score+=2*mult;sfx.letter(hIdx);burst(l.x,l.y,14,[C.mustard,C.bone]);renderHeadline();renderScore();
+      if(hIdx>=headline.length){heads++;liveT=7;score+=10;sfx.live();flash=.6;carla('live');renderScore();setTimeout(()=>{if(state==='play'||state==='ready')newHeadline();},900);}
+      else if(Math.random()<.35)carla('letter');}}
+  // letters for gaps already spawned keep up with what's needed
+  const need=needLetter();for(const l of letters)if(!l.got&&need)l.ch=need;
+}
+
+function draw(){ctx.setTransform(S,0,0,S,0,0);ctx.save();ctx.translate((Math.random()-.5)*shake,(Math.random()-.5)*shake);
+  drawSky();for(const t of towers)drawTower(t);for(const l of letters)drawLetter(l);drawGround();
+  for(const p of parts){ctx.globalAlpha=1-p.life/p.max;ctx.fillStyle=p.c;if(p.paper){ctx.save();ctx.translate(p.x,p.y);ctx.rotate(p.r);ctx.fillRect(-5,-6,10,12);ctx.fillStyle='#9a9180';ctx.fillRect(-3,-3,6,1);ctx.fillRect(-3,0,5,1);ctx.restore();}else ctx.fillRect(p.x,p.y,p.s,p.s);}
+  ctx.globalAlpha=1;drawNed(ned,state==='dying'||state==='over');
+  if(state==='ready'){ctx.font="18px Anton, Impact, sans-serif";ctx.textAlign='center';ctx.fillStyle=C.bone;ctx.globalAlpha=.6+.4*Math.sin(T*5);ctx.fillText('TAP TO FLAP',W/2,H*.62);ctx.globalAlpha=1;ctx.textAlign='start';}
+  ctx.restore();
+  if(liveT>0){ctx.strokeStyle=C.red;ctx.lineWidth=6;ctx.strokeRect(3,3,W-6,H-6);ctx.fillStyle=`rgba(200,49,43,${.06+.04*Math.sin(T*8)})`;ctx.fillRect(0,0,W,H);}
+  if(flash>0){ctx.fillStyle=`rgba(255,255,255,${flash*.6})`;ctx.fillRect(0,0,W,H);}
+  // scanlines for the broadcast look
+  ctx.fillStyle='rgba(0,0,0,.06)';for(let y=0;y<H;y+=3)ctx.fillRect(0,y,W,1);}
+
+let last=performance.now();
+function frame(now){const dt=Math.max(0,Math.min(1/30,(now-last)/1000));last=now;const r=cv.getBoundingClientRect();if(Math.abs(r.width*DPR-cv.width)>2||Math.abs(r.height*DPR-cv.height)>2)resize();update(dt);draw();requestAnimationFrame(frame);}
+
+/* ---------- input ---------- */
+const game=$('#game');
+game.addEventListener('pointerdown',e=>{if(e.target.closest('button'))return;e.preventDefault();flap();});
+addEventListener('keydown',e=>{if(e.code==='Space'||e.code==='ArrowUp'||e.code==='KeyW'){e.preventDefault();if(state==='menu'||state==='over')start();else flap();}});
+$('#goBtn').onclick=start;$('#againBtn').onclick=start;
+const mb=$('#mute');const sm=()=>{mb.textContent=muted?'MUTED':'SOUND';};sm();mb.onclick=()=>{audio();muted=!muted;store.set('muted',muted);sm();};
+$('#menuBest').textContent=best;
+resize();reset();requestAnimationFrame(frame);
+</script>
+</body>
+</html>

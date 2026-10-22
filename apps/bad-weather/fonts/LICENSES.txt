@@ -1,0 +1,4 @@
+Fonts bundled locally so the game runs offline and under the city server's content policy.
+Bricolage Grotesque: SIL Open Font License 1.1, via Fontsource (@fontsource/bricolage-grotesque 5.3.0).
+JetBrains Mono: SIL Open Font License 1.1, via Fontsource (@fontsource/jetbrains-mono 5.3.0).
+Full licence text: https://openfontlicense.org
