@@ -4,8 +4,8 @@ from pathlib import Path
 import zipfile
 ROOT=Path(__file__).resolve().parents[1]
 WEB=ROOT/'_build/netlify-mobile'
-VERSION='0.78.1'
-SERVER=['common-challenge.cjs','server.cjs','store.cjs','social.cjs','gallery-media.cjs','social-admin.cjs','start.cjs','database.cjs','city-build-store.cjs','structure-store.cjs','news-feed.cjs','main-beta.cjs','resident-life.cjs','classics.cjs','classics-text.cjs','Dockerfile','dockerignore','fly.toml','README.md']
+VERSION='0.79.0'
+SERVER=['common-challenge.cjs','server.cjs','store.cjs','social.cjs','gallery-media.cjs','social-admin.cjs','start.cjs','database.cjs','city-build-store.cjs','structure-store.cjs','news-feed.cjs','main-beta.cjs','resident-life.cjs','classics.cjs','classics-text.cjs','economy.cjs','Dockerfile','dockerignore','fly.toml','README.md']
 archive=ROOT/'_build'/f'fracture-city-social-server-v{VERSION}.zip'
 readme='''FRACTURE CITY / COMMON GROUND
 
@@ -29,12 +29,12 @@ and moderation commands. No public deployment is included or claimed.
 Do not upload this entire package to Netlify. Netlify cannot run this
 Node account/social database. The separate Netlify ZIP supports local drafts.
 
-CREATING WITHOUT CONSTANT MENUS
-B -> Fine art & interiors, then Return to city.
-Left-click / touch Mine selects artwork without pausing.
-G moves it, ] rotates, J duplicates, Z undoes the last art operation.
-Right-click / touch Place sets a moving design on a surface.
-Details & materials opens the full editor whenever you want it.
+BUILDING
+B switches to building. 1-8 or the mouse wheel pick from the hotbar.
+Right-click places, hold left-click breaks a block or picks furniture up.
+I opens the inventory: your items, the shop, the room kit and (solo only)
+Creative. Online, credits and items are kept on the server.
+PvP is on in the online city outside Common Ground and the building yard.
 
 Keep server/data and its backups private. Do not share a populated
 installation folder; share this original clean download instead.

@@ -4551,7 +4551,7 @@ function toggleConstructMode(){
   State.ui.construct = !State.ui.construct;
   $('build-hud').classList.toggle('show', State.ui.construct);
   if (!State.ui.construct && highlightMesh) highlightMesh.visible = false;
-  toast(State.ui.construct ? 'BUILD MODE · every tool is in the dock' : 'BUILD MODE OFF', 'info');
+  toast(State.ui.construct ? 'BUILD MODE · 1–8 or wheel to pick · right-click place · hold left break · I inventory' : 'BUILD MODE OFF', 'info');
   if (!State.ui.construct) shStopMine();
   refreshBuildHUD();
 }
@@ -30062,6 +30062,8 @@ document.addEventListener('DOMContentLoaded', init);
 <script src="future-city.js?v=0.74.0"></script>
 <script src="texture-pack.js?v=0.76.0"></script>
 <script src="campus-arcades.js?v=0.77.0"></script>
-<script src="build-dock.js?v=0.78.0"></script>
+<script src="build-dock.js?v=0.79.0"></script>
+<script src="inventory.js?v=0.79.0"></script>
+<script src="city-pvp.js?v=0.79.0"></script>
 </body>
 </html>

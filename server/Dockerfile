@@ -1,7 +1,7 @@
 FROM node:24-alpine
 ENV NODE_ENV=production HOST=0.0.0.0 PORT=8080 MAX_ROOMS=4 DB_PATH=/data/districts.sqlite BACKUP_DIR=/data/backups
 WORKDIR /app
-COPY server/server.cjs server/store.cjs server/social.cjs server/social-admin.cjs server/start.cjs server/database.cjs server/city-build-store.cjs server/structure-store.cjs server/gallery-media.cjs server/news-feed.cjs server/main-beta.cjs server/resident-life.cjs server/classics.cjs server/classics-text.cjs server/
+COPY server/server.cjs server/store.cjs server/social.cjs server/social-admin.cjs server/start.cjs server/database.cjs server/city-build-store.cjs server/structure-store.cjs server/gallery-media.cjs server/news-feed.cjs server/main-beta.cjs server/resident-life.cjs server/classics.cjs server/classics-text.cjs server/common-challenge.cjs server/economy.cjs server/
 COPY server/public-music/ server/public-music/
 COPY apps/ apps/
 COPY shared/ shared/

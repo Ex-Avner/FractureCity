@@ -222,3 +222,25 @@ Real headlines reach NPCs only through /api/news on this server, so the static
 Netlify edition never shows them. Feed sources are in server/news-feed.cjs;
 check /api/news after deploying: a source with available:false is not
 answering and is simply skipped.
+
+
+## Economy and PvP (0.79)
+
+Each account has a server wallet (starting at 300 credits) and an inventory.
+GET /api/wallet, POST /api/wallet/buy {sku,qty}, /api/wallet/earn
+{amount,reason}, /api/wallet/hotbar {slots}. Prices come from
+apps/fracture-city-game/shop-catalog.json (built by
+_build/build-shop-catalog.py). Building charges inventory from the change
+in a resident's own saves: furniture groups tagged f<id>- in city art, and
+workshop blocks (doors count as two) in their plot. Taking things down
+refunds them. Earning from jobs and zombies is simulated on the client, so
+claims are capped at 250 per claim, one claim per 2.5 s and 3,000 a day.
+
+PvP is on in city rooms outside Common Ground and the building yard
+(x 144-216, z 0-72). POST /api/city-shoot {target,weapon,ox,oy,oz,dx,dy,dz,
+pellets}: the server checks both residents are alive and outside the safe
+area, spawn protection, weapon cooldown and range, that the shot starts near
+the shooter's last position, and that the ray passes through the target's
+body box. Line of sight is the client's claim (the server has no city
+terrain). 100 health; a down pays the shooter 25 credits and respawns the
+target in Common Ground after 4 s.

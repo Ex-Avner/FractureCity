@@ -11,12 +11,14 @@ const {createCityBuildStore}=require('./city-build-store.cjs');
 const {createMainBeta}=require('./main-beta.cjs');
 const {createResidentLife}=require('./resident-life.cjs');
 const {createClassics}=require('./classics.cjs');
+const {createEconomy}=require('./economy.cjs');
 const clean=(s,n)=>String(s||'').replace(/[\x00-\x1f\x7f<>]/g,'').trim().slice(0,n),hash=s=>crypto.createHash('sha256').update(s).digest('hex'),id=()=>crypto.randomBytes(16).toString('hex');
 function createServer(opts={}){
 const rooms=new Map(),tokens=new Map(),limits=new Map(),now=opts.now||Date.now;let tickTimer,tickCount=0;const store=createStore(opts.dbPath||process.env.DB_PATH||path.join(__dirname,'data','districts.sqlite'),now);
 const life=createResidentLife(store.db,now);
 const media=createMedia(store.db,now),social=createSocial(store.db,now,media),cityBuild=createCityBuildStore(store.db),structures=createStructures(store.db);
 const challenge=createChallenge(store.db,now);
+const economy=createEconomy(store.db,{now});
 const news=createNews(store.db,{fetcher:opts.newsFetch,now});
 const classics=createClassics({dir:opts.classicsDir||path.join(path.dirname(opts.dbPath||process.env.DB_PATH||path.join(__dirname,'data','districts.sqlite')),'classics'),shelfDir:path.join(GAME,'classics'),fetcher:opts.classicsFetch,now});
 const mb=createMainBeta(store.db,{now,code:opts.mainCode,owners:opts.owners,idleDays:opts.idleDays}),MAX=()=>Number(opts.maxRooms||process.env.MAX_ROOMS||4),privateRooms=()=>[...rooms.values()].filter(r=>!r.public).length,present=()=>new Set([...rooms.values()].flatMap(r=>[...r.players.values()].map(p=>p.accountId)));
@@ -34,22 +36,61 @@ function json(res,value){res.setHeader('Cache-Control','no-store');res.setHeader
 function revokePlayers(id){for(const r of [...rooms.values()])for(const p of [...r.players.values()])if(p.accountId===id)remove(r,p)}
 function fail(code,message){throw Object.assign(Error(message),{status:code})}
 function rate(key,max,period){let r=limits.get(key),t=now();if(!r||t-r.t>=period){r={t,n:0};limits.set(key,r)}if(++r.n>max)fail(429,'Please slow down and try again.')}
-function state(r){return {code:r.code,public:!!r.public,structureRevision:r.map.city?structures.revision(r.code):0,artRevision:r.map.city?cityBuild.revision(r.code):0,map:r.map.id,phase:r.phase,host:r.host,time:now(),players:[...r.players.values()].map(p=>({id:p.id,accountId:p.accountId,name:p.name,color:p.color,x:p.x,y:p.y||0,z:p.z,yaw:p.yaw,pitch:p.pitch,hp:p.hp,ammo:p.ammo,reloading:p.reloadUntil>now(),ready:p.ready,connected:!!p.stream,kills:p.kills,deaths:p.deaths,score:p.score,moving:p.moving,sprint:p.sprint,safe:W.safe(p),protected:p.protectUntil>now(),respawnAt:p.respawnAt,emote:p.emoteUntil>now()?p.emote:null,seq:p.seq})),quests:r.quests,chat:r.chat,events:r.events.slice(-10)}}
+function state(r){return {code:r.code,public:!!r.public,structureRevision:r.map.city?structures.revision(r.code):0,artRevision:r.map.city?cityBuild.revision(r.code):0,map:r.map.id,phase:r.phase,host:r.host,time:now(),players:[...r.players.values()].map(p=>({id:p.id,accountId:p.accountId,name:p.name,color:p.color,x:p.x,y:p.y||0,z:p.z,yaw:p.yaw,pitch:p.pitch,hp:p.hp,ammo:p.ammo,reloading:p.reloadUntil>now(),ready:p.ready,connected:!!p.stream,kills:p.kills,deaths:p.deaths,score:p.score,moving:p.moving,sprint:p.sprint,safe:r.map.city?citySafe(p):W.safe(p),protected:p.protectUntil>now(),respawnAt:p.respawnAt,emote:p.emoteUntil>now()?p.emote:null,seq:p.seq})),quests:r.quests,chat:r.chat,events:r.events.slice(-10)}}
 function publish(r){const message='data: '+JSON.stringify(state(r))+'\n\n';for(const p of r.players.values())if(p.stream){if(p.stream.writableLength>131072){p.stream.destroy();p.stream=null}else p.stream.write(message)}}
 function system(r,text){r.chat.push({id:id(),name:'Dispatch',text,at:now()});r.chat=r.chat.slice(-30)}
 function spawn(p,r){p.x=(p.seat%4-1.5)*2;p.z=(Math.floor(p.seat/4)-1)*2;p.hp=100;p.ammo=6;p.respawnAt=0;p.protectUntil=now()+5000;p.input={x:0,z:0};p.reloadUntil=0;if(r?.map.city){p.x=165+(p.seat%4)*1.2;p.z=24+Math.floor(p.seat/4)*1.2;p.y=1;p.yaw=Math.PI;p.pitch=0;p.moving=false;p.poseAt=now()}}
 function remove(r,p){store.checkpoint(r);p.stream?.end();r.players.delete(p.id);tokens.delete(p.tokenHash);if(r.host===p.id)r.host=r.players.keys().next().value||null;system(r,p.name+' left.');if(!r.players.size)rooms.delete(r.code);else publish(r)}
-function tick(){const t=now();tickCount++;for(const r of rooms.values()){for(const p of [...r.players.values()]){if(t-p.seen>45000){remove(r,p);continue}if(r.phase!=='live')continue;if(p.hp<=0){if(t>=p.respawnAt)spawn(p,r);continue}if(p.reloadUntil&&t>=p.reloadUntil){p.ammo=6;p.reloadUntil=0}if(r.map.city){p.moving=t-(p.poseAt||0)<300&&!!p.moving;continue}if(t-p.inputAt<300)W.move(p,p.input,.05,r.map);else p.moving=false;if(W.safe(p))p.hp=Math.min(100,p.hp+.15)}if(tickCount%100===0)store.checkpoint(r);if(tickCount%2===0)publish(r)}for(const [k,v]of limits)if(t-v.t>120000)limits.delete(k);if(tickCount%12000===1)sweep()}
+function tick(){const t=now();tickCount++;for(const r of rooms.values()){for(const p of [...r.players.values()]){if(t-p.seen>45000){remove(r,p);continue}if(r.phase!=='live')continue;if(p.hp<=0){if(t>=p.respawnAt){spawn(p,r);if(r.map.city){p.seq++;publish(r)}}continue}if(p.reloadUntil&&t>=p.reloadUntil){p.ammo=6;p.reloadUntil=0}if(r.map.city){p.moving=t-(p.poseAt||0)<300&&!!p.moving;continue}if(t-p.inputAt<300)W.move(p,p.input,.05,r.map);else p.moving=false;if(W.safe(p))p.hp=Math.min(100,p.hp+.15)}if(tickCount%100===0)store.checkpoint(r);if(tickCount%2===0)publish(r)}for(const [k,v]of limits)if(t-v.t>120000)limits.delete(k);if(tickCount%12000===1)sweep()}
 function sweep(){try{mb.releaseGallery(present())}catch(e){console.error('Idle gallery release failed:',e.message)}}
 async function body(req,maxBytes=4096){let parts=[],size=0;for await(const c of req){size+=c.length;if(size>maxBytes)fail(413,'Message too large.');parts.push(c)}try{const v=JSON.parse(Buffer.concat(parts).toString()||'{}');if(!v||Array.isArray(v)||typeof v!=='object')fail(400,'Invalid message.');return v}catch{fail(400,'Invalid message.')}}
 function auth(req){const a=account(req);const t=(req.headers.authorization||'').replace(/^Bearer /,'');const v=tokens.get(hash(t));if(!v||v.p.accountId!==a.id)fail(401,'Session expired. Join a lobby again.');return v}
 function shoot(r,p){if(r.map.city)return;const t=now();if(r.phase!=='live'||p.hp<=0||W.safe(p)||p.protectUntil>t||p.reloadUntil||t-p.shotAt<350||p.ammo<=0)return;p.shotAt=t;p.ammo--;const o={x:p.x,y:1.55,z:p.z},d={x:-Math.sin(p.yaw)*Math.cos(p.pitch),y:Math.sin(p.pitch),z:-Math.cos(p.yaw)*Math.cos(p.pitch)};let hit=null,dist=W.wallDistance(r.map,o,d);for(const q of r.players.values()){if(q===p||q.hp<=0||W.safe(q)||q.protectUntil>t)continue;const a=W.rayBox(o,d,{x:q.x-.35,y:0,z:q.z-.35},{x:q.x+.35,y:1.85,z:q.z+.35});if(a<dist){dist=a;hit=q}}if(hit){hit.hp=Math.max(0,hit.hp-25);if(!hit.hp){hit.deaths++;hit.respawnAt=t+5000;p.kills++;p.score+=25;store.kill(r,p,hit);system(r,p.name+' downed '+hit.name+'.')}}r.events.push({id:id(),type:'shot',player:p.id,x:p.x,y:p.y||0,z:p.z,yaw:p.yaw,pitch:p.pitch,distance:dist,hit:hit?.id||null});r.events=r.events.slice(-10)}
+// City PvP. The server has no city terrain, so line of sight is the shooter's
+// claim; everything else is checked here against the server's own poses:
+// both residents alive, outside Common Ground and the building yard, past
+// spawn protection, weapon cooldown, range, and a ray from near the
+// shooter's last position that passes through the target's body box.
+const CITY_SAFE={x0:144,x1:216,z0:0,z1:72};
+const citySafe=p=>p.x>=CITY_SAFE.x0&&p.x<=CITY_SAFE.x1&&p.z>=CITY_SAFE.z0&&p.z<=CITY_SAFE.z1;
+const PVP={baton:{dmg:20,cd:280,range:3,pellets:1},pistol:{dmg:20,cd:330,range:40,pellets:1},shotgun:{dmg:8,cd:750,range:16,pellets:6},other:{dmg:20,cd:330,range:40,pellets:1}};
+function cityShoot(r,p,b){
+ const t=now();if(!r.map.city||r.phase!=='live')fail(409,'Enter the shared city first.');
+ const w=PVP[b.weapon]||PVP.other,target=r.players.get(b.target),out={hit:false};
+ for(const k of ['ox','oy','oz','dx','dy','dz'])if(!Number.isFinite(b[k]))fail(400,'Invalid shot.');
+ if(p.hp<=0)return{...out,reason:'down'};
+ if(citySafe(p))return{...out,reason:'safe'};
+ if(t-(p.cityShotAt||0)<w.cd*.85)return{...out,reason:'cooldown'};p.cityShotAt=t;
+ if(p.protectUntil>t)p.protectUntil=t;
+ const len=Math.hypot(b.dx,b.dy,b.dz);if(len<.5||len>1.5)fail(400,'Invalid shot.');const d={x:b.dx/len,y:b.dy/len,z:b.dz/len},o={x:b.ox,y:b.oy,z:b.oz};
+ if(Math.hypot(o.x-p.x,o.z-p.z)>2.5||Math.abs(o.y-((p.y||1)+1.6))>2.5)return{...out,reason:'origin'};
+ r.events.push({id:id(),type:'city-shot',player:p.id,x:o.x,y:o.y,z:o.z,dx:d.x,dy:d.y,dz:d.z,range:w.range,hit:null});r.events=r.events.slice(-10);
+ if(!target||target===p||target.hp<=0)return out;
+ if(citySafe(target))return{...out,reason:'target-safe'};
+ if(target.protectUntil>t)return{...out,reason:'protected'};
+ const ty=target.y||1,dist=W.rayBox(o,d,{x:target.x-.6,y:ty-.2,z:target.z-.6},{x:target.x+.6,y:ty+2.1,z:target.z+.6});
+ if(!(dist<=w.range+1))return{...out,reason:'miss'};
+ const pellets=Math.max(1,Math.min(w.pellets,Number.isSafeInteger(b.pellets)?b.pellets:1)),dmg=w.dmg*pellets;
+ target.hp=Math.max(0,target.hp-dmg);r.events[r.events.length-1].hit=target.id;r.events[r.events.length-1].dmg=dmg;
+ if(!target.hp){target.deaths++;target.respawnAt=t+4000;p.kills++;p.score+=25;store.kill(r,p,target);economy.credit(p.accountId,25);system(r,p.name+' downed '+target.name+'.')}
+ return{hit:true,dmg,hp:target.hp,down:!target.hp};
+}
 // Owner-only chat commands in the Main Beta: /remove @username, /allow @username.
 function moderate(r,p,text){if(!mb.isOwner(p.accountId))fail(403,'Only the server owner can use moderation commands.');const [,verb,name]=/^\/(remove|allow)\s+@?([a-z0-9_]{3,24})\s*$/i.exec(text)||[];if(!verb)fail(400,'Use /remove @username or /allow @username.');const target=store.db.prepare('SELECT id FROM accounts WHERE username=?').get(name.toLowerCase());if(!target)fail(404,'No resident with that username.');if(target.id===p.accountId)fail(400,'You cannot remove yourself.');if(verb.toLowerCase()==='remove'){r.banned.add(target.id);for(const q of [...r.players.values()])if(q.accountId===target.id)remove(r,q);system(r,'A resident was removed by the server owner.')}else{r.banned.delete(target.id);system(r,'@'+name.toLowerCase()+' may enter the Main Beta again.')}}
 const server=http.createServer(async(req,res)=>{res.setHeader('X-Content-Type-Options','nosniff');res.setHeader('Referrer-Policy','no-referrer');try{const u=new URL(req.url,'http://localhost');if(u.pathname==='/health'){res.setHeader('Content-Type','application/json');return res.end(JSON.stringify({ok:true,rooms:rooms.size,players:tokens.size,capacity:12,main:rooms.get(mb.code)?.players.size||0}))}
 if(u.pathname.startsWith('/api/')){res.setHeader('Cache-Control','no-store');
 const origin=req.headers.origin;if(origin&&!(opts.publicOrigin||process.env.PUBLIC_ORIGIN?[opts.publicOrigin||process.env.PUBLIC_ORIGIN]:['http://'+req.headers.host,'https://'+req.headers.host]).includes(origin))fail(403,'Use this server’s own game page.');
 if(u.pathname==='/api/main'&&req.method==='GET'){rate('main:'+clientIp(req),600,60000);const n=rooms.get(mb.code)?.players.size||0;return json(res,{players:n,capacity:12,full:n>=12})}
+if(u.pathname.startsWith('/api/wallet')){
+ const a=account(req);rate('wallet:'+a.id,120,60000);
+ if(u.pathname==='/api/wallet'&&req.method==='GET')return json(res,economy.read(a.id));
+ if(req.method!=='POST')fail(405,'Use POST.');if(!String(req.headers['content-type']||'').startsWith('application/json'))fail(415,'Send JSON.');
+ const b=await body(req,4096);
+ if(u.pathname==='/api/wallet/buy')return json(res,economy.buy(a.id,b.sku,b.qty));
+ if(u.pathname==='/api/wallet/earn'){rate('earn:'+a.id,40,60000);return json(res,economy.claim(a.id,b.amount,b.reason))}
+ if(u.pathname==='/api/wallet/hotbar')return json(res,economy.setHotbar(a.id,b.slots));
+ fail(404,'Unknown wallet action.');
+}
 if(u.pathname==='/api/resident-life'){
  const a=account(req);rate('life:'+a.id,120,60000);
  if(req.method==='GET')return json(res,life.read(a.id));
@@ -66,14 +107,14 @@ if(u.pathname==='/api/common-challenge'&&req.method==='GET'){const a=account(req
 if(u.pathname.startsWith('/api/common-challenge/')&&req.method==='POST'){const a=account(req);rate('challenge-write:'+a.id,10,60000);if(!String(req.headers['content-type']||'').startsWith('application/json'))fail(415,'Send JSON.');return json(res,challenge.action(a,u.pathname.split('/').pop(),await body(req,40000)))}
 if(u.pathname==='/api/social'&&req.method==='GET'){const a=account(req);rate('social-read:'+a.id,60,60000);return json(res,social.snapshot(a.id))}
 if(u.pathname==='/api/profiles'&&req.method==='GET'){account(req);return json(res,{profiles:store.leaders()})}
-if(u.pathname==='/api/city-structures'){const {r,p}=auth(req);if(!r.map.city||r.phase!=='live')fail(409,'Enter the shared city first.');if(!structures.ensure(r.code,p.accountId)&&r.public&&mb.releasePlot(r.code,present()))structures.ensure(r.code,p.accountId);if(req.method==='GET'){rate('structure-read:'+p.accountId,120,60000);return json(res,structures.snapshot(r.code,p.accountId))}if(req.method!=='POST')fail(405,'Use GET or POST.');if(!String(req.headers['content-type']||'').startsWith('application/json'))fail(415,'Send JSON.');rate('structure-write:'+p.accountId,60,60000);const b=await body(req,180000);if(b.travel===true){rate('plot-travel:'+p.accountId,12,60000);const snapshot=structures.snapshot(r.code,p.accountId),own=snapshot.owners.find(o=>o.author===p.accountId);if(!own)fail(409,'No free building plot in this city.');p.x=own.plot.x+3.5;p.y=1;p.z=own.plot.z-1;p.yaw=Math.PI;p.pitch=0;p.moving=false;p.poseAt=now();p.seq++;store.checkpoint(r);json(res,{...snapshot,arrival:{x:p.x,y:p.y,z:p.z}});publish(r);return}const result=structures.save(r.code,p.accountId,b,[...r.players.values()]);json(res,result);publish(r);return;}
+if(u.pathname==='/api/city-structures'){const {r,p}=auth(req);if(!r.map.city||r.phase!=='live')fail(409,'Enter the shared city first.');if(!structures.ensure(r.code,p.accountId)&&r.public&&mb.releasePlot(r.code,present()))structures.ensure(r.code,p.accountId);if(req.method==='GET'){rate('structure-read:'+p.accountId,120,60000);return json(res,structures.snapshot(r.code,p.accountId))}if(req.method!=='POST')fail(405,'Use GET or POST.');if(!String(req.headers['content-type']||'').startsWith('application/json'))fail(415,'Send JSON.');rate('structure-write:'+p.accountId,60,60000);const b=await body(req,180000);if(b.travel===true){rate('plot-travel:'+p.accountId,12,60000);const snapshot=structures.snapshot(r.code,p.accountId),own=snapshot.owners.find(o=>o.author===p.accountId);if(!own)fail(409,'No free building plot in this city.');p.x=own.plot.x+3.5;p.y=1;p.z=own.plot.z-1;p.yaw=Math.PI;p.pitch=0;p.moving=false;p.poseAt=now();p.seq++;store.checkpoint(r);json(res,{...snapshot,arrival:{x:p.x,y:p.y,z:p.z}});publish(r);return}const result=structures.save(r.code,p.accountId,b,[...r.players.values()],(before,after)=>economy.plotChange(p.accountId,before,after));json(res,{...result,wallet:economy.read(p.accountId)});publish(r);return;}
 if(u.pathname==='/api/city-art'){
  const {r,p}=auth(req);if(!r.map.city||r.phase!=='live')fail(409,'Enter the shared city first.');
  if(req.method==='GET'){rate('art-read:'+p.accountId,120,60000);return json(res,cityBuild.snapshot(r.code,p.accountId))}
  if(req.method!=='POST')fail(405,'Use GET or POST.');
  if(!String(req.headers['content-type']||'').startsWith('application/json'))fail(415,'Send JSON.');
  rate('art-write:'+p.accountId,60,60000);const b=await body(req,786432);
- const result=cityBuild.save(r.code,p.accountId,b.revision,b.objects);json(res,result);publish(r);return;
+ const result=cityBuild.save(r.code,p.accountId,b.revision,b.objects,(before,after)=>economy.artChange(p.accountId,before,after));json(res,{...result,wallet:economy.read(p.accountId)});publish(r);return;
 }
 if(u.pathname==='/api/media'&&req.method==='POST'){const a=account(req);rate('media:'+a.id,12,60000);if(!String(req.headers['content-type']||'').startsWith('application/json'))fail(415,'Send JSON.');return json(res,media.upload(a.id,await body(req,17000000)))}
 if(u.pathname.startsWith('/api/media/')){const a=account(req),key=u.pathname.slice(11);if(req.method==='DELETE')return json(res,media.discard(key,a.id));if(!['GET','HEAD'].includes(req.method))fail(405,'Use GET, HEAD or DELETE.');const m=media.read(key,a.id),data=Buffer.from(m.data);res.setHeader('Content-Type',m.mime);res.setHeader('Accept-Ranges','bytes');res.setHeader('Cache-Control','private, no-store');let start=0,end=data.length-1;const range=req.headers.range;if(range){const match=/^bytes=(\d+)-(\d*)$/.exec(range);if(!match)fail(416,'Unsupported range.');start=Number(match[1]);end=match[2]?Math.min(end,Number(match[2])):end;if(start>end||start>=data.length){res.setHeader('Content-Range','bytes */'+data.length);fail(416,'Range outside file.')}res.statusCode=206;res.setHeader('Content-Range',`bytes ${start}-${end}/${data.length}`)}res.setHeader('Content-Length',end-start+1);return res.end(req.method==='HEAD'?undefined:data.subarray(start,end+1))}
@@ -128,6 +169,7 @@ case '/api/input':{if(r.map.city)break;if(!Number.isSafeInteger(b.seq)||b.seq<=p
 case '/api/ready':p.ready=!!b.ready;break;
 case '/api/start':if(r.public)fail(409,'The Main Beta is always open.');if(r.host!==p.id)fail(403,'Only the host can start.');if([...r.players.values()].some(q=>!q.ready))fail(409,'Every resident must be ready.');r.phase='live';system(r,r.map.city?'Makers’ Mile is open. Meet and explore the real city together. Building edits and NPCs are local; this city session is social free roam.':'The district is open. The central ring is protected. PvP is active outside it.');break;
 case '/api/shoot':shoot(r,p);break;
+case '/api/city-shoot':{const result=cityShoot(r,p,b);json(res,result);if(result.hit)publish(r);return}
 case '/api/reload':if(p.hp>0&&!p.reloadUntil&&p.ammo<6)p.reloadUntil=now()+1600;break;
 case '/api/chat':rate('chat:'+p.id,5,10000);if(r.public&&/^\/(remove|allow)\s/i.test(clean(b.text,240))){moderate(r,p,clean(b.text,240));break}if(clean(b.text,240))r.chat.push({id:id(),player:p.id,accountId:p.accountId,name:p.name,text:clean(b.text,240),at:now()});r.chat=r.chat.slice(-30);break;
 case '/api/emote':if(!['Wave','Peace','Need help','Good game'].includes(b.emote))fail(400,'Unknown emote.');p.emote=b.emote;p.emoteUntil=now()+3500;break;

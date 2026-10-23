@@ -22,7 +22,7 @@ function createCityBuildStore(db){
  const rows=code=>db.prepare('SELECT author,revision,payload FROM city_art WHERE room=? ORDER BY author').all(code);
  const revision=code=>db.prepare('SELECT revision FROM city_art_versions WHERE room=?').get(code)?.revision||0;
  function snapshot(code,viewer){const owners=rows(code);return{revision:revision(code),ownRevision:owners.find(o=>o.author===viewer)?.revision||0,owners:owners.map(o=>({id:o.author,objects:JSON.parse(o.payload)}))}}
- function save(code,author,expected,objects){
+ function save(code,author,expected,objects,onChange){
  if(!Number.isSafeInteger(expected)||expected<0)fail(400,'Invalid artwork revision.');
  const normalized=validate(objects),payload=JSON.stringify(normalized);db.exec('BEGIN IMMEDIATE');
  try{const current=rows(code),own=current.find(o=>o.author===author);
@@ -32,6 +32,7 @@ function createCityBuildStore(db){
  if(normalized.some(o=>ids.has(o.id)))fail(403,'Another resident owns that piece.');
  const all=others.concat(normalized);if(all.length>4000)fail(409,'This city has reached its 4,000-piece limit.');
  if(all.filter(o=>['mural','sign'].includes(o.kind)).length>24)fail(409,'This city has room for 24 signs and murals.');
+ onChange?.(own?JSON.parse(own.payload):[],normalized);
  db.prepare('INSERT INTO city_art VALUES(?,?,?,?) ON CONFLICT(room,author) DO UPDATE SET revision=excluded.revision,payload=excluded.payload').run(code,author,expected+1,payload);
  db.prepare('INSERT INTO city_art_versions VALUES(?,1) ON CONFLICT(room) DO UPDATE SET revision=revision+1').run(code);
  db.exec('COMMIT');return snapshot(code,author);

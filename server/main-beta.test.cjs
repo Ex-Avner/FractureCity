@@ -73,7 +73,7 @@ test('Main Beta: idle plots and gallery spaces are released into archives, never
  const clock={t:1_800_000_000_000},srv=await boot(':memory:',clock);
  try{const db=srv.app.store.db,code=mainCode(),owners=[];
   const boss=client(srv,clock);await boss.register('beta_owner');await boss.join({public:true});assert.equal((await boss.get('city-structures')).status,200);await boss.post('leave');
-  for(let i=0;i<11;i++){const c=client(srv,clock);await c.register('builder_'+i);await c.join({public:true});const s=await c.get('city-structures');assert.equal(s.status,200);owners.push(c);if(i===0){const mine=s.data.owners.find(o=>o.author===s.data.viewer);const cells=[{x:mine.plot.x+1,y:1,z:mine.plot.z+1,id:120}];assert.equal((await c.post('city-structures',{revision:mine.revision,cells,doors:[]})).status,200)}await c.post('leave')}
+  for(let i=0;i<11;i++){const c=client(srv,clock);await c.register('builder_'+i);await c.join({public:true});const s=await c.get('city-structures');assert.equal(s.status,200);owners.push(c);if(i===0){const mine=s.data.owners.find(o=>o.author===s.data.viewer);const cells=[{x:mine.plot.x+1,y:1,z:mine.plot.z+1,id:120}];assert.equal((await c.post('wallet/buy',{sku:'b:120',qty:1})).status,200);assert.equal((await c.post('city-structures',{revision:mine.revision,cells,doors:[]})).status,200)}await c.post('leave')}
   assert.equal(db.prepare('SELECT COUNT(*) n FROM city_structures WHERE room=?').get(code).n,12);
   const early=client(srv,clock);await early.register('newcomer_early');await early.join({public:true});
   const none=await early.get('city-structures');assert.ok(!none.data.owners.some(o=>o.author===none.data.viewer),'no plot while every owner is recent');await early.post('leave');

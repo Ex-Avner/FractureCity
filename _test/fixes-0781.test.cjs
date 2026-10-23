@@ -25,8 +25,8 @@ try{
  const p=await ctx.newPage();p.on('pageerror',e=>errors.push(e.message));
  await p.goto(base+'/city/?online='+code,T);await p.waitForFunction(()=>window.FCCityOnline?.ready&&FCCityOnline.connected&&window.FCCityBuild?.ready,null,{timeout:300000});
  await p.evaluate(()=>{HD.locked=true;HD.setTier('perf',true);window.__toasts=[];const t=window.toast;window.toast=function(m,k){__toasts.push(String(m));return t.apply(this,arguments)};toggleConstructMode()});
- await p.waitForSelector('#build-dock:not([hidden])',T);await p.waitForTimeout(1500);
- assert.deepEqual((await hitFree(p,'#build-dock nav button, #build-dock .bd-tools button')).filter(b=>!b.free).map(b=>b.label),[],'no dock button is covered');
+ await p.waitForSelector('#fc-hotbar:not([hidden])',T);await p.waitForTimeout(1500);
+ assert.deepEqual((await hitFree(p,'#fc-hotbar button')).filter(b=>!b.free).map(b=>b.label),[],'no hotbar button is covered');
  await p.screenshot({path:root+'/_test/out/fix-0781-dock-online-phone.png',...T});
  const refused=await p.evaluate(()=>{const piece=i=>({id:'cap'+i,kind:'box',p:[150+i%20,1.5,30+Math.floor(i/20)],s:[.3,.3,.3],r:[0,0,0],color:'#888888',finish:'matte'});const list=[...CityArt.objects,...Array.from({length:1001},(_,i)=>piece(i))];const ok=CityArt.online.allow(list);return{ok,toasts:__toasts.slice()}});
  assert.equal(refused.ok,false);assert.ok(refused.toasts.some(t=>/1,000 pieces/.test(t)),'the limit shows as a toast');

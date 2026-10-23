@@ -1,0 +1,505 @@
+{
+ "version": 1,
+ "currency": "credits",
+ "startingBalance": 300,
+ "blocks": [
+  {
+   "sku": "b:120",
+   "id": 120,
+   "name": "Lime plaster",
+   "color": "#d7ceba",
+   "pattern": "plaster",
+   "price": 1,
+   "stack": 16
+  },
+  {
+   "sku": "b:121",
+   "id": 121,
+   "name": "Midnight plaster",
+   "color": "#253544",
+   "pattern": "plaster",
+   "price": 1,
+   "stack": 16
+  },
+  {
+   "sku": "b:122",
+   "id": 122,
+   "name": "Rose plaster",
+   "color": "#a86473",
+   "pattern": "plaster",
+   "price": 1,
+   "stack": 16
+  },
+  {
+   "sku": "b:123",
+   "id": 123,
+   "name": "Bottle-green tile",
+   "color": "#286c62",
+   "pattern": "tile",
+   "price": 2,
+   "stack": 16
+  },
+  {
+   "sku": "b:124",
+   "id": 124,
+   "name": "Cream subway tile",
+   "color": "#e4decc",
+   "pattern": "brick",
+   "price": 2,
+   "stack": 16
+  },
+  {
+   "sku": "b:125",
+   "id": 125,
+   "name": "Cobalt tile",
+   "color": "#395eae",
+   "pattern": "tile",
+   "price": 2,
+   "stack": 16
+  },
+  {
+   "sku": "b:126",
+   "id": 126,
+   "name": "Checkerboard",
+   "color": "#c2bda9",
+   "pattern": "check",
+   "price": 2,
+   "stack": 16
+  },
+  {
+   "sku": "b:127",
+   "id": 127,
+   "name": "Terrazzo",
+   "color": "#b6aaa4",
+   "pattern": "speckle",
+   "price": 3,
+   "stack": 16
+  },
+  {
+   "sku": "b:128",
+   "id": 128,
+   "name": "Walnut boards",
+   "color": "#6f4936",
+   "pattern": "wood",
+   "price": 2,
+   "stack": 16
+  },
+  {
+   "sku": "b:129",
+   "id": 129,
+   "name": "Pale oak boards",
+   "color": "#ba9770",
+   "pattern": "wood",
+   "price": 2,
+   "stack": 16
+  },
+  {
+   "sku": "b:130",
+   "id": 130,
+   "name": "Charred timber",
+   "color": "#34302d",
+   "pattern": "wood",
+   "price": 2,
+   "stack": 16
+  },
+  {
+   "sku": "b:131",
+   "id": 131,
+   "name": "Red brick",
+   "color": "#9e5442",
+   "pattern": "brick",
+   "price": 2,
+   "stack": 16
+  },
+  {
+   "sku": "b:132",
+   "id": 132,
+   "name": "Whitewashed brick",
+   "color": "#c8c4b8",
+   "pattern": "brick",
+   "price": 2,
+   "stack": 16
+  },
+  {
+   "sku": "b:133",
+   "id": 133,
+   "name": "Poured concrete",
+   "color": "#777f83",
+   "pattern": "concrete",
+   "price": 1,
+   "stack": 16
+  },
+  {
+   "sku": "b:134",
+   "id": 134,
+   "name": "Weathered concrete",
+   "color": "#4c5c64",
+   "pattern": "concrete",
+   "price": 1,
+   "stack": 16
+  },
+  {
+   "sku": "b:135",
+   "id": 135,
+   "name": "Fluted brass",
+   "color": "#b09756",
+   "pattern": "flute",
+   "price": 3,
+   "stack": 16
+  },
+  {
+   "sku": "b:136",
+   "id": 136,
+   "name": "Brushed steel",
+   "color": "#88959e",
+   "pattern": "flute",
+   "price": 3,
+   "stack": 16
+  },
+  {
+   "sku": "b:137",
+   "id": 137,
+   "name": "Copper panels",
+   "color": "#ae795d",
+   "pattern": "panel",
+   "price": 3,
+   "stack": 16
+  },
+  {
+   "sku": "b:138",
+   "id": 138,
+   "name": "Acoustic velvet",
+   "color": "#673e64",
+   "pattern": "panel",
+   "price": 3,
+   "stack": 16
+  },
+  {
+   "sku": "b:139",
+   "id": 139,
+   "name": "Amber light tile",
+   "color": "#ffce79",
+   "pattern": "light",
+   "price": 4,
+   "stack": 16
+  },
+  {
+   "sku": "b:140",
+   "id": 140,
+   "name": "Mint light tile",
+   "color": "#86daca",
+   "pattern": "light",
+   "price": 4,
+   "stack": 16
+  },
+  {
+   "sku": "b:141",
+   "id": 141,
+   "name": "Frosted glass",
+   "color": "#96b7c6",
+   "pattern": "glass",
+   "price": 3,
+   "stack": 16
+  },
+  {
+   "sku": "b:142",
+   "id": 142,
+   "name": "Oak door",
+   "color": "#977044",
+   "pattern": "door",
+   "price": 12,
+   "stack": 2
+  },
+  {
+   "sku": "b:143",
+   "id": 143,
+   "name": "Steel door",
+   "color": "#6d8793",
+   "pattern": "door",
+   "price": 12,
+   "stack": 2
+  }
+ ],
+ "furniture": [
+  {
+   "sku": "f:0",
+   "id": 0,
+   "name": "Cloud sofa",
+   "category": "Seating",
+   "price": 60
+  },
+  {
+   "sku": "f:1",
+   "id": 1,
+   "name": "Reading armchair",
+   "category": "Seating",
+   "price": 60
+  },
+  {
+   "sku": "f:2",
+   "id": 2,
+   "name": "Velvet ottoman",
+   "category": "Seating",
+   "price": 60
+  },
+  {
+   "sku": "f:3",
+   "id": 3,
+   "name": "Dining chair",
+   "category": "Seating",
+   "price": 60
+  },
+  {
+   "sku": "f:4",
+   "id": 4,
+   "name": "Bar stool",
+   "category": "Seating",
+   "price": 60
+  },
+  {
+   "sku": "f:5",
+   "id": 5,
+   "name": "Chaise longue",
+   "category": "Seating",
+   "price": 60
+  },
+  {
+   "sku": "f:6",
+   "id": 6,
+   "name": "Round café table",
+   "category": "Tables",
+   "price": 50
+  },
+  {
+   "sku": "f:7",
+   "id": 7,
+   "name": "Oval coffee table",
+   "category": "Tables",
+   "price": 50
+  },
+  {
+   "sku": "f:8",
+   "id": 8,
+   "name": "Writing desk",
+   "category": "Tables",
+   "price": 50
+  },
+  {
+   "sku": "f:9",
+   "id": 9,
+   "name": "Glass side table",
+   "category": "Tables",
+   "price": 50
+  },
+  {
+   "sku": "f:10",
+   "id": 10,
+   "name": "Dining table",
+   "category": "Tables",
+   "price": 50
+  },
+  {
+   "sku": "f:11",
+   "id": 11,
+   "name": "Open bookcase",
+   "category": "Storage",
+   "price": 70
+  },
+  {
+   "sku": "f:12",
+   "id": 12,
+   "name": "Floating shelves",
+   "category": "Storage",
+   "price": 70
+  },
+  {
+   "sku": "f:13",
+   "id": 13,
+   "name": "Sideboard",
+   "category": "Storage",
+   "price": 70
+  },
+  {
+   "sku": "f:14",
+   "id": 14,
+   "name": "Clothes rail",
+   "category": "Storage",
+   "price": 70
+  },
+  {
+   "sku": "f:15",
+   "id": 15,
+   "name": "Bed with pillows",
+   "category": "Bedroom",
+   "price": 90
+  },
+  {
+   "sku": "f:16",
+   "id": 16,
+   "name": "Bedside cabinet",
+   "category": "Bedroom",
+   "price": 90
+  },
+  {
+   "sku": "f:17",
+   "id": 17,
+   "name": "Floor mirror",
+   "category": "Bedroom",
+   "price": 90
+  },
+  {
+   "sku": "f:18",
+   "id": 18,
+   "name": "Floor lamp",
+   "category": "Lighting",
+   "price": 40
+  },
+  {
+   "sku": "f:19",
+   "id": 19,
+   "name": "Mushroom lamp",
+   "category": "Lighting",
+   "price": 40
+  },
+  {
+   "sku": "f:20",
+   "id": 20,
+   "name": "Pendant light",
+   "category": "Lighting",
+   "price": 40
+  },
+  {
+   "sku": "f:21",
+   "id": 21,
+   "name": "Neon loop",
+   "category": "Lighting",
+   "price": 40
+  },
+  {
+   "sku": "f:22",
+   "id": 22,
+   "name": "Kitchen cabinet",
+   "category": "Kitchen",
+   "price": 80
+  },
+  {
+   "sku": "f:23",
+   "id": 23,
+   "name": "Sink counter",
+   "category": "Kitchen",
+   "price": 80
+  },
+  {
+   "sku": "f:24",
+   "id": 24,
+   "name": "Cooker",
+   "category": "Kitchen",
+   "price": 80
+  },
+  {
+   "sku": "f:25",
+   "id": 25,
+   "name": "Retro refrigerator",
+   "category": "Kitchen",
+   "price": 80
+  },
+  {
+   "sku": "f:26",
+   "id": 26,
+   "name": "Coffee machine",
+   "category": "Kitchen",
+   "price": 80
+  },
+  {
+   "sku": "f:27",
+   "id": 27,
+   "name": "Freestanding bathtub",
+   "category": "Bathroom",
+   "price": 90
+  },
+  {
+   "sku": "f:28",
+   "id": 28,
+   "name": "Washstand",
+   "category": "Bathroom",
+   "price": 90
+  },
+  {
+   "sku": "f:29",
+   "id": 29,
+   "name": "Towel ladder",
+   "category": "Bathroom",
+   "price": 90
+  },
+  {
+   "sku": "f:30",
+   "id": 30,
+   "name": "Studio easel",
+   "category": "Studio",
+   "price": 110
+  },
+  {
+   "sku": "f:31",
+   "id": 31,
+   "name": "Record player",
+   "category": "Studio",
+   "price": 110
+  },
+  {
+   "sku": "f:32",
+   "id": 32,
+   "name": "Studio speaker",
+   "category": "Studio",
+   "price": 110
+  },
+  {
+   "sku": "f:33",
+   "id": 33,
+   "name": "Computer workstation",
+   "category": "Studio",
+   "price": 110
+  },
+  {
+   "sku": "f:34",
+   "id": 34,
+   "name": "Large leafy plant",
+   "category": "Plants & décor",
+   "price": 25
+  },
+  {
+   "sku": "f:35",
+   "id": 35,
+   "name": "Succulent bowl",
+   "category": "Plants & décor",
+   "price": 25
+  },
+  {
+   "sku": "f:36",
+   "id": 36,
+   "name": "Vase trio",
+   "category": "Plants & décor",
+   "price": 25
+  },
+  {
+   "sku": "f:37",
+   "id": 37,
+   "name": "Woven rug",
+   "category": "Plants & décor",
+   "price": 25
+  },
+  {
+   "sku": "f:38",
+   "id": 38,
+   "name": "Candle tray",
+   "category": "Plants & décor",
+   "price": 25
+  },
+  {
+   "sku": "f:39",
+   "id": 39,
+   "name": "Wall clock",
+   "category": "Plants & décor",
+   "price": 25
+  }
+ ]
+}
