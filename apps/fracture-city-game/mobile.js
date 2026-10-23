@@ -114,6 +114,10 @@
     if (u.inIntro)    return { label: 'SKIP ▸▸', run: () => tap('Escape') };
     if (hdOpen())     return { label: '✕ CLOSE', run: () => tap('f') };
     if (keysOpen)     return { label: '✕ CLOSE', run: () => showKeys(false) };
+    //  Build panels.
+    if (document.getElementById('furniture-menu') && window.FCFurniture) return { label: '✕ CLOSE', run: () => FCFurniture.close() };
+    if (window.CityArt && CityArt.panelOpen)   return { label: '✕ CLOSE', run: () => CityArt.close() };
+    if (window.CityBuild && CityBuild.panelOpen) return { label: '✕ CLOSE', run: () => CityBuild.close() };
     return null;
   }
 
