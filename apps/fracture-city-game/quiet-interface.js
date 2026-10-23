@@ -28,7 +28,7 @@ body:has(#city-online) #fc-tools{top:68px}
 body:has(#maker-interact:not([hidden])) #interact-prompt{display:none!important}
 @media(pointer:coarse){body.fc-compact #fc-story-goal,body.fc-compact #maker-goal{top:10px;max-width:56vw;font-size:10px}body.fc-compact #fc-tools{top:8px;right:8px}}
 `;document.head.appendChild(style);
-const menu=document.createElement('details');menu.id='fc-tools';menu.hidden=true;menu.innerHTML='<summary>Tools · F2</summary><div class="tray"><strong>Palm Radio</strong><p class="track">Your soundtrack</p><div class="row"><button data-act="prev" aria-label="Previous song">Back</button><button data-act="play">Play</button><button data-act="next" aria-label="Next song">Skip</button></div><div class="row"><button data-act="radio">Tracks & volume</button></div><div class="row"><button data-act="view">Camera · V</button><button data-act="hud">Full HUD</button></div><div class="row"><button data-act="journal">Journal · J</button><button data-act="quests">Stories · K</button></div><p>WASD move · mouse look · E interact<br>U radio · Y skip · Esc game menu</p></div>';document.body.appendChild(menu);
+const menu=document.createElement('details');menu.id='fc-tools';menu.hidden=true;menu.innerHTML='<summary>Tools · F2</summary><div class="tray"><strong>Palm Radio</strong><p class="track">Your soundtrack</p><div class="row"><button data-act="prev" aria-label="Previous song">Back</button><button data-act="play">Play</button><button data-act="next" aria-label="Next song">Skip</button></div><div class="row"><button data-act="radio">Tracks & volume</button></div><div class="row"><button data-act="view">Camera · V</button><button data-act="hud">Full HUD</button></div><div class="row"><button data-act="zombies">Zombies · ⇧Z</button><button data-act="peace">Peaceful · P</button></div><div class="row"><button data-act="journal">Journal · J</button><button data-act="quests">Stories · K</button></div><p>WASD move · mouse look · E interact<br>U radio · Y skip · Esc game menu</p></div>';document.body.appendChild(menu);
 function paint(){document.body.classList.toggle('fc-compact',compact);menu.querySelector('[data-act="hud"]').textContent=compact?'Full HUD':'Compact HUD';}paint();
 let held=false,wasPaused=false;
 function hold(){if(held)return;held=true;wasPaused=State.ui.paused;State.ui.paused=true;document.exitPointerLock?.();document.body.style.cursor='auto';}
@@ -39,6 +39,8 @@ menu.addEventListener('click',e=>{e.stopPropagation();const act=e.target.closest
 if(['prev','play','next'].includes(act))return window.PalmMedia?.[act]();
 if(act==='hud'){compact=!compact;try{localStorage.setItem('fc-compact-hud',String(compact))}catch{}paint();return;}
 menu.open=false;release();
+if(act==='zombies')return typeof shSiegeToggle==='function'&&shSiegeToggle();
+if(act==='peace')return typeof shSetPeaceful==='function'&&shSetPeaceful(!Peace.on);
 if(act==='radio')window.PalmMedia?.openRadio();
 else document.getElementById({view:'resident-view-toggle',journal:'campaign-casebook',quests:'sq-launch'}[act])?.click();
 });

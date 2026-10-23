@@ -3,7 +3,7 @@ const KINDS=new Set(['box','sphere','cylinder','cone','ring','wedge','sign','mur
 const FINISHES=new Set(['matte','metal','gloss','glow','glass']);
 const fail=(status,message)=>{throw Object.assign(Error(message),{status})};
 function validate(objects){
- if(!Array.isArray(objects)||objects.length>300)fail(400,'Each resident can publish up to 300 art pieces per city.');
+ if(!Array.isArray(objects)||objects.length>1000)fail(400,'Each resident can publish up to 1,000 art pieces per city.');
  const seen=new Set();return objects.map(o=>{
  if(!o||typeof o.id!=='string'||! /^[a-z0-9_-]{1,80}$/i.test(o.id)||seen.has(o.id))fail(400,'Invalid or repeated piece identifier.');seen.add(o.id);
  if(!KINDS.has(o.kind)||!FINISHES.has(o.finish)||(typeof o.color!=='string'||!/^#[a-f\d]{6}$/i.test(o.color)))fail(400,'Invalid shape, finish or color.');
@@ -30,7 +30,7 @@ function createCityBuildStore(db){
  if((own?.revision||0)!==expected)fail(409,'Your artwork changed in another session. Download your draft before reloading the city.');
  const others=current.filter(o=>o.author!==author).flatMap(o=>JSON.parse(o.payload)),ids=new Set(others.map(o=>o.id));
  if(normalized.some(o=>ids.has(o.id)))fail(403,'Another resident owns that piece.');
- const all=others.concat(normalized);if(all.length>1200)fail(409,'This city has reached its 1,200-piece limit.');
+ const all=others.concat(normalized);if(all.length>4000)fail(409,'This city has reached its 4,000-piece limit.');
  if(all.filter(o=>['mural','sign'].includes(o.kind)).length>24)fail(409,'This city has room for 24 signs and murals.');
  db.prepare('INSERT INTO city_art VALUES(?,?,?,?) ON CONFLICT(room,author) DO UPDATE SET revision=excluded.revision,payload=excluded.payload').run(code,author,expected+1,payload);
  db.prepare('INSERT INTO city_art_versions VALUES(?,1) ON CONFLICT(room) DO UPDATE SET revision=revision+1').run(code);

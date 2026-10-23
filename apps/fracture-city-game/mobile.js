@@ -253,6 +253,13 @@
       body.touch #pm-panel .in{padding-top:52px;}
       body.touch #shift-card,body.touch #inv-card{max-height:calc(100vh - 16px)!important;}
       body.touch #shift-card,body.touch #inv-card *{-webkit-overflow-scrolling:touch;}
+      body.touch .tc-chip[data-act=siege].live{background:#7a1f2a;border-color:#ff6b6b;color:#fff;}
+      body.touch #maker-goal,body.touch.fc-compact #maker-goal{top:56px!important;}
+      body.touch #fc-tools,body.touch.fc-compact #fc-tools{top:52px!important;right:8px!important;}
+      body.touch #city-online{top:52px!important;right:8px!important;}
+      body.touch #siege-bar{top:auto!important;bottom:calc(env(safe-area-inset-bottom) + 210px);pointer-events:none;padding:6px 12px;gap:10px;font-size:11px;max-width:calc(100vw - 24px);}
+      body.touch:has(#city-online) #fc-tools{top:100px!important;}
+      @media (max-width:520px){body.touch #tc-top{gap:4px;max-width:calc(100vw - 16px);}body.touch .tc-chip{padding:8px 5px;letter-spacing:0;min-width:30px;}}
     `;
     document.head.appendChild(css);
 
@@ -267,6 +274,7 @@
         ['BUILD', 'build', () => tap('b')],
         ['BOARD', 'board', () => tap('s', true)],
         ['CASE',  'case',  () => tap('j')],
+        ['ZOMBIES','siege', () => typeof shSiegeToggle === 'function' && shSiegeToggle()],
         ['KEYS',  'keys',  () => showKeys(!keysOpen)],
       ];
       for (const [label, act, run] of chips){
@@ -432,6 +440,7 @@
 
         const dlg = !!u.inDialogue;
         document.getElementById('mob-next').classList.toggle('on', dlg && !fnSceneUp());
+        const zc = document.querySelector('.tc-chip[data-act=siege]'); if (zc) zc.classList.toggle('live', typeof Siege !== 'undefined' && !!Siege.active);
         const ix = intrusionUp();
         document.getElementById('mob-pad').classList.toggle('on', ix);
         document.getElementById('mob-digits').classList.toggle('on', ix);

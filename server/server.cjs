@@ -72,7 +72,7 @@ if(u.pathname==='/api/city-art'){
  if(req.method==='GET'){rate('art-read:'+p.accountId,120,60000);return json(res,cityBuild.snapshot(r.code,p.accountId))}
  if(req.method!=='POST')fail(405,'Use GET or POST.');
  if(!String(req.headers['content-type']||'').startsWith('application/json'))fail(415,'Send JSON.');
- rate('art-write:'+p.accountId,60,60000);const b=await body(req,262144);
+ rate('art-write:'+p.accountId,60,60000);const b=await body(req,786432);
  const result=cityBuild.save(r.code,p.accountId,b.revision,b.objects);json(res,result);publish(r);return;
 }
 if(u.pathname==='/api/media'&&req.method==='POST'){const a=account(req);rate('media:'+a.id,12,60000);if(!String(req.headers['content-type']||'').startsWith('application/json'))fail(415,'Send JSON.');return json(res,media.upload(a.id,await body(req,17000000)))}

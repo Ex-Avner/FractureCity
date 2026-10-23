@@ -1,7 +1,7 @@
 /* Fine-grained, local artwork in the live city. Structural collision stays in CityBuild. */
 (function(){
 'use strict';
-const LIMIT=1200, MEDIA_LIMIT=24, SNAP=[.05,.1,.25,.5,1], TYPES=['box','sphere','cylinder','cone','ring','wedge','sign','mural'];
+const LIMIT=4000, MEDIA_LIMIT=24, SNAP=[.05,.1,.25,.5,1], TYPES=['box','sphere','cylinder','cone','ring','wedge','sign','mural'];
 const A=window.CityArt={enabled:false,panelOpen:false,objects:[],selected:new Set(),history:[],future:[],placeOnClick:false,workLight:true,snap:.25,repeatCount:6,spacing:1,radius:1.5,ready:false,draft:{kind:'box',s:[.5,.5,.5],r:[0,0,0],color:'#e8ba85',finish:'matte',text:'YOUR CITY. YOUR RULES.',pixels:Array(256).fill('#182b40')}};
 const copy=v=>JSON.parse(JSON.stringify(v)),esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const uid=()=>crypto.randomUUID(),round=n=>Math.round(n/A.snap)*A.snap;

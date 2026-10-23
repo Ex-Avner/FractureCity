@@ -136,7 +136,7 @@ function render(force){
 }
 dock.addEventListener('click',e=>{
  const b=e.target.closest('button');if(!b)return;b.blur();const A=art(),K=kit();
- if(b.dataset.mode){const k=b.dataset.mode;if(k==='atelier'){A?.open?.();render(true);return}setMode(k);if(k==='art'&&!A?.objects?.length)window.FCFurniture?.open?.();return}
+ if(b.dataset.mode){const k=b.dataset.mode;if(k==='atelier'){A?.open?.();render(true);return}setMode(k);if(k==='art'&&!A?.stamp&&!A?.objects?.some(o=>!A.online?.foreign?.(o.id)))window.FCFurniture?.open?.();return}
  if(b.dataset.slot){heldSlot=Number(b.dataset.slot);shRefreshHotbar();render(true);return}
  if(b.dataset.k){if(b.dataset.k==='catalogue'&&K?.openStructure)K.openStructure();else K?.quick?.(b.dataset.k);render(true);return}
  if(b.dataset.a){const a=b.dataset.a;
@@ -217,7 +217,7 @@ body.fc-build #art-direct{bottom:auto!important;top:76px!important}
 #build-dock .bd-status{margin-top:6px}
 #build-dock footer{color:var(--bd-mute);font-size:11px;text-align:center;border-top:1px solid var(--bd-line);padding-top:5px}
 @media (max-width:760px),(pointer:coarse){
- #build-dock{top:max(8px,env(safe-area-inset-top));bottom:auto;padding:6px;border-radius:12px;width:calc(100vw - 16px)}
+ #build-dock{z-index:100000;top:max(8px,env(safe-area-inset-top));bottom:auto;padding:6px;border-radius:12px;width:calc(100vw - 16px)}
  #build-dock header{gap:4px}#build-dock nav{flex-wrap:nowrap;overflow-x:auto}
  #build-dock button{min-height:36px;padding:6px 9px}
  #build-dock .bd-slots{display:flex;overflow-x:auto;scrollbar-width:none}
