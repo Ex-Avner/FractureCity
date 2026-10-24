@@ -11,7 +11,10 @@ const fail=(status,message)=>{throw Object.assign(Error(message),{status})};
 const CATALOG=JSON.parse(fs.readFileSync(path.join(__dirname,'..','apps','fracture-city-game','shop-catalog.json'),'utf8'));
 //  Rare wardrobe pieces (wardrobe.json) are sold once each.
 CATALOG.wardrobe=require('./looks.cjs').PREMIUM;
-const SKUS=new Map([...CATALOG.blocks,...CATALOG.furniture,...CATALOG.wardrobe].map(i=>[i.sku,i]));
+//  Casting Booth roles with a price are unlocked once each (npc-brain.js).
+CATALOG.roles=Object.entries(require('../apps/fracture-city-game/npc-brain.js').ROLES).filter(([,r])=>r.price).map(([k,r])=>({sku:'n:'+k,name:'Role: '+r.label,price:r.price,category:'Casting'}));
+const SKUS=new Map([...CATALOG.blocks,...CATALOG.furniture,...CATALOG.wardrobe,...CATALOG.roles].map(i=>[i.sku,i]));
+const ONCE=sku=>sku.startsWith('w:')||sku.startsWith('n:');
 const HOTBAR=8,MAX_STACK=9999,CLAIM_MAX=250,CLAIM_EVERY=2500,DAILY_CLAIMS=3000;
 const day=t=>new Date(t).toISOString().slice(0,10);
 //  Furniture placed from inventory carries its catalogue id in the group name.
@@ -34,8 +37,8 @@ function createEconomy(db,{now=Date.now}={}){
  function buy(a,sku,qty){
   const item=SKUS.get(sku);if(!item)fail(400,'That item is not in the shop.');
   if(!Number.isSafeInteger(qty)||qty<1||qty>256)fail(400,'Buy between 1 and 256 at a time.');
-  if(sku.startsWith('w:')&&qty!==1)fail(400,'Wardrobe pieces are bought once.');
-  return tx(()=>{if(sku.startsWith('w:')&&count(a,sku)>0)fail(409,'You already own '+item.name+'.');const w=wallet(a),cost=item.price*qty;if(w.balance<cost)fail(402,'Not enough credits for '+qty+' × '+item.name+' ('+cost+' needed, '+w.balance+' held).');
+  if(ONCE(sku)&&qty!==1)fail(400,sku.startsWith('n:')?'Roles are unlocked once.':'Wardrobe pieces are bought once.');
+  return tx(()=>{if(ONCE(sku)&&count(a,sku)>0)fail(409,'You already own '+item.name+'.');const w=wallet(a),cost=item.price*qty;if(w.balance<cost)fail(402,'Not enough credits for '+qty+' × '+item.name+' ('+cost+' needed, '+w.balance+' held).');
    db.prepare('UPDATE wallets SET balance=balance-? WHERE account_id=?').run(cost,a);setCount(a,sku,count(a,sku)+qty);return read(a)});
  }
  function claim(a,amount,reason){
@@ -60,6 +63,8 @@ function createEconomy(db,{now=Date.now}={}){
   for(const [sku,n]of used)if(n>0&&count(a,sku)<n)fail(402,'You need '+n+' × '+name(sku)+' and hold '+count(a,sku)+'. Buy more in the shop (I).');
   for(const [sku,n]of used)setCount(a,sku,count(a,sku)-n);
  }
- return{catalog:CATALOG,read,buy,claim,credit,setHotbar,owns:(a,sku)=>count(a,sku)>0,artChange:(a,before,after)=>apply(a,delta(furnitureGroups(before),furnitureGroups(after))),plotChange:(a,before,after)=>apply(a,delta(plotBlocks(before.cells,before.doors),plotBlocks(after.cells,after.doors)))};
+ //  A crew hand's scrounged blocks: a few of a block the resident has on the hotbar.
+ function give(a,n){const bar=JSON.parse(wallet(a).hotbar||'[]').filter(s=>typeof s==='string'&&s.startsWith('b:')&&SKUS.has(s));const sku=bar.length?bar[Math.floor(Math.random()*bar.length)]:(SKUS.has('b:3')?'b:3':null);if(!sku)return null;setCount(a,sku,count(a,sku)+n);return{sku,n,name:name(sku)}}
+ return{catalog:CATALOG,read,buy,claim,credit,give,setHotbar,owns:(a,sku)=>count(a,sku)>0,artChange:(a,before,after)=>apply(a,delta(furnitureGroups(before),furnitureGroups(after))),plotChange:(a,before,after)=>apply(a,delta(plotBlocks(before.cells,before.doors),plotBlocks(after.cells,after.doors)))};
 }
 module.exports={createEconomy,furnitureGroups,plotBlocks,CATALOG};

@@ -46,8 +46,8 @@ const SCENES={
 };
 const SCENE_FOR={suit:['office','office','work'],clerk:['office','office','skater'],medic:['work','office'],courier:['skater','work','punk'],runner:['skater','raver'],vendor:['work','skater'],busker:['punk','goth','skater'],drifter:['punk','goth','work'],punk:['punk','punk','goth'],broadcaster:['raver','goth','office'],records:['punk','goth'],bar:['goth','punk','raver'],repair:['work'],laundry:['work','skater'],tea:['goth','office'],print:['punk','office']};
 function rngOf(rng){return{pick:a=>a[Math.floor(rng.next()*a.length)],int:(a,b)=>a+Math.floor(rng.next()*(b-a+1)),sample:(a,n)=>{const c=[...a],o=[];while(n-->0&&c.length)o.push(c.splice(Math.floor(rng.next()*c.length),1)[0]);return o},next:()=>rng.next()}}
-function crowdLook(arch,rng){
- const r=rngOf(rng),pool=SCENE_FOR[arch?.key]||['punk','goth','skater','raver','work','office','skater','work'],scene=r.pick(pool);
+function crowdLook(arch,rng,scenes){
+ const r=rngOf(rng),pool=(Array.isArray(scenes)&&scenes.length&&scenes)||SCENE_FOR[arch?.key]||['punk','goth','skater','raver','work','office','skater','work'],scene=r.pick(pool);
  const base={skin:r.pick(P.skin),eyes:r.pick(['#3b2a1e','#6b4a2b','#4b6b8c','#69776d','#9d8651']),eyeShape:r.pick(OPTIONS.eyeShape),brows:r.pick(['straight','arched','heavy','slashed']),faceWidth:.9+r.next()*.2,faceLength:.92+r.next()*.16,jaw:.85+r.next()*.3,nose:.85+r.next()*.4,frame:r.pick(['slim','average','average','broad','curvy']),heightScale:.92+r.next()*.16,shoulders:.92+r.next()*.2,lips:'none',legwear:'none',headgear:'none',hairTip:'',tattoos:'none',extras:[]};
  const l=normalize({...base,...SCENES[scene](r)});if(!l.hairTip||l.hairTip==='')l.hairTip=l.hair;l.scene=scene;return l;
 }

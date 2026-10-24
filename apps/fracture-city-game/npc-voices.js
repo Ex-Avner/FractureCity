@@ -365,11 +365,13 @@ function start(person){
 }
 function recall(topic){ return ({ story: 'Still thinking about what I told you, are you?', rumor: 'Heard any more about that business I mentioned?', ned: 'Still watching Ned, then?', news: 'Did you look up that story?' })[topic] || ''; }
 function labelFor(person, role){
+ if (V[role]?.label) return V[role].label;
  if (role === 'keeper') return (person.shop?.name || 'SHOP').toUpperCase();
  const d = typeof districtAtPosition === 'function' && person.pos ? districtAtPosition(person.pos.x, person.pos.z) : null;
  return ((d ? d.name : 'FRACTURE CITY') + ' · ' + (person.char?.archetype || role)).toUpperCase();
 }
 function firstLine(person, role){
+ if (V[role]?.first) return V[role].first;
  //  A stranger opens with one of the original lines, so nothing written before is lost.
  try {
   if (role === 'keeper' && typeof KEEPER_BARKS !== 'undefined' && person.shop && KEEPER_BARKS[person.shop.type?.key]) return pick(KEEPER_BARKS[person.shop.type.key], idOf(person));
@@ -384,13 +386,18 @@ function options(){
  if (me.step < t.v.story.length) out.push({ label: me.step === 0 ? 'What’s your story?' : 'Go on, what happened next?', act: 'story' });
  out.push({ label: 'What’s going on around here?', act: 'rumor' });
  if (t.turns < 2) out.push({ label: 'What do you make of Ned?', act: 'ned' });
+ //  Voices can bring their own replies (Casting Booth NPCs: orders, errands, snacks).
+ const extra = typeof t.v.extra === 'function' ? t.v.extra(t) || [] : [];
+ out.push(...extra);
+ for (const drop of ['ned', 'name', 'rumor']){ if (out.length <= 5) break; const i = out.findIndex(o => o.act === drop); if (i >= 0) out.splice(i, 1); }
  out.push({ label: 'See you around.', act: 'bye' });
  out.push({ label: 'Not interested.', act: 'rude' });
- return out.slice(0, 6);
+ return out.slice(0, 8);
 }
 function react(act){
  const t = talk, me = t.me, v = t.v;
  t.turns++;
+ if (typeof v.handle === 'function'){ const beat = v.handle(act, t); if (beat) return show(beat); }
  if (act === 'bye'){ me.rapport = Math.min(6, me.rapport + (t.turns > 2 ? 1 : 0)); saveMemory(); return show({ text: pick(v.bye, t.id + me.met), end: true }); }
  if (act === 'rude'){ me.rapport = Math.max(-3, me.rapport - 2); me.rude++; saveMemory(); return show({ text: v.rude, end: true }); }
  if (act === 'name'){ me.knowsName = true; me.rapport += 1; saveMemory(); return show({ text: fill('{name}. Right. I will remember that. I remember most things, it is a problem.') }); }
@@ -451,7 +458,7 @@ function choose(o){ if (!o) return; if (o.act === 'close') return close(); react
 window.addEventListener('keydown', e => {
  if (!panel) return;
  if (e.code === 'Escape'){ close(); }
- else if (/^Digit[1-6]$/.test(e.code)){ const o = panel._opts?.[Number(e.code.slice(5)) - 1]; if (o){ if (o.href) window.open(o.href, '_blank', 'noopener'); else choose(o); } }
+ else if (/^Digit[1-8]$/.test(e.code)){ const o = panel._opts?.[Number(e.code.slice(5)) - 1]; if (o){ if (o.href) window.open(o.href, '_blank', 'noopener'); else choose(o); } }
  else if (e.code === 'Tab'){ const n = [...panel.querySelectorAll('[data-i]')], i = n.indexOf(document.activeElement); e.preventDefault(); n[(i + (e.shiftKey ? -1 : 1) + n.length) % n.length]?.focus(); }
  else if (e.code === 'Enter' || e.code === 'Space'){ const el = document.activeElement; if (el && panel.contains(el) && el.tagName === 'BUTTON'){ e.preventDefault(); el.click(); } }
  e.stopImmediatePropagation();

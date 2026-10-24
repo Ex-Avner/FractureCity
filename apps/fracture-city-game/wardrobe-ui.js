@@ -24,14 +24,18 @@ async function buy(key,val){const sku='w:'+key+':'+val,cost=price(key,val);
 const el=document.createElement('section');el.id='fc-wardrobe';el.hidden=true;el.setAttribute('role','dialog');el.setAttribute('aria-label','Wardrobe');document.body.append(el);
 for(const t of ['pointerdown','mousedown','wheel','keydown'])el.addEventListener(t,e=>{if(t!=='keydown'||e.code!=='Escape')e.stopPropagation()});
 let wasPaused=false;
-function open(){if(UI.open)return;UI.open=true;UI.draft=FCWardrobe.normalize(Shift.avatar);wasPaused=State.ui.paused;State.ui.paused=true;State.ui.inShiftPanel=true;document.exitPointerLock?.();document.body.style.cursor='auto';State.keys?.clear?.();el.hidden=false;draw()}
+//  open() dresses you; open({look,title,save,onSave}) dresses someone else (the Casting Booth).
+function open(opts){if(UI.open)return;UI.open=true;UI.custom=opts&&opts.onSave?opts:null;UI.draft=FCWardrobe.normalize(UI.custom?opts.look||{}:Shift.avatar);wasPaused=State.ui.paused;State.ui.paused=true;State.ui.inShiftPanel=true;document.exitPointerLock?.();document.body.style.cursor='auto';State.keys?.clear?.();el.hidden=false;draw()}
 function close(save){
  if(!UI.open)return;
  if(save){const bad=locked(UI.draft);if(bad.length){toast('Buy or take off: '+bad.map(([k,v])=>v.replace(/-/g,' ')).join(', '),'warn');return}
+  if(UI.custom){const cb=UI.custom.onSave,look={...UI.draft,extras:[...UI.draft.extras]};UI.custom=null;UI.open=false;el.hidden=true;clearPreview();State.ui.inShiftPanel=false;State.ui.paused=wasPaused;cb(look);return}
   Object.assign(Shift.avatar,UI.draft,{extras:[...UI.draft.extras]});if(typeof shRebuildMirror==='function')shRebuildMirror();if(typeof ShiftNet!=='undefined')ShiftNet.saveProfile(Shift.profile,Shift.avatar).then(where=>toast(where==='city'?'Look saved to the shared city.':'Look saved.','success')).catch(()=>{});if(online())FCCityOnline.sendLook?.()}
- UI.open=false;el.hidden=true;clearPreview();State.ui.inShiftPanel=false;State.ui.paused=wasPaused;if(!State.ui.paused)document.body.style.cursor='none';
+ const cancel=!save&&UI.custom?.onCancel;UI.custom=null;UI.open=false;el.hidden=true;clearPreview();State.ui.inShiftPanel=false;State.ui.paused=wasPaused;if(!State.ui.paused)document.body.style.cursor='none';if(cancel)cancel();
 }
-window.FCWardrobeUI={open,close,get draft(){return UI.draft}};
+//  A look with any rare pieces you do not own swapped for the everyday default.
+function affordable(look){const out={...look,extras:[...(look.extras||[])]};for(const [k,v] of locked(out)){if(Array.isArray(out[k]))out[k]=out[k].filter(x=>x!==v);else out[k]=FCWardrobe.DEFAULT_LOOK[k]}return out}
+window.FCWardrobeUI={open,close,affordable,get draft(){return UI.draft}};
 //  Every way into the old resident appearance panel now opens the wardrobe.
 const openPanel=window.shOpenPanel;
 window.shOpenPanel=function(id){if(id==='avatar')return open();return openPanel.apply(this,arguments)};
@@ -49,10 +53,10 @@ function draw(){
   return`<div class="wd-slot"><h4>${esc(s.label)}${s.multi?' <small>pick any</small>':''}</h4><div class="wd-opts">${s.options.map(v=>{const on=s.multi?(d[s.key]||[]).includes(v):d[s.key]===v,p=s.premium?.[v],own=owns(s.key,v);return`<button data-slot="${s.key}" data-val="${v}" data-multi="${s.multi?1:''}" class="${on?'on':''} ${p&&!own?'rare':''}">${esc(label(v))}${p?(own?'<i>owned</i>':`<i>¢ ${p}</i>`):''}</button>`}).join('')}</div></div>`}).join('');
  const bad=locked(d);
  el.innerHTML=`<div class="wd-stage"><canvas aria-label="Your resident. Drag to turn."></canvas><div class="wd-stage-tools"><button data-view>${UI.face?'Full body':'Face'}</button><button data-random>Randomise</button></div><div class="wd-presets">${S.presets.map((p,i)=>`<button data-preset="${i}">${esc(p.name)}</button>`).join('')}</div></div>
- <div class="wd-side"><header><div><small>FRACTURE CITY / WARDROBE</small><h2>Make some noise.</h2></div><div class="wd-wallet">${creative()?'<b>Creative</b>':`<b>¢ ${bal}</b><small>credits</small>`}</div></header>
+ <div class="wd-side"><header><div><small>FRACTURE CITY / ${UI.custom?'CASTING':'WARDROBE'}</small><h2>${esc(UI.custom?.title||'Make some noise.')}</h2></div><div class="wd-wallet">${creative()?'<b>Creative</b>':`<b>¢ ${bal}</b><small>credits</small>`}</div></header>
  <nav>${S.groups.map(x=>`<button data-group="${x.key}" class="${x.key===UI.group?'on':''}">${esc(x.label)}</button>`).join('')}<button data-group="colour" class="${UI.group==='colour'?'on':''}">Colours</button></nav>
  <div class="wd-body">${body}</div>
- <footer>${bad.length?`<p class="wd-warn">Trying on: ${bad.map(([k,v])=>`<button data-buy="${k}" data-val="${v}">Buy ${esc(label(v))} · ¢ ${price(k,v)}</button>`).join(' ')}</p>`:''}<div class="wd-actions"><button data-cancel>Cancel · Esc</button><button data-save class="wd-save" ${bad.length?'disabled':''}>Wear it</button></div></footer></div>`;
+ <footer>${bad.length?`<p class="wd-warn">Trying on: ${bad.map(([k,v])=>`<button data-buy="${k}" data-val="${v}">Buy ${esc(label(v))} · ¢ ${price(k,v)}</button>`).join(' ')}</p>`:''}<div class="wd-actions"><button data-cancel>Cancel · Esc</button><button data-save class="wd-save" ${bad.length?'disabled':''}>${esc(UI.custom?.save||'Wear it')}</button></div></footer></div>`;
  mountPreview();
 }
 el.addEventListener('click',e=>{

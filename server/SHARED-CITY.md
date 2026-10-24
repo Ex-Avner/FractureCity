@@ -244,3 +244,27 @@ the shooter's last position, and that the ray passes through the target's
 body box. Line of sight is the client's claim (the server has no city
 terrain). 100 health; a down pays the shooter 25 credits and respawns the
 target in Common Ground after 4 s.
+
+## Looks and the Casting Booth (0.80, 0.81)
+
+Residents' looks: POST /api/city-look {look} (cleaned by server/looks.cjs
+against apps/fracture-city-game/wardrobe.json; rare pieces need owning),
+GET /api/city-looks. The room's lookRev counts changes.
+
+Spawned NPCs (server/spawns.cjs, brains in
+apps/fracture-city-game/npc-brain.js, shared with solo cities):
+POST /api/npc-spawn {role,story,look,seed,x,y,z,to,message},
+/api/npc-dismiss {id}, /api/npc-order {id,cmd: follow|stay|here|story},
+/api/npc-poses {poses:[{id,x,y,z,yaw,moving,stuck}]}; GET /api/city-npcs for
+stories and looks (room state carries positions, acts, lines and npcRev).
+The server owns existence, role, story, look, health, goals and fights. It
+has no city terrain, so it hands each NPC to the nearest resident within
+60 m whose game has checked in (npc-poses, every 2 s even with nothing to
+move); that game moves it toward the server's goal with collision and
+reports, checked against speed. Nobody near, or reports gone quiet for
+1.5 s: the server steps it in a straight line. 12 NPCs per resident, 40 per
+city; paid roles are wallet items n:<role>. Trouble never acts inside
+Common Ground. Brawler punches cost health like PvP; city-shoot with {npc}
+hits trouble NPCs (5 credits per knockdown, rate-limited). NPCs leave ten
+minutes after their owner. Main Beta owner: /npcs @username clears
+someone's. NPCs live in server memory only; a restart clears them.
