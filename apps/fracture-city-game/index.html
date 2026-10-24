@@ -7856,7 +7856,10 @@ function shBuildCharacter(arch, rng, cfg){
   //  here rather than wrapped from outside because every measurement it needs —
   //  torso height, shoulder line, arm length, the build and height scales — is
   //  a local of this function and nothing else can see them.
-  if (typeof shCastDetail === 'function'){
+  //  wardrobe.js builds the visible figure itself and only needs this
+  //  function's metadata (nameplate, colours, gait), so it skips the geometry.
+  const LITE = !!window.FC_FIGURE_LITE;
+  if (typeof shCastDetail === 'function' && !LITE){
     try {
       shCastDetail(arch, rng, cfg,
         { body, headP, armLP, armRP, legLP, legRP },
@@ -7866,7 +7869,8 @@ function shBuildCharacter(arch, rng, cfg){
   }
 
   // ── Bake ──────────────────────────────────────────────────────────────────
-  citySoftenResident({body,headP,armLP,armRP,legLP,legRP});
+  if (LITE){ body.length = headP.length = armLP.length = armRP.length = legLP.length = legRP.length = 0; }
+  else citySoftenResident({body,headP,armLP,armRP,legLP,legRP});
   const bodySolid = shBakeParts(body, false);
   if (bodySolid) g.add(new THREE.Mesh(bodySolid, CHAR_BODY_MAT()));
   const bodyGlow = shBakeParts(body, true);
@@ -30007,6 +30011,8 @@ document.addEventListener('DOMContentLoaded', init);
 <script src="quiet-interface.js?v=0.59.0"></script>
 <script src="resident-head.js?v=0.55.0"></script>
 <script src="character-studio.js?v=0.55.0"></script>
+<script src="wardrobe.js?v=0.80.0"></script>
+<script src="wardrobe-ui.js?v=0.80.0"></script>
 <script src="arcade-previews.js?v=0.55.0"></script>
 <script src="enemies-arcade.js?v=0.72.0"></script>
 <script src="outbreak.js?v=0.55.0"></script>

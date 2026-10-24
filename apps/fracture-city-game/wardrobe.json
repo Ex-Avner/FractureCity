@@ -1,0 +1,70 @@
+{
+ "version": 1,
+ "colours": {
+  "skin": ["#f3d3bd", "#e8b896", "#d29a72", "#b97a55", "#8d5a3b", "#6b412a", "#4a2b1c", "#2f1c13", "#c9d6d2", "#b9b7e8"],
+  "hair": ["#0e0d12", "#2a1d19", "#5b3a24", "#a8743a", "#e9d7a6", "#f2f2f2", "#ff2e88", "#ff6a00", "#ffe500", "#39ff14", "#00e5ff", "#3d5afe", "#b388ff", "#d50000"],
+  "cloth": ["#0b0b0f", "#1d1f26", "#3a3d45", "#7b7f88", "#e9e5dc", "#6b1d1d", "#b3122e", "#ff2e88", "#ff6a00", "#e2c044", "#2e5e3a", "#39ff14", "#1d3b6b", "#00b8d4", "#4a2c6b", "#7a4b2a"],
+  "eyes": ["#3b2a1e", "#6b4a2b", "#4b6b8c", "#69776d", "#9d8651", "#7a7f88", "#c0392b", "#8e44ad", "#00e5ff", "#f5f5f5"],
+  "lips": ["none", "#0b0b0f", "#6b1d1d", "#b3122e", "#ff2e88", "#4a2c6b", "#1d3b6b", "#7a4b2a"]
+ },
+ "groups": [
+  {"key": "face", "label": "Face", "slots": [
+   {"key": "eyeShape", "label": "Eyes", "options": ["round", "sharp", "sleepy", "wide"]},
+   {"key": "brows", "label": "Brows", "options": ["straight", "arched", "slashed", "heavy", "none"]},
+   {"key": "makeup", "label": "Makeup & paint", "options": ["none", "liner", "smoky", "tears", "bolt", "glam", "skull"], "premium": {"skull": 120, "glam": 90}},
+   {"key": "faceWidth", "label": "Face width", "range": [0.88, 1.14]},
+   {"key": "faceLength", "label": "Face length", "range": [0.9, 1.1]},
+   {"key": "jaw", "label": "Jaw", "range": [0.82, 1.2]},
+   {"key": "nose", "label": "Nose", "range": [0.8, 1.3]}
+  ]},
+  {"key": "hair", "label": "Hair", "slots": [
+   {"key": "hairStyle", "label": "Cut", "options": ["buzz", "crop", "mohawk", "liberty", "fauxhawk", "spiked", "undercut", "mullet", "long", "pigtails", "bun", "dreads", "bald"], "premium": {"liberty": 150, "dreads": 80}},
+   {"key": "headgear", "label": "On your head", "options": ["none", "beanie", "cap", "bandana", "hood", "hat", "helmet", "visor", "mask", "crown"], "premium": {"crown": 220}}
+  ]},
+  {"key": "top", "label": "Top", "slots": [
+   {"key": "top", "label": "Shirt", "options": ["tee", "band-tee", "tank", "mesh", "turtleneck", "none"]},
+   {"key": "outfit", "label": "Jacket", "options": ["none", "leather", "studded", "denim-vest", "bomber", "hoodie", "plaid", "longcoat", "tailored"], "premium": {"studded": 180}}
+  ]},
+  {"key": "legs", "label": "Legs & boots", "slots": [
+   {"key": "bottoms", "label": "Bottoms", "options": ["skinny", "ripped", "plaid", "cargo", "kilt", "shorts"], "premium": {"kilt": 90}},
+   {"key": "legwear", "label": "Under", "options": ["none", "fishnet", "socks"]},
+   {"key": "boots", "label": "Boots", "options": ["combat", "creepers", "high-tops", "steel-toe", "platform"], "premium": {"platform": 140}}
+  ]},
+  {"key": "extras", "label": "Hardware", "slots": [
+   {"key": "extras", "label": "Extras", "multi": true, "options": ["spikes", "studded-belt", "chain", "collar", "gloves", "patches", "pins", "shades", "neon"], "premium": {"spikes": 160, "neon": 200}},
+   {"key": "piercings", "label": "Piercings", "options": ["none", "rings", "studs", "septum", "lip", "eyebrow", "loaded"]},
+   {"key": "tattoos", "label": "Ink", "options": ["none", "bands", "circuit", "blackwork", "sleeve", "neck", "face"]}
+  ]},
+  {"key": "body", "label": "Body", "slots": [
+   {"key": "frame", "label": "Frame", "options": ["slim", "average", "broad", "curvy"]},
+   {"key": "heightScale", "label": "Height", "range": [0.88, 1.12]},
+   {"key": "shoulders", "label": "Shoulders", "range": [0.86, 1.18]}
+  ]}
+ ],
+ "colourSlots": [
+  {"key": "skin", "label": "Skin", "palette": "skin"},
+  {"key": "eyes", "label": "Eyes", "palette": "eyes"},
+  {"key": "lips", "label": "Lips", "palette": "lips"},
+  {"key": "hair", "label": "Hair", "palette": "hair"},
+  {"key": "hairTip", "label": "Dyed tips", "palette": "hair"},
+  {"key": "top2", "label": "Shirt", "palette": "cloth"},
+  {"key": "coat", "label": "Jacket", "palette": "cloth"},
+  {"key": "pants", "label": "Bottoms", "palette": "cloth"},
+  {"key": "boots2", "label": "Boots", "palette": "cloth"},
+  {"key": "accent", "label": "Accent & metal", "palette": "cloth"}
+ ],
+ "defaults": {
+  "skin": "#d29a72", "eyes": "#4b6b8c", "lips": "none", "hair": "#ff2e88", "hairTip": "#0e0d12", "top2": "#0b0b0f", "coat": "#1d1f26", "pants": "#0b0b0f", "boots2": "#0b0b0f", "accent": "#e2c044",
+  "eyeShape": "sharp", "brows": "straight", "makeup": "liner", "faceWidth": 1, "faceLength": 1, "jaw": 1, "nose": 1,
+  "hairStyle": "mohawk", "headgear": "none", "top": "band-tee", "outfit": "leather", "bottoms": "ripped", "legwear": "none", "boots": "combat",
+  "extras": ["studded-belt", "chain"], "piercings": "rings", "tattoos": "bands", "frame": "average", "heightScale": 1, "shoulders": 1
+ },
+ "presets": [
+  {"name": "Gutter Punk", "look": {"hairStyle": "mohawk", "hair": "#39ff14", "hairTip": "#0e0d12", "outfit": "denim-vest", "coat": "#1d3b6b", "top": "band-tee", "top2": "#0b0b0f", "bottoms": "ripped", "pants": "#0b0b0f", "boots": "combat", "extras": ["patches", "pins", "chain"], "piercings": "loaded", "tattoos": "sleeve", "makeup": "none", "accent": "#e9e5dc"}},
+  {"name": "Goth", "look": {"hairStyle": "long", "hair": "#0e0d12", "hairTip": "#4a2c6b", "outfit": "longcoat", "coat": "#0b0b0f", "top": "turtleneck", "top2": "#0b0b0f", "bottoms": "skinny", "pants": "#0b0b0f", "boots": "creepers", "extras": ["collar", "gloves"], "makeup": "smoky", "lips": "#4a2c6b", "skin": "#f3d3bd", "piercings": "septum", "accent": "#7b7f88"}},
+  {"name": "Riot Grrrl", "look": {"hairStyle": "pigtails", "hair": "#ff2e88", "hairTip": "#ffe500", "outfit": "plaid", "coat": "#b3122e", "top": "tank", "top2": "#0b0b0f", "bottoms": "shorts", "pants": "#0b0b0f", "legwear": "fishnet", "boots": "combat", "extras": ["studded-belt", "pins"], "makeup": "liner", "lips": "#b3122e", "piercings": "rings", "accent": "#e2c044"}},
+  {"name": "Skater", "look": {"hairStyle": "mullet", "hair": "#a8743a", "headgear": "beanie", "outfit": "hoodie", "coat": "#2e5e3a", "top": "tee", "bottoms": "cargo", "pants": "#3a3d45", "boots": "high-tops", "boots2": "#e9e5dc", "extras": [], "makeup": "none", "piercings": "studs", "accent": "#ff6a00"}},
+  {"name": "Raver", "look": {"hairStyle": "spiked", "hair": "#00e5ff", "hairTip": "#ff2e88", "outfit": "none", "top": "mesh", "top2": "#39ff14", "bottoms": "cargo", "pants": "#4a2c6b", "boots": "platform", "extras": ["neon", "shades", "gloves"], "makeup": "glam", "accent": "#39ff14", "piercings": "eyebrow"}},
+  {"name": "Office Drone", "look": {"hairStyle": "crop", "hair": "#2a1d19", "outfit": "tailored", "coat": "#3a3d45", "top": "turtleneck", "top2": "#e9e5dc", "bottoms": "skinny", "pants": "#1d1f26", "boots": "steel-toe", "boots2": "#1d1f26", "extras": [], "makeup": "none", "piercings": "none", "tattoos": "none", "accent": "#7b7f88"}}
+ ]
+}
