@@ -306,7 +306,8 @@ function saveMemory(){
   if(window.FCResidentLife?.enabled)FCResidentLife.put('npcs',m);
  } catch (e){}
 }
-function playerName(){ return window.FCAccounts?.user?.displayName || (typeof Shift !== 'undefined' && Shift.profile && (Shift.profile.name || Shift.profile.handle)) || 'stranger'; }
+//  The signed-in name, else the city profile's; the placeholder handle ("@resident") is nobody's name.
+function playerName(){ const n = window.FCAccounts?.user?.displayName || (typeof Shift !== 'undefined' && Shift.profile && (Shift.profile.displayName || Shift.profile.name || Shift.profile.handle)) || ''; const clean = String(n).replace(/^@/, '').trim(); return !clean || /^resident$/i.test(clean) ? 'stranger' : clean; }
 
 addEventListener('fc-life-ready',()=>{MEM=null;memFor=null;});
 // ─── The conversation ──────────────────────────────────────────────────────
@@ -382,7 +383,7 @@ function firstLine(person, role){
 
 function options(){
  const t = talk, me = t.me, out = [];
- if (!me.knowsName) out.push({ label: 'I’m ' + playerName() + '.', act: 'name' });
+ if (!me.knowsName && playerName() !== 'stranger') out.push({ label: 'I’m ' + playerName() + '.', act: 'name' });
  if (me.step < t.v.story.length) out.push({ label: me.step === 0 ? 'What’s your story?' : 'Go on, what happened next?', act: 'story' });
  out.push({ label: 'What’s going on around here?', act: 'rumor' });
  if (t.turns < 2) out.push({ label: 'What do you make of Ned?', act: 'ned' });

@@ -405,7 +405,8 @@ function frame(now){
    }
    e.wasSim = sim;
    e.group.position.copy(p);
-   const visible = dPlayer < 90; e.group.visible = visible;
+   //  Close enough to fill the camera (first person): hide the body rather than look out through it.
+   const visible = dPlayer < 90 && !(dPlayer < .55 && !window.FCResident?.thirdPerson); e.group.visible = visible;
    if (!visible) continue;
    e.char.group.rotation.y += (((e.yaw - e.char.group.rotation.y) % TAU + TAU * 1.5) % TAU - Math.PI) * Math.min(1, dt * 10);
    //  Speech: a bubble per new line.

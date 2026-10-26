@@ -268,3 +268,16 @@ Common Ground. Brawler punches cost health like PvP; city-shoot with {npc}
 hits trouble NPCs (5 credits per knockdown, rate-limited). NPCs leave ten
 minutes after their owner. Main Beta owner: /npcs @username clears
 someone's. NPCs live in server memory only; a restart clears them.
+
+## Feed and profiles (0.82)
+
+Gallery boards stay in social_works (eight slots, two per resident). Feed
+posts live in social_posts with social_post_replies and social_post_hearts;
+social_profiles holds a tagline and the resident's wardrobe look (cleaned by
+looks.cjs; also written when /api/city-look is saved). GET
+/api/social/feed?scope=all|following&before=<ms>, /api/social/profile/
+<username|id:account>, /api/social/item/<id>, /api/social/people?q=. POST
+/api/social/post {title,text,photo,audio,pixels}, post-reply, post-appreciate,
+post-remove, post-remove-reply, profile {tagline,look}. 12 posts an hour per
+resident, newest 200 kept. Mutes hide both ways. Feed media counts as
+published for /api/media and the 24-hour unused-media sweep.

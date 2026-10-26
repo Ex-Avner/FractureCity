@@ -82,7 +82,7 @@ const NEAR_BOARD = () => {
     });
     c.ok('art is on a billboard face', art.face, JSON.stringify(art));
     c.ok('art boards leave the colour cycle', !art.stillCycling);
-    c.gt('skyline carries art', art.sky, 0);
+    //  The floating skyline sprites were removed (advertising lives on real facades and roofs), so there is no skyline art to check.
     await page.waitForFunction(() => PalmMedia.playingVideos > 0, null, { timeout: 20000 }).catch(() => {});
     c.gt('nearest board plays a clip', await page.evaluate(() => PalmMedia.playingVideos), 0);
     await page.waitForTimeout(2500);

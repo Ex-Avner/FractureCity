@@ -185,7 +185,9 @@ el.addEventListener('change', e => { if (e.target.dataset.to !== undefined) draf
 async function spawn(where){
  if (UI.busy) return; UI.busy = true; UI.msg = '';
  if (draft.role === 'courier' && !draft.to){ const first = el.querySelector('[data-to]')?.value; draft.to = first || ''; }
- const at = where === 'booth' ? { x: B.BOOTH.door.x + (Math.random() - .5) * 2, z: B.BOOTH.door.z + Math.random(), y: BOOTH.y } : { x: Player.position.x, z: Player.position.z, y: Player.position.y - Player.height };
+ //  "Here" means a couple of metres in front of you, on open ground, not inside you.
+ const ahead = () => { const fx = Player.position.x - Math.sin(Player.yaw) * 2.2, fz = Player.position.z - Math.cos(Player.yaw) * 2.2, s = typeof shFindOpenSpot === 'function' ? shFindOpenSpot(fx, fz, .3, 1.7, 10) : null; return s ? { x: s.x, z: s.z, y: s.y } : { x: fx, z: fz, y: Player.position.y - Player.height }; };
+ const at = where === 'booth' ? { x: B.BOOTH.door.x + (Math.random() - .5) * 2, z: B.BOOTH.door.z + Math.random(), y: BOOTH.y } : ahead();
  try {
   await FCNpcs.spawn({ role: draft.role, story: draft.story, look: draft.look, seed: draft.seed, to: draft.to, message: draft.message, ...at });
   const name = draft.story.name.split(' ')[0];

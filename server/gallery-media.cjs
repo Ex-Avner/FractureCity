@@ -15,14 +15,17 @@ function createMedia(db,now=Date.now){
   else fail(415,'Use a photo, MP3 or WAV.');
   // Media of an exhibit released for inactivity stays with its archive (main-beta.cjs).
   const archived=db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='social_works_archive'").get()?' UNION SELECT photo FROM social_works_archive WHERE photo IS NOT NULL UNION SELECT audio FROM social_works_archive WHERE audio IS NOT NULL':'';
-  db.prepare('DELETE FROM gallery_media WHERE created<? AND id NOT IN (SELECT photo FROM social_works WHERE photo IS NOT NULL UNION SELECT audio FROM social_works WHERE audio IS NOT NULL'+archived+')').run(now()-86400000);
+  const posts=db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='social_posts'").get()?' UNION SELECT photo FROM social_posts WHERE photo IS NOT NULL UNION SELECT audio FROM social_posts WHERE audio IS NOT NULL':'';
+  db.prepare('DELETE FROM gallery_media WHERE created<? AND id NOT IN (SELECT photo FROM social_works WHERE photo IS NOT NULL UNION SELECT audio FROM social_works WHERE audio IS NOT NULL'+archived+posts+')').run(now()-86400000);
   if(db.prepare('SELECT COALESCE(SUM(bytes),0) n FROM gallery_media WHERE author=?').get(author).n+data.length>64*1024*1024)fail(413,'Your media storage is full (64 MB). Remove an older exhibit first.');
   if(db.prepare('SELECT COALESCE(SUM(bytes),0) n FROM gallery_media').get().n+data.length>Number(process.env.MEDIA_QUOTA_MB||128)*1024*1024)fail(507,'The gallery storage is full. Contact the server owner.');
   const id=crypto.randomUUID(),name=String(b.name||'Untitled').replace(/[\x00-\x1f\x7f<>]/g,'').slice(0,120);db.prepare('INSERT INTO gallery_media VALUES(?,?,?,?,?,?,?)').run(id,author,mime,name,data.length,data,now());return{id,mime,name,bytes:data.length};
  }
+ //  Feed posts (social.cjs, 0.82) publish media too.
+ function published(id){try{return !!db.prepare('SELECT 1 FROM social_posts WHERE photo=? OR audio=?').get(id,id)}catch(e){return false}}
  function owned(id,author,type){const m=db.prepare('SELECT id,mime FROM gallery_media WHERE id=? AND author=?').get(String(id),author);if(!m||!m.mime.startsWith(type+'/'))fail(400,'Choose your own uploaded '+type+'.');return m.id}
- function read(id,viewer){const m=db.prepare('SELECT * FROM gallery_media WHERE id=?').get(id);if(!m)fail(404,'Media not found.');if(m.author!==viewer){if(!db.prepare('SELECT 1 FROM social_works WHERE photo=? OR audio=?').get(id,id))fail(404,'Media not published.');if(db.prepare('SELECT 1 FROM social_blocks WHERE (author=? AND target=?) OR (author=? AND target=?)').get(viewer,m.author,m.author,viewer))fail(404,'Media unavailable.')}return m}
- function discard(id,author){if(db.prepare('SELECT 1 FROM social_works WHERE photo=? OR audio=?').get(id,id))fail(409,'Remove the exhibit before deleting its media.');db.prepare('DELETE FROM gallery_media WHERE id=? AND author=?').run(id,author);return{ok:true}}
+ function read(id,viewer){const m=db.prepare('SELECT * FROM gallery_media WHERE id=?').get(id);if(!m)fail(404,'Media not found.');if(m.author!==viewer){if(!db.prepare('SELECT 1 FROM social_works WHERE photo=? OR audio=?').get(id,id)&&!published(id))fail(404,'Media not published.');if(db.prepare('SELECT 1 FROM social_blocks WHERE (author=? AND target=?) OR (author=? AND target=?)').get(viewer,m.author,m.author,viewer))fail(404,'Media unavailable.')}return m}
+ function discard(id,author){if(db.prepare('SELECT 1 FROM social_works WHERE photo=? OR audio=?').get(id,id)||published(id))fail(409,'Remove the exhibit before deleting its media.');db.prepare('DELETE FROM gallery_media WHERE id=? AND author=?').run(id,author);return{ok:true}}
  return{upload,owned,read,discard};
 }
 module.exports={createMedia};
