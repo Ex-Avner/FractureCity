@@ -313,7 +313,7 @@ function think(npc, world, dt){
   if (npc.leaveT > 30){ npc.x = e.x; npc.z = e.z; npc.teleported = true; npc.leaveT = 0; stop(npc); return; }
   goTo(npc, e.x, e.z, R.speed * 1.4); return;
  }
- if (npc.stuck){ npc.stuck = false; if (npc.mode === 'walk' || npc.mode === 'flee'){ const w = wanderPoint(npc, world, 10); goTo(npc, w.x, w.z); } }
+ if (npc.stuck){ npc.stuck = false; if (npc.mode === 'walk' || npc.mode === 'flee'){ const w = wanderPoint(npc, world, 10); goTo(npc, w.x, w.z); } else if (npc.role === 'protester'){ npc.turn = (npc.turn || 0) + 1.3; npc.leg = false; stop(npc); } }
  switch (R.group){
   case 'help': return helper(npc, world, o, dt);
   case 'trouble': return trouble(npc, world, o, dt);
@@ -346,7 +346,8 @@ function citizen(npc, world, dt){
  if (role === 'protester'){
   //  March a beat between home and ten metres along, sign up.
   npc.act = 'protest';
-  if (arrived(npc) || npc.speed === 0){ npc.leg = !npc.leg; const a = (hash(npc.id) % 628) / 100; goTo(npc, npc.home.x + (npc.leg ? Math.cos(a) * 10 : 0), npc.home.z + (npc.leg ? Math.sin(a) * 10 : 0)); }
+  //  A wall in the way turns the march (npc.turn) rather than marching into it forever.
+  if (arrived(npc) || npc.speed === 0){ npc.leg = !npc.leg; const a = (hash(npc.id) % 628) / 100 + (npc.turn || 0); goTo(npc, npc.home.x + (npc.leg ? Math.cos(a) * 10 : 0), npc.home.z + (npc.leg ? Math.sin(a) * 10 : 0)); }
   bark(npc, world); return;
  }
  //  Wanderer, skater, tagger, gossip between visits: walk somewhere, stop, look.
@@ -369,6 +370,7 @@ function helper(npc, world, o, dt){
   stop(npc); face(npc, to); npc.act = 'talk';
   world.say(npc, `From ${npc.ownerName}: “${npc.task.msg}”`, 9);
   world.chat?.(`${npc.story?.name || 'A courier'} to ${to.name}, from ${npc.ownerName}: ${npc.task.msg}`);
+  world.notify?.(to.accountId, npc.owner, `${npc.story?.name || 'A courier'} brought a message from ${npc.ownerName}: “${npc.task.msg}”`);
   npc.task.done = true; npc.t = 3; return;
  }
  if (!o){ stop(npc); npc.act = 'idle'; bark(npc, world); return; }

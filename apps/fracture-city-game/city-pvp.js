@@ -51,12 +51,16 @@ function frame(now){requestAnimationFrame(frame);
  const self=me(),room=FCCityOnline.room;if(!self||!room)return;
  for(const e of room.events||[])if(e.type==='city-shot'&&!lastEvent.has(e.id)){lastEvent.add(e.id);if(e.player!==self.id)tracer(e);if(lastEvent.size>60)lastEvent=new Set([...lastEvent].slice(-30))}
  const hp=self.hp??100;
- if(hp<lastHp&&hp>0){const h=$('.pv-hurt');h.classList.remove('on');void h.offsetWidth;h.classList.add('on')}
+ if(hp<lastHp&&hp>0){const h=$('.pv-hurt');h.classList.remove('on');void h.offsetWidth;h.classList.add('on');
+  //  The server keeps PvP health; take the same share off the HUD's health bar so a hit
+  //  shows where you look. Never to zero here: the server decides when you are down.
+  const lost=(lastHp-hp)/100*(Player.hpMax||100);Player.hp=Math.max(1,(Player.hp||0)-lost);Player.damageFlash=.5;document.getElementById('dmg-vignette')?.classList.add('show');if(typeof refreshHpHUD==='function')refreshHpHUD()}
+
  lastHp=hp;
  const bar=$('.pv-hp');bar.hidden=hp>=100||hp<=0;if(!bar.hidden){bar.querySelector('s').style.width=hp+'%';bar.querySelector('span').textContent=Math.ceil(hp)+' / 100'}
  const down=hp<=0,d=$('.pv-down');d.hidden=!down;
  if(down){d.querySelector('span').textContent='Back in Common Ground in '+Math.max(0,Math.ceil(((self.respawnAt||0)-(room.time||Date.now()))/1000))+'s';if(!wasDown){pausedByUs=!State.ui.paused;State.ui.paused=true;State.keys?.clear?.();Player.velocity?.set(0,0,0)}}
- else if(wasDown){if(pausedByUs)State.ui.paused=false;pausedByUs=false;lastHp=100}
+ else if(wasDown){if(pausedByUs)State.ui.paused=false;pausedByUs=false;lastHp=100;Player.hp=Player.hpMax||100;if(typeof refreshHpHUD==='function')refreshHpHUD()}
  wasDown=down;
  const safe=inSafe(Player.position.x,Player.position.z);
  if(safe!==lastSafe){if(lastSafe!==null){const z=$('.pv-zone');z.textContent=safe?'SAFE ZONE · Common Ground':'PVP ZONE · other residents can hit you';z.className='pv-zone on '+(safe?'safe':'open');z.hidden=false;clearTimeout(zoneT);zoneT=setTimeout(()=>{z.hidden=true},2600)}lastSafe=safe}
@@ -66,7 +70,7 @@ const css=document.createElement('style');css.textContent=`
 #city-pvp[hidden]{display:none}
 #city-pvp .pv-marker{position:fixed;left:50%;top:50%;width:26px;height:26px;margin:-13px 0 0 -13px;pointer-events:none;z-index:60;opacity:0;background:linear-gradient(45deg,transparent 45%,#fff 45%,#fff 55%,transparent 55%),linear-gradient(-45deg,transparent 45%,#fff 45%,#fff 55%,transparent 55%)}
 #city-pvp .pv-marker.on{opacity:1}#city-pvp .pv-marker.down{filter:drop-shadow(0 0 4px #ff3b3b) hue-rotate(-40deg);transform:scale(1.4)}
-#city-pvp .pv-hp{position:fixed;left:50%;bottom:92px;transform:translateX(-50%);z-index:61;display:flex;align-items:center;gap:8px;padding:5px 10px;background:#0b151bd9;border:1px solid #6b2a30;border-radius:8px;font:600 11px system-ui;color:#ffd7d2}
+#city-pvp .pv-hp{position:fixed;left:50%;bottom:136px;transform:translateX(-50%);z-index:61;display:flex;align-items:center;gap:8px;padding:5px 10px;background:#0b151bd9;border:1px solid #6b2a30;border-radius:8px;font:600 11px system-ui;color:#ffd7d2}
 #city-pvp .pv-hp i{display:block;width:140px;height:8px;background:#2a1517;border-radius:4px;overflow:hidden}#city-pvp .pv-hp s{display:block;height:100%;background:#ff5a4d}
 #city-pvp .pv-zone{position:fixed;left:50%;top:18%;transform:translateX(-50%);z-index:61;padding:8px 14px;border-radius:8px;font:700 12px system-ui;letter-spacing:.06em;background:#0b151be6}
 #city-pvp .pv-zone.safe{color:#9ff0c9;border:1px solid #2f7a5c}#city-pvp .pv-zone.open{color:#ffb0a8;border:1px solid #8a2f36}

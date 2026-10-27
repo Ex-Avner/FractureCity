@@ -77,7 +77,7 @@ function portrait(card, full = false){
 function face(card, cls = 'sx-face'){ const id = 'pf' + Math.random().toString(36).slice(2); portrait(card).then(url => { const el = document.getElementById(id); if (el && url) el.style.backgroundImage = `url(${url})`; }); return `<span id="${id}" class="${cls}" style="--c:${esc(card?.color || '#527b93')}"></span>`; }
 
 // ─── Panel ──────────────────────────────────────────────────────────────────
-const UI = { open: false, tab: 'feed', scope: 'all', items: [], before: null, more: false, view: null, busy: false, msg: '', people: [], q: '' };
+const UI = { open: false, tab: 'feed', scope: 'all', items: [], before: null, more: false, view: null, busy: false, msg: '', people: [], q: '', notes: { notes: [], unread: 0, owner: false, banned: null }, mod: null, reporting: null };
 const el = document.createElement('section'); el.id = 'fc-social'; el.hidden = true; el.setAttribute('role', 'dialog'); el.setAttribute('aria-label', 'Social'); document.body.append(el);
 for (const t of ['pointerdown', 'mousedown', 'wheel', 'keydown', 'keyup']) el.addEventListener(t, e => { if (t !== 'keydown' || e.code !== 'Escape') e.stopPropagation(); });
 let wasPaused = false;
@@ -87,7 +87,7 @@ function open(tab, arg){
  if (tab === 'profile') return showProfile(arg || (me() ? me().username : null));
  if (tab === 'item') return showItem(arg);
  UI.view = null; UI.tab = tab || UI.tab || 'feed';
- if (UI.tab === 'feed') loadFeed(true); else if (UI.tab === 'people') loadPeople(); else draw();
+ if (UI.tab === 'feed') loadFeed(true); else if (UI.tab === 'people') loadPeople(); else if (UI.tab === 'inbox') loadInbox(); else if (UI.tab === 'mod') loadMod(); else draw();
 }
 function close(){ if (!UI.open) return; UI.open = false; el.hidden = true; el.innerHTML = ''; State.ui.inShiftPanel = false; State.ui.paused = wasPaused; if (!State.ui.paused) document.body.style.cursor = 'none'; }
 window.addEventListener('keydown', e => {
@@ -126,7 +126,8 @@ function itemCard(it, full){
   ${it.photo ? `<img class="sx-photo" loading="lazy" alt="${esc(it.title || 'Photo')}" src="/api/media/${encodeURIComponent(it.photo)}">` : ''}
   ${it.pixels ? `<img class="sx-mural" alt="Painted mural" src="${mural(it.pixels)}">` : ''}
   ${it.audio ? `<audio controls preload="none" src="/api/media/${encodeURIComponent(it.audio)}"></audio>` : ''}
-  <footer><button class="sx-act ${it.appreciated ? 'on' : ''}" data-heart="${esc(it.id)}" data-kind="${it.kind}" aria-label="Appreciate">♥ ${it.appreciations}</button>${full ? '' : `<button class="sx-act" data-open="${esc(it.id)}">↩ ${it.replyCount} ${it.replyCount === 1 ? 'reply' : 'replies'}</button>`}${mine ? `<button class="sx-act sx-x" data-remove="${esc(it.id)}" data-kind="${it.kind}">Remove</button>` : ''}</footer>
+  <footer><button class="sx-act ${it.appreciated ? 'on' : ''}" data-heart="${esc(it.id)}" data-kind="${it.kind}" aria-label="Appreciate">♥ ${it.appreciations}</button>${full ? '' : `<button class="sx-act" data-open="${esc(it.id)}">↩ ${it.replyCount} ${it.replyCount === 1 ? 'reply' : 'replies'}</button>`}${mine ? `<button class="sx-act sx-x" data-remove="${esc(it.id)}" data-kind="${it.kind}">Remove</button>` : `<button class="sx-act sx-x" data-reportmenu="${esc(it.id)}">Report</button>`}${UI.notes.owner && !mine ? `<button class="sx-act sx-mod" data-modremove="${esc(it.id)}">Take down</button>` : ''}</footer>
+  ${UI.reporting === it.id ? `<div class="sx-report"><span>What is wrong with it?</span>${['Spam', 'Hate or harassment', 'Sexual content', 'Someone else’s work', 'Other'].map(r => `<button class="sx-act" data-report="${esc(it.id)}" data-kind="${it.kind}" data-reason="${esc(r)}">${esc(r)}</button>`).join('')}<button class="sx-act" data-reportcancel>Cancel</button></div>` : ''}
   ${full ? `<section class="sx-replies">${(it.replies || []).map(r => `<div class="sx-reply"><button class="sx-name" data-profile="${esc(r.artist.username)}">${esc(r.artist.name)}</button><span>${esc(r.text)}</span>${r.artist.id === me()?.id || mine ? `<button class="sx-act sx-x" data-unreply="${esc(r.id)}">×</button>` : ''}</div>`).join('') || '<p class="sx-dim">No replies yet. Say something.</p>'}
    <form class="sx-replyform"><input name="text" maxlength="${it.kind === 'board' ? 140 : 280}" placeholder="Reply to ${esc(a.name)}" required><button class="fc-btn hot">Reply</button></form></section>` : ''}
  </article>`;
@@ -161,13 +162,46 @@ function draw(){
  else if (UI.view?.kind === 'profile') body = UI.view.data ? profileView(UI.view.data) : '<p class="sx-dim">Opening profile…</p>';
  else if (UI.view?.kind === 'item') body = UI.view.data ? itemCard(UI.view.data, true) : '<p class="sx-dim">Opening…</p>';
  else if (UI.tab === 'people') body = peopleView();
+ else if (UI.tab === 'inbox') body = inboxView();
+ else if (UI.tab === 'mod') body = modView();
  else body = composer() + `<div class="sx-scope"><button class="${UI.scope === 'all' ? 'on' : ''}" data-scope="all">Everyone</button><button class="${UI.scope === 'following' ? 'on' : ''}" data-scope="following">Following</button></div>` + (UI.items.length ? UI.items.map(i => itemCard(i)).join('') : UI.busy ? '<p class="sx-dim">Loading the feed…</p>' : `<div class="sx-empty"><h3>${UI.scope === 'following' ? 'Nobody you follow has posted.' : 'The feed is quiet.'}</h3><p>${UI.scope === 'following' ? 'Follow people from their profiles, or switch to Everyone.' : 'Be the first. Post something above.'}</p></div>`) + (UI.more ? '<button class="fc-btn sx-more" data-more>Older posts</button>' : '');
  const scroll = el.querySelector('.sx-body')?.scrollTop || 0, keepScroll = !UI.view && UI.tab === 'feed';
- el.innerHTML = `<div class="sx-frame"><header class="sx-head"><div><small>COMMON GROUND / SOCIAL</small><h2>${UI.view?.kind === 'profile' ? 'Profile' : UI.view?.kind === 'item' ? 'Thread' : UI.tab === 'people' ? 'People' : 'The Feed'}</h2></div>
-  <nav>${UI.view ? '<button class="fc-btn" data-back>← Back</button>' : ''}<button class="${!UI.view && UI.tab === 'feed' ? 'on' : ''}" data-tab="feed">Feed</button><button class="${!UI.view && UI.tab === 'people' ? 'on' : ''}" data-tab="people">People</button>${user ? `<button class="${UI.view?.kind === 'profile' && UI.view.data?.profile.mine ? 'on' : ''}" data-profile="${esc(user.username)}">You</button>` : ''}<button class="sx-close" data-close aria-label="Close">✕</button></nav></header>
-  ${UI.msg ? `<p class="sx-msg">${esc(UI.msg)}</p>` : ''}<div class="sx-body">${body}</div></div>`;
+ el.innerHTML = `<div class="sx-frame"><header class="sx-head"><div><small>COMMON GROUND / SOCIAL</small><h2>${UI.view?.kind === 'profile' ? 'Profile' : UI.view?.kind === 'item' ? 'Thread' : UI.tab === 'people' ? 'People' : UI.tab === 'inbox' ? 'Inbox' : UI.tab === 'mod' ? 'Moderation' : 'The Feed'}</h2></div>
+  <nav>${UI.view ? '<button class="fc-btn" data-back>← Back</button>' : ''}<button class="${!UI.view && UI.tab === 'feed' ? 'on' : ''}" data-tab="feed">Feed</button><button class="${!UI.view && UI.tab === 'people' ? 'on' : ''}" data-tab="people">People</button>${user ? `<button class="${!UI.view && UI.tab === 'inbox' ? 'on' : ''}" data-tab="inbox">Inbox${UI.notes.unread ? ` <i class="sx-badge">${UI.notes.unread}</i>` : ''}</button>` : ''}${UI.notes.owner ? `<button class="${!UI.view && UI.tab === 'mod' ? 'on' : ''}" data-tab="mod">Mod${(UI.mod ? UI.mod.reports.length : UI.notes.reports) ? ` <i class="sx-badge">${UI.mod ? UI.mod.reports.length : UI.notes.reports}</i>` : ''}</button>` : ''}${user ? `<button class="${UI.view?.kind === 'profile' && UI.view.data?.profile.mine ? 'on' : ''}" data-profile="${esc(user.username)}">You</button>` : ''}<button class="sx-close" data-close aria-label="Close">✕</button></nav></header>
+  ${UI.notes.banned ? `<p class="sx-msg sx-ban">Your posting is suspended${UI.notes.banned.until < 8e15 ? ' until ' + new Date(UI.notes.banned.until).toLocaleString() : ''}. Reason: ${esc(UI.notes.banned.reason)}</p>` : ''}${UI.msg ? `<p class="sx-msg">${esc(UI.msg)}</p>` : ''}<div class="sx-body">${body}</div></div>`;
  if (keepScroll) el.querySelector('.sx-body').scrollTop = scroll;
+ rearm();
 }
+
+// ─── Inbox and moderation (0.83) ────────────────────────────────────────────
+const NOTE = { reply: ['↩', 'replied'], heart: ['♥', 'loved your post'], follow: ['+', 'followed you'], mention: ['@', 'mentioned you'], courier: ['✉', 'sent a courier'], removed: ['!', ''], banned: ['!', ''], unbanned: ['✓', ''] };
+function inboxView(){
+ const ns = UI.notes.notes;
+ if (!ns.length) return '<div class="sx-empty"><h3>Nothing yet.</h3><p>Replies, hearts, new followers, mentions and courier messages land here.</p></div>';
+ return `${UI.notes.unread ? '<button class="fc-btn sx-readall" data-readall>Mark all read</button>' : ''}<ul class="sx-notes">${ns.map(n => { const [icon, verb] = NOTE[n.kind] || ['•', '']; return `<li><button class="sx-note ${n.read ? '' : 'new'}" data-note="${esc(n.id)}"><i class="sx-icon k-${esc(n.kind)}">${icon}</i><span><b>${esc(n.actor?.name || 'Fracture City')}</b> ${esc(verb)}${n.text ? `<small>${esc(n.text)}</small>` : ''}</span><em>${ago(n.at)}</em></button></li>`; }).join('')}</ul>`;
+}
+function modView(){
+ const m = UI.mod; if (!m) return '<p class="sx-dim">Loading reports…</p>';
+ const rows = m.reports.map(r => `<article class="sx-card sx-modcard"><header><div><b>${esc(r.reason)}</b><small>reported by ${esc(r.reporter?.name || '?')} · ${ago(r.at)}</small></div></header>${r.item ? `<p><button class="sx-name" data-profile="${esc(r.item.author.username)}">${esc(r.item.author.name)}</button> · ${r.item.kind === 'board' ? 'gallery board' : 'post'}${r.item.banned ? ' · <i>already suspended</i>' : ''}</p>${r.item.title ? `<h3>${esc(r.item.title)}</h3>` : ''}<p>${esc(r.item.text)}</p>${r.item.photo ? `<img class="sx-photo" src="/api/media/${encodeURIComponent(r.item.photo)}" alt="">` : ''}` : '<p class="sx-dim">The reported post is already gone.</p>'}
+  <footer>${r.item ? `<button class="sx-act sx-mod" data-modremove="${esc(r.item.id)}">Take down</button><button class="sx-act" data-modban="${esc(r.item.author.id)}" data-days="1" data-reason="${esc(r.reason)}">Suspend 1 day</button><button class="sx-act" data-modban="${esc(r.item.author.id)}" data-days="7" data-reason="${esc(r.reason)}">7 days</button><button class="sx-act" data-modban="${esc(r.item.author.id)}" data-days="-1" data-reason="${esc(r.reason)}">Until lifted</button>` : ''}<button class="sx-act sx-x" data-moddismiss="${esc(r.id)}">Dismiss</button></footer></article>`).join('') || '<div class="sx-empty"><h3>No open reports.</h3><p>Reports from residents land here. You can also take down any post from the feed.</p></div>';
+ const bans = m.bans.length ? `<h4 class="sx-section">Suspended</h4>${m.bans.map(b => `<div class="sx-reply"><button class="sx-name" data-profile="${esc(b.account?.username)}">${esc(b.account?.name)}</button><span>${b.until > 8e15 ? 'until lifted' : 'until ' + new Date(b.until).toLocaleString()} · ${esc(b.reason)}</span><button class="sx-act" data-modunban="${esc(b.account?.id)}">Lift</button></div>`).join('')}` : '';
+ return `<p class="sx-dim">Only you see this tab. Owner chat commands still work: /remove @user, /allow @user, /npcs @user.</p>${rows}${bans}`;
+}
+async function loadInbox(){ if (!me()){ draw(); return; } await pollNotes(); draw(); }
+async function loadMod(){ UI.busy = true; draw(); try { UI.mod = await api('social/mod'); } catch (e){ UI.msg = e.message; } UI.busy = false; draw(); }
+//  The bell: unread count on the HUD, a toast when something new arrives.
+const bell = document.createElement('button'); bell.id = 'fc-bell'; bell.hidden = true; bell.setAttribute('aria-label', 'Inbox'); bell.onclick = () => open(!UI.notes.unread && UI.notes.reports ? 'mod' : 'inbox'); document.body.append(bell);
+let lastNoteAt = 0, polling = false;
+function paintBell(){ const n = UI.notes.unread + (UI.notes.reports || 0), changed = bell.textContent !== '✉ ' + n || bell.hidden !== (!me() || !n); bell.hidden = !me() || !n; bell.textContent = '✉ ' + n; if (UI.open && changed) draw(); }
+async function pollNotes(){
+ if (polling || !me()) return; polling = true;
+ try {
+  const out = await api('social/notes'), newest = out.notes[0]?.at || 0;
+  if (lastNoteAt && newest > lastNoteAt){ const fresh = out.notes.filter(n => !n.read && n.at > lastNoteAt); const n = fresh[0]; if (n){ const [, verb] = NOTE[n.kind] || []; say((n.actor?.name || 'Fracture City') + ' ' + (verb || n.text) + (fresh.length > 1 ? ' (+' + (fresh.length - 1) + ' more)' : ''), 'info'); } }
+  lastNoteAt = Math.max(lastNoteAt, newest) || Date.now(); UI.notes = out;
+ } catch (e){} finally { polling = false; paintBell(); }
+}
+setInterval(pollNotes, 20000); window.addEventListener('fc-account-ready', pollNotes); setTimeout(pollNotes, 4000);
 
 // ─── Actions ────────────────────────────────────────────────────────────────
 function find(id){ return UI.items.find(i => i.id === id) || (UI.view?.data?.items || []).find(i => i.id === id) || (UI.view?.data?.id === id ? UI.view.data : null); }
@@ -185,10 +219,19 @@ el.addEventListener('click', e => {
  if (d.profile){ UI.editing = false; return showProfile(d.profile); }
  if (d.open) return showItem(d.open);
  if (d.heart) return act(async () => { const it = find(d.heart); const on = !it?.appreciated; const out = d.kind === 'board' ? await api('social/appreciate', { work: d.heart, enabled: on }) : await api('social/post-appreciate', { post: d.heart, enabled: on }); if (out.item) replace(out.item); else { const w = out.works?.find(w => w.id === d.heart); if (w) replace({ id: w.id, appreciated: w.appreciated, appreciations: w.appreciations }); } });
- if (d.remove) return act(async () => { if (!confirmRemove(b)) return; if (d.kind === 'board') await api('social/remove', { work: d.remove }); else await api('social/post-remove', { post: d.remove }); UI.items = UI.items.filter(i => i.id !== d.remove); if (UI.view?.data?.items) UI.view.data.items = UI.view.data.items.filter(i => i.id !== d.remove); if (UI.view?.kind === 'item') UI.view = null; window.CitySocial?.refresh?.(); });
+ if (d.remove){ if (!confirmRemove(b)) return; return act(async () => { if (d.kind === 'board') await api('social/remove', { work: d.remove }); else await api('social/post-remove', { post: d.remove }); UI.items = UI.items.filter(i => i.id !== d.remove); if (UI.view?.data?.items) UI.view.data.items = UI.view.data.items.filter(i => i.id !== d.remove); if (UI.view?.kind === 'item') UI.view = null; window.CitySocial?.refresh?.(); }); }
  if (d.unreply) return act(async () => { const it = UI.view.data; const out = it.kind === 'board' ? await api('social/remove-reply', { work: it.id, reply: d.unreply }) : await api('social/post-remove-reply', { post: it.id, reply: d.unreply }); if (out.item) UI.view.data = out.item; else await showItem(it.id); });
  if (d.follow) return act(async () => { await api('social/follow', { target: d.follow, enabled: !!d.on }); await showProfile(UI.view.ref); });
- if (d.mute) return act(async () => { if (!confirmRemove(b, 'Mute? Tap again')) return; await api('social/block', { target: d.mute, enabled: true }); UI.view = null; UI.msg = 'Muted. You will not see each other’s posts.'; window.CitySocial?.refresh?.(); await loadFeed(true); });
+ if (d.mute){ if (!confirmRemove(b, 'Mute? Tap again')) return; return act(async () => { await api('social/block', { target: d.mute, enabled: true }); UI.view = null; UI.msg = 'Muted. You will not see each other’s posts.'; window.CitySocial?.refresh?.(); await loadFeed(true); }); }
+ if (d.reportmenu){ UI.reporting = d.reportmenu; return draw(); }
+ if (d.reportcancel !== undefined){ UI.reporting = null; return draw(); }
+ if (d.report) return act(async () => { if (d.kind === 'board') await api('social/report', { work: d.report, reason: d.reason }); else await api('social/post-report', { post: d.report, reason: d.reason }); UI.reporting = null; UI.msg = 'Reported. The server owner will look at it. Mute them from their profile if you want them gone for you now.'; });
+ if (d.note) return act(async () => { const n = UI.notes.notes.find(x => x.id === d.note); if (n && !n.read){ UI.notes = await api('social/notes-read', { ids: [n.id] }); paintBell(); } if (n?.item) return showItem(n.item); if (n?.actor) return showProfile(n.actor.username); });
+ if (d.readall !== undefined) return act(async () => { UI.notes = await api('social/notes-read', { all: true }); paintBell(); });
+ if (d.modremove){ if (!confirmRemove(b, 'Take it down? Tap again')) return; return act(async () => { UI.mod = await api('social/mod-remove', { item: d.modremove }); UI.items = UI.items.filter(i => i.id !== d.modremove); if (UI.view?.kind === 'item') UI.view = null; UI.msg = 'Taken down. Its author has been told.'; window.CitySocial?.refresh?.(); }); }
+ if (d.moddismiss) return act(async () => { UI.mod = await api('social/mod-dismiss', { report: d.moddismiss }); });
+ if (d.modban) return act(async () => { UI.mod = await api('social/mod-ban', { target: d.modban, days: +d.days, reason: d.reason || 'Breaking the server rules.' }); UI.msg = 'Suspended.'; });
+ if (d.modunban) return act(async () => { UI.mod = await api('social/mod-unban', { target: d.modunban }); });
  if (d.edit !== undefined){ UI.editing = true; return draw(); }
  if (d.canceledit !== undefined){ UI.editing = false; return draw(); }
  if (d.uselook !== undefined) return act(async () => { const out = await api('social/profile', { look: window.FCWardrobe?.current || Shift.avatar }); UI.view.data.profile = out.profile; UI.myLook = out.profile.look; UI.msg = 'Portrait updated from your current look.'; });
@@ -196,7 +239,13 @@ el.addEventListener('click', e => {
  if (d.account !== undefined){ close(); return window.FCAccounts?.profile(); }
 });
 //  Two-step confirm without a dialog: the first tap arms the button.
-function confirmRemove(b, label = 'Sure? Tap again'){ if (b.dataset.armed) return true; b.dataset.armed = '1'; b.textContent = label; setTimeout(() => { if (b.isConnected){ delete b.dataset.armed; } }, 3000); return false; }
+//  The armed state survives a redraw (the inbox poll redraws the panel).
+function confirmRemove(b, label = 'Sure? Tap again'){
+ const key = ['remove', 'mute', 'modremove'].map(k => b.dataset[k] ? k + '=' + b.dataset[k] : '').find(Boolean);
+ if (b.dataset.armed || (UI.armed && UI.armed.key === key && Date.now() < UI.armed.until)){ UI.armed = null; return true; }
+ UI.armed = { key, label, until: Date.now() + 4000 }; b.dataset.armed = '1'; b.textContent = label; return false;
+}
+function rearm(){ const a = UI.armed; if (!a || Date.now() > a.until) return; const [k, v] = a.key.split('='); const b = [...el.querySelectorAll('[data-' + k + ']')].find(x => x.dataset[k] === v); if (b){ b.dataset.armed = '1'; b.textContent = a.label; } }
 el.addEventListener('change', e => { if (e.target.type === 'file'){ const f = el.querySelector('.sx-files'); const names = [...el.querySelectorAll('.sx-compose input[type=file]')].map(i => i.files[0]?.name).filter(Boolean); if (f) f.textContent = names.join(' · '); } });
 el.addEventListener('submit', e => {
  e.preventDefault(); const f = e.target, v = Object.fromEntries(new FormData(f));
@@ -320,8 +369,22 @@ css.textContent = `
 #fc-social .sx-people{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
 #fc-social .sx-person{display:flex;flex-direction:column;align-items:center;gap:4px;text-align:center;background:var(--fc-panel);border:1px solid var(--fc-line);border-radius:6px;padding:12px 8px;color:var(--fc-text);font:inherit;cursor:pointer}
 #fc-social .sx-person:hover{border-color:var(--fc-cyan)}#fc-social .sx-person .sx-face{width:64px;height:64px}#fc-social .sx-person small{color:var(--fc-dim)}#fc-social .sx-person i{font-size:12px;color:var(--fc-cyan);font-style:normal}
+#fc-social .sx-badge{display:inline-block;min-width:18px;padding:0 5px;margin-left:3px;border-radius:9px;background:var(--fc-pink);color:var(--fc-ink);font:800 11px/18px var(--fc-body);font-style:normal;text-align:center}
+#fc-social nav>button.on .sx-badge{background:var(--fc-ink);color:var(--fc-cyan)}
+#fc-social .sx-ban{background:#ff2e8820;color:#ff9cc6;border-color:#ff2e8855}
+#fc-social .sx-notes{list-style:none;margin:0;padding:0}
+#fc-social .sx-note{display:flex;gap:10px;align-items:center;width:100%;text-align:left;background:var(--fc-panel);border:1px solid var(--fc-line);border-radius:6px;padding:10px 12px;margin-bottom:6px;color:var(--fc-text);font:inherit;cursor:pointer}
+#fc-social .sx-note.new{border-left:4px solid var(--fc-pink)}#fc-social .sx-note span{flex:1;min-width:0}#fc-social .sx-note small{display:block;color:var(--fc-dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}#fc-social .sx-note em{color:var(--fc-dim);font-style:normal;font-size:12px}
+#fc-social .sx-icon{flex:none;width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font-style:normal;font-weight:800;background:var(--fc-raise);color:var(--fc-cyan)}
+#fc-social .sx-icon.k-heart{color:var(--fc-pink)}#fc-social .sx-icon.k-removed,#fc-social .sx-icon.k-banned{color:var(--fc-yellow)}
+#fc-social .sx-readall{margin:0 0 8px auto;display:block}
+#fc-social .sx-report{display:flex;flex-wrap:wrap;gap:5px;align-items:center;margin-top:8px;padding:8px;border:1px dashed var(--fc-line);border-radius:6px}#fc-social .sx-report span{font-size:12px;color:var(--fc-yellow);margin-right:4px}
+#fc-social .sx-mod{color:var(--fc-yellow);border-color:#ffe50066}
+#fc-social .sx-modcard{border-left-color:var(--fc-yellow)}
+#fc-bell{position:fixed;top:196px;right:18px;z-index:120;font:700 13px var(--fc-body);color:var(--fc-ink);background:var(--fc-pink);border:0;border-radius:18px;padding:8px 13px;min-height:36px;cursor:pointer;box-shadow:3px 3px 0 var(--fc-cyan)}#fc-bell[hidden]{display:none}
+@media (pointer:coarse){#fc-bell{top:auto;bottom:210px;right:10px}}
 @media (max-width:640px){#fc-social{inset:4px}#fc-social .sx-frame{box-shadow:none}#fc-social h2{font-size:26px}#fc-social .sx-profile{grid-template-columns:1fr}#fc-social .sx-portrait{max-width:220px;margin:auto;width:100%}#fc-social .sx-people{grid-template-columns:1fr 1fr}#fc-social nav>button{padding:8px 9px}}`;
 document.head.append(css);
 
-window.FCSocialHub = { open, close, get state(){ return UI; }, portrait };
+window.FCSocialHub = { open, close, get state(){ return UI; }, portrait, pollNotes };
 })();

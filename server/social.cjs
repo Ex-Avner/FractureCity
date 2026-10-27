@@ -1,6 +1,6 @@
 'use strict';
 const crypto=require('node:crypto');
-function createSocial(db,now=Date.now,media){
+function createSocial(db,now=Date.now,media,opts={}){
 const run=(s,...p)=>db.prepare(s).run(...p),one=(s,...p)=>db.prepare(s).get(...p),all=(s,...p)=>db.prepare(s).all(...p),fail=(n,s)=>{throw Object.assign(Error(s),{status:n})},clean=(s,n)=>String(s||'').replace(/[\x00-\x1f\x7f<>]/g,'').trim().slice(0,n),id=()=>crypto.randomUUID();
 db.exec(`CREATE TABLE IF NOT EXISTS social_works(id TEXT PRIMARY KEY,slot INTEGER UNIQUE NOT NULL,author TEXT NOT NULL REFERENCES accounts(id),title TEXT NOT NULL,body TEXT NOT NULL,pixels TEXT,created INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS social_replies(id TEXT PRIMARY KEY,work TEXT NOT NULL REFERENCES social_works(id) ON DELETE CASCADE,author TEXT NOT NULL REFERENCES accounts(id),body TEXT NOT NULL,created INTEGER NOT NULL);
@@ -75,6 +75,48 @@ function action(who,kind,b){const uid=who.id;
  else if(kind==='report'){const reason=clean(b.reason,200);if(!reason)fail(400,'Describe the issue.');run('INSERT OR IGNORE INTO social_reports VALUES(?,?,?,?,?)',id(),uid,work.id,reason,now())}
  else fail(404,'Unknown social action.');return snapshot(uid)
 }
-return{snapshot,action,feed,profile,item,people};
+// ── 0.83: notifications, reports on posts, moderation, bans, word filter ──
+const filter=require('./wordfilter.cjs'),isOwner=id=>!!opts.isOwner?.(id);
+db.exec(`CREATE TABLE IF NOT EXISTS social_notes(id TEXT PRIMARY KEY,account TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,kind TEXT NOT NULL,actor TEXT,item TEXT,text TEXT NOT NULL DEFAULT '',created INTEGER NOT NULL,read INTEGER NOT NULL DEFAULT 0);
+CREATE INDEX IF NOT EXISTS social_notes_account ON social_notes(account,created);
+CREATE UNIQUE INDEX IF NOT EXISTS social_notes_once ON social_notes(account,kind,actor,item) WHERE kind IN ('heart','follow');
+CREATE TABLE IF NOT EXISTS social_bans(account_id TEXT PRIMARY KEY REFERENCES accounts(id) ON DELETE CASCADE,until INTEGER NOT NULL,reason TEXT NOT NULL,by TEXT,created INTEGER NOT NULL);`);
+function banned(id){const b=one('SELECT until,reason FROM social_bans WHERE account_id=?',id);if(!b)return null;if(b.until<now()){run('DELETE FROM social_bans WHERE account_id=?',id);return null}return b}
+function mustSpeak(id){const b=banned(id);if(b)fail(403,'Your posting is suspended until '+(b.until>=8.6e15?'the server owner lifts it':new Date(b.until).toISOString().slice(0,16).replace('T',' ')+' UTC')+'. Reason: '+b.reason)}
+function note(account,kind,actor,item,text=''){if(!account||account===actor||blocked(account,actor))return;run('INSERT OR IGNORE INTO social_notes(id,account,kind,actor,item,text,created) VALUES(?,?,?,?,?,?,?)',id(),account,kind,actor||null,item||null,clean(text,160),now());
+ for(const old of all('SELECT id FROM social_notes WHERE account=? ORDER BY created DESC LIMIT -1 OFFSET 200',account))run('DELETE FROM social_notes WHERE id=?',old.id)}
+function mentions(text,actor,item){const seen=new Set();for(const m of String(text||'').matchAll(/@([a-z0-9_]{3,24})/gi)){const u=one('SELECT id FROM accounts WHERE username=?',m[1].toLowerCase());if(u&&!seen.has(u.id)){seen.add(u.id);note(u.id,'mention',actor,item,text)}}}
+function notes(viewer){const rows=all('SELECT * FROM social_notes WHERE account=? ORDER BY created DESC LIMIT 60',viewer).filter(n=>!n.actor||!blocked(viewer,n.actor));return{notes:rows.map(n=>({id:n.id,kind:n.kind,actor:n.actor?person(n.actor):null,item:n.item,text:n.text,at:n.created,read:!!n.read})),unread:one('SELECT COUNT(*) AS n FROM social_notes WHERE account=? AND read=0',viewer).n,owner:isOwner(viewer),reports:isOwner(viewer)?one('SELECT COUNT(*) AS n FROM social_reports').n:0,banned:banned(viewer)}}
+function itemAuthor(ref){return one('SELECT author FROM social_posts WHERE id=?',ref)?.author||one('SELECT author FROM social_works WHERE id=?',ref)?.author||null}
+function mod(viewer){if(!isOwner(viewer))fail(403,'Only the server owner can moderate.');
+ const reports=all('SELECT * FROM social_reports ORDER BY created DESC LIMIT 100').map(r=>{const p=one('SELECT * FROM social_posts WHERE id=?',r.work),w=p?null:one('SELECT * FROM social_works WHERE id=?',r.work),it=p||w;return{id:r.id,reason:r.reason,at:r.created,reporter:person(r.author),item:it?{id:it.id,kind:p?'post':'board',title:it.title,text:it.body,photo:it.photo||null,author:person(it.author),banned:!!banned(it.author)}:null}});
+ return{reports,bans:all('SELECT * FROM social_bans ORDER BY created DESC').filter(b=>b.until>=now()).map(b=>({account:person(b.account_id),until:b.until,reason:b.reason}))}}
+function removeItem(ref,by){const p=one('SELECT * FROM social_posts WHERE id=?',ref),w=p?null:one('SELECT * FROM social_works WHERE id=?',ref),it=p||w;if(!it)return null;
+ run(p?'DELETE FROM social_posts WHERE id=?':'DELETE FROM social_works WHERE id=?',it.id);
+ for(const m of [it.photo,it.audio].filter(Boolean))if(!one('SELECT 1 FROM social_works WHERE photo=? OR audio=?',m,m)&&!one('SELECT 1 FROM social_posts WHERE photo=? OR audio=?',m,m))run('DELETE FROM gallery_media WHERE id=?',m);
+ run('DELETE FROM social_reports WHERE work=?',it.id);note(it.author,'removed',by,null,'“'+(it.title||it.body.slice(0,60))+'” was removed by the server owner.');return it}
+const TEXT_KINDS={post:b=>[b.title,b.text],'post-reply':b=>[b.text],reply:b=>[b.text],publish:b=>[b.title,b.text],profile:b=>[b.tagline]};
+function act(who,kind,b){const uid=who.id;
+ if(kind==='notes-read'){if(b.all===true)run('UPDATE social_notes SET read=1 WHERE account=?',uid);else if(Array.isArray(b.ids))for(const n of b.ids.slice(0,100))run('UPDATE social_notes SET read=1 WHERE account=? AND id=?',uid,String(n));return notes(uid)}
+ if(kind==='post-report'){const reason=clean(b.reason,200);if(!reason)fail(400,'Describe the issue.');const p=one('SELECT * FROM social_posts WHERE id=?',String(b.post||''));if(!p||blocked(uid,p.author))fail(404,'This post is unavailable.');run('INSERT OR IGNORE INTO social_reports VALUES(?,?,?,?,?)',id(),uid,p.id,reason,now());return{ok:true}}
+ if(kind.startsWith('mod-')){if(!isOwner(uid))fail(403,'Only the server owner can moderate.');
+  if(kind==='mod-remove'){if(!removeItem(String(b.item||''),uid))fail(404,'That post is already gone.');return mod(uid)}
+  if(kind==='mod-dismiss'){run('DELETE FROM social_reports WHERE id=?',String(b.report||''));return mod(uid)}
+  if(kind==='mod-ban'){const t=person(String(b.target||''));if(!t)fail(404,'No such resident.');if(t.id===uid)fail(400,'You cannot suspend yourself.');const days=Number(b.days);if(!(days>0)&&days!==-1)fail(400,'Choose a length.');const reason=clean(b.reason,120)||'Breaking the server rules.';
+   run('INSERT INTO social_bans VALUES(?,?,?,?,?) ON CONFLICT(account_id) DO UPDATE SET until=excluded.until,reason=excluded.reason,by=excluded.by,created=excluded.created',t.id,days===-1?8.64e15:now()+days*86400000,reason,uid,now());note(t.id,'banned',uid,null,'Your posting is suspended'+(days===-1?'':' for '+days+' day'+(days===1?'':'s'))+'. Reason: '+reason);return mod(uid)}
+  if(kind==='mod-unban'){run('DELETE FROM social_bans WHERE account_id=?',String(b.target||''));note(String(b.target||''),'unbanned',uid,null,'You can post again.');return mod(uid)}
+  fail(404,'Unknown moderation action.')}
+ if(TEXT_KINDS[kind]){mustSpeak(uid);filter.check(...TEXT_KINDS[kind](b))}
+ //  Who gets told, worked out before the action changes anything.
+ let target=null;if(kind==='reply'||kind==='appreciate')target=one('SELECT author FROM social_works WHERE id=?',String(b.work||''))?.author;if(kind==='post-reply'||kind==='post-appreciate')target=one('SELECT author FROM social_posts WHERE id=?',String(b.post||''))?.author;
+ const out=action(who,kind,b);
+ if(kind==='reply'){note(target,'reply',uid,b.work,b.text);mentions(b.text,uid,b.work)}
+ if(kind==='post-reply'){note(target,'reply',uid,b.post,b.text);mentions(b.text,uid,b.post)}
+ if((kind==='appreciate'||kind==='post-appreciate')&&b.enabled===true)note(target,'heart',uid,b.work||b.post);
+ if(kind==='follow'&&b.enabled===true)note(String(b.target||''),'follow',uid,null);
+ if(kind==='post'&&out.item)mentions((b.title||'')+' '+b.text,uid,out.item.id);
+ if(kind==='publish'){const w=one('SELECT id FROM social_works WHERE author=? AND slot=?',uid,b.slot);if(w)mentions((b.title||'')+' '+b.text,uid,w.id)}
+ return out}
+return{snapshot,action:act,feed,profile,item,people,notes,mod,banned,note,mustSpeak,filter};
 }
 module.exports={createSocial};

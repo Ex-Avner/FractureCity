@@ -15,7 +15,7 @@ const SIM_RANGE=60,THINK_EVERY=.25,ABSENT_MS=10*60000;
 const fail=(status,message)=>{throw Object.assign(Error(message),{status})};
 const num=v=>Number.isFinite(v)?v:null;
 
-function createSpawns({economy,looks,now=Date.now,hurtPlayer,chat}={}){
+function createSpawns({economy,looks,now=Date.now,hurtPlayer,chat,notify}={}){
  const list=r=>r.npcs||(r.npcs=new Map());
  const bump=r=>{r.npcRev=(r.npcRev||0)+1};
  function ownedBy(r,accountId){return [...list(r).values()].filter(n=>n.owner===accountId).length}
@@ -84,7 +84,8 @@ function createSpawns({economy,looks,now=Date.now,hurtPlayer,chat}={}){
    strike:(a,b,dmg)=>{if(B.strike(a,b,dmg))r.events.push({id:crypto.randomBytes(4).toString('hex'),type:'npc-down',npc:b.id,by:a.id});r.events=r.events.slice(-10)},
    reward:(pl,c,why,n)=>{const k='reward:'+pl.accountId;if(t-(r.rewardAt?.[k]||0)<30000)return;(r.rewardAt||(r.rewardAt={}))[k]=t;economy.credit(pl.accountId,c);chat?.(r,pl.name+' '+why+' (+'+c+' credits).')},
    gift:(pl,n)=>{const g=economy.give(pl.accountId,4);if(g)chat?.(r,(n.story?.name||'A crew hand')+' scrounged '+g.n+' × '+g.name+' for '+pl.name+'.')},
-   chat:text=>chat?.(r,text)};
+   chat:text=>chat?.(r,text),
+   notify:(account,actor,text)=>notify?.(account,actor,text)};
  }
  let acc=0;
  function tick(r,dt){

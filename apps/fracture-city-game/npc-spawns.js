@@ -88,6 +88,12 @@ function dispose(e){ e.group.removeFromParent(); if (e.bubble){ e.bubble.materia
 
 //  What the body is doing, on top of walking and breathing.
 function pose(e, act, t, dt, moving){
+ poseBody(e, act, t, dt, moving);
+ //  Signs stay upright and face the way the protester faces, whatever the arm is doing
+ //  (the raised arm turned the hand, and the placard, upside down).
+ if (e.sign){ const c = e.char; c.group.updateWorldMatrix(true, true); const want = c.group.getWorldQuaternion(new THREE.Quaternion()), hand = e.sign.parent.getWorldQuaternion(new THREE.Quaternion()); e.sign.quaternion.copy(hand.invert().multiply(want)); }
+}
+function poseBody(e, act, t, dt, moving){
  const c = e.char, s = c.studio, L = c.leftArm, R = c.rightArm, el = s.elbows;
  c.group.rotation.x = 0; s.torso.rotation.x = 0; c.talking = !!e.talking;
  if (e.board) e.board.visible = act === 'skate';

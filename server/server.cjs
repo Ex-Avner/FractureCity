@@ -18,11 +18,11 @@ const clean=(s,n)=>String(s||'').replace(/[\x00-\x1f\x7f<>]/g,'').trim().slice(0
 function createServer(opts={}){
 const rooms=new Map(),tokens=new Map(),limits=new Map(),now=opts.now||Date.now;let tickTimer,tickCount=0;const store=createStore(opts.dbPath||process.env.DB_PATH||path.join(__dirname,'data','districts.sqlite'),now);
 const life=createResidentLife(store.db,now);
-const media=createMedia(store.db,now),social=createSocial(store.db,now,media),cityBuild=createCityBuildStore(store.db),structures=createStructures(store.db);
+const media=createMedia(store.db,now),social=createSocial(store.db,now,media,{isOwner:id=>mb.isOwner(id)}),cityBuild=createCityBuildStore(store.db),structures=createStructures(store.db);
 const challenge=createChallenge(store.db,now);
 const economy=createEconomy(store.db,{now});
 //  Casting Booth NPCs. A brawler's punch costs health like PvP and downs the same way.
-const spawns=createSpawns({economy,looks,now,chat:(r,text)=>{system(r,text)},hurtPlayer:(r,p,dmg,n)=>{if(!p||p.hp<=0||p.protectUntil>now())return;p.hp=Math.max(0,p.hp-dmg);if(!p.hp){p.deaths++;p.respawnAt=now()+4000;system(r,p.name+' was knocked down by '+(n.story?.name||'a brawler')+'.')}}});
+const spawns=createSpawns({economy,looks,now,notify:(account,actor,text)=>social.note(account,'courier',actor,null,text),chat:(r,text)=>{system(r,text)},hurtPlayer:(r,p,dmg,n)=>{if(!p||p.hp<=0||p.protectUntil>now())return;p.hp=Math.max(0,p.hp-dmg);if(!p.hp){p.deaths++;p.respawnAt=now()+4000;system(r,p.name+' was knocked down by '+(n.story?.name||'a brawler')+'.')}}});
 const news=createNews(store.db,{fetcher:opts.newsFetch,now});
 const classics=createClassics({dir:opts.classicsDir||path.join(path.dirname(opts.dbPath||process.env.DB_PATH||path.join(__dirname,'data','districts.sqlite')),'classics'),shelfDir:path.join(GAME,'classics'),fetcher:opts.classicsFetch,now});
 const mb=createMainBeta(store.db,{now,code:opts.mainCode,owners:opts.owners,idleDays:opts.idleDays}),MAX=()=>Number(opts.maxRooms||process.env.MAX_ROOMS||4),privateRooms=()=>[...rooms.values()].filter(r=>!r.public).length,present=()=>new Set([...rooms.values()].flatMap(r=>[...r.players.values()].map(p=>p.accountId)));
@@ -111,6 +111,8 @@ if(u.pathname==='/api/account/me'&&req.method==='GET'){const a=account(req);retu
 if(u.pathname==='/api/common-challenge'&&req.method==='GET'){const a=account(req);rate('challenge-read:'+a.id,30,60000);return json(res,challenge.snapshot(a.id))}
 if(u.pathname.startsWith('/api/common-challenge/')&&req.method==='POST'){const a=account(req);rate('challenge-write:'+a.id,10,60000);if(!String(req.headers['content-type']||'').startsWith('application/json'))fail(415,'Send JSON.');return json(res,challenge.action(a,u.pathname.split('/').pop(),await body(req,40000)))}
 if(u.pathname.startsWith('/api/social/')&&req.method==='GET'){const a=account(req);rate('social-read:'+a.id,120,60000);const [,,,what,ref]=u.pathname.split('/');
+ if(what==='notes')return json(res,social.notes(a.id));
+ if(what==='mod')return json(res,social.mod(a.id));
  if(what==='feed')return json(res,social.feed(a.id,{scope:u.searchParams.get('scope')==='following'?'following':'all',before:u.searchParams.get('before')}));
  if(what==='profile')return json(res,social.profile(a.id,decodeURIComponent(ref||'')));
  if(what==='item')return json(res,social.item(a.id,decodeURIComponent(ref||'')));
@@ -123,6 +125,7 @@ if(u.pathname==='/api/city-npcs'&&req.method==='GET'){const {r,p}=auth(req);rate
 if(u.pathname.startsWith('/api/npc-')&&req.method==='POST'){const {r,p}=auth(req);if(!r.map.city||r.phase!=='live')fail(409,'Enter the shared city first.');if(!String(req.headers['content-type']||'').startsWith('application/json'))fail(415,'Send JSON.');const action=u.pathname.slice(9);p.seen=now();
  if(action==='poses'){rate('npc-poses:'+p.id,30,1000);const b=await body(req,16384);return json(res,{ok:true,n:spawns.poses(r,p,b.poses)})}
  const b=await body(req,16384);
+ if(action==='spawn'||action==='order'){social.mustSpeak(p.accountId);const st=b.story&&typeof b.story==='object'?b.story:{};social.filter.check(b.message,...Object.values(st).filter(v=>typeof v==='string'))}
  if(action==='spawn'){rate('npc-spawn:'+p.accountId,20,60000);const ids=spawns.add(r,p,b);publish(r);return json(res,{ok:true,ids,wallet:economy.read(p.accountId)})}
  if(action==='dismiss'){rate('npc-dismiss:'+p.accountId,60,60000);spawns.remove(r,p,b.id);publish(r);return json(res,{ok:true})}
  if(action==='order'){rate('npc-order:'+p.accountId,60,60000);const out=spawns.command(r,p,b);publish(r);return json(res,out)}
@@ -146,11 +149,12 @@ if(u.pathname.startsWith('/api/account/')){
  const action=u.pathname.split('/').pop();
  if(['register','login','recover'].includes(action)){
   rate('account-name:'+String(b.username||'').toLowerCase(),10,600000);
+  if(action==='register')social.filter.check(b.username,b.displayName);
   const result=await store[action](b);if(action==='recover')revokePlayers(result.account.id);
   cookie(res,result.token);return json(res,{account:result.account,recovery:result.recovery,rooms:store.recent(result.account.id)});
  }
  const a=account(req);
- if(action==='profile'){const updated=store.update(a.id,b);for(const r of rooms.values())for(const p of r.players.values())if(p.accountId===a.id){p.name=updated.displayName;p.color=updated.color}return json(res,{account:updated})}
+ if(action==='profile'){social.filter.check(b.displayName,b.bio);const updated=store.update(a.id,b);for(const r of rooms.values())for(const p of r.players.values())if(p.accountId===a.id){p.name=updated.displayName;p.color=updated.color}return json(res,{account:updated})}
  if(action==='password'){const result=await store.change(a.id,b);revokePlayers(a.id);cookie(res,result.token);return json(res,{account:result.account,recovery:result.recovery})}
  if(action==='logout'||action==='logout-all'){if(action==='logout-all')store.logoutAll(a.id);else store.logout(accountToken(req));revokePlayers(a.id);cookie(res,'');return json(res,{ok:true})}
  if(action==='export')return json(res,{account:a,districts:store.recent(a.id),exportedAt:now()});
@@ -193,7 +197,7 @@ case '/api/shoot':shoot(r,p);break;
 case '/api/city-look':{if(!r.map.city)fail(409,'Enter the shared city first.');rate('look:'+p.accountId,20,60000);p.look=looks.clean(b.look,sku=>economy.owns(p.accountId,sku));try{social.action({id:p.accountId},'profile',{look:p.look})}catch(e){}r.lookRev=(r.lookRev||0)+1;json(res,{ok:true,look:p.look});publish(r);return}
 case '/api/city-shoot':{const result=cityShoot(r,p,b);json(res,result);if(result.hit)publish(r);return}
 case '/api/reload':if(p.hp>0&&!p.reloadUntil&&p.ammo<6)p.reloadUntil=now()+1600;break;
-case '/api/chat':rate('chat:'+p.id,5,10000);if(r.public&&/^\/(remove|allow|npcs)\s/i.test(clean(b.text,240))){moderate(r,p,clean(b.text,240));break}if(clean(b.text,240))r.chat.push({id:id(),player:p.id,accountId:p.accountId,name:p.name,text:clean(b.text,240),at:now()});r.chat=r.chat.slice(-30);break;
+case '/api/chat':rate('chat:'+p.id,5,10000);if(clean(b.text,240)&&!/^\/(remove|allow|npcs)\s/i.test(clean(b.text,240))){social.mustSpeak(p.accountId);social.filter.check(b.text)}if(r.public&&/^\/(remove|allow|npcs)\s/i.test(clean(b.text,240))){moderate(r,p,clean(b.text,240));break}if(clean(b.text,240))r.chat.push({id:id(),player:p.id,accountId:p.accountId,name:p.name,text:clean(b.text,240),at:now()});r.chat=r.chat.slice(-30);break;
 case '/api/emote':if(!['Wave','Peace','Need help','Good game'].includes(b.emote))fail(400,'Unknown emote.');p.emote=b.emote;p.emoteUntil=now()+3500;break;
 case '/api/quest':{if(r.phase!=='live'||p.hp<=0)fail(409,'Enter the district first.');const q=C.quests.find(q=>q.id===b.id),progress=r.quests[b.id];if(!q||!progress||progress.done)fail(409,'Contract unavailable.');const s=q.steps[progress.step];if(Math.hypot(p.x-s.at[0],p.z-s.at[1])>4)fail(409,'Move closer to the contract marker.');if(s.choices&&(!Number.isInteger(b.choice)||!s.choices[b.choice]))fail(400,'Choose a response.');if(s.choices)progress.choices.push(b.choice);progress.step++;progress.done=progress.step===q.steps.length;if(progress.done){store.reward(r,q);system(r,q.title+' completed. First-time completions earn '+q.reward+' permanent reputation.')}break}
 case '/api/leave':remove(r,p);break;
