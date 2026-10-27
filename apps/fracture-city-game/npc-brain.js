@@ -41,8 +41,10 @@ const ROLES = {
 const GROUPS = [['life','City life'], ['help','Followers and helpers'], ['trouble','Trouble'], ['talk','Talkers']];
 const LIMITS = { perPlayer: 12, perCity: 40, solo: 24, name: 24, field: 160, bio: 700, message: 120 };
 //  Common Ground and the building yard: no trouble there, and the booth stands inside.
-const SAFE = { x0: 144, x1: 216, z0: 0, z1: 72 };
-const inSafe = (x, z) => x >= SAFE.x0 && x <= SAFE.x1 && z >= SAFE.z0 && z <= SAFE.z1;
+//  Common Ground and the building yard (0.84: the yard grew to x 192-288, z 48-120).
+const SAFE_AREAS = [{ x0: 144, x1: 216, z0: 0, z1: 72 }, { x0: 192, x1: 288, z0: 48, z1: 120 }];
+const SAFE = { x0: 144, x1: 288, z0: 0, z1: 120 };   // the bounding box, for finding a way out
+const inSafe = (x, z) => SAFE_AREAS.some(s => x >= s.x0 && x <= s.x1 && z >= s.z0 && z <= s.z1);
 const BOOTH = { x: 164, z: 45, door: { x: 164, z: 49.6 } };
 
 // ─── Small helpers ───────────────────────────────────────────────────────────
@@ -271,7 +273,9 @@ function wanderPoint(npc, world, radius){
 }
 //  The nearest point outside Common Ground, plus a few metres.
 function exitPoints(x, z){
- return [{ x: SAFE.x0 - 6, z }, { x: SAFE.x1 + 6, z }, { x, z: SAFE.z0 - 6 }, { x, z: SAFE.z1 + 6 }].sort((a, b) => Math.hypot(a.x - x, a.z - z) - Math.hypot(b.x - x, b.z - z));
+ const edges = r => [{ x: r.x0 - 6, z }, { x: r.x1 + 6, z }, { x, z: r.z0 - 6 }, { x, z: r.z1 + 6 }];
+ const near = SAFE_AREAS.filter(r => x >= r.x0 && x <= r.x1 && z >= r.z0 && z <= r.z1).flatMap(edges).filter(p => !inSafe(p.x, p.z));
+ return (near.length ? near : edges(SAFE)).sort((a, b) => Math.hypot(a.x - x, a.z - z) - Math.hypot(b.x - x, b.z - z));
 }
 function exitPoint(x, z){ return exitPoints(x, z)[0]; }
 function bark(npc, world, force){
@@ -454,5 +458,5 @@ function strike(from, to, dmg){
  return false;
 }
 
-return { ROLES, GROUPS, LIMITS, SAFE, BOOTH, inSafe, exitPoint, story, reroll, bio, voice, rumorAbout, quest, cleanSpec, init, think, step, strike, BARKS, hash, rng };
+return { ROLES, GROUPS, LIMITS, SAFE, SAFE_AREAS, BOOTH, inSafe, exitPoint, story, reroll, bio, voice, rumorAbout, quest, cleanSpec, init, think, step, strike, BARKS, hash, rng };
 });

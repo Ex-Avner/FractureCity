@@ -46,7 +46,7 @@ try{
  const after=await o.evaluate(()=>({hp:Player.hp,max:Player.hpMax,bar:document.getElementById('hp-text')?.textContent||document.querySelector('[id*=hp]')?.textContent}));
  assert.equal(Math.round(after.hp),Math.round(before-30*after.max/100),JSON.stringify(after));
  me.hp=1;await o.waitForFunction(()=>FCCityOnline.self?.hp===1,null,T);await o.waitForTimeout(300);assert.ok(await o.evaluate(()=>Player.hp>=1),'never dies locally from PvP');
- me.hp=0;me.respawnAt=Date.now()+1500;await o.waitForFunction(()=>FCCityOnline.self?.hp===0,null,T);me.hp=100;await o.waitForFunction(()=>FCCityOnline.self?.hp===100,null,T);await o.waitForTimeout(500);
+ me.hp=0;me.respawnAt=Date.now()+8000;await o.waitForFunction(()=>FCCityOnline.self?.hp===0,null,T);me.hp=100;await o.waitForFunction(()=>FCCityOnline.self?.hp===100,null,T);await o.waitForTimeout(500);
  assert.equal(await o.evaluate(()=>Player.hp===Player.hpMax),true,'full again after the down');
  console.log('PASS PvP hits show on the health bar and a respawn refills it');
  reader.cancel().catch(()=>{});await ctx.close();

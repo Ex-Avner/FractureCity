@@ -5,8 +5,11 @@ fs.mkdirSync(path.dirname(filename),{recursive:true,mode:0o700});
 // A fresh mounted volume starts root-owned. Drop privileges before opening the database or listening.
 if(process.getuid&&process.getuid()===0){fs.chownSync(path.dirname(filename),1000,1000);for(const suffix of ['', '-wal','-shm'])if(fs.existsSync(filename+suffix))fs.chownSync(filename+suffix,1000,1000);process.setgid(1000);process.setuid(1000)}
 const {createServer}=require('./server.cjs'),{pruneBackups}=require('./main-beta.cjs'),app=createServer({dbPath:filename});
-app.server.listen(Number(process.env.PORT||8787),process.env.HOST||'127.0.0.1',()=>console.log('Fracture City persistent district server listening on '+(process.env.PORT||8787)));
 const backupDir=process.env.BACKUP_DIR||path.join(path.dirname(filename),'backups');let backingUp=false;
+// A pending world reset (world-reset.cjs) runs before anyone can connect, and
+// only after a full copy of the database is safely written.
+(async()=>{if(app.worldReset.pending()){try{fs.mkdirSync(backupDir,{recursive:true,mode:0o700});const copy=path.join(backupDir,'before-world-reset-'+app.worldReset.WORLD_EPOCH+'-'+new Date().toISOString().replace(/[:.]/g,'-')+'.sqlite');await app.store.backup(copy);console.log('World reset: backed up to '+copy);console.log('World reset:',JSON.stringify(app.worldReset.run()))}catch(e){console.error('World reset skipped, backup failed:',e.message)}}
+app.server.listen(Number(process.env.PORT||8787),process.env.HOST||'127.0.0.1',()=>console.log('Fracture City persistent district server listening on '+(process.env.PORT||8787)))})();
 async function dailyBackup(){if(backingUp)return;backingUp=true;try{fs.mkdirSync(backupDir,{recursive:true,mode:0o700});const target=path.join(backupDir,'districts-'+new Date().toISOString().slice(0,10)+'.sqlite');if(!fs.existsSync(target))await app.store.backup(target);
 // Keep a week of daily copies. Uploads live inside the database, so unpruned copies fill the 1 GB disk.
 const gone=pruneBackups(backupDir,Number(process.env.BACKUP_KEEP||7));if(gone.length)console.log('Removed old backups:',gone.join(', '))}catch(e){console.error('Database backup failed:',e.message)}finally{backingUp=false}}

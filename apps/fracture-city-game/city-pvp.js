@@ -5,12 +5,12 @@
    health, downs and respawns. Common Ground and the building yard are safe.
    Shots from others draw as tracers; your own PvP health shows when hurt. */
 (function(){'use strict';
-const SAFE={x0:144,x1:216,z0:0,z1:72};
+const SAFE=[{x0:144,x1:216,z0:0,z1:72},{x0:192,x1:288,z0:48,z1:120}];
 const live=()=>!!(window.FCCityOnline&&FCCityOnline.ready&&FCCityOnline.connected);
 const me=()=>window.FCCityOnline?.self;
 const token=()=>{try{return JSON.parse(sessionStorage.getItem('fc-district-session')||'{}').token||''}catch(e){return''}};
 async function api(route,data){const res=await fetch('/api/'+route,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token()},body:JSON.stringify(data),signal:AbortSignal.timeout(6000)});const out=await res.json().catch(()=>({}));if(!res.ok)throw Object.assign(Error(out.error||'Shot not sent.'),{status:res.status});return out}
-const inSafe=(x,z)=>x>=SAFE.x0&&x<=SAFE.x1&&z>=SAFE.z0&&z<=SAFE.z1;
+const inSafe=(x,z)=>SAFE.some(s=>x>=s.x0&&x<=s.x1&&z>=s.z0&&z<=s.z1);
 
 // ─── Your shots ─────────────────────────────────────────────────────────────
 const box=new THREE.Box3(),hitPoint=new THREE.Vector3();
