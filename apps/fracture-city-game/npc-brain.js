@@ -45,7 +45,7 @@ const LIMITS = { perPlayer: 12, perCity: 40, solo: 24, name: 24, field: 160, bio
 const SAFE_AREAS = [{ x0: 144, x1: 216, z0: 0, z1: 72 }, { x0: 192, x1: 288, z0: 48, z1: 120 }];
 const SAFE = { x0: 144, x1: 288, z0: 0, z1: 120 };   // the bounding box, for finding a way out
 const inSafe = (x, z) => SAFE_AREAS.some(s => x >= s.x0 && x <= s.x1 && z >= s.z0 && z <= s.z1);
-const BOOTH = { x: 164, z: 45, door: { x: 164, z: 49.6 } };
+const BOOTH = { x: 163, z: 45, door: { x: 163, z: 49.6 } };  // matches npc-booth.js
 
 // ─── Small helpers ───────────────────────────────────────────────────────────
 function hash(s){ let h = 2166136261; for (const ch of String(s)){ h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619); } return h >>> 0; }

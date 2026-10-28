@@ -9,7 +9,7 @@
    Geometry belongs to the Common Ground chunk, like the campus arcades. */
 (function(){'use strict';
 if (typeof THREE === 'undefined' || typeof State === 'undefined' || !window.FCNpcBrain) return;
-const B = window.FCNpcBrain, BOOTH = { x: 164, z: 45, w: 7, d: 5, h: 3.7, y: 1 };
+const B = window.FCNpcBrain, BOOTH = { x: 163, z: 45, w: 7, d: 5, h: 3.7, y: 1 };  // 0.85: 1 m west, off the x 167 walk
 const KEY = chunkCoordOf(BOOTH.x) + ',' + chunkCoordOf(BOOTH.z), NAME = 'casting-booth';
 const COUNTER = { x: 161.9, z: 47.2 };
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));

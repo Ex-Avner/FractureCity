@@ -41,7 +41,7 @@ const EXE = process.env.PW_CHROMIUM || undefined;
     c.ok('warden enemy type registered', reg.warden);
 
     // ── The prologue, from the front door ──────────────────────────────────
-    await page.evaluate(() => { if (window.HD){ HD.locked = true; HD.tier = 'perf'; } shFrontAct('new-campaign'); });
+    await page.evaluate(() => { if (window.HD){ HD.locked = true; HD.tier = 'perf'; } FN.startMinute(); });  // the front menu opens on the bulletin since 0.7x; the Minute is still played from saves
     const seen = { steps: new Set(), choices: [], cards: 0, took: [], dialogue: 0, beats: [], lines: [], context: true, leaked: false, injections: 0 };
     let holdChecked=false;
     let done = false;

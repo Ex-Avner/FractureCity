@@ -75,9 +75,11 @@ setInterval(()=>{if(online()&&State.ui.freeBuild){State.ui.freeBuild=false;rende
 
 // ─── Holding ────────────────────────────────────────────────────────────────
 I.held=()=>I.slots[I.sel];
-function apply(){
+//  keep: entering build mode keeps what you had selected (0.85: opening the art
+//  workshop used to drop your selection 150 ms later). Changing the held item clears it.
+function apply(keep){
  const sku=I.slots[I.sel],it=parse(sku),A=window.CityArt,K=window.CityBuild;
- if(A){A.cancelStamp?.();A.selected?.clear()}
+ if(A&&!keep){A.cancelStamp?.();A.selected?.clear()}
  if(!it){if(K)K.enabled=false;if(A)A.enabled=false;return}
  if(it.kind==='block'){if(K)K.enabled=false;if(A)A.enabled=false;if(BLOCKS[it.id]){HOTBAR[HOTBAR.length-1]=it.id;heldSlot=HOTBAR.length-1}return}
  if(it.kind==='kit'){if(A)A.enabled=false;if(K){K.enabled=true;if(kitDef(it.shape))K.shape=it.shape;K.material=it.material}return}
@@ -137,7 +139,7 @@ function paint(showName){
  if(showName){const n=bar.querySelector('.hb-name');n.textContent=I.slots[I.sel]?label(I.slots[I.sel]):'Empty hand';n.classList.add('on');clearTimeout(flash);flash=setTimeout(()=>n.classList.remove('on'),1400)}
 }
 setInterval(()=>paint(false),200);
-let wasBuild=false;setInterval(()=>{if(State.ui.construct&&!wasBuild){apply();paint(true)}wasBuild=!!State.ui.construct},150);
+let wasBuild=false;setInterval(()=>{if(State.ui.construct&&!wasBuild){apply(true);paint(true)}wasBuild=!!State.ui.construct},150);
 function render(){if(I.open)drawInv();paint(false)}
 
 // ─── Inventory panel ────────────────────────────────────────────────────────

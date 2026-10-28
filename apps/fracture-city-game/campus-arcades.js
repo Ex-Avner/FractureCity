@@ -4,12 +4,14 @@
    of the arcade building's roster. */
 (function(){'use strict';
 //  x, z: cabinet centre. face: the way the screen looks (radians, 0 = +z).
+//  0.85: three cabinets moved off the court's walks: Oh No Ned 4 m east (x 177 walk),
+//  Bad Weather 2 m west (x 167 walk), Toilet Heads 3 m south (z 27 east approach).
 const GAMES=[
- {slug:'toilet-heads',title:'TOILET HEADS HD',sub:'ENDLESS JUMPER',color:0x5fd3ff,x:200.5,z:26.5,face:-Math.PI/2,art:'bounce'},
+ {slug:'toilet-heads',title:'TOILET HEADS HD',sub:'ENDLESS JUMPER',color:0x5fd3ff,x:200.5,z:29.5,face:-Math.PI/2,art:'bounce'},
  {slug:'fractured-mirror',title:'FRACTURED MIRROR',sub:'DRAW. REFLECT. LOOP.',color:0xb98cff,x:210.5,z:38.5,face:-Math.PI/2,art:'mirror'},
  {slug:'breaking-ned',title:'BREAKING NED',sub:'ONE-TAP FLYER',color:0xff5a4d,x:148.5,z:27.5,face:Math.PI/2,art:'news'},
- {slug:'oh-no-ned',title:'OH NO NED',sub:'SLINGSHOT PHYSICS',color:0x9be15d,x:176.5,z:50.5,face:Math.PI,art:'sling'},
- {slug:'bad-weather',title:'BAD WEATHER',sub:'BUILD. THEN BRACE.',color:0xffb347,x:166.5,z:56.5,face:Math.PI,art:'storm'},
+ {slug:'oh-no-ned',title:'OH NO NED',sub:'SLINGSHOT PHYSICS',color:0x9be15d,x:180.5,z:50.5,face:Math.PI,art:'sling'},
+ {slug:'bad-weather',title:'BAD WEATHER',sub:'BUILD. THEN BRACE.',color:0xffb347,x:164.5,z:56.5,face:Math.PI,art:'storm'},
 ];
 const Y=1,REACH=2.3,hex=c=>'#'+c.toString(16).padStart(6,'0');
 for(const g of GAMES){g.fx=Math.sin(g.face);g.fz=Math.cos(g.face);g.key=chunkCoordOf(g.x)+','+chunkCoordOf(g.z);g.name='campus-arcade-'+g.slug}

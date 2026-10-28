@@ -45,7 +45,7 @@ const EXE = process.env.PW_CHROMIUM || undefined;
       return { x: b.left + b.width / 2, y: b.top + b.height / 2 };
     }, sel);
     if (!r) return false;
-    //  Coordinates are CSS px of the 980-wide layout; the touchscreen speaks the
+    //  Coordinates are CSS px of the native-width layout; the touchscreen speaks the
     //  same units because the page reports them.
     await page.touchscreen.tap(r.x, r.y);
     return true;
@@ -76,8 +76,8 @@ const EXE = process.env.PW_CHROMIUM || undefined;
       vp: (document.querySelector('meta[name=viewport]') || {}).content, w: innerWidth, mobile: !!window.Mobile }));
     c.ok('touch mode on', boot.touch);
     c.ok('mobile.js loaded and built', boot.mobile && boot.over);
-    c.ok('viewport tag set', /width=980/.test(boot.vp || '') && /viewport-fit=cover/.test(boot.vp || ''), boot.vp);
-    c.eq('layout width', boot.w, 980);
+    c.ok('viewport tag set (native width)', /width=device-width/.test(boot.vp || '') && /viewport-fit=cover/.test(boot.vp || ''), boot.vp);
+    c.eq('layout width', boot.w, 844);
 
     c.ok('prologue skipped', await skipPrologue(page));
     await wait(1500);
@@ -98,12 +98,14 @@ const EXE = process.env.PW_CHROMIUM || undefined;
         chipsVsCounter: hit(top, ob), chipsVsTime: hit(top, time), objVsMap: hit(ch, mm), objVsStick: hit(ch, stick),
         abVsObj: hit(ab, ch), distVsChips: hit(dist, top), mapVsActs: hit(mm, acts), mapVsCredits: hit(mm, cr),
         ctxVsWeapons: hit(mctx, wpn), ctxVsActs: hit(mctx, acts),
-        onScreen: [top, ch, mm, acts, stick, wpn].every(on),
+        onScreen: [top, ch, mm, acts, stick, wpn].filter(Boolean).every(on), offList: Object.entries({top, ch, mm, acts, stick, wpn}).filter(([k,v]) => v && !on(v)).map(([k,v]) => k + ':' + Math.round(v.left) + ',' + Math.round(v.top) + ',' + Math.round(v.right) + ',' + Math.round(v.bottom)).join(' '),
         casebookBtnHidden: !R('campaign-casebook'),
       };
     });
     for (const [k, v] of Object.entries(lay)){
-      if (k === 'onScreen' || k === 'casebookBtnHidden') c.ok('layout: ' + k, v);
+      if (k === 'offList') continue;
+      if (k === 'onScreen') c.ok('layout: onScreen', v, lay.offList);
+      else if (k === 'casebookBtnHidden') c.ok('layout: ' + k, v);
       else c.ok('layout: no overlap ' + k, !v);
     }
 
@@ -127,14 +129,15 @@ const EXE = process.env.PW_CHROMIUM || undefined;
 
     await tapEl('.tc-chip[data-act="inv"]');
     c.ok('ITEMS chip opens the inventory', await poll(() => State.ui.inInventory), await ev(() => __keys.slice(-4).join(' ') + ' ' + JSON.stringify(State.ui) + document.getElementById('touch-layer').style.display));
-    await tapEl('#mob-back');
-    c.ok('BACK closes the inventory', await poll(() => !State.ui.inInventory));
+    //  The 0.81 inventory is a full panel above the touch layer with its own close.
+    await tapEl('#fc-inv header [data-close]');
+    c.ok('the inventory close button closes it', await poll(() => !State.ui.inInventory));
 
     await tapEl('.tc-chip[data-act="menu"]');
     c.ok('☰ chip opens the menu', await poll(() => State.ui.paused));
     await shot('3-menu');
     //  The front menu's own Resume is the way back; it must be on screen.
-    const resume = await ev(() => { const b = [...document.querySelectorAll('button, [role=button], .fm-card, a')].find(x => /resume/i.test(x.textContent) && x.offsetWidth);
+    const resume = await ev(() => { const b = [...document.querySelectorAll('button, [role=button], .fm-card, a')].find(x => /resume|back to the streets/i.test(x.textContent) && x.offsetWidth);
       if (!b) return null; const r = b.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2, on: r.bottom <= innerHeight }; });
     c.ok('menu Resume is on screen', resume && resume.on);
     if (resume) await page.touchscreen.tap(resume.x, resume.y);

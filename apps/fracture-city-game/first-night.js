@@ -1740,17 +1740,20 @@ function fnPrologueSkip(){
 }
 
 // ─── The front door: a new story starts with the Minute ────────────────────
+//  Since 0.7x the front menu (city-flow.js) opens on the bulletin instead; the
+//  Minute stays reachable for saves made inside it and through FN.startMinute.
+async function fnStartMinute(){
+  await shSlotNew('campaign');
+  Campaign.active = false;
+  const hud = document.getElementById('campaign-hud'); if (hud) hud.classList.remove('show');
+  fnPrologueBegin();
+  fnPrologueWaitForGround();
+}
+FN.startMinute = () => typeof fcLoad === 'function' ? fcLoad('Building the Civic Core…', fnStartMinute) : fnStartMinute();
 const _frontAct = shFrontAct;
 window.shFrontAct = function(act){
   if (act === 'new-campaign'){
-    const run = async () => {
-      await shSlotNew('campaign');
-      Campaign.active = false;
-      const hud = document.getElementById('campaign-hud'); if (hud) hud.classList.remove('show');
-      fnPrologueBegin();
-      fnPrologueWaitForGround();
-    };
-    if (typeof fcLoad === 'function') fcLoad('Building the Civic Core…', run); else run();
+    FN.startMinute();
     return;
   }
   return _frontAct.apply(this, arguments);

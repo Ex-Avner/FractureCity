@@ -43,7 +43,7 @@ const EXE = process.env.PW_CHROMIUM || undefined;
     c.eq('Quarry Hand renamed', reg.cls, 'UTILITY HAND');
 
     // ── Prologue ──────────────────────────────────────────────────────────
-    await page.evaluate(() => { if (window.HD){ HD.locked = true; HD.tier = 'perf'; } shFrontAct('new-campaign'); });
+    await page.evaluate(() => { if (window.HD){ HD.locked = true; HD.tier = 'perf'; } FN.startMinute(); });  // the front menu opens on the bulletin since 0.7x; the Minute is still played from saves
     const lines = [];
     let foughtTurned = false;
     for (let i = 0; i < 900; i++){
@@ -58,7 +58,8 @@ const EXE = process.env.PW_CHROMIUM || undefined;
         if (Dialogue.active){ Dialogue.queue.length = 0; Dialogue.chars = 1e9; shEndDialogue(); o.d = true; return o; }
         const P = FN.prologue; if (!P) return o;
         let t = P.target; if (typeof t === 'function') t = t(); if (Array.isArray(t)) t = { x: t[0], z: t[1] };
-        if (t){ const s2 = shFindOpenSpot(t.x + 1.2, t.z + 1.2, 0.4, 1.8, 14); if (s2) Player.position.set(s2.x, s2.y + Player.height, s2.z); }
+        //  Nearest clear side of the marker, as first-night.test.js does.
+        if (t){ const s2 = [[1.2,1.2],[-1.2,1.2],[1.2,-1.2],[-1.2,-1.2],[0,1.2],[0,-1.2]].map(([dx,dz])=>shFindOpenSpot(t.x+dx,t.z+dz,.4,1.8,14)).filter(Boolean).sort((a,b)=>Math.hypot(a.x-t.x,a.z-t.z)-Math.hypot(b.x-t.x,b.z-t.z))[0]; if (s2) Player.position.set(s2.x, s2.y + Player.height, s2.z); }
         if (FN._nearPickup) document.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyR', key: 'r' }));
         if (P.step === 'break' && FN.state.loadout[1] === 'crowbar'){
           const foe = P.foes.find(e => e.state !== 'dead' && e.hp > 0);

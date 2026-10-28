@@ -12,7 +12,7 @@ try{
  await p.evaluate(async()=>{HD.locked=true;HD.setTier('perf',true);await OwnBlock.start();State.dayTime=13*60;if(State.ui.freeBuild)shToggleFreeBuild();State.hud.credits=400;Player.position.set(161.9,1+Player.height,49.2);Player.yaw=0;Player.pitch=-.05});
  await settle(p,30);
  // ── The booth ──
- const booth=await p.evaluate(()=>({here:!!State.chunkMap.get(chunkCoordOf(164)+','+chunkCoordOf(45))?.group?.getObjectByName('casting-booth'),walls:State.chunkMap.get(chunkCoordOf(164)+','+chunkCoordOf(45)).collisionAABBs.filter(a=>a.minX>=160&&a.maxX<=168&&a.minZ>=42&&a.maxZ<=48).length,near:FCCastingBooth.near()}));
+ const booth=await p.evaluate(()=>({here:!!State.chunkMap.get(chunkCoordOf(164)+','+chunkCoordOf(45))?.group?.getObjectByName('casting-booth'),walls:State.chunkMap.get(chunkCoordOf(164)+','+chunkCoordOf(45)).collisionAABBs.filter(a=>a.minX>=159&&a.maxX<=167&&a.minZ>=42&&a.maxZ<=48).length,near:FCCastingBooth.near()}));
  assert.deepEqual(booth,{here:true,walls:5,near:true});
  const myHair=await p.evaluate(()=>Shift.avatar.hairStyle);
  await p.keyboard.press('e');await p.waitForSelector('#fc-casting:not([hidden]) canvas',T);

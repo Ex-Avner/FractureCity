@@ -68,6 +68,7 @@ function frame(now){requestAnimationFrame(frame);
 requestAnimationFrame(frame);
 const css=document.createElement('style');css.textContent=`
 #city-pvp[hidden]{display:none}
+#city-pvp [hidden]{display:none!important}
 #city-pvp .pv-marker{position:fixed;left:50%;top:50%;width:26px;height:26px;margin:-13px 0 0 -13px;pointer-events:none;z-index:60;opacity:0;background:linear-gradient(45deg,transparent 45%,#fff 45%,#fff 55%,transparent 55%),linear-gradient(-45deg,transparent 45%,#fff 45%,#fff 55%,transparent 55%)}
 #city-pvp .pv-marker.on{opacity:1}#city-pvp .pv-marker.down{filter:drop-shadow(0 0 4px #ff3b3b) hue-rotate(-40deg);transform:scale(1.4)}
 #city-pvp .pv-hp{position:fixed;left:50%;bottom:136px;transform:translateX(-50%);z-index:61;display:flex;align-items:center;gap:8px;padding:5px 10px;background:#0b151bd9;border:1px solid #6b2a30;border-radius:8px;font:600 11px system-ui;color:#ffd7d2}
