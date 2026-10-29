@@ -57,6 +57,27 @@ const ramp=(()=>{const d=new Uint8Array([70,70,70,255,150,150,150,255,215,215,21
 const TOON=new THREE.MeshToonMaterial({vertexColors:true,gradientMap:ramp});
 const GLOW=new THREE.MeshBasicMaterial({vertexColors:true,toneMapped:false});
 function loft(rows,seg=12){const p=[],ix=[];for(const [y,rx,rz,cz=0]of rows)for(let j=0;j<=seg;j++){const a=j/seg*Math.PI*2;p.push(Math.sin(a)*rx,y,Math.cos(a)*rz+cz)}for(let i=0;i<rows.length-1;i++)for(let j=0;j<seg;j++){const a=i*(seg+1)+j,b=a+seg+1;ix.push(a,a+1,b,b,a+1,b+1)}const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(p,3));g.setIndex(ix);g.computeVertexNormals();return g}
+const ball=new THREE.SphereGeometry(1,12,8),pebble=new THREE.SphereGeometry(1,7,5);
+function paintedTube(rows,paint,cuts,seg,round={},step=.012){
+ rows=[...rows].sort((p,q)=>q[0]-p[0]);const top=rows[0][0],bot=rows.at(-1)[0];
+ const radius=y=>{for(let i=0;i<rows.length-1;i++){const [y0,a0,b0]=rows[i],[y1,a1,b1]=rows[i+1];if(y<=y0&&y>=y1){const t=y0===y1?0:(y0-y)/(y0-y1);return[a0+(a1-a0)*t,b0+(b1-b0)*t]}}return y>top?rows[0].slice(1,3):rows.at(-1).slice(1,3)};
+ const ys=new Set(rows.map(r=>r[0]));for(let y=top;y>bot;y-=step)ys.add(+y.toFixed(4));const cutSet=new Set(cuts.filter(c=>c<top&&c>bot));for(const c of cutSet)ys.add(c);
+ const list=[...ys].sort((p,q)=>q-p),C2=new THREE.Color(),p=[],col=[],ix=[];let rings=0;
+ const ring=(y,py,scale=1,yr=y)=>{const [rx,rz]=radius(yr);for(let j=0;j<=seg;j++){const a=j/seg*Math.PI*2,k=paint(py,a);p.push(Math.sin(a)*(rx+(k.out||0))*scale,y,Math.cos(a)*(rz+(k.out||0))*scale);C2.set(k.c);col.push(C2.r,C2.g,C2.b)}rings++};
+ //  A rounded end is a half-dome on the last ring, so two limbs that meet at a
+ //  joint overlap as one smooth knuckle whatever the bend.
+ const dome=(y,dir)=>{const [rx,rz]=radius(y),ry=(rx+rz)/2,steps=3;const order=dir>0?[...Array(steps).keys()].reverse():[...Array(steps).keys()];for(const k of order){const f=(k+1)/steps*Math.PI/2;ring(y+dir*ry*Math.sin(f),y,Math.max(.0001,Math.cos(f)),y)}};
+ if(round.top)dome(top,1);
+ for(const y of list){if(cutSet.has(y)){ring(y,y+.0005);ring(y,y-.0005)}else ring(y,y)}
+ if(round.bottom)dome(bot,-1);
+ for(let i=0;i<rings-1;i++)for(let j=0;j<seg;j++){const a=i*(seg+1)+j,b=a+seg+1;ix.push(a,a+1,b,b,a+1,b+1)}
+ //  Flat caps on square ends, so a bent joint never shows the inside of a tube.
+ for(const [end,yy,up] of [[0,top,true],[rings-1,bot,false]]){if(up?round.top:round.bottom)continue;const c0=p.length/3;const k=paint(yy,0);C2.set(k.c);p.push(0,yy,0);col.push(C2.r,C2.g,C2.b);
+  for(let j=0;j<=seg;j++){const v=end*(seg+1)+j;p.push(p[v*3],p[v*3+1],p[v*3+2]);col.push(col[v*3],col[v*3+1],col[v*3+2])}
+  for(let j=0;j<seg;j++)up?ix.push(c0,c0+1+j+1,c0+1+j):ix.push(c0,c0+1+j,c0+1+j+1)}
+ //  Rings run top to bottom, so wind each triangle the other way to face outward.
+ for(let i=0;i<ix.length;i+=3){const t=ix[i+1];ix[i+1]=ix[i+2];ix[i+2]=t}
+ const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(p,3));g.setAttribute('color',new THREE.Float32BufferAttribute(col,3));g.setIndex(ix);g.computeVertexNormals();return g}
 const C=new THREE.Color();
 const hexOf=v=>C.set(v).getHex();
 const shade=(v,n)=>C.set(v).multiplyScalar(n).getHex();
@@ -65,9 +86,9 @@ function bake(bone,parts){
  for(const glow of [false,true]){const list=parts.filter(p=>!!p.glow===glow);if(!list.length)continue;
   const pos=[],norm=[],col=[],idx=[];
   for(const p of list){const g=p.geo.clone();g.scale(...p.s);if(p.rx)g.rotateX(p.rx);if(p.ry)g.rotateY(p.ry);if(p.r)g.rotateZ(p.r);g.translate(...p.p);
-   const off=pos.length/3,a=g.attributes.position.array,n=g.attributes.normal.array,c=new THREE.Color(p.c);
+   const off=pos.length/3,a=g.attributes.position.array,n=g.attributes.normal.array,c=new THREE.Color(p.c||0),vc=p.vc&&g.attributes.color?g.attributes.color.array:null;
    if(g.index)for(const v of g.index.array)idx.push(v+off);else for(let i=0;i<a.length/3;i++)idx.push(i+off);
-   for(let i=0;i<a.length;i+=3){pos.push(a[i],a[i+1],a[i+2]);norm.push(n[i],n[i+1],n[i+2]);col.push(c.r,c.g,c.b)}g.dispose()}
+   for(let i=0;i<a.length;i+=3){pos.push(a[i],a[i+1],a[i+2]);norm.push(n[i],n[i+1],n[i+2]);if(vc)col.push(vc[i],vc[i+1],vc[i+2]);else col.push(c.r,c.g,c.b)}g.dispose()}
   const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.setAttribute('normal',new THREE.Float32BufferAttribute(norm,3));g.setAttribute('color',new THREE.Float32BufferAttribute(col,3));g.setIndex(idx);
   const m=new THREE.Mesh(g,glow?GLOW:TOON);m.castShadow=!glow;m.receiveShadow=!glow;m.userData.residentGeometry=true;bone.add(m)}
 }
@@ -83,6 +104,10 @@ function build(L,meta){
  const box=(b,x,y,z,sx,sy,sz,c,o)=>put(b,cube,[x,y,z],[sx,sy,sz],c,o);
  const spike=(b,x,y,z,r,h,c,o)=>put(b,cone,[x,y,z],[r,h,r],c,o);
  const shape=(b,rows,c,seg=12,o)=>{const g=loft(rows,seg);owned.push(g);put(b,g,[0,0,0],[1,1,1],c,o)};
+ //  A limb: rows [y,rx,rz] (any order), paint(y,angle)->{c,out}; cuts are hem heights with a hard edge.
+ const limb=(b,rows,paint,cuts=[],round={},fine=false)=>{const g=paintedTube(rows,paint,cuts,typeof fine==='number'?fine:12,round,fine==='coarse'?.04:fine?.025:1);owned.push(g);buckets.get(b).push({geo:g,p:[0,0,0],s:[1,1,1],c:0,vc:true})};
+ //  A ball joint, coloured like the limb it closes.
+ const joint=(b,x,y,z,r,rz,paint,geo=ball)=>put(b,geo,[x,y,z],[r+(paint.out||0),r+(paint.out||0),rz+(paint.out||0)],paint.c);
  const skin=L.makeup==='skull'?'#e9e5dc':L.skin,glowOn=L.extras.includes('neon');
  const torso=new THREE.Group();torso.position.y=1.43;inner.add(torso);
  const body=bone(torso,0,-1.43,0),head=bone(torso,0,.075,0);head.scale.setScalar(1.12);
@@ -91,19 +116,23 @@ function build(L,meta){
  const hipX=.105*(fr.hip/.162);
  const ll=bone(inner,-hipX,.9,0),rl=bone(inner,hipX,.9,0);
  const elbows=[],knees=[],fingers=[];
+ //  Kilts and long coat tails hang from a skirt bone that swings with the stride (0.86).
+ const skirt=bone(inner,0,.95,0),SK=-.95;
  // ── Torso, shirt and jacket ──
  const ch=fr.chest,wa=fr.waist,hp=fr.hip;
- const torsoRows=k=>[[.95,hp+k,.105+k*.7],[1.02,wa+.004+k,.1+k*.7],[1.12,wa+k,.098+k*.7],[1.27,ch+k,.118+k*.7],[1.39,ch+.03+k,.112+k*.7],[1.45,ch-.02+k,.09+k*.7],[1.49,.075,.066]];
+ const torsoRows=k=>[[.94,hp+.01+k,.113+k*.7],[1.02,wa+.004+k,.1+k*.7],[1.12,wa+k,.098+k*.7],[1.27,ch+k,.118+k*.7],[1.39,ch+.03+k,.112+k*.7],[1.45,ch-.02+k,.09+k*.7],[1.49,.075,.066]];
  const topCol=L.top==='none'||L.top==='mesh'?skin:L.top2;
- shape(body,torsoRows(0),topCol,14);
+ //  A mesh top is painted onto the torso as a net instead of bars floating over it.
+ if(L.top==='mesh')limb(body,torsoRows(0).slice(0,6),(y,a)=>({c:Math.abs(Math.sin(a*6))<.16||Math.abs(Math.sin(y*70))<.16?L.top2:skin,out:0}),[],{},36);else shape(body,torsoRows(0),topCol,14);
+ if(L.top==='mesh')shape(body,torsoRows(-.002).slice(5),skin,14);
  if(fr.bust)for(const s of[-1,1])ell(body,s*.058,1.3,.078,.06,.05,.05,L.top==='none'?(L.outfit==='none'?L.top2:skin):topCol);
  if(L.top==='none'&&fr.bust&&L.outfit==='none')shape(body,[[1.22,ch+.006,.124],[1.34,ch+.032,.125]],L.top2,14);
- if(L.top==='mesh'){for(let i=0;i<9;i++)box(body,(i-4)*.04,1.22,.12+Math.cos((i-4)*.18)*.0,.006,.48,.006,L.top2);for(let j=0;j<6;j++)ell(body,0,1.02+j*.08,0,ch+.004,.004,.118,L.top2)}
+ 
  if(L.top==='band-tee'){box(body,0,1.3,.128,.14,.11,.008,L.accent);for(let i=0;i<3;i++)box(body,(i-1)*.04,1.3,.133,.026,.05,.004,L.top2);box(body,0,1.36,.134,.1,.012,.004,L.top2)}
  if(L.top==='turtleneck')shape(body,[[1.46,.08,.072],[1.56,.066,.06]],L.top2);
  if(L.top==='tank')for(const s of[-1,1])box(body,s*.09,1.43,.03,.03,.1,.2,L.top2);
  // pelvis in the bottoms colour
- shape(body,[[.82,hp-.004,.11],[.9,hp+.012,.118],[.96,hp+.004,.108]],L.pants,14);
+ shape(body,[[.82,hp-.004,.11],[.9,hp+.012,.118],[.95,hp-.004,.1]],L.pants,14);
  const sleeves=!['none','denim-vest'].includes(L.outfit),jacket=L.outfit!=='none';
  if(jacket){
   const coat=L.coat;shape(body,torsoRows(.014).slice(0,6),coat,14);
@@ -116,7 +145,7 @@ function build(L,meta){
   if(L.outfit==='bomber'){shape(body,[[.98,wa+.022,.12],[1.03,wa+.02,.118]],shade(coat,.75));shape(body,[[1.44,.09,.08],[1.5,.08,.074]],shade(coat,.75));box(body,0,1.22,.135,.006,.4,.006,METAL)}
   if(L.outfit==='hoodie'){ell(body,0,1.5,-.085,.13,.1,.08,coat);box(body,0,1.1,.133,.16,.09,.012,shade(coat,.85));for(const s of[-1,1])box(body,s*.03,1.36,.136,.005,.09,.005,L.accent)}
   if(L.outfit==='plaid'){const rr=y=>y<1.2?wa+.018+(y-1.02)*(ch-wa)/.25:ch+.02;for(let i=0;i<5;i++){const y=1.06+i*.085;ell(body,0,y,0,rr(y),.005,.124+(rr(y)-.15)*.6,shade(coat,.45))}for(const z of[-1,1])for(let i=0;i<5;i++)box(body,(i-2)*.055,1.22,z*(.122+(ch-.15)*.6),.008,.42,.006,shade(coat,.45))}
-  if(L.outfit==='longcoat'){shape(body,[[.48,hp+.06,.15],[.7,hp+.04,.14],[.9,hp+.03,.13],[1.0,wa+.03,.12]],coat,14);box(body,0,.74,.15,.008,.5,.008,shade(coat,.5))}
+  if(L.outfit==='longcoat'){shape(skirt,[[.48+SK,hp+.07,.16],[.7+SK,hp+.045,.145],[.9+SK,hp+.03,.13],[.97+SK,hp+.026,.124]],coat,14);shape(body,[[.92,hp+.03,.128],[1.0,wa+.03,.12]],coat,14);box(skirt,0,.74+SK,.155,.008,.46,.008,shade(coat,.5))}
   if(L.outfit==='tailored'){box(body,0,1.24,.134+(ch-.15)*.6,.022,.24,.006,L.accent);for(let i=0;i<2;i++)ell(body,.05,1.1+i*.07,.13,.007,.007,.005,DARK)}
   if(glowOn){for(const s of[-1,1])box(body,s*.035,1.2,.136+(ch-.15)*.6,.006,.44,.006,L.accent,{glow:true});box(body,0,1.0,.125,.34,.008,.006,L.accent,{glow:true})}
  }
@@ -129,39 +158,56 @@ function build(L,meta){
  shape(body,[[1.46,.062,.056],[1.57,.054,.05]],skin);
  if(L.tattoos==='neck')for(const s of[-1,1])box(body,s*.045,1.52,.03,.012,.06,.04,INK,{r:s*.3});
  // ── Arms ──
- const upperCol=sleeves?L.coat:(['tee','band-tee','turtleneck'].includes(L.top)?L.top2:skin),foreCol=sleeves?L.coat:(L.top==='turtleneck'?L.top2:skin);
+ //  0.86: each limb is one closed tube whose rings carry the colour of what
+ //  covers them (sleeve, skin, ink, net), with a hard edge at every hem and a
+ //  small lip where fabric ends. Ball joints at shoulders, elbows, hips and
+ //  knees keep a bent limb solid. No overlay shells, so nothing z-fights.
+ const longSleeve=sleeves||L.top==='turtleneck',shortSleeve=!longSleeve&&['tee','band-tee'].includes(L.top);
+ const sleeveCol=sleeves?L.coat:L.top2,HEM=-.16,CUFF=-.22;
+ const inkOn=!['none','neck','face'].includes(L.tattoos);
+ const ink=(y,a,part)=>{if(!inkOn||Number.isNaN(a))return null;const front=Math.cos(a);
+  if(L.tattoos==='sleeve')return Math.sin(a*3+y*55)+Math.sin(a*5-y*31)*.6>-.55?INK:null;
+  if(part!=='fore')return null;
+  if(L.tattoos==='bands')return BANDS.some(v=>Math.abs(y-v)<.0035)?INK:null;
+  if(L.tattoos==='blackwork')return front>.25&&BANDS.some(v=>Math.abs(y-v)<.012)?INK:null;
+  if(L.tattoos==='circuit'){const q=((y*38+a*1.4)%1+1)%1;return front>.1&&y<-.03&&y>-.22&&Math.abs(q-.5)<.07?INK:null}
+  return null};
+ const armPaint=part=>(y,a)=>{
+  if(part==='upper'&&(longSleeve||shortSleeve&&y>HEM))return{c:sleeveCol,out:.004};
+  if(part==='fore'&&longSleeve)return sleeves&&y<CUFF?{c:shade(L.coat,.7),out:.007}:{c:sleeveCol,out:.004};
+  return{c:ink(y,a,part)||skin,out:0}};
+ const upperPaint=armPaint('upper'),forePaint=armPaint('fore'),fineArm=['sleeve','circuit'].includes(L.tattoos),BANDS=[-.05,-.085,-.12,-.155,-.19],bandW=L.tattoos==='bands'?.0035:L.tattoos==='blackwork'?.012:0,inkCuts=bandW?BANDS.flatMap(v=>[v+bandW,v-bandW]):[];
  for(const [arm,side] of [[la,-1],[ra,1]]){
-  shape(arm,[[-.30,.048,.052],[-.22,.056,.06],[-.1,.068,.07],[-.02,.074,.07],[.045,.04,.04]],upperCol);
-  if(!sleeves&&['tee','band-tee'].includes(L.top))shape(arm,[[-.3,.048,.052],[-.16,.062,.066]],skin);
+  limb(arm,[[.045,.04,.04],[-.02,.074,.07],[-.1,.068,.07],[-.22,.056,.06],[-.285,.049,.052]],upperPaint,shortSleeve?[HEM]:[],{bottom:true},fineArm);
+  joint(arm,0,-.03,0,.064,.062,upperPaint(-.03,NaN));
   if(L.extras.includes('spikes'))for(let i=0;i<3;i++)spike(arm,side*.02,.06,-.03+i*.03,.012,.06,METAL,{r:-side*.5});
   const fore=bone(arm,0,-.285,0);elbows.push(fore);
-  shape(fore,[[-.25,.04,.042],[-.2,.045,.047],[-.1,.054,.056],[0,.052,.054]],foreCol);
-  if(sleeves)shape(fore,[[-.25,.047,.049],[-.22,.047,.049]],shade(L.coat,.7));
-  if(foreCol===skin&&L.tattoos!=='none'&&L.tattoos!=='neck'&&L.tattoos!=='face'){
-   if(L.tattoos==='sleeve')for(let i=0;i<7;i++)ell(fore,0,-.03-i*.03,0,.056-i*.0015,.009,.058-i*.0015,i%2?INK:shade(INK,1.6));
-   else for(let i=0;i<5;i++){const y=-.05-i*.035;if(L.tattoos==='bands')ell(fore,0,y,0,.056,.006,.058,INK);else box(fore,0,y,.054,.06,L.tattoos==='blackwork'?.024:.008,.006,INK,{r:L.tattoos==='circuit'?(i%2?.45:-.45):0})}
-  }
-  if(glowOn&&sleeves)shape(fore,[[-.215,.049,.051],[-.205,.049,.051]],L.accent,12,{glow:true});
-  const gloves=L.extras.includes('gloves');
-  ell(fore,0,-.29,.006,.038,.05,.026,gloves?DARK:skin);ell(fore,-side*.04,-.272,.02,.016,.032,.018,gloves?DARK:skin,{r:-side*.4});
+  limb(fore,[[0,.05,.053],[-.1,.054,.056],[-.2,.045,.047],[-.25,.04,.042]],forePaint,sleeves?[CUFF]:longSleeve?[]:inkCuts,{top:true},fineArm);
+  if(glowOn&&sleeves)shape(fore,[[-.215,.054,.056],[-.205,.054,.056]],L.accent,12,{glow:true});
+  const gloves=L.extras.includes('gloves'),hand=gloves?DARK:skin;
+  ell(fore,0,-.29,.006,.038,.05,.026,hand);ell(fore,-side*.04,-.272,.02,.016,.032,.018,hand,{r:-side*.4});
   const digits=bone(fore,0,-.322,.01);fingers.push(digits);
-  for(let i=0;i<4;i++)ell(digits,(i-1.5)*.018,-.022,0,.01,.03-(Math.abs(i-1.5)*.005),.012,skin);
+  for(let i=0;i<4;i++)put(digits,pebble,[(i-1.5)*.018,-.022,0],[.01,.03-(Math.abs(i-1.5)*.005),.012],hand);
  }
  // ── Legs and boots ──
- const shorts=L.bottoms==='shorts',kilt=L.bottoms==='kilt',bareLeg=L.legwear==='fishnet'?mix(skin,DARK,.35):skin;
+ const shorts=L.bottoms==='shorts',kilt=L.bottoms==='kilt',net=L.legwear==='fishnet',SHORTS=-.26,fineLeg=net&&'coarse',RIPS={thigh:[-.32,-.14],shin:[-.1]},PLAID=[-.04,-.14,-.24,-.34],legCuts=part=>L.bottoms==='ripped'?RIPS[part].flatMap(v=>[v+.009,v-.009]):L.bottoms==='plaid'&&part==='thigh'?PLAID.flatMap(v=>[v+.005,v-.005]):[];
  const legW=L.bottoms==='cargo'?1.12:1;
+ const netBase=mix(skin,DARK,.3),netLine=mix(skin,DARK,.62);
+ const bare=(y,a)=>!net?skin:Number.isNaN(a)?netBase:Math.abs(Math.sin(a*6+y*85))<.2||Math.abs(Math.sin(a*6-y*85))<.2?netLine:netBase;
+ const ripAt=(y,a,spots)=>!Number.isNaN(a)&&L.bottoms==='ripped'&&Math.cos(a)>.55&&spots.some(v=>Math.abs(y-v)<.009);
+ const pantsAt=(y,a,part)=>{
+  if(ripAt(y,a,RIPS[part]))return skin;
+  if(L.bottoms==='plaid'&&!Number.isNaN(a)&&(part==='thigh'&&PLAID.some(v=>Math.abs(y-v)<.005)||Math.abs(Math.sin(a*2))<.06))return shade(L.accent,.8);
+  return L.pants};
+ const thighPaint=(y,a)=>kilt||shorts&&y<SHORTS?{c:bare(y,a),out:0}:{c:pantsAt(y,a,'thigh'),out:shorts?.005:0};
+ const shinPaint=(y,a)=>{if(L.legwear==='socks'&&y<-.25)return{c:'#e9e5dc',out:.003};return shorts||kilt?{c:bare(y,a),out:0}:{c:pantsAt(y,a,'shin'),out:0}};
  for(const [leg,side] of [[ll,-1],[rl,1]]){
-  shape(leg,[[-.43,.06*legW,.064*legW],[-.34,.07*legW,.076*legW],[-.19,.083*legW,.088*legW],[-.02,.09*legW,.097*legW],[.05,.072,.082]],kilt?bareLeg:L.pants);
-  if(shorts)shape(leg,[[-.43,.058,.062],[-.26,.074,.08]],bareLeg);
-  if(L.bottoms==='ripped')for(const [y,z,w]of[[-.32,.07,.05],[-.14,.086,.035]])box(leg,side*.01,y,z,w,.016,.012,skin);
-  if(L.bottoms==='cargo')box(leg,side*.088,-.2,0,.02,.1,.07,shade(L.pants,.8));
-  if(L.bottoms==='plaid'){for(let i=0;i<4;i++)ell(leg,0,-.04-i*.1,0,.092-i*.006,.005,.1-i*.006,shade(L.accent,.8));box(leg,0,-.2,.094,.006,.4,.006,shade(L.pants,.5))}
+  limb(leg,[[.05,.072,.082],[-.02,.09*legW,.097*legW],[-.19,.083*legW,.088*legW],[-.34,.07*legW,.076*legW],[-.43,.06*legW,.064*legW]],thighPaint,shorts?[SHORTS]:legCuts('thigh'),{bottom:true},fineLeg);
+  joint(leg,0,-.005,0,.076,.084,thighPaint(0,NaN),sphere);
+  if(L.bottoms==='cargo')box(leg,side*.093,-.2,0,.02,.1,.07,shade(L.pants,.8));
+  if(L.bottoms==='plaid')box(leg,0,-.2,.094,.006,.4,.006,shade(L.pants,.5));
   const shin=bone(leg,0,-.43,0);knees.push(shin);
-  const shinCol=(shorts||kilt)?bareLeg:L.pants;
-  shape(shin,[[-.36,.052*legW,.058*legW],[-.27,.056*legW,.066*legW],[-.15,.064*legW,.074*legW],[0,.062*legW,.068*legW]],shinCol);
-  if(L.legwear==='fishnet'&&(shorts||kilt))for(let i=0;i<6;i++)ell(shin,0,-.04-i*.055,0,.064,.004,.07,DARK);
-  if(L.legwear==='socks')shape(shin,[[-.36,.055,.06],[-.25,.058,.064]],'#e9e5dc');
-  if(L.bottoms==='ripped')box(shin,side*.005,-.1,.068,.045,.014,.01,skin);
+  limb(shin,[[0,.06*legW,.065*legW],[-.15,.064*legW,.074*legW],[-.27,.056*legW,.066*legW],[-.36,.052*legW,.058*legW]],shinPaint,[...(L.legwear==='socks'?[-.25]:[]),...(shorts||kilt?[]:legCuts('shin'))],{top:true},fineLeg);
   // boots
   const bc=L.boots2,sole=L.boots==='creepers'?'#c9a46b':L.boots==='high-tops'?'#e9e5dc':DARK,soleH={creepers:.05,platform:.12,'high-tops':.03}[L.boots]||.035;
   const bootTop=L.boots==='high-tops'?-.3:L.boots==='creepers'?-.37:L.boots==='platform'?-.12:-.22;
@@ -173,7 +219,7 @@ function build(L,meta){
   if(L.boots==='high-tops')ell(shin,0,-.41,.15,.058,.035,.045,'#e9e5dc');
   if(glowOn)box(shin,0,-.44+.01,.055,.142,.008,.272,L.accent,{glow:true});
  }
- if(kilt){shape(body,[[.62,hp+.06,.16],[.8,hp+.03,.13],[.96,hp+.005,.11]],L.pants,14);for(let i=0;i<3;i++)ell(body,0,.66+i*.1,0,hp+.058-i*.01,.004,.158-i*.01,shade(L.accent,.8))}
+ if(kilt){shape(skirt,[[.6+SK,hp+.1,.2],[.8+SK,hp+.045,.15],[.97+SK,hp+.01,.118]],L.pants,16);[[.66,.0875,.189],[.76,.06,.164],[.86,.035,.14]].forEach(([y,x,z])=>ell(skirt,0,y+SK,0,hp+x,.004,z,shade(L.accent,.8)))}
  // ── Head ──
  const H=.165,jaw=L.jaw;
  const headRows=[[-.125,.048,.058],[-.1,.086*jaw,.094],[-.06,.112*Math.min(1.1,jaw),.114],[-.01,.124,.123],[.05,.127,.123],[.1,.114,.111],[.14,.084,.084],[.165,.042,.046],[.176,.005,.006]].map(([y,rx,rz])=>[H+y*fl,rx*fw,rz]);
@@ -257,7 +303,7 @@ function build(L,meta){
  inner.position.y=0;inner.updateMatrixWorld(true);//  physical-support.js treats 0.46 m below the knee as the sole; honour both.
  //  Like the old figure, keep that point 1.5 cm up so idle sway never dips it.
  const low=new THREE.Box3().setFromObject(inner).min.y;inner.position.y=Math.max(.002-low,.015-(.9-.43-.46));
- return{root,torso,head,eyes,mouth,la,ra,ll,rl,elbows,knees,fingers,lift:inner.position.y};
+ return{root,torso,head,eyes,mouth,la,ra,ll,rl,elbows,knees,fingers,skirt,lift:inner.position.y};
 }
 // ─── Hooking into the game ──────────────────────────────────────────────────
 let figureConfig=null;
@@ -283,7 +329,7 @@ window.shBuildCharacter=function(arch,rng,cfg){
  const height=Math.max(.85,Math.min(1.15,look.heightScale*(arch?.height&&!explicit?Math.max(.95,Math.min(1.05,arch.height)):1)));
  f.root.scale.set(width,height,1);f.root.add(c.plate);if(c.aura)f.root.add(c.aura);c.plate.position.y=2.12;
  Object.assign(c,{group:f.root,head:f.head,leftArm:f.la,rightArm:f.ra,leftLeg:f.ll,rightLeg:f.rl,look,
-  studio:{torso:f.torso,faceOffset:.165,outfit:look.outfit,tattoos:look.tattoos,piercings:look.piercings,elbows:f.elbows,knees:f.knees,fingers:f.fingers,height:(1.84+f.lift)*height,eyes:f.eyes,mouth:f.mouth,blinkAt:1+rng.next()*4}});
+  studio:{torso:f.torso,skirt:f.skirt,faceOffset:.165,outfit:look.outfit,tattoos:look.tattoos,piercings:look.piercings,elbows:f.elbows,knees:f.knees,fingers:f.fingers,height:(1.84+f.lift)*height,eyes:f.eyes,mouth:f.mouth,blinkAt:1+rng.next()*4}});
  c.gait.bob=.012;c.headTilt=c.headTilt||0;return c;
 };
 const figure=shBuildFigure;
@@ -298,12 +344,18 @@ window.shAnimateCharacter=function(c,dt,moving,t){animate.apply(this,arguments);
  if(now>s.blinkAt){const k=(now-s.blinkAt)/.13;s.eyes.scale.y=k<1?Math.max(.1,Math.abs(1-2*k)):1;if(k>=1)s.blinkAt=now+2+Math.random()*4.5}
  s.mouth.scale.y=c.talking?1+Math.abs(Math.sin(now*14))*1.8:1;
  if(!moving)s.torso.rotation.z=Math.sin(now*.9+c.gait.phase)*.018;
+ fitSkirt(c);
 };
+//  The skirt follows whichever thigh is furthest out, front or back, so a stride
+//  stays inside a kilt or a coat tail. Called after every pose change.
+function fitSkirt(c){const k=c.studio?.skirt;if(!k)return;const l=c.leftLeg.rotation.x,r=c.rightLeg.rotation.x,f=Math.max(0,-Math.min(l,r)),b=Math.max(0,Math.max(l,r));k.rotation.x=(b-f)*.45;k.scale.z=1+(f+b)*.55}
+//  Later scripts wrap the animator too and set the legs; fit the skirt after all of them.
+addEventListener('DOMContentLoaded',()=>{const all=window.shAnimateCharacter;window.shAnimateCharacter=function(c){const r=all.apply(this,arguments);try{fitSkirt(c)}catch(e){}return r}});
 //  The person you are talking to moves their mouth until the conversation ends.
 const talkers=new Set();
 if(typeof shTalkTo==='function'){const talk=shTalkTo;window.shTalkTo=function(person){const r=talk.apply(this,arguments);const c=person?.char;if(c&&State.ui.inDialogue){c.talking=true;talkers.add(c)}return r}}
 if(typeof shEndDialogue==='function'){const end=shEndDialogue;window.shEndDialogue=function(){const r=end.apply(this,arguments);for(const c of talkers)c.talking=false;talkers.clear();return r}}
-window.FCWardrobe={DEFAULT_LOOK,OPTIONS,RANGES,normalize,crowdLook,build,get current(){return normalize(Shift.avatar)}};
+window.FCWardrobe={DEFAULT_LOOK,OPTIONS,RANGES,normalize,crowdLook,build,fitSkirt,get current(){return normalize(Shift.avatar)}};
 //  New and old saves both work: missing fields take the defaults.
 Object.assign(SH_DEFAULT_AVATAR,DEFAULT_LOOK);
 for(const k of Object.keys(DEFAULT_LOOK))if(Shift.avatar[k]===undefined)Shift.avatar[k]=Array.isArray(DEFAULT_LOOK[k])?[...DEFAULT_LOOK[k]]:DEFAULT_LOOK[k];
