@@ -1,0 +1,317 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Outgrow</title>
+<link rel="stylesheet" href="fonts/fonts.css">
+<style>
+/* OUTGROW · a Common Ground cabinet. Every hit grows both of you; first to full size wins. */
+:root{--bg:#0c0a18;--ink:#f4f1ff;--dim:#9a93c0;--you:#3dffb0;--apex:#ff3d8b;--gold:#ffd54a;
+ --head:'Anton','Impact','Arial Narrow Bold',sans-serif;--mono:'JetBrains Mono',ui-monospace,Menlo,monospace;color-scheme:dark}
+*{box-sizing:border-box}[hidden]{display:none!important}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--ink);font:500 13px var(--mono);overflow:hidden;user-select:none;-webkit-user-select:none;touch-action:none;-webkit-tap-highlight-color:transparent}
+canvas{display:block;position:fixed;inset:0;width:100%;height:100%}
+.hud{position:fixed;left:0;right:0;top:0;padding:max(10px,env(safe-area-inset-top)) max(12px,env(safe-area-inset-right)) 0 max(12px,env(safe-area-inset-left));display:grid;grid-template-columns:1fr auto 1fr;gap:12px;align-items:start;pointer-events:none}
+.bar{background:#ffffff14;border-radius:999px;height:12px;overflow:hidden;position:relative}
+.bar i{display:block;height:100%;border-radius:999px;transition:width .15s}
+.side b{font:400 18px var(--head);letter-spacing:.06em}
+.side small{display:block;color:var(--dim);margin:2px 0 6px}
+.you i{background:linear-gradient(90deg,#1fa874,var(--you))}
+.apex i{background:linear-gradient(90deg,#a3205a,var(--apex))}
+.apex{text-align:right}
+.mid{text-align:center;font:400 22px var(--head);letter-spacing:.08em;color:var(--gold);text-shadow:0 0 12px #ffd54a55}
+.mid small{display:block;font:500 11px var(--mono);color:var(--dim);letter-spacing:0}
+#rivals{margin-top:6px;font-size:11px;color:var(--dim);line-height:1.5}
+#rivals span{color:var(--ink)}
+#evo{position:fixed;left:50%;top:22%;transform:translate(-50%,-50%);font:400 clamp(28px,6vw,54px) var(--head);letter-spacing:.06em;color:var(--you);text-shadow:0 0 24px #3dffb088;pointer-events:none;opacity:0;transition:opacity .25s;text-align:center}
+#evo small{display:block;font:700 14px var(--mono);color:var(--ink);letter-spacing:0}
+#evo.on{opacity:1}
+.card{position:fixed;inset:0;display:grid;place-items:center;background:radial-gradient(ellipse at 50% 40%,#1b1238ee,#0c0a18f5);z-index:5;padding:20px}
+.card .in{max-width:560px;text-align:center}
+.card h1{font:400 clamp(54px,12vw,110px)/.9 var(--head);letter-spacing:.04em;margin:0;background:linear-gradient(180deg,#fff,#ff3d8b);-webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 0 18px #ff3d8b55)}
+.card h2{font:400 clamp(30px,7vw,56px)/1 var(--head);letter-spacing:.05em;margin:0 0 8px}
+.card p{line-height:1.6;color:#d7d2f0;margin:10px 0}
+.card ul{list-style:none;padding:0;margin:14px 0;text-align:left;display:inline-block;line-height:1.7}
+.card li::before{content:'◆ ';color:var(--apex)}
+.card kbd{font:700 11px var(--mono);background:#ffffff1a;border:1px solid #ffffff33;border-radius:5px;padding:1px 6px}
+.go{font:400 26px var(--head);letter-spacing:.1em;color:#0c0a18;background:var(--you);border:0;border-radius:14px;padding:12px 38px;margin-top:10px;cursor:pointer;box-shadow:0 0 0 3px #0c0a18,0 0 0 5px var(--you),0 0 30px #3dffb066}
+.go:active{transform:scale(.97)}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:14px 0}
+.stats div{background:#ffffff0d;border-radius:10px;padding:8px}.stats b{display:block;font:400 22px var(--head);color:var(--ink)}
+/* touch controls */
+.pad{position:fixed;inset:auto 0 0 0;height:46%;pointer-events:none;display:none}
+.touch .pad{display:block}
+#stick{position:absolute;left:max(18px,env(safe-area-inset-left));bottom:max(18px,env(safe-area-inset-bottom));width:140px;height:140px;border-radius:50%;background:#ffffff0d;border:2px solid #ffffff22;pointer-events:auto}
+#knob{position:absolute;left:45px;top:45px;width:50px;height:50px;border-radius:50%;background:#3dffb055;border:2px solid var(--you)}
+.btns{position:absolute;right:max(16px,env(safe-area-inset-right));bottom:max(16px,env(safe-area-inset-bottom));display:grid;grid-template-columns:repeat(2,74px);gap:10px;pointer-events:auto}
+.btns button{width:74px;height:74px;border-radius:50%;border:2px solid #ffffff44;background:#ffffff12;color:var(--ink);font:700 11px var(--mono);letter-spacing:.05em;touch-action:none}
+.btns button.big{grid-column:2;grid-row:1/3;height:158px;border-radius:40px;border-color:var(--apex);background:#ff3d8b30;font:400 20px var(--head)}
+.btns button[disabled]{opacity:.28}
+.btns button.cool{opacity:.55}
+.keys{position:fixed;left:50%;bottom:10px;transform:translateX(-50%);font-size:11px;color:var(--dim);pointer-events:none;white-space:nowrap}
+.touch .keys{display:none}
+#pause{position:fixed;right:max(12px,env(safe-area-inset-right));bottom:max(12px,env(safe-area-inset-bottom));z-index:4;background:#ffffff14;border:1px solid #ffffff33;color:var(--ink);border-radius:10px;font:700 11px var(--mono);padding:8px 10px}
+.touch #pause{top:max(76px,env(safe-area-inset-top));bottom:auto;right:auto;left:max(12px,env(safe-area-inset-left))}
+@media (max-width:560px){.hud{grid-template-columns:1fr 1fr}.mid{grid-column:1/3;grid-row:1;font-size:18px}.side b{font-size:15px}}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div class="hud" id="hud" hidden>
+ <div class="side you"><b>YOU · <span id="ySize">6</span></b><small id="yStage">SPORE · next: DASH at 15</small><div class="bar"><i id="yBar"></i></div></div>
+ <div class="mid"><span id="clock">0:00</span><small>FULL SIZE = 100</small></div>
+ <div class="side apex"><b><span id="aName">APEX</span> · <span id="aSize">0</span></b><small id="aStage">the biggest thing out here</small><div class="bar"><i id="aBar"></i></div><div id="rivals"></div></div>
+</div>
+<div id="evo"></div>
+<div class="keys" id="keys" hidden><kbd>WASD</kbd> move · <kbd>J</kbd>/<kbd>Space</kbd>/click bite · <kbd>K</kbd> dash · <kbd>L</kbd> spit · <kbd>I</kbd> roar · <kbd>P</kbd> pause</div>
+<button id="pause" hidden>II</button>
+<div class="pad" id="pad"><div id="stick"><div id="knob"></div></div>
+ <div class="btns"><button id="bDash" disabled>DASH</button><button class="big" id="bBite">BITE</button><button id="bSpit" disabled>SPIT</button><button id="bRoar" disabled hidden>ROAR</button></div></div>
+
+<div class="card" id="title"><div class="in">
+ <h1>OUTGROW</h1>
+ <p>A Common Ground survival cabinet. The swamp under the plaza is full of things that want to be the biggest thing in it.</p>
+ <ul>
+  <li>Every hit grows <b>both</b> of you. The biter grows more.</li>
+  <li>Bite something less than half your size and you <b>eat</b> it.</li>
+  <li>Evolve at 15, 30, 50 and 75: dash, spines, spit, roar.</li>
+  <li>They fight each other too. If anything reaches <b>100</b> before you, you lose.</li>
+  <li>Get eaten and you lose. Reach full size first and you win.</li>
+ </ul>
+ <div><button class="go" id="play">PLAY</button></div>
+ <p id="best"></p>
+</div></div>
+<div class="card" id="over" hidden><div class="in">
+ <h2 id="oTitle">FULL SIZE</h2><p id="oWhy"></p>
+ <div class="stats"><div><b id="sTime">0:00</b>time</div><div><b id="sBites">0</b>bites landed</div><div><b id="sEaten">0</b>eaten</div></div>
+ <button class="go" id="again">AGAIN</button><p id="oBest"></p>
+</div></div>
+<div class="card" id="paused" hidden><div class="in"><h2>PAUSED</h2><button class="go" id="resume">RESUME</button></div></div>
+
+<script>
+'use strict';
+// ─── Setup ─────────────────────────────────────────────────────────────────
+const cv=document.getElementById('c'),g=cv.getContext('2d'),$=id=>document.getElementById(id);
+let W=0,H=0,DPR=1;
+function resize(){DPR=Math.min(2,devicePixelRatio||1);W=innerWidth;H=innerHeight;cv.width=W*DPR|0;cv.height=H*DPR|0;g.setTransform(DPR,0,0,DPR,0,0)}
+addEventListener('resize',resize);resize();
+const touch=matchMedia('(pointer:coarse)').matches||'ontouchstart'in window;if(touch)document.body.classList.add('touch');
+const store={get(k){try{return localStorage.getItem(k)}catch(e){return null}},set(k,v){try{localStorage.setItem(k,v)}catch(e){}}};
+const R=(a,b)=>a+Math.random()*(b-a),clamp=(v,a,b)=>Math.max(a,Math.min(b,v)),pick=a=>a[Math.random()*a.length|0];
+const fmt=t=>Math.floor(t/60)+':'+String(Math.floor(t%60)).padStart(2,'0');
+
+// ─── Rules ─────────────────────────────────────────────────────────────────
+const FULL=100,ARENA=1700,EAT=2.1,EAT_YOU=2.5,STAGES=[0,15,30,50,75],STAGE_NAMES=['SPORE','CRAWLER','BITER','BRUTE','TITAN'];
+const POWERS=['','DASH','SPINES','SPIT','ROAR'];
+const radius=s=>9+s*.95;
+const speedOf=s=>250/(1+s/45);
+const stageOf=s=>STAGES.reduce((n,t,i)=>s>=t?i:n,0);
+const KINDS={
+ gnasher:{col:'#ff3d8b',name:['RAZOR SUE','BIG LEN','KNUCKLES','MAW','GRISTLE','TEETH MCGEE'],aggro:1,lunge:1,ranged:false},
+ lurker:{col:'#b388ff',name:['SLINK','THE HUSH','NIGHT SOUP','MOSSBACK','CREEP'],aggro:.7,lunge:1.6,ranged:false},
+ spitter:{col:'#ffb347',name:['GOBBO','LOOGIE','SPRAYCAN','DRIP','HOCKER'],aggro:.85,lunge:.8,ranged:true},
+ bloat:{col:'#00e5ff',name:['BLOATY','THE LUMP','TANK','CHONK','PUDDING'],aggro:.6,lunge:.7,ranged:false},
+};
+//  Who gets what from one hit. The biter grows most; the bitten still grows a little.
+function hitGrowth(att,tgt,mult=1){return{att:(.18+tgt.size*.006)*mult*(1-att.size/220),tgt:.08*mult*(tgt.spines?.6:1)}}
+
+// ─── State ─────────────────────────────────────────────────────────────────
+let S=null,mode='title',last=performance.now(),shake=0;
+function creature(o){const c={x:0,y:0,vx:0,vy:0,size:4,face:0,bite:0,cd:0,dash:0,dashCd:0,spitCd:0,roarCd:0,stun:0,pop:0,wob:Math.random()*9,seed:Math.random()*1e4,stage:0,spines:false,target:null,think:0,...o};c.stage=stageOf(c.size);return c}
+function newGame(){
+ S={t:0,ents:[],shots:[],parts:[],texts:[],bites:0,taken:0,eaten:0,over:false,spawnT:0,names:new Set()};
+ S.you=creature({you:true,x:0,y:0,size:6,col:'#3dffb0',name:'YOU'});S.ents.push(S.you);
+ for(let i=0;i<9;i++)spawnRival(R(3,9));
+ for(let i=0;i<26;i++)spawnMote();
+ mode='play';showHUD(true);updateHUD(true);
+}
+function edgeSpot(min=420){for(let i=0;i<40;i++){const a=R(0,Math.PI*2),d=R(min,ARENA-60),x=Math.cos(a)*d,y=Math.sin(a)*d;if(!S.you||Math.hypot(x-S.you.x,y-S.you.y)>min)return{x,y}}return{x:ARENA*.8,y:0}}
+function spawnRival(size){const kind=pick(Object.keys(KINDS)),K=KINDS[kind];let name=pick(K.name);for(let i=0;S.names.has(name)&&i<6;i++)name=pick(K.name);if(S.names.has(name))name+=' '+(2+S.ents.length%7);S.names.add(name);
+ S.ents.push(creature({...edgeSpot(),kind,col:K.col,name,size,face:R(0,6.3)}))}
+function spawnMote(){S.ents.push(creature({...edgeSpot(200),mote:true,col:pick(['#c8ff70','#7dfff2','#ffe680']),size:R(.8,2.2),face:R(0,6.3)}))}
+
+// ─── Input ─────────────────────────────────────────────────────────────────
+const keys=new Set(),stick={x:0,y:0,id:null};let mouseBite=false;
+addEventListener('keydown',e=>{keys.add(e.code);if(mode==='play'){if(['KeyJ','Space'].includes(e.code))act('bite');if(['KeyK','ShiftLeft','ShiftRight'].includes(e.code))act('dash');if(e.code==='KeyL')act('spit');if(e.code==='KeyI')act('roar');if(e.code==='KeyP'||e.code==='Escape')setPause(true)}
+ else if(mode==='pause'&&(e.code==='KeyP'||e.code==='Escape'))setPause(false);else if((mode==='title'||mode==='over')&&(e.code==='Enter'||e.code==='Space'))newGame();
+ if(['Space','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code))e.preventDefault()});
+addEventListener('keyup',e=>keys.delete(e.code));
+addEventListener('blur',()=>{keys.clear();if(mode==='play')setPause(true)});
+cv.addEventListener('pointerdown',e=>{if(mode==='play'&&e.pointerType==='mouse'){const you=S.you,cx=W/2,cy=H/2;you.face=Math.atan2(e.clientY-cy,e.clientX-cx);act('bite')}});
+const st=$('stick'),kn=$('knob');
+st.addEventListener('pointerdown',e=>{stick.id=e.pointerId;st.setPointerCapture(e.pointerId);moveStick(e)});
+st.addEventListener('pointermove',e=>{if(e.pointerId===stick.id)moveStick(e)});
+const endStick=e=>{if(e.pointerId===stick.id){stick.id=null;stick.x=stick.y=0;kn.style.transform=''}};st.addEventListener('pointerup',endStick);st.addEventListener('pointercancel',endStick);
+function moveStick(e){const r=st.getBoundingClientRect();let dx=e.clientX-(r.left+r.width/2),dy=e.clientY-(r.top+r.height/2);const d=Math.hypot(dx,dy),m=55;if(d>m){dx*=m/d;dy*=m/d}stick.x=dx/m;stick.y=dy/m;kn.style.transform=`translate(${dx}px,${dy}px)`}
+for(const [id,a] of [['bBite','bite'],['bDash','dash'],['bSpit','spit'],['bRoar','roar']])$(id).addEventListener('pointerdown',e=>{e.preventDefault();if(mode==='play')act(a)});
+$('play').onclick=newGame;$('again').onclick=newGame;$('resume').onclick=()=>setPause(false);$('pause').onclick=()=>setPause(true);
+function setPause(on){if(on&&mode!=='play')return;mode=on?'pause':'play';$('paused').hidden=!on;keys.clear();last=performance.now()}
+function act(a){const y=S.you;if(y.stun>0)return;
+ if(a==='bite')startBite(y);
+ if(a==='dash'&&y.stage>=1&&y.dashCd<=0){y.dash=.22;y.dashCd=2;y.vx+=Math.cos(y.face)*520;y.vy+=Math.sin(y.face)*520;burst(y.x,y.y,y.col,10,120)}
+ if(a==='spit'&&y.stage>=3&&y.spitCd<=0)spit(y);
+ if(a==='roar'&&y.stage>=4&&y.roarCd<=0)roar(y)}
+
+// ─── Combat ────────────────────────────────────────────────────────────────
+function startBite(c){if(c.cd>0||c.stun>0)return false;c.bite=.18;c.cd=.38+c.size*.003;const r=radius(c.size);c.vx+=Math.cos(c.face)*(120+r*1.2);c.vy+=Math.sin(c.face)*(120+r*1.2);c.bitHit=new Set();return true}
+function biteCheck(c){const r=radius(c.size),reach=r*1.25+8,fx=Math.cos(c.face),fy=Math.sin(c.face);
+ for(const t of S.ents){if(t===c||t.dead||c.bitHit.has(t))continue;const dx=t.x-c.x,dy=t.y-c.y,d=Math.hypot(dx,dy),tr=radius(t.size);if(d>reach+tr)continue;if(d>0&&(dx*fx+dy*fy)/d<.25&&d>r*.6)continue;
+  c.bitHit.add(t);land(c,t,1)}}
+function land(att,tgt,mult,kind='bite'){
+ if(tgt.dead||att.dead)return;if(tgt.dash>0&&tgt.you)return; // a dodge
+ //  Eat it: much smaller things do not get to grow from the hit.
+ if(att.size>=tgt.size*(tgt.you?EAT_YOU:EAT)&&kind!=='roar'){devour(att,tgt);return}
+ const gr=hitGrowth(att,tgt,mult);grow(att,gr.att);grow(tgt,gr.tgt);
+ const a=Math.atan2(tgt.y-att.y,tgt.x-att.x),k=(160+att.size*3)*clamp(att.size/tgt.size,.4,2.5)*(kind==='spit'?.5:1);tgt.vx+=Math.cos(a)*k;tgt.vy+=Math.sin(a)*k;tgt.stun=Math.max(tgt.stun,.25);
+ if(tgt.spines&&kind==='bite'){att.stun=Math.max(att.stun,.45);att.vx-=Math.cos(a)*220;att.vy-=Math.sin(a)*220;burst(att.x,att.y,'#ffffff',6,160)}
+ burst((att.x+tgt.x)/2,(att.y+tgt.y)/2,tgt.col,8+mult*4|0,180);
+ if(att.you){S.bites++;float(att.x,att.y-radius(att.size)-8,'+'+gr.att.toFixed(2),'#3dffb0');shake=Math.max(shake,4)}
+ if(tgt.you){S.taken++;float(tgt.x,tgt.y-radius(tgt.size)-8,'HIT · +'+gr.tgt.toFixed(2),'#ff9fc4');shake=Math.max(shake,8)}
+}
+function devour(att,tgt){tgt.dead=true;grow(att,tgt.size*.3+.2);burst(tgt.x,tgt.y,tgt.col,22,260);
+ if(att.you){S.eaten++;float(att.x,att.y-radius(att.size)-10,'ATE '+(tgt.mote?'A MOTE':tgt.name),'#ffd54a');shake=Math.max(shake,6)}
+ if(tgt.you)end(false,(att.name||'Something')+' ate you.')}
+function grow(c,n){const before=c.stage;c.size=Math.min(FULL,c.size+n);c.pop=.25;c.stage=stageOf(c.size);
+ if(c.stage>before){if(c.stage>=2)c.spines=true;if(c.you)evolve(c.stage);else if(c.stage>=3&&S.you)float(c.x,c.y-radius(c.size)-14,c.name+' EVOLVED','#ff3d8b')}
+ if(c.size>=FULL&&!S.over)end(!!c.you,c.you?'You reached full size first.':c.name+' reached full size first.')}
+function spit(c){c.spitCd=1.2;const sp=520;S.shots.push({x:c.x+Math.cos(c.face)*radius(c.size),y:c.y+Math.sin(c.face)*radius(c.size),vx:Math.cos(c.face)*sp+c.vx*.3,vy:Math.sin(c.face)*sp+c.vy*.3,r:5+c.size*.08,owner:c,life:1.1,col:c.col})}
+function roar(c){c.roarCd=8;const R0=radius(c.size)*3.2+120;S.ring={x:c.x,y:c.y,r:0,max:R0,col:c.col,t:0};shake=12;
+ for(const t of S.ents){if(t===c||t.dead)continue;if(Math.hypot(t.x-c.x,t.y-c.y)<R0+radius(t.size))land(c,t,.6,'roar')}}
+function burst(x,y,col,n,sp){for(let i=0;i<n;i++){const a=R(0,6.3),v=R(.3,1)*sp;S.parts.push({x,y,vx:Math.cos(a)*v,vy:Math.sin(a)*v,life:R(.3,.7),col,r:R(1.5,4)})}}
+function float(x,y,text,col){S.texts.push({x,y,text,col,life:1.1})}
+let evoT=0;function evolve(stage){const el=$('evo');el.innerHTML=STAGE_NAMES[stage]+'<small>'+(POWERS[stage]?'NEW: '+POWERS[stage]+(stage===1?' · K / DASH':stage===2?' · biters get stung':stage===3?' · L / SPIT':' · I / ROAR'):'')+'</small>';el.classList.add('on');evoT=2.2;burst(S.you.x,S.you.y,'#3dffb0',30,300);shake=10;updateButtons()}
+function end(win,why){if(S.over)return;S.over=true;mode='over';
+ const best=+store.get('outgrow-best')||0,t=S.t;let rec='';if(win&&(!best||t<best)){store.set('outgrow-best',String(t));rec='New best time.'}
+ $('oTitle').textContent=win?'FULL SIZE':'OUTGROWN';$('oTitle').style.color=win?'var(--you)':'var(--apex)';$('oWhy').textContent=why;
+ $('sTime').textContent=fmt(t);$('sBites').textContent=S.bites;$('sEaten').textContent=S.eaten;$('oBest').textContent=rec||((+store.get('outgrow-best'))?'Best time to full size: '+fmt(+store.get('outgrow-best')):'');
+ const game=S;setTimeout(()=>{if(mode==='over'&&S===game)$('over').hidden=false},win?900:700);showHUD(false)}
+
+// ─── Brains ────────────────────────────────────────────────────────────────
+function brain(c,dt){
+ if(c.mote){c.think-=dt;if(c.think<=0){c.think=R(1,3);c.face=R(0,6.3)}const sp=60;c.vx+=Math.cos(c.face)*sp*dt*3;c.vy+=Math.sin(c.face)*sp*dt*3;
+  //  Motes scatter from anything close.
+  for(const t of S.ents)if(t!==c&&!t.mote&&!t.dead){const d=Math.hypot(t.x-c.x,t.y-c.y);if(d<radius(t.size)+90){c.face=Math.atan2(c.y-t.y,c.x-t.x);break}}return}
+ const K=KINDS[c.kind];c.think-=dt;
+ if(c.think<=0||!c.target||c.target.dead){c.think=R(.4,.9);let best=null,score=-1e9;
+  for(const t of S.ents){if(t===c||t.dead)continue;const d=Math.hypot(t.x-c.x,t.y-c.y);if(d>700)continue;const ratio=t.size/c.size;
+   //  Hunt what it can beat, eat what it can swallow, and give the player a little extra attention.
+   let s=-d*.004+(ratio<.48?2.2:ratio<1.4?1:ratio<1.9?-.5:-3)+(t.you?.8*K.aggro:0)+(t.mote&&c.size<20?.6:0)-(t.mote&&c.size>30?2:0);if(s>score){score=s;best=t}}
+  c.target=best;c.flee=best&&best.size>c.size*1.9}
+ const t=c.target;let ax=0,ay=0;
+ if(t){const dx=t.x-c.x,dy=t.y-c.y,d=Math.hypot(dx,dy)||1;
+  if(c.flee){ax=-dx/d;ay=-dy/d}
+  else{ax=dx/d;ay=dy/d;c.face=Math.atan2(dy,dx);const reach=radius(c.size)*1.25+radius(t.size)+8;
+   if(d<reach*(K.lunge>1.2?1.6:1.05))startBite(c);
+   if(K.ranged&&c.stage>=1&&c.spitCd<=0&&d<520&&d>reach)spit(c);
+   if(c.stage>=1&&c.kind==='lurker'&&c.dashCd<=0&&d<260&&d>reach){c.dash=.2;c.dashCd=3;c.vx+=ax*480;c.vy+=ay*480}
+   if(c.stage>=4&&c.roarCd<=0&&d<radius(c.size)*3)roar(c)}}
+ else{c.wander=(c.wander||R(0,6.3))+R(-1,1)*dt;ax=Math.cos(c.wander);ay=Math.sin(c.wander)}
+ //  Keep away from the rim.
+ const rr=Math.hypot(c.x,c.y);if(rr>ARENA-200){ax-=c.x/rr*1.5;ay-=c.y/rr*1.5}
+ const sp=speedOf(c.size)*(.75+K.aggro*.25);c.vx+=ax*sp*dt*4;c.vy+=ay*sp*dt*4;if(!t||c.flee)c.face=Math.atan2(c.vy,c.vx);
+}
+
+// ─── Step ──────────────────────────────────────────────────────────────────
+function step(dt){
+ S.t+=dt;const y=S.you;
+ //  You
+ let mx=(keys.has('KeyD')||keys.has('ArrowRight')?1:0)-(keys.has('KeyA')||keys.has('ArrowLeft')?1:0)+stick.x,my=(keys.has('KeyS')||keys.has('ArrowDown')?1:0)-(keys.has('KeyW')||keys.has('ArrowUp')?1:0)+stick.y;
+ const ml=Math.hypot(mx,my);if(ml>.1){mx/=Math.max(1,ml);my/=Math.max(1,ml);if(y.stun<=0){const sp=speedOf(y.size)*1.08;y.vx+=mx*sp*dt*5;y.vy+=my*sp*dt*5}if(y.bite<=0)y.face=Math.atan2(my,mx)}
+ for(const c of S.ents){if(c.dead)continue;if(!c.you&&c.stun<=0)brain(c,dt);
+  for(const k of ['cd','dashCd','spitCd','roarCd','stun','dash','pop'])if(c[k]>0)c[k]-=dt;
+  if(c.bite>0){c.bite-=dt;biteCheck(c)}
+  const top=speedOf(c.size)*(c.dash>0?3.2:c.bite>0?2:1.15)*(c.mote?.35:1),v=Math.hypot(c.vx,c.vy);if(v>top){c.vx*=top/v;c.vy*=top/v}
+  const fr=Math.pow(c.stun>0?.08:.02,dt);c.vx*=fr;c.vy*=fr;c.x+=c.vx*dt;c.y+=c.vy*dt;
+  const rr=Math.hypot(c.x,c.y),lim=ARENA-radius(c.size);if(rr>lim){c.x*=lim/rr;c.y*=lim/rr;c.vx*=.4;c.vy*=.4}}
+ //  Bodies push apart.
+ const live=S.ents.filter(c=>!c.dead);
+ for(let i=0;i<live.length;i++)for(let j=i+1;j<live.length;j++){const a=live[i],b=live[j],dx=b.x-a.x,dy=b.y-a.y,d=Math.hypot(dx,dy)||.01,m=radius(a.size)+radius(b.size);if(d<m){const o=(m-d)/2,nx=dx/d,ny=dy/d,wa=b.size/(a.size+b.size),wb=1-wa;a.x-=nx*o*wa*1.6;a.y-=ny*o*wa*1.6;b.x+=nx*o*wb*1.6;b.y+=ny*o*wb*1.6}}
+ //  Spit
+ for(const s of S.shots){s.x+=s.vx*dt;s.y+=s.vy*dt;s.life-=dt;for(const t of S.ents){if(t.dead||t===s.owner)continue;if(Math.hypot(t.x-s.x,t.y-s.y)<radius(t.size)+s.r){land(s.owner,t,.6,'spit');s.life=0;break}}}
+ S.shots=S.shots.filter(s=>s.life>0);
+ for(const p of S.parts){p.x+=p.vx*dt;p.y+=p.vy*dt;p.vx*=.9;p.vy*=.9;p.life-=dt}S.parts=S.parts.filter(p=>p.life>0);
+ for(const t of S.texts){t.y-=34*dt;t.life-=dt}S.texts=S.texts.filter(t=>t.life>0);
+ if(S.ring){S.ring.t+=dt;S.ring.r=S.ring.max*Math.min(1,S.ring.t/.35);if(S.ring.t>.6)S.ring=null}
+ S.ents=S.ents.filter(c=>!c.dead);
+ //  Keep the swamp stocked: fresh small rivals and motes drift in.
+ S.spawnT-=dt;const rivals=S.ents.filter(c=>!c.you&&!c.mote).length,motes=S.ents.filter(c=>c.mote).length;
+ if(S.spawnT<=0){S.spawnT=2.5;if(rivals<10)spawnRival(R(3,8)+S.t*.02);if(motes<26)for(let i=0;i<3;i++)spawnMote()}
+ if(evoT>0){evoT-=dt;if(evoT<=0)$('evo').classList.remove('on')}
+ shake*=Math.pow(.02,dt);
+}
+
+// ─── Draw ──────────────────────────────────────────────────────────────────
+let zoom=1;
+function draw(){
+ const y=S?S.you:{x:0,y:0,size:6};const want=clamp(Math.min(W,H)/(radius(y.size)*13+260),.32,1.4);zoom+=(want-zoom)*.05;
+ g.save();g.fillStyle='#0c0a18';g.fillRect(0,0,W,H);
+ const sx=(Math.random()-.5)*shake,sy=(Math.random()-.5)*shake;g.translate(W/2+sx,H/2+sy);g.scale(zoom,zoom);g.translate(-y.x,-y.y);
+ //  Swamp floor: grid, spores, the rim.
+ const step=80,x0=Math.floor((y.x-W/2/zoom)/step)*step,x1=y.x+W/2/zoom,y0=Math.floor((y.y-H/2/zoom)/step)*step,y1=y.y+H/2/zoom;
+ g.strokeStyle='#1d1838';g.lineWidth=1/zoom;g.beginPath();for(let x=x0;x<x1;x+=step){g.moveTo(x,y0);g.lineTo(x,y1)}for(let yy=y0;yy<y1;yy+=step){g.moveTo(x0,yy);g.lineTo(x1,yy)}g.stroke();
+ const now=performance.now()/1000;g.fillStyle='#2a2352';for(let i=0;i<70;i++){const px=((i*397.7)%3400)-1700+Math.sin(now*.3+i)*20,py=((i*733.1)%3400)-1700+Math.cos(now*.25+i)*20;g.beginPath();g.arc(px,py,2+(i%3),0,7);g.fill()}
+ g.strokeStyle='#ff3d8b55';g.lineWidth=6;g.setLineDash([24,18]);g.beginPath();g.arc(0,0,ARENA,0,7);g.stroke();g.setLineDash([]);
+ if(!S){g.restore();return}
+ if(S.ring){g.strokeStyle=S.ring.col;g.globalAlpha=1-S.ring.t/.6;g.lineWidth=10;g.beginPath();g.arc(S.ring.x,S.ring.y,S.ring.r,0,7);g.stroke();g.globalAlpha=1}
+ for(const s of S.shots){g.fillStyle=s.col;g.beginPath();g.arc(s.x,s.y,s.r,0,7);g.fill()}
+ const list=[...S.ents].sort((a,b)=>a.size-b.size);for(const c of list)drawCreature(c,now);
+ for(const p of S.parts){g.globalAlpha=Math.min(1,p.life*2);g.fillStyle=p.col;g.beginPath();g.arc(p.x,p.y,p.r,0,7);g.fill()}g.globalAlpha=1;
+ g.textAlign='center';for(const t of S.texts){g.globalAlpha=Math.min(1,t.life*1.5);g.fillStyle=t.col;g.font=`700 ${14/zoom*.8}px 'JetBrains Mono',monospace`;g.fillText(t.text,t.x,t.y)}g.globalAlpha=1;
+ g.restore();
+ //  Arrow to the apex when it is off screen.
+ const apex=S.ents.filter(c=>!c.you&&!c.mote).sort((a,b)=>b.size-a.size)[0];
+ if(apex){const dx=(apex.x-y.x)*zoom,dy=(apex.y-y.y)*zoom;if(Math.abs(dx)>W/2-30||Math.abs(dy)>H/2-30){const a=Math.atan2(dy,dx),ex=W/2+Math.cos(a)*(Math.min(W,H)/2-46),ey=H/2+Math.sin(a)*(Math.min(W,H)/2-46);g.save();g.translate(ex,ey);g.rotate(a);g.fillStyle='#ff3d8b';g.beginPath();g.moveTo(14,0);g.lineTo(-8,-9);g.lineTo(-8,9);g.fill();g.restore();g.fillStyle='#ff3d8b';g.font="700 11px 'JetBrains Mono',monospace";g.textAlign='center';g.fillText(apex.name+' '+apex.size.toFixed(0),ex,ey+24)}}
+}
+function drawCreature(c,now){
+ const r=radius(c.size)*(1+(c.pop>0?Math.sin(c.pop/.25*Math.PI)*.12:0)),st=c.stage,wob=Math.sin(now*4+c.wob)*.04;
+ g.save();g.translate(c.x,c.y);
+ if(c.mote){g.fillStyle=c.col;g.globalAlpha=.85;g.beginPath();g.arc(0,0,r*.7,0,7);g.fill();g.globalAlpha=1;g.restore();return}
+ //  Glow and shadow
+ g.fillStyle='#00000055';g.beginPath();g.ellipse(4,r*.35,r*1.05,r*.6,0,0,7);g.fill();
+ g.rotate(c.face);
+ //  Tendrils from stage 1, spines from stage 2, a crest from stage 4.
+ if(st>=1){g.strokeStyle=c.col;g.lineWidth=Math.max(2,r*.08);g.lineCap='round';const n=2+st;for(let i=0;i<n;i++){const a=Math.PI+((i/(n-1||1))-.5)*1.6,len=r*(.5+st*.12);g.beginPath();g.moveTo(Math.cos(a)*r*.8,Math.sin(a)*r*.8);g.quadraticCurveTo(Math.cos(a)*(r+len*.5)+Math.sin(now*5+i)*r*.15,Math.sin(a)*(r+len*.5),Math.cos(a)*(r+len),Math.sin(a)*(r+len)+Math.cos(now*5+i)*r*.2);g.stroke()}}
+ if(st>=2){g.fillStyle='#f4f1ff';const n=6+st*3;for(let i=0;i<n;i++){const a=i/n*Math.PI*2;if(Math.cos(a)>.6)continue;g.beginPath();g.moveTo(Math.cos(a-.12)*r*.95,Math.sin(a-.12)*r*.95);g.lineTo(Math.cos(a)*r*(1.22+st*.04),Math.sin(a)*r*(1.22+st*.04));g.lineTo(Math.cos(a+.12)*r*.95,Math.sin(a+.12)*r*.95);g.fill()}}
+ const body=g.createRadialGradient(-r*.3,-r*.3,r*.1,0,0,r*1.05);body.addColorStop(0,'#ffffff');body.addColorStop(.18,c.col);body.addColorStop(1,shadeHex(c.col,.35));
+ g.fillStyle=body;g.beginPath();g.ellipse(0,0,r*(1+wob),r*(1-wob),0,0,7);g.fill();
+ g.strokeStyle=c.you?'#ffffff':'#0c0a18';g.lineWidth=c.you?Math.max(2,r*.06):Math.max(1.5,r*.04);g.stroke();
+ if(st>=4){g.fillStyle='#ffd54a';for(let i=0;i<5;i++){const a=Math.PI*(.75+i*.125);g.beginPath();g.moveTo(Math.cos(a)*r*.7,Math.sin(a)*r*.7);g.lineTo(Math.cos(a)*r*1.35,Math.sin(a)*r*1.35);g.lineTo(Math.cos(a+.15)*r*.75,Math.sin(a+.15)*r*.75);g.fill()}}
+ //  Mouth opens on a bite.
+ const open=c.bite>0?.55:.12+Math.sin(now*3+c.wob)*.04;g.fillStyle='#0c0a18';g.beginPath();g.moveTo(r*.35,0);g.arc(r*.35,0,r*.55,-open,open);g.closePath();g.fill();
+ if(c.bite>0){g.fillStyle='#ffffff';for(let i=-2;i<=2;i++){const a=i*open/2.5;g.beginPath();g.moveTo(r*.35+Math.cos(a)*r*.5,Math.sin(a)*r*.5);g.lineTo(r*.35+Math.cos(a)*r*.32,Math.sin(a)*r*.32+r*.05);g.lineTo(r*.35+Math.cos(a)*r*.32,Math.sin(a)*r*.32-r*.05);g.fill()}}
+ //  Eyes: more of them as it evolves.
+ const eyes=c.you?2:Math.min(5,2+Math.floor(st/2));for(let i=0;i<eyes;i++){const a=((i/(eyes-1||1))-.5)*1.3,ex=Math.cos(a)*r*.25,ey=Math.sin(a)*r*.55-r*.1,er=r*(.17-eyes*.012);
+  g.fillStyle='#ffffff';g.beginPath();g.arc(ex,ey,er,0,7);g.fill();g.fillStyle=c.stun>0?'#ff3d8b':'#0c0a18';g.beginPath();g.arc(ex+er*.35,ey,er*.5,0,7);g.fill()}
+ g.restore();
+ //  Read the danger at a glance: green rings are food, red ones can eat you.
+ if(!c.you&&S.you){const y=S.you;g.lineWidth=3;if(y.size>=c.size*EAT){g.strokeStyle='#3dffb0';g.setLineDash([]);g.beginPath();g.arc(c.x,c.y,radius(c.size)+5,0,7);g.stroke()}else if(c.size>=y.size*EAT_YOU){g.strokeStyle='#ff3d8b';g.setLineDash([10,8]);g.lineDashOffset=-now*30;g.beginPath();g.arc(c.x,c.y,radius(c.size)+7,0,7);g.stroke();g.setLineDash([])}}
+ //  Name and size over rivals that matter.
+ if(!c.you&&c.size>=8){g.textAlign='center';g.font=`700 ${Math.max(11,r*.28)}px 'JetBrains Mono',monospace`;g.fillStyle='#f4f1ffcc';g.fillText(c.name+' · '+c.size.toFixed(0),c.x,c.y-radius(c.size)-12)}
+ if(c.you){g.strokeStyle='#3dffb0aa';g.lineWidth=3;g.beginPath();g.arc(c.x,c.y,radius(c.size)+8,-Math.PI/2,-Math.PI/2+Math.PI*2*c.size/FULL);g.stroke()}
+}
+function shadeHex(h,k){const n=parseInt(h.slice(1),16);return'#'+[16,8,0].map(s=>Math.round(((n>>s)&255)*k).toString(16).padStart(2,'0')).join('')}
+
+// ─── HUD ───────────────────────────────────────────────────────────────────
+function showHUD(on){$('hud').hidden=!on;$('keys').hidden=!on;$('pause').hidden=!on;$('pad').style.visibility=on?'visible':'hidden';if(on){$('title').hidden=true;$('over').hidden=true;$('paused').hidden=true;updateButtons()}}
+let hudT=0;
+function updateHUD(force){hudT-=1/60;if(hudT>0&&!force)return;hudT=.1;const y=S.you,st=y.stage;
+ $('ySize').textContent=y.size.toFixed(1);$('yBar').style.width=y.size+'%';$('yStage').textContent=STAGE_NAMES[st]+(st<4?' · next: '+POWERS[st+1]+' at '+STAGES[st+1]:' · ROAR ready in '+Math.max(0,y.roarCd).toFixed(0)+'s');
+ const rivals=S.ents.filter(c=>!c.you&&!c.mote).sort((a,b)=>b.size-a.size),ap=rivals[0];
+ if(ap){$('aName').textContent=ap.name;$('aSize').textContent=ap.size.toFixed(1);$('aBar').style.width=ap.size+'%';$('aStage').textContent=STAGE_NAMES[ap.stage]+' · '+ap.kind}
+ $('rivals').innerHTML=rivals.slice(1,4).map(c=>`<span>${c.name}</span> ${c.size.toFixed(0)}`).join('<br>');
+ $('clock').textContent=fmt(S.t);updateButtons()}
+function updateButtons(){if(!S)return;const y=S.you;$('bDash').disabled=y.stage<1;$('bSpit').disabled=y.stage<3;$('bRoar').hidden=y.stage<4;$('bRoar').disabled=y.stage<4; $('bDash').classList.toggle('cool',y.dashCd>0);$('bSpit').classList.toggle('cool',y.spitCd>0);$('bRoar').classList.toggle('cool',y.roarCd>0)}
+{const b=+store.get('outgrow-best');if(b)$('best').textContent='Best time to full size: '+fmt(b)}
+
+// ─── Loop ──────────────────────────────────────────────────────────────────
+function frame(t){const dt=Math.min(.05,(t-last)/1000);last=t;
+ if(mode==='play'&&S&&!S.over){step(dt);updateHUD()}else if(mode==='over'&&S){for(const p of S.parts){p.x+=p.vx*dt;p.y+=p.vy*dt;p.life-=dt}S.parts=S.parts.filter(p=>p.life>0)}
+ draw();requestAnimationFrame(frame)}
+requestAnimationFrame(frame);
+//  For tests and the city cabinet.
+window.Outgrow={get state(){return S},get mode(){return mode},newGame,act,step,land,grow,hitGrowth,FULL,STAGES};
+</script>
+</body>
+</html>

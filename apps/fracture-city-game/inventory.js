@@ -92,7 +92,18 @@ const fPlace=window.FCFurniture?.place;
 if(window.FCFurniture)FCFurniture.place=function(id){const sku='f:'+id;FCFurniture.close?.();let k=I.slots.indexOf(sku);if(k<0){k=I.slots.indexOf(null);if(k<0)k=I.sel;I.slots[k]=sku;saveHotbar()}if(!State.ui.construct&&Player.mode==='walk')toggleConstructMode();I.select(k);if(!count(sku)&&!creative()){openInv('shop');toast('Buy '+label(sku)+' to place it.','info')}};
 //  No item in hand places nothing.
 const place=window.placeBlock;
-window.placeBlock=function(){if(State.ui.construct&&!I.slots[I.sel]&&!window.CityBuild?.enabled&&!window.CityArt?.enabled)return;return place.apply(this,arguments)};
+//  0.86: online, the blocks you hold are the server's count (what the
+//  inventory shows), not the solo save's mined blocks. Placing used to check
+//  the solo count and said "No … in hand" while the inventory showed plenty.
+let placing=false;
+window.placeBlock=function(){if(State.ui.construct&&!I.slots[I.sel]&&!window.CityBuild?.enabled&&!window.CityArt?.enabled)return;
+ const it=parse(I.slots[I.sel]);
+ if(online()&&State.ui.construct&&it?.kind==='block'&&!window.CityBuild?.enabled&&!window.CityArt?.enabled){if(!I.server)refresh();if(count('b:'+it.id)<1){toast(`You hold no ${label('b:'+it.id)}. Open the inventory (I) to buy more.`,'warn');return}}
+ placing=true;try{return place.apply(this,arguments)}finally{placing=false}};
+const soloTake=window.shInvTake;
+//  Online the server charges when the plot saves and sends the wallet back, so
+//  placing only checks the count here.
+window.shInvTake=function(id,n){if(placing&&online())return count('b:'+id)>=n;return soloTake.apply(this,arguments)};
 //  A piece chosen in the room panel goes into the hand you are holding.
 let panelWas=false;setInterval(()=>{const K=window.CityBuild,open=!!K?.panelOpen;if(panelWas&&!open&&K?.enabled&&State.ui.construct){I.slots[I.sel]='k:'+K.shape+':'+(/door/.test(K.shape)?(K.shape==='door'?142:143):K.material);saveHotbar();paint(true)}panelWas=open},200);
 //  Left-click on your own furniture picks it back up.

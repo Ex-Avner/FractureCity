@@ -1,4 +1,4 @@
-/* Five stand-alone arcade cabinets spread across the Common Ground campus.
+/* Six stand-alone arcade cabinets spread across the Common Ground campus.
    Chunk-owned geometry and collision, like the Chainfire cabinet, so they
    survive streaming. They launch in the city's arcade frame and are not part
    of the arcade building's roster. */
@@ -12,6 +12,8 @@ const GAMES=[
  {slug:'breaking-ned',title:'BREAKING NED',sub:'ONE-TAP FLYER',color:0xff5a4d,x:148.5,z:27.5,face:Math.PI/2,art:'news'},
  {slug:'oh-no-ned',title:'OH NO NED',sub:'SLINGSHOT PHYSICS',color:0x9be15d,x:180.5,z:50.5,face:Math.PI,art:'sling'},
  {slug:'bad-weather',title:'BAD WEATHER',sub:'BUILD. THEN BRACE.',color:0xffb347,x:164.5,z:56.5,face:Math.PI,art:'storm'},
+ //  0.86: Outgrow, on the west lawn facing the court.
+ {slug:'outgrow',title:'OUTGROW',sub:'GROW OR GET EATEN',color:0x3dffb0,x:152.5,z:50.5,face:Math.PI/2,art:'grow'},
 ];
 const Y=1,REACH=2.3,hex=c=>'#'+c.toString(16).padStart(6,'0');
 for(const g of GAMES){g.fx=Math.sin(g.face);g.fz=Math.cos(g.face);g.key=chunkCoordOf(g.x)+','+chunkCoordOf(g.z);g.name='campus-arcade-'+g.slug}
@@ -25,6 +27,7 @@ function screenArt(g){
  if(g.art==='news'){c.fillRect(40,70,432,46);c.fillStyle='#0d0b1f';c.font='bold 34px sans-serif';c.textAlign='center';c.fillText('B R E A K I N G',256,105);c.fillStyle=col;for(let i=0;i<5;i++)c.fillRect(60+i*86,200+(i%2)*40,60,60);c.fillStyle='#ffe6a4';c.beginPath();c.arc(120,175,18,0,7);c.fill()}
  if(g.art==='sling'){c.beginPath();c.moveTo(90,320);c.lineTo(110,230);c.moveTo(130,320);c.lineTo(110,230);c.stroke();c.beginPath();c.arc(110,225,16,0,7);c.fill();for(let i=0;i<6;i++)c.strokeRect(300+(i%3)*50,330-Math.floor(i/3)*55-55,46,52);c.setLineDash([4,10]);c.beginPath();c.moveTo(125,215);c.quadraticCurveTo(230,90,320,200);c.stroke();c.setLineDash([])}
  if(g.art==='storm'){for(let i=0;i<5;i++){const x=70+i*86,h=40+(i*37)%70;c.fillRect(x,330-h,56,h);c.beginPath();c.moveTo(x-6,330-h);c.lineTo(x+28,300-h);c.lineTo(x+62,330-h);c.fill()}c.fillStyle='#d8dcf0';for(const [x,y] of [[150,110],[330,95]]){c.beginPath();c.arc(x,y,34,0,7);c.arc(x+40,y+8,28,0,7);c.arc(x-38,y+10,24,0,7);c.fill()}c.strokeStyle='#fff6a0';c.beginPath();c.moveTo(250,120);c.lineTo(225,175);c.lineTo(255,175);c.lineTo(228,235);c.stroke()}
+ if(g.art==='grow'){const blob=(x,y,r,col)=>{c.fillStyle=col;c.beginPath();c.arc(x,y,r,0,7);c.fill();c.fillStyle='#0d0b1f';c.beginPath();c.arc(x+r*.3,y-r*.2,r*.16,0,7);c.fill()};blob(150,230,34,'#3dffb0');blob(330,210,70,'#ff3d8b');for(let i=0;i<7;i++)blob(60+i*64,320,6+i*1.5,'#ffd54a');c.strokeStyle='#f4f1ff';c.setLineDash([6,8]);c.beginPath();c.arc(330,210,86,0,7);c.stroke();c.setLineDash([])}
  c.fillStyle='#f4f1ff';c.textAlign='center';c.font='bold '+(g.title.length>13?30:36)+'px sans-serif';c.fillText(g.title,256,48);c.font='18px sans-serif';c.fillText('FREE PLAY · PRESS E',256,362);
  const tex=new THREE.CanvasTexture(cv);tex.encoding=THREE.sRGBEncoding;return tex;
 }

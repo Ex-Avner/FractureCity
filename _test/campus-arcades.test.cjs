@@ -1,12 +1,12 @@
-// Five stand-alone arcade cabinets across Common Ground, served through the real
+// Six stand-alone arcade cabinets across Common Ground, served through the real
 // city server (its app allowlist and content policy), plus "Clear my pieces here".
 const root=require('node:path').resolve(__dirname,'..'),{chromium}=require(root+'/_test/node_modules/playwright'),{createServer}=require(root+'/server/server.cjs'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),os=require('node:os');
-const FONTS={'toilet-heads':['Lilita One','Nunito'],'fractured-mirror':['Syncopate','Chakra Petch'],'breaking-ned':['Anton','IBM Plex Mono'],'oh-no-ned':['Anton','Old Standard TT'],'bad-weather':['Bricolage Grotesque','JetBrains Mono']};
+const FONTS={'toilet-heads':['Lilita One','Nunito'],'fractured-mirror':['Syncopate','Chakra Petch'],'breaking-ned':['Anton','IBM Plex Mono'],'oh-no-ned':['Anton','Old Standard TT'],'bad-weather':['Bricolage Grotesque','JetBrains Mono'],'outgrow':['Anton','JetBrains Mono']};
 (async()=>{const dir=fs.mkdtempSync(path.join(os.tmpdir(),'fc-ca-'));const app=createServer({dbPath:path.join(dir,'t.sqlite'),newsFetch:async()=>new Response('<rss></rss>')});
 await new Promise(r=>app.server.listen(0,'127.0.0.1',r));const base='http://127.0.0.1:'+app.server.address().port,browser=await chromium.launch({channel:'chrome'}),errors=[],outside=[];
 try{
  for(const slug of Object.keys(FONTS)){const html=fs.readFileSync(path.join(root,'apps',slug,'index.html'),'utf8');assert.doesNotMatch(html,/https?:\/\/(fonts\.g|cdnjs)/,slug+' has no outside fonts or scripts');const r=await fetch(base+'/apps/'+slug+'/index.html');assert.equal(r.status,200,slug+' is served')}
- console.log('PASS all five games are served by the city server with no outside dependencies');
+ console.log('PASS all six games are served by the city server with no outside dependencies');
  const p=await (await browser.newContext({viewport:{width:1280,height:720}})).newPage();
  p.on('pageerror',e=>errors.push(e.message));p.on('console',m=>{if(/Content Security Policy|Refused to/i.test(m.text())&&!/hn\.algolia|hacker-news\.firebaseio/.test(m.text()))errors.push(m.text().slice(0,200))});
  p.on('request',r=>{if(!r.url().startsWith(base)&&!/^(data|blob):/.test(r.url()))outside.push(r.url())});
