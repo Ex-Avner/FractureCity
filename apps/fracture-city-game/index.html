@@ -1394,6 +1394,7 @@ body.in-intro #hud-peace{opacity:0;}
 </div>
 
 <script src="../../shared/vendor/three.min.js"></script>
+<script src="real-light.js?v=0.89.0"></script>
 <script src="campaign-guide.js?v=0.55.0"></script>
 <script src="city-rounded.js?v=0.55.0"></script>
 <script src="city-grounding.js?v=0.74.0"></script>
@@ -28737,6 +28738,9 @@ function hdBloomInit(){
   });
 }
 
+//  Real Light (real-light.js) grades in this composite.
+HD.Bloom = Bloom; HD.bloomInit = hdBloomInit;
+
 function hdBloomSize(r){
   const sz = r.getDrawingBufferSize(new THREE.Vector2());
   const w = Math.max(2, Math.floor(sz.x)), h = Math.max(2, Math.floor(sz.y));
@@ -30056,7 +30060,7 @@ document.addEventListener('DOMContentLoaded', init);
 <script src="city-flow.js?v=0.70.0"></script>
 <script src="online-tour.js?v=0.75.0"></script>
 <script src="world-materials.js?v=0.66.0"></script>
-<script src="sodium-noir.js?v=0.66.0"></script>
+<script src="sodium-noir.js?v=0.89.0"></script>
 <script src="npc-voices.js?v=0.82.0"></script>
 <script src="city-wildlife.js?v=0.65.0"></script>
 <script src="the-seam.js?v=0.70.0"></script>

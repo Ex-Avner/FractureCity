@@ -22,14 +22,17 @@ if (typeof THREE === 'undefined' || typeof State === 'undefined') return;
 // ─── The hues ──────────────────────────────────────────────────────────────
 //  sky: horizon, low, high, zenith (same shape as SKY_BANDS). sun/hemi/ground
 //  tint the lights. grade is the soft-light overlay colour.
+//  0.89: the days used to be bile green, bruise violet, rust. They are now
+//  the weathers a real city gets: the hue still changes daily and a whole
+//  online room still shares it, but every one is a sky you could photograph.
 const HUES = [
- {id:'bile',     name:'Bile Green',     sky:['#d8df7a','#a9bf52','#5f8d42','#2b5a3c'], sun:'#f2ffb4', hemi:'#d6f09a', ground:'#6d6a3c', grade:'#a8c84a'},
- {id:'bruise',   name:'Bruise Violet',  sky:['#e2a6cf','#a978c4','#6a4ca6','#33296e'], sun:'#ffd8f2', hemi:'#e4c4ff', ground:'#5c3c62', grade:'#9a5ac0'},
- {id:'rust',     name:'Rust Day',       sky:['#f2a866','#d47344','#8c4a38','#45283a'], sun:'#ffcc92', hemi:'#ffd2a2', ground:'#6c4232', grade:'#d0703a'},
- {id:'chemical', name:'Chemical Teal',  sky:['#94f2da','#45cbb8','#1f8c9a','#0d4a6a'], sun:'#dcfff2', hemi:'#b2fff0', ground:'#2e5c5a', grade:'#2fbfae'},
- {id:'nicotine', name:'Nicotine Noon',  sky:['#f2df8c','#dcbb52','#a2894a','#58503e'], sun:'#fff0b2', hemi:'#ffe9aa', ground:'#6c5c3a', grade:'#d8b448'},
- {id:'ashrose',  name:'Ash Rose',       sky:['#f4bcb2','#d48c92','#8c6282','#3e3458'], sun:'#ffe2da', hemi:'#ffd2d2', ground:'#5c424a', grade:'#d07c8a'},
- {id:'oxide',    name:'Oxide Haze',     sky:['#aee4cc','#6cb4b2','#3c7a92','#1e3c5c'], sun:'#e4fff4', hemi:'#c4f2e6', ground:'#3c5a56', grade:'#5aa89a'},
+ {id:'clear',    name:'Clear',          sky:['#a9cfee','#5aa8e6','#2a76d2','#1148b4'], sun:'#fff2dc', hemi:'#bcd6f2', ground:'#6b6258', grade:'#9cc0e0'},
+ {id:'haze',     name:'Summer Haze',    sky:['#dcd8c8','#aec2d2','#7299c2','#3e6aa4'], sun:'#ffe6c4', hemi:'#d2dce4', ground:'#6e6456', grade:'#d8cfb8'},
+ {id:'overcast', name:'Overcast',       sky:['#bcc3c9','#a5adb6','#8c96a2','#6f7a88'], sun:'#e6ebf0', hemi:'#c4ccd4', ground:'#5e5c5a', grade:'#a8b0b8'},
+ {id:'smog',     name:'Smog',           sky:['#d9c4a2','#b8b1a3','#8295a6','#4d6688'], sun:'#ffdcae', hemi:'#d8cbb6', ground:'#6c5e4c', grade:'#c8b08a'},
+ {id:'marine',   name:'Marine Layer',   sky:['#c6d3db','#93b0c3','#5f89ab','#34608c'], sun:'#eef4f8', hemi:'#c2d4e0', ground:'#565a5c', grade:'#96b0c0'},
+ {id:'golden',   name:'Golden',         sky:['#f0d8b4','#a0c2e0','#5190d0','#1e5cb0'], sun:'#ffe2b8', hemi:'#d6dcea', ground:'#74644e', grade:'#e8c890'},
+ {id:'cold',     name:'Cold Front',     sky:['#d0e3f2','#82b8e8','#3f88d8','#1652b8'], sun:'#f4f8ff', hemi:'#c8dcf4', ground:'#585c64', grade:'#a8c8e8'},
 ];
 //  Night: up-facing surfaces (streets, roofs, shoulders) take sodium orange from
 //  above; walls and undersides fall to teal. That split is the sodium-noir look,
@@ -73,7 +76,7 @@ function retintSky(){
   if (!Grit.enabled){ b.c = o.slice(); return; }
   const h = b.h;
   //  Full daylight 7.5 to 17.5, half at sunrise and sunset, sodium at night.
-  const dayW = h >= 7.5 && h <= 17.5 ? 0.82 : (h >= 6.2 && h <= 18.8) ? 0.45 : 0;
+  const dayW = h >= 7.5 && h <= 17.5 ? 0.6 : (h >= 6.2 && h <= 18.8) ? 0.3 : 0;
   const nightW = h <= 4.0 || h >= 21.5 ? 0.7 : (h >= 20 || h <= 5) ? 0.45 : 0;
   b.c = o.map((col, k) => {
    let out = col;
@@ -259,7 +262,10 @@ function frame(hour){
    ? 'radial-gradient(ellipse at 50% 120%, rgba(255,140,50,.55), transparent 60%), linear-gradient(180deg, rgba(30,90,110,.55), rgba(20,40,60,.25))'
    : `radial-gradient(ellipse at 50% -20%, ${Grit.hue.grade}, transparent 75%), linear-gradient(180deg, ${Grit.hue.grade}aa, ${Grit.hue.grade}33 55%, rgba(30,24,20,.5))`;
  }
- overlay.style.opacity = on ? String(0.46 + 0.18 * night) : '0';
+ //  0.89: the grade lives in the composite now (real-light.js); this film
+ //  only returns if Real Light is switched off.
+ const film = on && !(window.FCRealLight && FCRealLight.enabled);
+ overlay.style.opacity = film ? String(0.46 + 0.18 * night) : '0';
  if (State.renderer && !State.renderer.domElement.classList.contains('grit-main')) State.renderer.domElement.classList.add('grit-main');
  document.body.classList.toggle('grit-contrast', on && !!window.HD && HD.tier !== 'perf');
 }
@@ -278,10 +284,10 @@ function tintSky(){
  if (!Grit.enabled) return;
  const hour = ((State.dayTime || 0) / 60) % 24, day = dayFactor(hour);
  if (day < 0.02) return;
- const w = 0.42 * day, target = TMP.set(Grit.hue.sky[1]);
+ const w = 0.2 * day, target = TMP.set(Grit.hue.sky[1]);
  const col = State.sky?.geometry?.attributes?.color;
  if (col){ const a = col.array; for (let i = 0; i < a.length; i += 3){ a[i] += (target.r - a[i]) * w; a[i+1] += (target.g - a[i+1]) * w; a[i+2] += (target.b - a[i+2]) * w; } col.needsUpdate = true; }
- if (State.scene?.fog) State.scene.fog.color.lerp(TMP.set(Grit.hue.sky[0]), 0.5 * day);
+ if (State.scene?.fog) State.scene.fog.color.lerp(TMP.set(Grit.hue.sky[0]), 0.35 * day);
 }
 if (typeof updateDayNight === 'function'){
  const origDay = updateDayNight;
