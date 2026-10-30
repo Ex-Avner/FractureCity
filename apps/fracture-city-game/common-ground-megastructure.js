@@ -10,7 +10,7 @@ const PLAN=Object.freeze({version:2,name:'The Lantern Hall',floor:1,roof:193,
  publicLevels:[1,7],overlook:{x0:140,x1:146,z0:42,z1:62,y:7},
  stair:{x0:140,x1:144,z0:30,z1:42,rise:.25,going:.5,steps:24},
  protectedPlots:{x0:192,x1:288,z0:48,z1:120}});
-let root=null,scene=null,resources=[],seed=401,lightRig=null,floorAt=-Infinity;
+let root=null,scene=null,resources=[],seed=401,lightRig=null,floorAt=-Infinity,blend=0;
 const floorPose=new THREE.Object3D();
 const batches=new Map(),mats={},solids=[],fogColor=new THREE.Color(0x24383e);
 const arches=[[-2,98],[22,126],[46,158],[72,192]];
@@ -129,7 +129,7 @@ function court(){
  box('arrival','basalt',167,9.4,22,44,1.2,8);
  for(const x of [146,188]){box('arrival','concrete',x,5,22,2,8,2);box('arrival','bronze',x-.65,5,20.98,.08,7,.08);}
  for(let x=148;x<188;x+=2){box('arrival','metal',x,8.55,22,.12,.4,7);box('arrival','glow',x,8.62,25.7,1.3,.04,.12);}
- lettering('F R A C T U R E C I T Y','COMMON GROUND  /  YOUR STORY STARTS HERE',167,7.8,25.99,20,1.5,Math.PI);
+ lettering('F R A C T U R E   C I T Y','COMMON GROUND  /  YOUR STORY STARTS HERE',167,7.8,25.99,20,1.5,Math.PI);
  // A ceremonial rear portal surrounds the existing gallery rather than replacing its content.
  for(const x of [149,189]){box('gallery','concrete',x,6.5,67,1.6,11,2);box('gallery','bronze',x-.55,6.5,65.98,.08,10,.06);}
  box('gallery','basalt',169,12.2,67,42,1.4,4);
@@ -184,11 +184,15 @@ function build(){
   if(key==='floor:basalt'||key==='floor:stone')m.userData.hallFloor=rows;
   m.instanceMatrix.needsUpdate=true;if(m.computeBoundingSphere)m.computeBoundingSphere();else m.frustumCulled=false;root.add(m);instances+=rows.length;
  }batches.clear();
- const hemi=new THREE.HemisphereLight(0xb9d6dc,0x263337,.38);root.add(hemi);
- const lamps=[];for(const [x,y,z,c,intensity,d]of [[167,20,48,0xffd29a,2.4,65],[167,7,25,0xffdfb4,1.4,28],[144,12,48,0x8ebfc6,1.2,40]]){const l=new THREE.PointLight(c,intensity,d,1.4);l.position.set(x,y,z);l.castShadow=false;root.add(l);lamps.push(l)}
- lightRig={hemi,lamps};API.stats={instances,batches:root.children.filter(o=>o.isInstancedMesh).length,lights:4,colliders:solids.length};
+ // The hall's lights live outside root and are never hidden: changing how many
+ // lights the scene has makes three rebuild every lit shader (~30 programs, a
+ // visible hitch at the hall's edge). They fade to zero intensity instead.
+ const rig=new THREE.Group();rig.name='common-ground-megastructure-lights';scene.add(rig);
+ const hemi=new THREE.HemisphereLight(0xb9d6dc,0x263337,0);rig.add(hemi);
+ const lamps=[];for(const [x,y,z,c,intensity,d]of [[167,20,48,0xffd29a,2.4,65],[167,7,25,0xffdfb4,1.4,28],[144,12,48,0x8ebfc6,1.2,40]]){const l=new THREE.PointLight(c,0,d,1.4);l.position.set(x,y,z);l.castShadow=false;rig.add(l);lamps.push(l)}
+ lightRig={hemi,lamps,rig};API.stats={instances,batches:root.children.filter(o=>o.isInstancedMesh).length,lights:4,colliders:solids.length};
 }
-function dispose(){root?.traverse(o=>{if(o.isInstancedMesh)o.dispose?.()});root?.removeFromParent();for(const r of new Set(resources))r.dispose?.();resources=[];batches.clear();for(const k of Object.keys(mats))delete mats[k];scene=null;root=null;lightRig=null;floorAt=-Infinity;}
+function dispose(){root?.traverse(o=>{if(o.isInstancedMesh)o.dispose?.()});root?.removeFromParent();lightRig?.rig.removeFromParent();for(const r of new Set(resources))r.dispose?.();resources=[];batches.clear();for(const k of Object.keys(mats))delete mats[k];scene=null;root=null;lightRig=null;floorAt=-Infinity;}
 function refreshFloor(){
  if(!root)return;for(const m of root.children){const rows=m.userData.hallFloor;if(!rows)continue;
  rows.forEach((r,i)=>{const ok=[[-.5,-.5],[-.5,.5],[.5,-.5],[.5,.5]].every(([dx,dz])=>isSolid(getBlock(Math.floor(r.p[0]+dx),0,Math.floor(r.p[2]+dz))));floorPose.position.fromArray(r.p);floorPose.rotation.set(0,0,0);floorPose.scale.fromArray(ok?r.s:[0,0,0]);floorPose.updateMatrix();m.setMatrixAt(i,floorPose.matrix)});m.instanceMatrix.needsUpdate=true;
@@ -198,11 +202,20 @@ function update(){
  if(!State.scene)return;if(scene!==State.scene){dispose();scene=State.scene;seed=401;build()}
  if(performance.now()-floorAt>500){refreshFloor();floorAt=performance.now();}
  const p=Player.position,dx=Math.abs(p.x-179),dz=Math.abs(p.z-36);root.visible=dx<190&&dz<170;
- const blend=Math.max(0,Math.min(1,(47-dx)/8,(46-dz)/10));
- if(blend&&State.scene.fog&&'density'in State.scene.fog){State.scene.fog.density=THREE.MathUtils.lerp(State.scene.fog.density,.0030,blend);State.scene.fog.color.lerp(fogColor,blend*.92);}
+ blend=Math.max(0,Math.min(1,(47-dx)/8,(46-dz)/10));
+ // Fog is applied through Real Light's zone hook (below), so the look table,
+ // which runs after this, does not erase it.
+ if(!window.FCRealLight&&blend)hallAir({fog:State.scene.fog});
  // Light sources fade outside the architectural room; static luminous trim remains.
  if(lightRig){lightRig.hemi.intensity=.38*blend;for(let i=0;i<3;i++)lightRig.lamps[i].intensity=[2.4,1.4,1.2][i]*blend;}
 }
-const API=window.FCCommonGroundMega={plan:PLAN,solids,stats:{},update,dispose,refreshFloor,get root(){return root;}};
+// An interior: the hall's own air, and the sun mostly kept out by the vault.
+function hallAir(c){
+ if(!blend)return;
+ if(c.fog&&'density'in c.fog){c.fog.density=THREE.MathUtils.lerp(c.fog.density,.0030,blend);c.fog.color.lerp(fogColor,blend*.92);}
+ if(c.sun)c.sun.intensity*=1-.8*blend;
+}
+if(window.FCRealLight)FCRealLight.zones.push(hallAir);
+const API=window.FCCommonGroundMega={plan:PLAN,solids,stats:{},update,dispose,refreshFloor,get root(){return root;},get blend(){return blend;},get lights(){return lightRig;}};
 const day=window.updateDayNight;if(typeof day==='function')window.updateDayNight=function(){const r=day.apply(this,arguments);update();return r};
 })();

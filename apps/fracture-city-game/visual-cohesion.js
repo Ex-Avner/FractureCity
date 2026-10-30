@@ -153,22 +153,10 @@
     }
     col.needsUpdate=true;SKY.horizon=band[0].clone();
   };
-  const light=shApplyLighting;
-  window.shApplyLighting=function(hour){
-    const r=light.apply(this,arguments);if(!State.hemi)return r;
-    const day=Math.min(shRamp(hour,5,8),1-shRamp(hour,17.5,20));
-    State.hemi.color.setHex(0xa0b3c5);State.hemi.groundColor.setHex(P.shadow);
-    State.ambient.color.setHex(P.bureau);State.ambient.intensity=(.42+day*.3)*LOOK.exposure;
-    State.neonFillA.color.setHex(P.sodium);State.neonFillA.intensity=(1-day)*.22;
-    State.neonFillB.color.setHex(P.districts.FLOOD.sign);State.neonFillB.intensity=(1-day)*.12;
-    if(State.rimLight)State.rimLight.color.setHex(P.bureau);
-    return r;
-  };
   const skyFrame=shSkyFrame;
   window.shSkyFrame=function(dt){
     const r=skyFrame.apply(this,arguments),h=(State.dayTime/60)%24;
     for(const cloud of SKY.clouds)cloud.mesh.material.color.setHex(h>=20||h<6 ? P.shadow : P.sodium);
-    if(State.renderer){State.renderer.toneMapping=THREE.ACESFilmicToneMapping;State.renderer.toneMappingExposure=1.22*LOOK.exposure;}
     return r;
   };
   const sign=shSignTexture;

@@ -34,7 +34,7 @@ function screenArt(g){
 
 function build(chunk,g){
  const root=new THREE.Group();root.name=g.name;root.position.set(g.x,Y,g.z);root.rotation.y=g.face;chunk.group.add(root);
- const dark=new THREE.MeshStandardMaterial({color:0x1d2633,roughness:.5,metalness:.4}),trim=new THREE.MeshStandardMaterial({color:g.color,roughness:.4,metalness:.45,emissive:g.color,emissiveIntensity:.08}),glow=new THREE.MeshBasicMaterial({color:g.color});
+ const dark=new THREE.MeshStandardMaterial({color:0x1d2633,roughness:.5,metalness:.4}),trim=new THREE.MeshStandardMaterial({color:new THREE.Color(g.color).multiplyScalar(.42),roughness:.3,metalness:.22,emissive:g.color,emissiveIntensity:.025}),glow=new THREE.MeshBasicMaterial({color:g.color});
  const box=(w,h,d,x,y,z,m=dark)=>{const mesh=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),m);mesh.position.set(x,y,z);root.add(mesh);return mesh};
  box(1.45,.16,1.25,0,.08,0);box(1.2,1.15,.85,0,.72,0);box(1.22,1.05,.6,0,1.73,-.13);box(1.35,.3,.85,0,2.35,0);
  for(const x of [-.63,.63]){box(.07,2.35,.82,x,1.25,0,trim);box(.025,1.85,.025,x,1.3,.43,glow)}

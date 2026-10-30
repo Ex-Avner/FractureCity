@@ -1394,7 +1394,7 @@ body.in-intro #hud-peace{opacity:0;}
 </div>
 
 <script src="../../shared/vendor/three.min.js"></script>
-<script src="real-light.js?v=0.89.0"></script>
+<script src="real-light.js?v=0.90.0"></script>
 <script src="campaign-guide.js?v=0.55.0"></script>
 <script src="city-rounded.js?v=0.55.0"></script>
 <script src="city-grounding.js?v=0.74.0"></script>
@@ -4386,12 +4386,7 @@ function updateDayNight(dt){
     Math.sin(sunAngle) * 80 + 5,
     Math.sin(sunAngle * 0.3) * 30,
   );
-  // Sun color shifts with time
-  if (hour < 7) State.sunLight.color.setHex(0xff8060);
-  else if (hour < 9) State.sunLight.color.setHex(0xffd078);
-  else if (hour < 17) State.sunLight.color.setHex(0xffe8c0);
-  else if (hour < 19) State.sunLight.color.setHex(0xff8050);
-  else State.sunLight.color.setHex(0x4060a0);
+  // Sun colour: the look table in real-light.js.
 
   // Stars visible at night, fade in dusk
   const starOpacity = hour > 20 || hour < 5 ? 0.85
@@ -7517,32 +7512,11 @@ function shBuildLightRig(){
 // Smooth 0→1 ramp, so dawn and dusk are transitions rather than light switches.
 function shRamp(v, a, b){ return Math.max(0, Math.min(1, (v - a) / (b - a))); }
 
+//  0.90: every light, the fog and the exposure are set in one place, the look
+//  table in real-light.js. This stays as the name the rest of the game calls.
 function shApplyLighting(hour){
   if (!State.hemi) return;
-  const E = LOOK.exposure;
-
-  // Daylight factor: up through 5→7.5, down through 17.5→20.
-  const day = Math.min(shRamp(hour, 5.0, 7.5), 1 - shRamp(hour, 17.5, 20.0));
-  const night = 1 - day;
-
-  // Hemisphere — bright cool sky by day, dim violet civic glow by night.
-  State.hemi.intensity = (0.34 + day * 0.86) * E;
-  State.hemi.color.setHex(day > 0.5 ? 0x9fc4ff : 0x5a4a92);
-  State.hemi.groundColor.setHex(day > 0.5 ? 0x6a5a62 : 0x3b2a48);
-
-  // Ambient floor — this is the number that was frozen at 0.35 forever.
-  State.ambient.intensity = (0.30 + day * 0.42) * E;
-  State.ambient.color.setHex(day > 0.5 ? 0xc8d4ff : 0x6a5aa8);
-
-  // Sun ramps instead of snapping between 1.0 and 0.05.
-  State.sunLight.intensity = (0.12 + day * 0.95) * E;
-
-  // Neon fills rise as the sun sets — the signage lights the street.
-  State.neonFillA.intensity = night * 0.30 * E;
-  State.neonFillB.intensity = night * 0.26 * E;
-
-  // Thinner fog than the original 0.008, which was swallowing the skyline.
-  if (State.scene.fog) State.scene.fog.density = 0.0052 - day * 0.0016;
+  if (window.FCRealLight && FCRealLight.look) FCRealLight.look(hour);
 }
 
 function shSetExposure(delta){
@@ -17879,15 +17853,6 @@ function shApplyNoir(){
   rim.position.set(-0.6, 0.35, -1);
   State.scene.add(rim);
   State.rimLight = rim;
-
-  //  A touch darker than before, since the highlights can now be trusted to
-  //  carry the image — but only a touch.
-  if (State.ambient) State.ambient.intensity = 0.30;
-  if (State.hemi){
-    State.hemi.intensity = 0.78;
-    State.hemi.color.setHex(0x8aa8e6);
-    State.hemi.groundColor.setHex(0x3a2a46);
-  }
 }
 
 //  Fog that knows what time it is. One flat grey at every hour was doing a lot
@@ -19841,23 +19806,7 @@ function shSkyFrame(dt){
     m.opacity += (want - m.opacity) * Math.min(1, dt * 1.5);
   }
 
-  //  Fog takes the horizon's colour, so the far end of a street is the sky.
-  if (State.scene.fog && SKY.horizon){
-    State.scene.fog.color.copy(SKY.horizon);
-    //  Clear days see further. This is most of "lit up": the old fog was a
-    //  flat 0.0052 at noon and you could not see the other side of a district.
-    const base = 0.0026 + night * 0.0026;
-    State.scene.fog.density = base * (1 + SKY.cover * 0.55);
-  }
-
-  //  And the grade opens up in daylight instead of closing down. The noir pass
-  //  had this the wrong way round — it was brighter at midnight than at noon.
-  if (State.renderer && typeof NOIR !== 'undefined'){
-    const want = 1.16 + day * 0.13 - SKY.cover * 0.06;
-    State.renderer.toneMappingExposure +=
-      (want * (typeof LOOK !== 'undefined' ? LOOK.exposure : 1) - State.renderer.toneMappingExposure)
-      * Math.min(1, dt * 2.2);
-  }
+  //  Fog and exposure: the look table in real-light.js.
 }
 
 // ─── Wiring ─────────────────────────────────────────────────────────────────
@@ -19877,31 +19826,6 @@ function shSkyFrame(dt){
     const r = origDay.apply(this, arguments);
     try { shSkyFrame(dt || 0.016); }
     catch (e){ if (!shSkyFrame._warned){ shSkyFrame._warned = 1; console.error('sky frame:', e); } }
-    return r;
-  };
-
-  //  Daylight was being lit as if it were dusk. These are the same lights, run
-  //  harder while the sun is up and tinted toward the sky rather than away
-  //  from it.
-  const origLight = shApplyLighting;
-  window.shApplyLighting = function(hour){
-    const r = origLight.apply(this, arguments);
-    try {
-      const E = (typeof LOOK !== 'undefined' ? LOOK.exposure : 1);
-      const day = Math.min(shRamp(hour, 4.6, 7.4), 1 - shRamp(hour, 17.4, 20.2));
-      const clear = 1 - SKY.cover * 0.45;
-      if (State.hemi){
-        State.hemi.intensity = (0.42 + day * 1.25 * clear) * E;
-        State.hemi.color.setHex(day > 0.45 ? 0xbcd8ff : 0x6d7ec0);
-        State.hemi.groundColor.setHex(day > 0.45 ? 0x7d8496 : 0x2f3358);
-      }
-      if (State.ambient){
-        State.ambient.intensity = (0.34 + day * 0.60) * E;
-        State.ambient.color.setHex(day > 0.45 ? 0xd6e6ff : 0x7386c8);
-      }
-      if (State.sunLight) State.sunLight.intensity = (0.10 + day * 1.30 * clear) * E;
-      if (State.rimLight) State.rimLight.intensity = 0.30 + (1 - day) * 0.34;
-    } catch (e){}
     return r;
   };
 
@@ -28886,7 +28810,6 @@ const _hdApplyLighting = shApplyLighting;
 window.shApplyLighting = function(hour){
   const r = _hdApplyLighting.apply(this, arguments);
   try {
-    if (State.scene && State.scene.fog) State.scene.fog.density *= HD.T.fog;
     if (State.camera && State.camera.far !== HD.T.far){
       State.camera.far = HD.T.far;
       State.camera.updateProjectionMatrix();
@@ -30011,7 +29934,7 @@ document.addEventListener('DOMContentLoaded', init);
 </script>
 <script src="front-menu.js?v=0.59.0"></script>
 <script src="first-night.js?v=0.85.0"></script>
-<script src="visual-cohesion.js?v=0.55.0"></script>
+<script src="visual-cohesion.js?v=0.90.0"></script>
 <script src="city-media.js?v=0.55.0"></script>
 <script src="quiet-interface.js?v=0.82.0"></script>
 <script src="resident-head.js?v=0.55.0"></script>
@@ -30061,7 +29984,7 @@ document.addEventListener('DOMContentLoaded', init);
 <script src="city-flow.js?v=0.70.0"></script>
 <script src="online-tour.js?v=0.75.0"></script>
 <script src="world-materials.js?v=0.66.0"></script>
-<script src="sodium-noir.js?v=0.89.0"></script>
+<script src="sodium-noir.js?v=0.90.0"></script>
 <script src="npc-voices.js?v=0.82.0"></script>
 <script src="city-wildlife.js?v=0.65.0"></script>
 <script src="the-seam.js?v=0.70.0"></script>
@@ -30072,7 +29995,7 @@ document.addEventListener('DOMContentLoaded', init);
 <script src="common-challenge.js?v=0.75.0"></script>
 <script src="future-city.js?v=0.74.0"></script>
 <script src="texture-pack.js?v=0.76.0"></script>
-<script src="campus-arcades.js?v=0.87.0"></script>
+<script src="campus-arcades.js?v=0.90.0"></script>
 <script src="build-dock.js?v=0.79.0"></script>
 <script src="inventory.js?v=0.87.0"></script>
 <script src="city-pvp.js?v=0.85.0"></script>
@@ -30084,6 +30007,6 @@ document.addEventListener('DOMContentLoaded', init);
 <script src="social-hub.js?v=0.83.0"></script>
 <script src="phone-hud.js?v=0.85.0"></script>
 <script src="soundstage.js?v=0.88.0"></script>
-<script src="common-ground-megastructure.js?v=2.0.0"></script>
+<script src="common-ground-megastructure.js?v=2.1.0"></script>
 </body>
 </html>

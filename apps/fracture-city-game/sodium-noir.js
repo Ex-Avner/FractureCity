@@ -90,29 +90,8 @@ function retintSky(){
 // ─── Lights ────────────────────────────────────────────────────────────────
 const TMP = new THREE.Color();
 function dayFactor(hour){ return typeof shRamp === 'function' ? Math.min(shRamp(hour, 4.6, 7.4), 1 - shRamp(hour, 17.4, 20.2)) : 1; }
-function grade(hour){
- if (!Grit.enabled) return;
- const day = dayFactor(hour), night = 1 - day, h = Grit.hue;
- if (State.hemi){
-  //  Coloured sky against warm ground: that difference is what gives shapes
-  //  their depth. Brighter overall, so "noir" never means "can't see".
-  State.hemi.color.lerp(TMP.set(h.hemi), 0.42 * day).lerp(TMP.set(NIGHT.hemi), 0.7 * night);
-  State.hemi.groundColor.lerp(TMP.set(h.ground), 0.32 * day).lerp(TMP.set(NIGHT.ground), 0.85 * night);
-  //  Well lit at night: the city glows back at the sky.
-  State.hemi.intensity *= 1.0 + 0.85 * night;
-  if (night > 0.5) State.hemi.intensity = Math.max(State.hemi.intensity, 1.3 * (typeof LOOK !== 'undefined' ? LOOK.exposure : 1));
- }
- if (State.ambient){
-  //  Less flat fill, so faces turned from the light actually turn darker.
-  State.ambient.intensity *= 0.82 + 0.3 * night;
-  State.ambient.color.lerp(TMP.set(h.hemi), 0.32 * day).lerp(TMP.set(NIGHT.amb), 0.7 * night);
- }
- if (State.sunLight){
-  State.sunLight.color.lerp(TMP.set(h.sun), 0.32 * day);
-  State.sunLight.intensity *= 1.0 + 0.12 * day;
- }
- if (State.neonFillA) State.neonFillA.intensity *= 1.25;
-}
+//  0.90: lights, fog and exposure are set by the look table in real-light.js,
+//  which reads Grit.hue for the day's weather.
 
 // ─── Lamp pools, haze and sheen ────────────────────────────────────────────
 function canvasTex(w, h, paint){ const c = document.createElement('canvas'); c.width = w; c.height = h; paint(c.getContext('2d'), w, h); const t = new THREE.CanvasTexture(c); t.encoding = THREE.sRGBEncoding; return t; }
@@ -274,7 +253,7 @@ if (typeof shApplyLighting === 'function'){
  const origLight = shApplyLighting;
  window.shApplyLighting = function(hour){
   const r = origLight.apply(this, arguments);
-  try { grade(hour); frame(hour); } catch (e){ if (!Grit._warned){ Grit._warned = 1; console.warn('[grit]', e); } }
+  try { frame(hour); } catch (e){ if (!Grit._warned){ Grit._warned = 1; console.warn('[grit]', e); } }
   return r;
  };
 }
@@ -287,7 +266,6 @@ function tintSky(){
  const w = 0.2 * day, target = TMP.set(Grit.hue.sky[1]);
  const col = State.sky?.geometry?.attributes?.color;
  if (col){ const a = col.array; for (let i = 0; i < a.length; i += 3){ a[i] += (target.r - a[i]) * w; a[i+1] += (target.g - a[i+1]) * w; a[i+2] += (target.b - a[i+2]) * w; } col.needsUpdate = true; }
- if (State.scene?.fog) State.scene.fog.color.lerp(TMP.set(Grit.hue.sky[0]), 0.35 * day);
 }
 if (typeof updateDayNight === 'function'){
  const origDay = updateDayNight;

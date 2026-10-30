@@ -32,7 +32,7 @@
 if (typeof THREE === 'undefined') return;
 
 const RL = window.FCRealLight = {
- enabled: true, fogPatched: false, skyline: null, towers: 0, trees: 0,
+ enabled: true, zones: [], fogPatched: false, skyline: null, towers: 0, trees: 0,
  haze: { falloff: 0.05, amount: 0.55 },
 };
 try { if (localStorage.getItem('fc-real-light') === 'off') RL.enabled = false; } catch (e){}
@@ -248,23 +248,76 @@ function oldHorizon(visible){
  for (const g of [State.skyline, State.farSkyline]) if (g) for (const c of g.children) c.visible = visible;
 }
 
-// ─── 3. Light with a direction ─────────────────────────────────────────────
-function relight(hour){
- if (!RL.enabled || !State.sunLight) return;
- const day = dayOf(hour);
- //  Lower sun at the ends of the day is warmer and, relative to the fill,
- //  stronger: the golden hour is contrast as much as colour.
- const golden = day * Math.max(ramp(hour, 15.5, 18), 1 - ramp(hour, 6.5, 9));
- State.sunLight.intensity *= 1 + 0.42 * day;
- State.sunLight.color.lerp(TMP.setHex(0xffd7a8), 0.35 * golden).lerp(TMP.setHex(0xfff3e2), 0.25 * (day - golden) * (1 - golden));
- if (State.hemi){
-  State.hemi.intensity *= 1 - 0.16 * day;
-  //  A real sky is blue overhead and the ground bounces warm grey.
-  State.hemi.color.lerp(TMP.setHex(0xa9c6ea), 0.45 * day);
-  State.hemi.groundColor.lerp(TMP.setHex(0x6b6258), 0.4 * day);
+// ─── 3. The look table: the one place light, fog and exposure are set ──────
+//  Until 0.90 six passes wrote these numbers every frame, each scaling or
+//  overwriting the last: the base rig, the sky's daylight pass, the visual
+//  cohesion palette, the HD fog multiplier, the sodium grade and this file.
+//  Half the writes were dead (the HD fog multiplier was overwritten by the sky
+//  pass a few lines later; the sky's exposure easing by the palette pass), and
+//  no single file could tell you what the noon sun actually was. Now this
+//  function sets every value absolutely, from the clock, the weather cover,
+//  the day's weather hue, the tier and the player's brightness setting. The
+//  older passes no longer touch lights, fog or exposure.
+const C = {
+ sunHigh: 0xfff1de, sunLow: 0xffb27a, moon: 0x8ea6d8,
+ hemiDay: 0xa9c6ea, groundDay: 0x6b6258, hemiNight: 0xcf9a5e, groundNight: 0x24525c,
+ ambDay: 0xc8d2dc, ambNight: 0x2c6a74,
+ rimDay: 0x9fb8d8, rimNight: 0x4f8fa8,
+ neonA: 0xffa040, neonB: 0x6fd6e0,
+};
+const LT = new THREE.Color(), LT2 = new THREE.Color(), V3 = new THREE.Vector3();
+function look(hour){
+ if (!State.sunLight || !State.hemi) return;
+ const day = dayOf(hour), night = 1 - day;
+ const cover = (typeof SKY !== 'undefined' && SKY.cover != null) ? SKY.cover : 0.4, clear = 1 - cover * 0.45;
+ const E = (typeof LOOK !== 'undefined' ? LOOK.exposure : 1);
+ const G = window.Grit, hue = G && G.enabled ? G.hue : null;
+ const sd = (typeof SKY !== 'undefined' && SKY.sunDir) ? SKY.sunDir : { x: 0.3, y: 0.8, z: 0.2 };
+ const md = (typeof SKY !== 'undefined' && SKY.moonDir) ? SKY.moonDir : { x: -0.3, y: 0.6, z: -0.2 };
+ //  Sun by day, moon by night: the key light comes from whichever is up, so
+ //  nothing is ever lit from under the street.
+ const up = sd.y > -0.02, dir = up ? sd : md;
+ State.sunLight.position.set(dir.x * 120, Math.max(0.08, dir.y) * 120, dir.z * 120);
+ const elev = Math.max(0, Math.min(1, sd.y * 2.2));
+ State.sunLight.intensity = (0.16 + 2.0 * day * clear) * E;
+ if (up) LT.setHex(C.sunLow).lerp(LT2.setHex(C.sunHigh), elev); else LT.setHex(C.moon);
+ if (hue && up) LT.lerp(LT2.set(hue.sun), 0.3 * day);
+ State.sunLight.color.copy(LT);
+ //  Sky fill: blue overhead by day; at night sodium from above, teal below.
+ State.hemi.intensity = ((0.35 + 1.05 * clear) * day + 1.3 * night) * E;
+ LT.setHex(C.hemiDay); if (hue) LT.lerp(LT2.set(hue.hemi), 0.3);
+ State.hemi.color.copy(LT).lerp(LT2.setHex(C.hemiNight), night);
+ LT.setHex(C.groundDay); if (hue) LT.lerp(LT2.set(hue.ground), 0.3);
+ State.hemi.groundColor.copy(LT).lerp(LT2.setHex(C.groundNight), night);
+ if (State.ambient){
+  State.ambient.intensity = (0.37 * day + 0.47 * night) * E;
+  State.ambient.color.setHex(C.ambDay).lerp(LT2.setHex(C.ambNight), night);
  }
- if (State.ambient) State.ambient.intensity *= 1 - 0.38 * day;
+ if (State.rimLight){ State.rimLight.intensity = 0.30 + 0.34 * night; State.rimLight.color.setHex(C.rimDay).lerp(LT2.setHex(C.rimNight), night); }
+ if (State.neonFillA){ State.neonFillA.intensity = 0.22 * night * E; State.neonFillA.color.setHex(C.neonA); }
+ if (State.neonFillB){ State.neonFillB.intensity = 0.12 * night * E; State.neonFillB.color.setHex(C.neonB); }
+ //  Fog is the horizon's colour, leaning toward the day's weather, and thins
+ //  on tiers that see further (normalised so HIGH is the tuned reference).
+ const fog = State.scene && State.scene.fog;
+ if (fog){
+  if (typeof SKY !== 'undefined' && SKY.horizon) fog.color.copy(SKY.horizon);
+  if (hue) fog.color.lerp(LT2.set(hue.sky[0]), 0.35 * day);
+  const tier = window.HD && HD.T ? HD.T.fog / 0.74 : 1;
+  fog.density = (0.0026 + 0.0026 * night) * (1 + cover * 0.55) * tier;
+ }
+ //  Zones: an authored place (the Lantern Hall) can claim the air and the
+ //  light while the player is inside it. They run last, inside this table,
+ //  so nothing downstream overwrites them.
+ for (const z of RL.zones){ try { z({ fog, sun: State.sunLight, hemi: State.hemi, ambient: State.ambient, day, night }); } catch (e){} }
+ if (State.renderer){
+  //  First Night's quiet minute dims the whole city for one beat.
+  const quiet = (typeof Campaign !== 'undefined' && Campaign._quietExposure != null) ? 0.72 : 1;
+  State.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  State.renderer.toneMappingExposure = 1.22 * E * quiet;
+ }
+ RL.last = { hour, day, cover, sun: State.sunLight.intensity, hemi: State.hemi.intensity, fog: fog ? fog.density : 0, exposure: State.renderer ? State.renderer.toneMappingExposure : 0 };
 }
+RL.look = look;
 
 // ─── 4. The grade ──────────────────────────────────────────────────────────
 const GRADE_FRAG = `
@@ -415,7 +468,7 @@ function leafMaterial(m){
  return out;
 }
 function isCrown(o){
- if (!o.isMesh || o.userData.rlTree || o.userData.rlSkip) return false;
+ if (!o.isMesh || o.isInstancedMesh || o.userData.rlTree || o.userData.rlSkip) return false;
  const g = o.geometry; if (!g || (g.type !== 'IcosahedronGeometry' && g.type !== 'DodecahedronGeometry')) return false;
  const m = o.material; if (!m || Array.isArray(m) || !m.color || m.transparent) return false;
  m.color.getHSL(HSL);
@@ -440,9 +493,79 @@ function treesRestore(){
  RL.trees = 0;
 }
 
+// ─── 6. Wear: surface detail for hand-built props ──────────────────────────
+//  Props built from plain boxes (the first-person weapons and hands, the
+//  arcade cabinets) had one flat colour per face. This adds object-space
+//  mottling to the colour and the roughness, so a gun reads as worn steel and
+//  a cabinet as lacquer with handling marks. Object space, so the pattern
+//  sticks to the prop as it moves; no UVs needed, which matters because the
+//  weapons are merged without them.
+const WEAR_GLSL = `
+ varying vec3 vWearP;
+ float wHash(vec3 p){ p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
+ float wNoise(vec3 x){ vec3 i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(mix(wHash(i), wHash(i + vec3(1,0,0)), f.x), mix(wHash(i + vec3(0,1,0)), wHash(i + vec3(1,1,0)), f.x), f.y),
+             mix(mix(wHash(i + vec3(0,0,1)), wHash(i + vec3(1,0,1)), f.x), mix(wHash(i + vec3(0,1,1)), wHash(i + vec3(1,1,1)), f.x), f.y), f.z); }`;
+function wear(m, scale, amount){
+ if (!m || m.userData.rlWear || !m.isMeshStandardMaterial) return;
+ m.userData.rlWear = true;
+ const prev = m.onBeforeCompile;
+ m.onBeforeCompile = function(sh, r){
+  if (prev) prev.call(this, sh, r);
+  sh.vertexShader = 'varying vec3 vWearP;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n vWearP = position;\n#ifdef USE_INSTANCING\n vWearP = (instanceMatrix * vec4(position, 1.0)).xyz;\n#endif');
+  sh.fragmentShader = WEAR_GLSL + '\n' + sh.fragmentShader
+   .replace('#include <color_fragment>', `#include <color_fragment>
+ float wN = wNoise(vWearP * ${scale.toFixed(1)}) * 0.6 + wNoise(vWearP * ${(scale * 3.7).toFixed(1)}) * 0.4;
+ diffuseColor.rgb *= 1.0 + (wN - 0.5) * ${(amount * 2).toFixed(3)};`)
+   .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
+ roughnessFactor = clamp(roughnessFactor + (wN - 0.5) * 0.3, 0.05, 1.0);`);
+ };
+ const key = m.customProgramCacheKey ? m.customProgramCacheKey.bind(m) : () => '';
+ m.customProgramCacheKey = () => key() + '|rlwear' + scale + ':' + amount;
+ m.needsUpdate = true;
+}
+RL.wear = wear;
+function wearSweep(){
+ if (!State.camera || !State.scene) return;
+ //  The first-person kit: worn metal and skin, and less of the self-glow
+ //  that made it read as a flat sticker against the street.
+ for (const c of State.camera.children){
+  if (c.name !== 'first-person-equipment') continue;
+  c.traverse(o => { if (!o.isMesh) return; const m = o.material; if (!m || m.userData.rlWear) return;
+   if (m.emissiveIntensity) m.emissiveIntensity *= 0.35;
+   wear(m, 34, m.metalness > 0.3 ? 0.16 : 0.08); });
+ }
+ State.scene.traverse(o => {
+  if (!o.isMesh || !o.parent || !/^campus-arcade-/.test(o.parent.name)) return;
+  wear(o.material, 9, 0.12);
+ });
+ //  Common Ground's stone, paving and bronze: weathering at two scales, a
+ //  metre-wide blotch and a hand-sized grain, so big plain slabs stop reading
+ //  as untextured cards.
+ State.scene.traverse(o => {
+  if (!o.isMesh || !/^common-ground-(stone|paving|pavingAlt|atrium|bronze|dark|wood)$/.test(o.name)) return;
+  const m = o.material; if (Array.isArray(m)) return;
+  wear(m, 0.9, /bronze|dark/.test(o.name) ? 0.1 : 0.14);
+ });
+}
+
+// ─── 7. One glass for the HUD's world prompts ──────────────────────────────
+//  Eight features each drew their own "press E" pill in their own colours,
+//  fonts and radii. They now share one dark glass, one type, one radius; each
+//  keeps a thin accent rule on the left so you can still tell them apart.
+const ui = document.createElement('style');
+ui.textContent = `:root{--ui-glass:#0f1820e6;--ui-line:#5d6d78;--ui-ink:#eef2f3}
+#cg-approach,#news-approach,#rw-approach,#seam-approach,#casting-prompt,#npc-talk-prompt,#city-art-open,#common-invite,#common-later{background:var(--ui-glass)!important;color:var(--ui-ink)!important;border:1px solid var(--ui-line)!important;border-radius:22px!important;font:600 14px/1.3 system-ui,sans-serif!important;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);box-shadow:0 6px 18px #0006!important}
+#cg-approach{border-left:3px solid #e7bd78!important}#news-approach{border-left:3px solid #afd9c7!important}#rw-approach{border-left:3px solid #c9a85a!important}#seam-approach{border-left:3px solid #9ff3ff!important}
+#casting-prompt{border-left:3px solid #00e5ff!important}#npc-talk-prompt{border-left:3px solid #ff2e88!important}#city-art-open{border-left:3px solid #9dbf96!important}
+#npc-quest,#seam-hud{background:var(--ui-glass)!important;border-color:var(--ui-line)!important;color:var(--ui-ink)!important;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+#npc-quest{border-left:3px solid #ffe500!important}`;
+document.head.append(ui);
+
 // ─── Wiring ────────────────────────────────────────────────────────────────
 function frame(){
  const hour = hourNow(), day = dayOf(hour), night = 1 - day;
+ look(hour);
  installGrade();
  if (RL.enabled){
   buildSkyline(); oldHorizon(false);
@@ -464,15 +587,11 @@ function frame(){
  gradeFrame(hour);
  document.body.classList.toggle('rl-css-vig', RL.enabled && !!window.HD && !HD.bloomOn);
 }
-if (typeof shApplyLighting === 'function'){
- const orig = window.shApplyLighting;
- window.shApplyLighting = function(hour){ const r = orig.apply(this, arguments); try { relight(hour); } catch (e){ if (!RL._w1){ RL._w1 = 1; console.warn('[real-light]', e); } } return r; };
-}
 if (typeof updateDayNight === 'function'){
  const orig = window.updateDayNight;
  window.updateDayNight = function(){ const r = orig.apply(this, arguments); try { frame(); } catch (e){ if (!RL._w2){ RL._w2 = 1; console.warn('[real-light]', e); } } return r; };
 }
-setInterval(() => { try { treeSweep(); } catch (e){} }, 2000);
+setInterval(() => { try { treeSweep(); } catch (e){} try { wearSweep(); } catch (e){} }, 2000);
 
 RL.set = function(on){
  RL.enabled = !!on;
