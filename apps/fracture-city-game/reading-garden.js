@@ -198,9 +198,9 @@ function plaqueTexture(line){
 }
 function titleTexture(){
  return canvasTex(1600, 220, (g, w, h) => {
-  g.fillStyle = '#1b2a26'; g.fillRect(0, 0, w, h);
-  g.strokeStyle = '#c9a85a'; g.lineWidth = 4; g.strokeRect(10, 10, w - 20, h - 20);
-  g.fillStyle = '#f1e2b0'; g.textAlign = 'center'; g.font = '600 92px Georgia, serif'; g.fillText('THE READING WALL', w / 2, 118);
+  g.clearRect(0, 0, w, h);
+  g.strokeStyle = '#c9a85a'; g.lineWidth = 2; g.beginPath();g.moveTo(400,200);g.lineTo(1200,200);g.stroke();
+  g.fillStyle = '#f1e2b0'; g.textAlign = 'center'; g.font = '500 76px Georgia, serif'; g.fillText('THE READING WALL', w / 2, 118);
   g.fillStyle = '#b8d8c4'; g.font = '30px Georgia, serif';
   const n = shelfBooks().length;
   g.fillText((n ? n + ' CLASSICS ON THE SHELF' : 'THE CLASSICS') + (online() ? '  ◆  75,000 MORE IN THE ONLINE LIBRARY' : '  ◆  PUBLIC DOMAIN, FREE TO READ'), w / 2, 176);
@@ -226,11 +226,11 @@ function build(){
  for (const z of [WALL.z - .06]) for (let k = 0; k <= 4; k++) box(root, W, .06, .12, mat('board', () => new THREE.MeshLambertMaterial({ color: 0x334854 })), (WALL.x0 + WALL.x1) / 2, midY - H / 2 + k * H / 4, z);
  //  The plaque with today's passage, in a brass frame, lit from below.
  const pl = new THREE.Group(); pl.position.set(CX, 2.9, WALL.z - .14); root.add(pl);
- box(pl, 5.6, 2.2, .1, mat('brass', () => new THREE.MeshLambertMaterial({ color: 0x779aab })), 0, 0, .03);
+ box(pl, 5.6, 2.2, .1, mat('brass', () => new THREE.MeshLambertMaterial({ color: 0xb79960 })), 0, 0, .03);
  view.plaque = plane(pl, 5.3, 2, new THREE.MeshBasicMaterial({ color: 0xffffff }), 0, 0, -.03, Math.PI);
  box(pl, 5.7, .06, .3, mat('lampbar', () => new THREE.MeshBasicMaterial({ color: 0xffe2a8 })), 0, -1.2, -.25);
  //  The title band along the cornice.
- const tb = plane(root, 8, .85, new THREE.MeshBasicMaterial({ map: titleTexture() }), CX, WALL.top + .15, WALL.z - .08, Math.PI); tb.name = 'reading-wall-title';
+ const tb = plane(root, 8, .85, new THREE.MeshBasicMaterial({ map: titleTexture(), transparent:true, depthWrite:false }), CX, WALL.top + .15, WALL.z - .08, Math.PI); tb.name = 'reading-wall-title';
  //  Reading lamps either side of the plaque.
  for (const s of [-1, 1]){
   const g = new THREE.Group(); g.position.set(CX + s * 4.3, 1, WALL.z - .7); root.add(g);
@@ -241,16 +241,22 @@ function build(){
   view.lanterns.push(g);
  }
  // Rounded tree crowns sit above the walking volume; trunks remain solid voxels.
- const crownMat=mat('crown',()=>new THREE.MeshStandardMaterial({color:0x578b7b,roughness:.9}));
- for(const [x,z]of TREES)for(const [dx,y,dz,r]of [[0,5.8,0,1.9],[-1,5.3,.4,1.3],[.9,6.1,-.3,1.2]]){
-  const crown=new THREE.Mesh(new THREE.IcosahedronGeometry(r,2),crownMat);crown.position.set(x+.5+dx,y,z+.5+dz);crown.scale.y=.7;root.add(crown);
+ const crownMat=mat('crown',()=>new THREE.MeshStandardMaterial({color:0x668e72,roughness:.95}));
+ const leafGeo=new THREE.IcosahedronGeometry(1,1),leafMesh=new THREE.InstancedMesh(leafGeo,crownMat,TREES.length*28),leafPose=new THREE.Object3D(),leafColor=new THREE.Color(),leafRandom=rand(771);
+ let li=0;
+ for(const [x,z]of TREES)for(let k=0;k<28;k++){
+  const a=k*2.39996,rr=Math.sqrt(leafRandom())*1.8,yy=5.6+(leafRandom()-.5)*1.7;
+  leafPose.position.set(x+.5+Math.cos(a)*rr,yy,z+.5+Math.sin(a)*rr);
+  leafPose.scale.set(.55+leafRandom()*.4,.45+leafRandom()*.4,.6+leafRandom()*.3);leafPose.rotation.set(leafRandom(),leafRandom(),leafRandom());leafPose.updateMatrix();leafMesh.setMatrixAt(li,leafPose.matrix);
+  leafMesh.setColorAt(li++,leafColor.setHSL(.36+leafRandom()*.04,.20,.37+leafRandom()*.16));
  }
+ leafMesh.instanceMatrix.needsUpdate=true;leafMesh.frustumCulled=false;root.add(leafMesh);
  //  Flowers: stems and heads in four colours, on the beds and along the lawn edges.
  const R = rand(4242), spots = [];
  for (const b of FLOWERBEDS) for (let k = 0; k < (b.x1 - b.x0) * (b.z1 - b.z0) * 5; k++) spots.push([b.x0 + .15 + R() * (b.x1 - b.x0 - .3), b.z0 + .15 + R() * (b.z1 - b.z0 - .3)]);
  for (let k = 0; k < 90; k++){ const x = LAWN.x0 + R() * (LAWN.x1 - LAWN.x0), z = LAWN.z0 + R() * (LAWN.z1 - LAWN.z0 - 1); if (PATH(Math.floor(x), Math.floor(z)) || COURT(Math.floor(x), Math.floor(z)) || POOLS.some(p => inRect(x, z, { x0: p.x0 - .5, x1: p.x1 + .5, z0: p.z0 - .5, z1: p.z1 + .5 })) || near(Math.floor(x), Math.floor(z), TREES, 1.2)) continue; spots.push([x, z]); }
  const stems = new THREE.InstancedMesh(GEO.box, mat('stem', () => new THREE.MeshLambertMaterial({ color: 0x4f7a3e })), spots.length);
- const COLORS = [0xe8b04a, 0xd85a6a, 0xf0ead8, 0x8a6ad8, 0xe07a3a];
+ const COLORS = [0xd3bb7e, 0xc9d6bf, 0xf0ead8, 0x7d9e91, 0xc4a86c];
  const heads = new THREE.InstancedMesh(GEO.box, mat('petal', () => new THREE.MeshLambertMaterial({ color: 0xffffff })), spots.length);
  const col = new THREE.Color(), o = new THREE.Object3D();
  spots.forEach(([x, z], i) => {
@@ -262,14 +268,14 @@ function build(){
  root.add(stems, heads);
  //  Water over the pools: a moving sheen that picks up the sky's tint.
  for (const p of POOLS){
-  const w = plane(root, p.x1 - p.x0 - 2, p.z1 - p.z0 - 2, new THREE.MeshLambertMaterial({ color: 0x388e9d, transparent: true, opacity: .78, emissive: 0x0c2630 }), (p.x0 + p.x1) / 2, 1.04, (p.z0 + p.z1) / 2);
+  const w = plane(root, p.x1 - p.x0 - 2, p.z1 - p.z0 - 2, new THREE.MeshLambertMaterial({ color: 0x1b4e58, transparent: true, opacity: .78, emissive: 0x0c2630 }), (p.x0 + p.x1) / 2, 1.04, (p.z0 + p.z1) / 2);
   w.rotation.x = -Math.PI / 2; view.water.push(w);
  }
  //  Path lanterns along the central walk.
  for (const z of [31.5, 33.5]) for (const x of [164.75, 169.25]){
   const g = new THREE.Group(); g.position.set(x, 1, z); root.add(g);
   box(g, .08, .9, .08, mat('iron', null), 0, .45, 0);
-  const l = box(g, .22, .26, .22, mat('lantern', () => new THREE.MeshBasicMaterial({color:0xb6eee2})), 0, 1, 0); view.lanterns.push(l);
+  const l = box(g, .22, .26, .22, mat('lantern', () => new THREE.MeshBasicMaterial({color:0xffd8a0})), 0, 1, 0); view.lanterns.push(l);
  }
  //  Fireflies over the lawns at night, and loose pages drifting around the wall.
  const n = 70, pos = new Float32Array(n * 3), seeds = [];
@@ -278,7 +284,7 @@ function build(){
  view.fireflies = new THREE.Points(fg, new THREE.PointsMaterial({ color: 0xd8ff8a, size: .11, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending }));
  view.fireflies.userData.seeds = seeds; view.fireflies.frustumCulled = false; root.add(view.fireflies);
  const pageMat = mat('page', () => new THREE.MeshLambertMaterial({ map: canvasTex(64, 80, (g, w, h) => { g.fillStyle = '#efe6cf'; g.fillRect(0, 0, w, h); g.fillStyle = '#9a8e76'; for (let y = 10; y < h - 6; y += 6) g.fillRect(6, y, w - 12 - (y % 18 ? 0 : 14), 2); }), side: THREE.DoubleSide, transparent: true }));
- for (let i = 0; i < 9; i++){ const p = plane(root, .34, .44, pageMat, CX, 6, WALL.z); p.userData = { a: i / 9 * TAU, r: 4 + R() * 3, y: 4.5 + R() * 3, v: (.08 + R() * .12) * (R() < .5 ? -1 : 1), spin: R() * 3 }; view.pages.push(p); }
+ for (let i = 0; i < 3; i++){ const p = plane(root, .20, .28, pageMat, CX, 6, WALL.z); p.userData = { a: i / 9 * TAU, r: 4 + R() * 3, y: 4.5 + R() * 3, v: (.08 + R() * .12) * (R() < .5 ? -1 : 1), spin: R() * 3 }; view.pages.push(p); }
  view.plaqueKey = '';
  Promise.resolve().then(refreshPlaque);
  return true;
@@ -287,7 +293,7 @@ function dispose(){
  if (!root) return;
  root.removeFromParent();
  const shared = new Set(Object.values(mats));
- root.traverse(o => { if (o.geometry && o.geometry !== GEO.box && o.geometry !== GEO.plane) o.geometry.dispose(); if (o.material && !shared.has(o.material)){ o.material.map?.dispose(); o.material.dispose(); } });
+ root.traverse(o => { if(o.isInstancedMesh)o.dispose?.(); if (o.geometry && o.geometry !== GEO.box && o.geometry !== GEO.plane) o.geometry.dispose(); if (o.material && !shared.has(o.material)){ o.material.map?.dispose(); o.material.dispose(); } });
  root = null; view.plaque = null; view.spines = []; view.fireflies = null; view.pages = []; view.water = []; view.lanterns = [];
 }
 async function refreshPlaque(){

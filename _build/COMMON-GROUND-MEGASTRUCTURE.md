@@ -1,29 +1,45 @@
-# Common Ground: inhabited hall, architectural pass 1
+# Common Ground / The Lantern Hall
 
-Implemented against live local commit ac84ce3 (v0.89.0), not the supplied v0.87 backup.
+## Revision 2: grounded arrival and playable overlook
 
-## Installed scope
+Replaces the rejected floating rectangular enclosure. Four concrete ribs now rise from actual ground footings into an ascending vault (98 / 126 / 158 / 192 units above the floor). A continuous roof slit reveals the sky. Deep side galleries follow the vault's curvature, with bronze screens, recessed glazing and warm occupied windows. The principal arrival landmark is a segmented bronze oculus surrounding three displaced stone fragments, visible from the actual spawn rather than only when looking straight up.
 
-The game now loads `common-ground-megastructure.js` after the existing feature modules. It adds a 192 x 144 unit perimeter envelope centered at world (180,36), a 96 x 72 unit inner atrium, a roof 192 units above the existing floor (world y=193), stacked inhabited facades, two supported bridge silhouettes, a roof aperture and trusses, four orientation signs, and two displaced fragments. Two local lighting sources and locally reduced fog reveal the vertical interior. Architecture is deterministic and grouped into 52 instanced material/sector batches (5,853 box instances).
+The arrival canopy, stone paving, bronze path inlays, library framing and warmer reading-garden palette connect the architecture to the existing social court. The reading wall, library, music booth, gallery and six arcade positions are retained. Trees use clustered instanced foliage and fewer drifting pages. Existing player structures remain visible; they have not been deleted to improve a screenshot.
 
-The new enclosure is independent of the 64-block voxel storage. The original campus, books, listening booth, studios, gallery artworks, arcades, player plots, respawn and saves retain their coordinates and behavior. No save migration or server changes are made. The module does not issue network requests.
+## Playable geometry
 
-This is the first architectural pass, not completion of the full design specification. Upper tiers, bridges and fractured structures are scenic. No lift controls or upper destination prompts are advertised. Ground-level district relocation, load-bearing lower podium integration, full public elevated collision, accessible lifts and multiplayer-authoritative travel remain subsequent work. The scenic shell is visible from surrounding streets; the wider city has not been regenerated to fit a new footprint. This avoids erasing player-owned plots or existing gameplay.
+A new west-side stair at x=140..144, z=30..42 rises from world y=1 to y=7 in 24 quarter-unit steps. It leads to a guarded 6 x 20 unit overlook at x=140..146, z=42..62. The stair, deck, guards and podium use the engine's existing fractional prop-collision system. Normal walking climbs and descends without jumping. Both directions are tested through updateWalkPhysics, including stable landing and guard restraint.
 
-## Integration
+The old generated west-edge voxel geometry is cleared within x=138..146, z=28..64 during chunk generation. Saved edits are applied afterwards by the existing engine, retaining their precedence. The surface courses check their underlying ground and hide above edited holes. The twelve online building plots are explicitly tested against every new collision box; their build volumes stay clear. The original 64-block voxel allocation is unchanged.
 
-- `apps/fracture-city-game/index.html`: one final script include.
-- `apps/fracture-city-game/common-ground-megastructure.js`: owned scene group, instancing, material/texture disposal, local fog adaptation, visibility bounds and diagnostic API `FCCommonGroundMega`.
-- `_test/common-ground-megastructure.test.cjs`: browser regression test using the existing harness and a fresh browser profile.
+A 0.001-unit AABB contact tolerance fixes repeated step-assist bumps caused by floating-point residue on fractional-height landings. This changes contact tolerance only, not movement speed, jump height, step height or server limits.
 
-The existing day/night function is wrapped after all current modules. It computes the outside lighting/fog first; the hall then applies its local fog blend. Scene replacement disposes owned resources and rebuilds once. Chunk regeneration does not own or duplicate this scene-level enclosure. No changes to the global voxel height, day/night settings, or persisted user options.
+## Boundaries
 
-## Validation
+The +6 m overlook is playable. The high occupied galleries, vault and oculus remain scenic; this release does not claim that every visible floor is accessible. No new teleport or server endpoint is introduced. No saved data is migrated. Surrounding player buildings and social content are preserved.
 
-Run `node _test/common-ground-megastructure.test.cjs` from the project with local browser-test dependencies installed. Checks: single enclosure; unchanged 64-block height; safe spawn; original arcade approach ground elevation; chunk reload; hide/restore at distance; scene disposal/rebuild; fog restoration; no browser exceptions; render overhead under 60 draws / 80,000 triangles in the test view.
+This revision replaces the previous floating-shell first pass. The installed-game architecture, reading-garden and solo/online respawn checks passed before publication.
 
-Observed before installation: 45 additional draw calls and 69,290 triangles in the arrival view. This is incremental geometry cost, not an FPS or 48-player performance guarantee. No multiplayer load or minimum-device performance certification has been performed.
+## Verification
 
-## Rollback
+Run `node _test/common-ground-megastructure.test.cjs`. The suite checks:
 
-Restore the previous index.html from the separately supplied rollback ZIP; remove the new module, this note and its test. The ZIP contains no private save data. The existing desktop launcher points directly to this project's index.html; reload the game to pick up the change. This does not deploy a hosted website.
+- clear original spawn and facility approaches;
+- all twelve online player plots free from new collision;
+- stair ascent, stable landing, guard restraint and descent through actual movement physics;
+- chunk regeneration without duplicate collision or scene roots;
+- saved voxel edits applied over authored geometry;
+- decorative paving hidden over removed ground;
+- scene disposal and recreation without browser exceptions;
+- incremental rendering cost and day/night captures.
+
+The measured architectural overhead was 64 draw calls and 34,926 triangles in the tested arrival view on the performance tier. This is a geometry measurement, not an FPS guarantee. Final results and compatibility checks are recorded in the delivery note.
+
+## Files
+
+- `apps/fracture-city-game/common-ground-megastructure.js`: architecture, lighting, collision blueprint and paving lifecycle.
+- `apps/fracture-city-game/reading-garden.js`: art palette, library title treatment and instanced foliage; reading behavior retained.
+- `apps/fracture-city-game/index.html`: cache versions and fractional collision tolerance.
+- `_test/common-ground-megastructure.test.cjs`: behavioral regression and image capture.
+
+Reload the existing game to see the installed changes. The rollback ZIP contains the five files as they were before this revision and contains no private saves.

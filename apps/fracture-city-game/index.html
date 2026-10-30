@@ -3878,7 +3878,8 @@ function blockedAt(cx, feet, cz, r, h){
     for (const a of c.collisionAABBs){
       if (cx + r > a.minX && cx - r < a.maxX &&
           cz + r > a.minZ && cz - r < a.maxZ &&
-          feet < a.maxY && feet + h > (a.minY || 0)){
+          // Do not step up again on floating-point residue at a fractional landing.
+          feet < a.maxY - 0.001 && feet + h > (a.minY || 0) + 0.001){
         return true;
       }
     }
@@ -30065,7 +30066,7 @@ document.addEventListener('DOMContentLoaded', init);
 <script src="city-wildlife.js?v=0.65.0"></script>
 <script src="the-seam.js?v=0.70.0"></script>
 <script src="skate-lines.js?v=0.67.0"></script>
-<script src="reading-garden.js?v=0.69.0"></script>
+<script src="reading-garden.js?v=0.90.0"></script>
 <script src="common-ground-atrium.js?v=0.75.0"></script>
 <script src="chainfire-cabinet.js?v=0.72.0"></script>
 <script src="common-challenge.js?v=0.75.0"></script>
@@ -30083,6 +30084,6 @@ document.addEventListener('DOMContentLoaded', init);
 <script src="social-hub.js?v=0.83.0"></script>
 <script src="phone-hud.js?v=0.85.0"></script>
 <script src="soundstage.js?v=0.88.0"></script>
-<script src="common-ground-megastructure.js?v=1.0.0"></script>
+<script src="common-ground-megastructure.js?v=2.0.0"></script>
 </body>
 </html>
