@@ -148,7 +148,10 @@ function almanac(){
  const hue = window.Grit?.hue || { id: 'oxide', name: 'Oxide Haze' };
  const day = window.Grit?._key || new Date(now()).toISOString().slice(0, 10);
  const label = new Date((String(day).match(/\d{4}-\d{2}-\d{2}/) || [new Date(now()).toISOString().slice(0, 10)])[0] + 'T12:00:00Z').toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
- return { day, label, hue, ...(EVENTS[hue.id] || EVENTS.oxide) };
+ //  0.89 renamed the day hues to weathers; each weather keeps the almanac
+ //  event its old hue had, so the farm's calendar did not go quiet.
+ const OLD = { clear: 'bile', haze: 'bruise', overcast: 'rust', smog: 'chemical', marine: 'nicotine', golden: 'ashrose', cold: 'oxide' };
+ return { day, label, hue, ...(EVENTS[hue.id] || EVENTS[OLD[hue.id]] || EVENTS.oxide) };
 }
 //  Things overheard, for echo corn and the rumour cats.
 const ECHOES = [
