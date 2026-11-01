@@ -38,14 +38,18 @@ test('building online spends and refunds items',async()=>{const srv=await boot()
  console.log('PASS building spends and refunds');
 }finally{await srv.stop()}});
 
-test('city PvP: hits outside safe zones, downs, pays and respawns',async()=>{const srv=await boot();try{
+test('city PvP: opt-in on both sides, hits outside safe zones, downs, pays and respawns',async()=>{const srv=await boot();try{
  const a=client(srv),b=client(srv);await a.register('pvp_a');await b.register('pvp_b');const ja=await a.join({map:'city'});await b.join({code:ja.data.code});
  const room=srv.app.rooms.get(ja.data.code);room.phase='live';const pa=room.players.get(a.id),pb=room.players.get(b.id);
  const place=(p,x,z)=>Object.assign(p,{x,z,y:1,protectUntil:0});
  const shot=(from,to,extra={})=>({target:to.id,weapon:'pistol',ox:from.x,oy:2.6,oz:from.z,dx:to.x-from.x,dy:0,dz:to.z-from.z,...extra});
  const norm=s=>{const l=Math.hypot(s.dx,s.dy,s.dz);return{...s,dx:s.dx/l,dy:s.dy/l,dz:s.dz/l}};
  place(pa,100,100);place(pb,110,100);
- let r=(await a.call('city-shoot',norm(shot(pa,pb)))).data;assert.equal(r.hit,true);assert.equal(pb.hp,80);
+ //  0.92: PvP is opt-in for both sides.
+ let r=(await a.call('city-shoot',norm(shot(pa,pb)))).data;assert.equal(r.reason,'pvp-off','the shooter has not opted in');
+ await a.call('pvp',{on:true});srv.clock.t+=400;r=(await a.call('city-shoot',norm(shot(pa,pb)))).data;assert.equal(r.reason,'target-off','the target has not opted in');assert.equal(pb.hp,100);
+ await b.call('pvp',{on:true});assert.equal(pb.pvp,true);srv.clock.t+=400;
+ r=(await a.call('city-shoot',norm(shot(pa,pb)))).data;assert.equal(r.hit,true);assert.equal(pb.hp,80);
  r=(await a.call('city-shoot',norm(shot(pa,pb)))).data;assert.equal(r.hit,false,'weapon cooldown');assert.equal(r.reason,'cooldown');
  srv.clock.t+=400;r=(await a.call('city-shoot',norm({...shot(pa,pb),dz:5}))).data;assert.equal(r.hit,false,'a ray that misses the body');
  srv.clock.t+=400;place(pb,170,30);r=(await a.call('city-shoot',norm(shot(pa,pb)))).data;assert.equal(r.reason,'target-safe','Common Ground is safe');

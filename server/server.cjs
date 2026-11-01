@@ -41,7 +41,7 @@ function json(res,value){res.setHeader('Cache-Control','no-store');res.setHeader
 function revokePlayers(id){for(const r of [...rooms.values()])for(const p of [...r.players.values()])if(p.accountId===id)remove(r,p)}
 function fail(code,message){throw Object.assign(Error(message),{status:code})}
 function rate(key,max,period){let r=limits.get(key),t=now();if(!r||t-r.t>=period){r={t,n:0};limits.set(key,r)}if(++r.n>max)fail(429,'Please slow down and try again.')}
-function state(r){return {code:r.code,public:!!r.public,lookRev:r.lookRev||0,npcRev:r.npcRev||0,npcs:r.map.city?spawns.state(r):[],structureRevision:r.map.city?structures.revision(r.code):0,artRevision:r.map.city?cityBuild.revision(r.code):0,map:r.map.id,phase:r.phase,host:r.host,time:now(),players:[...r.players.values()].map(p=>({id:p.id,accountId:p.accountId,name:p.name,color:p.color,x:p.x,y:p.y||0,z:p.z,yaw:p.yaw,pitch:p.pitch,hp:p.hp,ammo:p.ammo,reloading:p.reloadUntil>now(),ready:p.ready,connected:!!p.stream,kills:p.kills,deaths:p.deaths,score:p.score,moving:p.moving,sprint:p.sprint,safe:r.map.city?citySafe(p):W.safe(p),protected:p.protectUntil>now(),respawnAt:p.respawnAt,emote:p.emoteUntil>now()?p.emote:null,seq:p.seq})),quests:r.quests,chat:r.chat,events:r.events.slice(-10)}}
+function state(r){return {code:r.code,public:!!r.public,lookRev:r.lookRev||0,npcRev:r.npcRev||0,npcs:r.map.city?spawns.state(r):[],structureRevision:r.map.city?structures.revision(r.code):0,artRevision:r.map.city?cityBuild.revision(r.code):0,map:r.map.id,phase:r.phase,host:r.host,time:now(),players:[...r.players.values()].map(p=>({id:p.id,accountId:p.accountId,name:p.name,color:p.color,x:p.x,y:p.y||0,z:p.z,yaw:p.yaw,pitch:p.pitch,hp:p.hp,ammo:p.ammo,reloading:p.reloadUntil>now(),ready:p.ready,connected:!!p.stream,pvp:!!p.pvp,kills:p.kills,deaths:p.deaths,score:p.score,moving:p.moving,sprint:p.sprint,safe:r.map.city?citySafe(p):W.safe(p),protected:p.protectUntil>now(),respawnAt:p.respawnAt,emote:p.emoteUntil>now()?p.emote:null,seq:p.seq})),quests:r.quests,chat:r.chat,events:r.events.slice(-10)}}
 function publish(r){const message='data: '+JSON.stringify(state(r))+'\n\n';for(const p of r.players.values())if(p.stream){if(p.stream.writableLength>131072){p.stream.destroy();p.stream=null}else p.stream.write(message)}}
 function system(r,text){r.chat.push({id:id(),name:'Dispatch',text,at:now()});r.chat=r.chat.slice(-30)}
 function spawn(p,r){p.x=(p.seat%4-1.5)*2;p.z=(Math.floor(p.seat/4)-1)*2;p.hp=100;p.ammo=6;p.respawnAt=0;p.protectUntil=now()+5000;p.input={x:0,z:0};p.reloadUntil=0;if(r?.map.city){p.x=165+(p.seat%4)*1.2;p.z=24+Math.floor(p.seat/4)*1.2;p.y=1;p.yaw=Math.PI;p.pitch=0;p.moving=false;p.poseAt=now()}}
@@ -72,7 +72,10 @@ function cityShoot(r,p,b){
  if(Math.hypot(o.x-p.x,o.z-p.z)>2.5||Math.abs(o.y-((p.y||1)+1.6))>2.5)return{...out,reason:'origin'};
  r.events.push({id:id(),type:'city-shot',player:p.id,x:o.x,y:o.y,z:o.z,dx:d.x,dy:d.y,dz:d.z,range:w.range,hit:null});r.events=r.events.slice(-10);
  if(b.npc)return spawns.shoot(r,p,b,w,o,d);
+ //  0.92: PvP is opt-in. Both the shooter and the target must have switched it on.
+ if(!p.pvp)return{...out,reason:'pvp-off'};
  if(!target||target===p||target.hp<=0)return out;
+ if(!target.pvp)return{...out,reason:'target-off'};
  if(citySafe(target))return{...out,reason:'target-safe'};
  if(target.protectUntil>t)return{...out,reason:'protected'};
  const ty=target.y||1,dist=W.rayBox(o,d,{x:target.x-.6,y:ty-.2,z:target.z-.6},{x:target.x+.6,y:ty+2.1,z:target.z+.6});
@@ -194,6 +197,7 @@ case '/api/city-pose':{
 }
 case '/api/input':{if(r.map.city)break;if(!Number.isSafeInteger(b.seq)||b.seq<=p.seq)break;for(const k of ['x','z','yaw','pitch'])if(!Number.isFinite(b[k]))fail(400,'Invalid movement.');p.seq=b.seq;p.yaw=((b.yaw%(Math.PI*2))+Math.PI*2)%(Math.PI*2);p.pitch=Math.max(-1.3,Math.min(1.3,b.pitch));p.input={x:Math.max(-1,Math.min(1,b.x)),z:Math.max(-1,Math.min(1,b.z)),sprint:!!b.sprint};p.inputAt=now();break}
 case '/api/ready':p.ready=!!b.ready;break;
+case '/api/pvp':{if(!r.map.city)fail(409,'Enter the shared city first.');p.pvp=!!b.on;publish(r);return json(res,{pvp:p.pvp})}
 case '/api/start':if(r.public)fail(409,'The Main Beta is always open.');if(r.host!==p.id)fail(403,'Only the host can start.');if([...r.players.values()].some(q=>!q.ready))fail(409,'Every resident must be ready.');r.phase='live';system(r,r.map.city?'Makers’ Mile is open. Meet and explore the real city together. Building edits and NPCs are local; this city session is social free roam.':'The district is open. The central ring is protected. PvP is active outside it.');break;
 case '/api/shoot':shoot(r,p);break;
 case '/api/city-look':{if(!r.map.city)fail(409,'Enter the shared city first.');rate('look:'+p.accountId,20,60000);p.look=looks.clean(b.look,sku=>economy.owns(p.accountId,sku));try{social.action({id:p.accountId},'profile',{look:p.look})}catch(e){}r.lookRev=(r.lookRev||0)+1;json(res,{ok:true,look:p.look});publish(r);return}

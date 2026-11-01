@@ -2,11 +2,13 @@
 (function(){
 'use strict';
 const entry={slug:'backroom',title:'BACKROOM',sub:'ART / MUSIC / MAKE A GAME',color:0x86e8c4};
-if(!ARCADE_ROSTER.some(a=>a.slug===entry.slug))ARCADE_ROSTER.push(entry);
+//  0.92: builder-facing; only with the developer flag (dev-flag.js).
+const DEV=!!window.FC_DEV?.on;
+if(DEV&&!ARCADE_ROSTER.some(a=>a.slug===entry.slug))ARCADE_ROSTER.push(entry);
 let returnState=null;
 function open(){const menu=document.getElementById('menu-overlay');returnState={menu:!menu.classList.contains('hide'),paused:State.ui.paused};menu.classList.add('hide');State.ui.paused=true;shPlayCabinet('backroom')}
 const exit=shExitCabinet;window.shExitCabinet=function(){const result=exit.apply(this,arguments);if(returnState){State.ui.paused=returnState.paused;if(returnState.menu)openMenu();else document.body.style.cursor=State.ui.paused?'auto':'none';returnState=null}return result};
 const css=document.createElement('style');css.textContent='body.in-arcade #fc-tools{display:none!important}';document.head.appendChild(css);
-const tray=document.querySelector('#fc-tools .tray');if(tray){const b=document.createElement('button');b.textContent='Artist studio · Backroom';b.onclick=e=>{e.stopPropagation();FCQuietUI.menu.open=false;setTimeout(open,0)};tray.appendChild(b)}
+const tray=document.querySelector('#fc-tools .tray');if(tray&&DEV){const b=document.createElement('button');b.textContent='Artist studio · Backroom';b.onclick=e=>{e.stopPropagation();FCQuietUI.menu.open=false;setTimeout(open,0)};tray.appendChild(b)}
 window.FCBackroom={open};
 })();

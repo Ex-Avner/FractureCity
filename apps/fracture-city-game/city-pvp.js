@@ -11,17 +11,25 @@ const me=()=>window.FCCityOnline?.self;
 const token=()=>{try{return JSON.parse(sessionStorage.getItem('fc-district-session')||'{}').token||''}catch(e){return''}};
 async function api(route,data){const res=await fetch('/api/'+route,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token()},body:JSON.stringify(data),signal:AbortSignal.timeout(6000)});const out=await res.json().catch(()=>({}));if(!res.ok)throw Object.assign(Error(out.error||'Shot not sent.'),{status:res.status});return out}
 const inSafe=(x,z)=>SAFE.some(s=>x>=s.x0&&x<=s.x1&&z>=s.z0&&z<=s.z1);
+//  0.92: PvP is opt-in. Off by default; the switch lives in Tools. Only players
+//  who have both switched it on can hurt each other (the server checks too).
+let optIn=false;try{optIn=localStorage.getItem('fc-pvp')==='on'}catch(e){}
+let sentFor='';
+function sync(){if(!live())return;const key=(me()?.id||'')+':'+optIn;if(key===sentFor)return;sentFor=key;api('pvp',{on:optIn}).catch(()=>{sentFor=''})}
+function setOpt(on){optIn=!!on;try{localStorage.setItem('fc-pvp',optIn?'on':'off')}catch(e){}sentFor='';sync();label();toast(optIn?'PvP on: other players who opted in can fight you outside the safe zones.':'PvP off: no player can hurt you, and you cannot hurt them.','info')}
+function label(){const b=document.querySelector('#fc-tools [data-act=pvp]');if(b)b.textContent='PvP with other players · '+(optIn?'ON':'OFF')}
+setInterval(()=>{const tray=document.querySelector('#fc-tools .tray');if(tray&&!tray.querySelector('[data-act=pvp]')&&live()){const b=document.createElement('button');b.dataset.act='pvp';b.onclick=e=>{e.stopPropagation();setOpt(!optIn)};const row=document.createElement('div');row.className='row';row.append(b);tray.append(row)}const b=document.querySelector('#fc-tools [data-act=pvp]');if(b)b.hidden=!live();label();sync()},1500);
 
 // ─── Your shots ─────────────────────────────────────────────────────────────
 const box=new THREE.Box3(),hitPoint=new THREE.Vector3();
 function bodyHit(ray,p,range){box.min.set(p.x-.45,(p.y??1)-.05,p.z-.45);box.max.set(p.x+.45,(p.y??1)+1.95,p.z+.45);const h=ray.intersectBox(box,hitPoint);if(!h)return null;const d=h.distanceTo(ray.origin);return d<=range?d:null}
 function clearPath(origin,dir,dist){const v=raycastVoxel(origin,dir,dist);return !v||Math.hypot(v.x+.5-origin.x,v.y+.5-origin.y,v.z+.5-origin.z)>dist}
 function shotFired(){
- if(!live()||Player.mode==='drive')return;
+ if(!live()||!optIn||Player.mode==='drive')return;
  const self=me();if(!self||self.hp<=0)return;
  const key=Player.currentWeapon,w=(typeof shWeapon==='function'?shWeapon(key):WEAPONS[key])||{range:30,pellets:1};
  const forward=new THREE.Vector3(0,0,-1).applyEuler(State.camera.rotation).normalize(),origin=Player.position.clone();
- const peers=(FCCityOnline.room?.players||[]).filter(p=>p.id!==self.id&&p.hp>0&&p.connected);
+ const peers=(FCCityOnline.room?.players||[]).filter(p=>p.id!==self.id&&p.hp>0&&p.connected&&p.pvp);
  if(!peers.length)return;
  //  Shotguns: each pellet scatters as the game's own gun does; count the pellets that land.
  const pellets=w.pellets||1,hits=new Map();
@@ -33,7 +41,7 @@ function shotFired(){
  const target=[...hits.entries()].sort((a,b)=>b[1]-a[1])[0];
  const body={weapon:['baton','pistol','shotgun'].includes(key)?key:'other',ox:origin.x,oy:origin.y,oz:origin.z,dx:forward.x,dy:forward.y,dz:forward.z,target:target?target[0]:null,pellets:target?target[1]:0};
  if(!target)return;
- api('city-shoot',body).then(r=>{if(r.hit){marker(r.down);if(r.down){const v=peers.find(p=>p.id===target[0]);toast('You downed '+(v?.name||'a resident')+' · +25 credits','success')}}else if(r.reason==='safe')toast('Common Ground is a safe zone. No PvP here.','info');else if(r.reason==='target-safe')toast('They are in a safe zone.','info');else if(r.reason==='protected')toast('Just respawned: protected for a few seconds.','info')}).catch(()=>{});
+ api('city-shoot',body).then(r=>{if(r.hit){marker(r.down);if(r.down){const v=peers.find(p=>p.id===target[0]);toast('You downed '+(v?.name||'a resident')+' · +25 credits','success')}}else if(r.reason==='safe')toast('Common Ground is a safe zone. No PvP here.','info');else if(r.reason==='target-safe')toast('They are in a safe zone.','info');else if(r.reason==='target-off')toast('They have PvP switched off.','info');else if(r.reason==='pvp-off')toast('Switch PvP on in Tools to fight other players.','info');else if(r.reason==='protected')toast('Just respawned: protected for a few seconds.','info')}).catch(()=>{});
 }
 const attack=window.tryAttack;
 window.tryAttack=function(){const before=Player.attackCooldown;const r=attack.apply(this,arguments);if(before<=0&&Player.attackCooldown>0)shotFired();return r};
@@ -84,4 +92,5 @@ const css=document.createElement('style');css.textContent=`
 @media (pointer:coarse){#city-pvp .pv-hp{bottom:auto;top:96px}}`;
 document.head.append(css);
 window.FCCityPvp={safe:inSafe,SAFE};
+window.FCPvp={get on(){return optIn},set:setOpt};
 })();
