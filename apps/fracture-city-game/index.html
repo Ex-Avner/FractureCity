@@ -14902,7 +14902,7 @@ function shFrontAct(act){
         toast('There is no city to save yet.', 'warn');
         return;
       }
-      shSlotSave(Slots.activeId, null).then(() => { shFrontSaves(); toast('Saved.', 'success'); });
+      shSlotSave(Slots.activeId, null).then(() => { shFrontSaves(); toast('Saved.', 'success'); }).catch(e => toast(e.message, 'warn'));
       break;
   }
 }
@@ -29958,11 +29958,11 @@ document.addEventListener('DOMContentLoaded', init);
 <script src="story-refresh.js?v=0.59.0"></script>
 <script src="opening-block.js?v=0.55.0"></script>
 <script src="backroom-door.js?v=0.92.0"></script>
-<script src="city-build.js?v=0.71.0"></script>
+<script src="city-build.js?v=0.92.1"></script>
 <script src="city-art.js?v=0.71.0"></script>
 <script src="art-direct.js?v=0.71.0"></script>
 <script src="movement-flow.js?v=0.55.0"></script>
-<script src="own-the-block.js?v=0.90.1"></script>
+<script src="own-the-block.js?v=0.92.1"></script>
 <script src="art-collection.js?v=0.55.0"></script>
 <script src="furniture-catalogue.js?v=0.71.0"></script>
 <script>window.FC_ACCOUNTS_OPTIONAL=true;</script>
@@ -29981,7 +29981,8 @@ document.addEventListener('DOMContentLoaded', init);
 <script src="world-foundation.js?v=0.55.0"></script>
 <script src="neighborhood-signal.js?v=0.75.0"></script>
 <script src="city-shared-build.js?v=0.85.0"></script>
-<script src="city-structures.js?v=0.87.0"></script>
+<script src="structure-save-queue.js?v=1.0.0"></script>
+<script src="city-structures.js?v=0.92.1"></script>
 <script src="city-online.js?v=0.85.0"></script>
 <script src="city-flow.js?v=0.70.0"></script>
 <script src="online-tour.js?v=0.90.1"></script>
@@ -29992,14 +29993,15 @@ document.addEventListener('DOMContentLoaded', init);
 <script src="the-seam.js?v=0.91.0"></script>
 <script src="skate-lines.js?v=0.67.0"></script>
 <script src="reading-garden.js?v=0.90.1"></script>
-<script src="common-ground-atrium.js?v=0.75.0"></script>
+<script src="common-ground-atrium.js?v=0.75.1"></script>
+<script src="common-ground-garden.js?v=1.0.0"></script>
 <script src="chainfire-cabinet.js?v=0.72.0"></script>
 <script src="common-challenge.js?v=0.75.0"></script>
 <script src="future-city.js?v=0.74.0"></script>
 <script src="texture-pack.js?v=0.76.0"></script>
 <script src="campus-arcades.js?v=0.90.0"></script>
 <script src="build-dock.js?v=0.79.0"></script>
-<script src="inventory.js?v=0.87.0"></script>
+<script src="inventory.js?v=0.92.1"></script>
 <script src="city-pvp.js?v=0.92.0"></script>
 <script src="npc-brain.js?v=0.85.0"></script>
 <script src="npc-spawns.js?v=0.83.0"></script>
@@ -30010,7 +30012,7 @@ document.addEventListener('DOMContentLoaded', init);
 <script src="phone-hud.js?v=0.85.0"></script>
 <script src="soundstage.js?v=0.88.0"></script>
 <script src="common-ground-megastructure.js?v=3.0.0"></script>
-<script src="common-ground-guide.js?v=1.0.0"></script>
+<script src="common-ground-guide.js?v=1.1.0"></script>
 <script src="omnism-church.js?v=0.91.0"></script>
 <script src="backlot.js?v=0.92.0"></script>
 </body>

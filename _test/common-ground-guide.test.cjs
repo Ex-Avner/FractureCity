@@ -27,7 +27,7 @@ const root=path.resolve(__dirname,'..');
   await p.locator('#cg-directory').waitFor();
   assert.equal(await p.evaluate(()=>State.ui.paused),true);
   assert.equal(await p.locator('#cg-directory').getAttribute('aria-modal'),'true');
-  assert.equal(await p.locator('#cg-directory [data-destination]').count(),6);
+  assert.equal(await p.locator('#cg-directory [data-destination]').count(),7);
   assert.equal(await p.evaluate(()=>document.activeElement?.dataset.destination),'read');
   const buttons=await p.locator('#cg-directory button').count();
   for(let i=0;i<buttons+2;i++){
@@ -94,6 +94,8 @@ const root=path.resolve(__dirname,'..');
    // leaving the overlook must actually descend the whole stair.
    results.push(traverse('gallery',[167,1,35.6]));
    results.push(traverse('read',[143,7,52]));
+   results.push(traverse('garden',[155,2,14]));
+   results.push(traverse('overlook',[155,2,14]));
    guide.cancel();Player.position.set(167,Player.height+1,24);Player.velocity.set(0,0,0);State.ui.paused=false;guide.update();return results;
   });
   for(const walk of walks){
@@ -106,7 +108,7 @@ const root=path.resolve(__dirname,'..');
   assert.ok(gallery.points.length>2,'gallery must route around the Reading Wall, not through it');
   const overlook=walks.find(w=>w.id==='overlook');
   assert.ok(overlook.points.filter(p=>p[1]>1&&p[1]<7).length>=8,'overlook route includes explicit stair waypoints');
-  console.log('PASS actual walking physics reaches all six destinations, routes around the wall and climbs/descends the overlook.',walks.map(w=>({id:w.id,from:w.start,end:w.end,waypoints:w.points.length})));
+  console.log('PASS actual walking physics reaches all seven destinations, routes around the wall and climbs/descends the overlook.',walks.map(w=>({id:w.id,from:w.start,end:w.end,waypoints:w.points.length})));
 
   // Follow the changing live waypoint, including its early-turn advancement.
   // Traversing a frozen route alone cannot catch corner cutting in the HUD.

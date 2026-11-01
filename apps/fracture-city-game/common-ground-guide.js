@@ -8,36 +8,38 @@ const DESTINATIONS=Object.freeze([
  {id:'arcade',title:'The arcade corner',verb:'Play something',detail:'Breaking Ned — one tap, one more try.',at:[149.7,1,27.5],hint:'Press E to play Breaking Ned.',color:'#d9a17e',number:'03'},
  {id:'gallery',title:'People’s Gallery',verb:'Leave something of yours',detail:'Resident stories, photographs and songs.',at:[168,1,62.4],hint:'Approach a display and press E.',color:'#d9a17e',number:'04'},
  {id:'overlook',title:'The overlook',verb:'Take in the hall',detail:'Take the teal-lit stair to a quiet place above the hall.',at:[143,7,52],hint:'You’re here. Look out across Common Ground.',color:'#91c4c3',number:'05'},
- {id:'theory',title:'Theory library',verb:'Follow an idea',detail:'The Collapse of Meaning, chapter by chapter.',at:[155,1,26.9],hint:'Press E to open the theory library.',color:'#e4c181',number:'06'}
+ {id:'theory',title:'Theory library',verb:'Follow an idea',detail:'The Collapse of Meaning, chapter by chapter.',at:[155,1,26.9],hint:'Press E to open the theory library.',color:'#e4c181',number:'06'},
+ {id:'garden',title:'Conservatory Garden',verb:'Walk among the blossoms',detail:'Flowering groves, a reflecting rill and an open art terrace.',at:[167,1,12],hint:'You’re here. The art terrace is beside the flowering trees.',color:'#c7b59a',number:'07'}
 ]);
-const BOUNDS={x0:140,x1:213,z0:20,z1:68},R=.43;
+const BOUNDS={x0:140,x1:213,z0:0,z1:68},R=.43;
 let panel=null,priorPause=false,oldFocus=null,selected=null,path=[],index=0,status='',arrivalUntil=0,lastCheck=0,lastTick=0,world=null;
 const dist=(a,b)=>Math.hypot(a[0]-b[0],a[2]-b[2]);
 const here=()=>[Player.position.x,Player.position.y-Player.height,Player.position.z];
-function inHall(){const p=Player.position;return !!window.OwnBlock?.ready&&OwnBlock.state.enabled&&p.x>=137&&p.x<=216&&p.z>=18&&p.z<=73&&!State.ui.inIntro;}
+function inHall(){const p=Player.position;return !!window.OwnBlock?.ready&&OwnBlock.state.enabled&&p.x>=137&&p.x<=216&&p.z>=0&&p.z<=73&&!State.ui.inIntro;}
 function blocked(){const u=State.ui;return u.paused||u.inDialogue||u.inArcade||u.inIntro||u.inInventory||u.inShiftPanel||u.inMiniGame||u.construct||u.inCar||window.CityArt?.panelOpen||window.CityBuild?.panelOpen||window.FCAccounts?.visible||window.FCNewsHub?.isOpen||window.FCCommonGround?.isOpen||window.FCReadingGarden?.isOpen||window.CitySocial?.writing||window.OwnBlock?.modal||window.NPCVoices?.open||window.FCSeam?.panel;}
-function ground(x,z){
+function ground(x,z,y=1){
  if(x<BOUNDS.x0||x>BOUNDS.x1||z<BOUNDS.z0||z>BOUNDS.z1)return false;
- if(blockedAt(x,1.01,z,R,Player.height))return false;
- return [[-R,-R],[-R,R],[R,-R],[R,R],[0,0]].every(([dx,dz])=>isSolid(getBlock(Math.floor(x+dx),0,Math.floor(z+dz))));
+ if(blockedAt(x,y+.01,z,R,Player.height))return false;
+ return [[-R,-R],[-R,R],[R,-R],[R,R],[0,0]].every(([dx,dz])=>isSolid(getBlock(Math.floor(x+dx),y-1,Math.floor(z+dz))));
 }
 function clear(a,b){
- if(Math.abs(a[1]-1)>.2||Math.abs(b[1]-1)>.2)return false;
- const n=Math.max(1,Math.ceil(dist(a,b)/.3));for(let i=0;i<=n;i++){const t=i/n;if(!ground(a[0]+(b[0]-a[0])*t,a[2]+(b[2]-a[2])*t))return false;}return true;
+ const y=Math.round(a[1]);if(![1,2].includes(y)||Math.abs(a[1]-y)>.2||Math.abs(b[1]-y)>.2)return false;
+ const n=Math.max(1,Math.ceil(dist(a,b)/.3));for(let i=0;i<=n;i++){const t=i/n;if(!ground(a[0]+(b[0]-a[0])*t,a[2]+(b[2]-a[2])*t,y))return false;}return true;
 }
 function nearest(p){
- const options=[];for(let dx=-3;dx<=3;dx++)for(let dz=-3;dz<=3;dz++){const q=[Math.round(p[0])+dx,1,Math.round(p[2])+dz];if(ground(q[0],q[2])&&clear(p,q))options.push(q)}
+ const options=[];for(let dx=-3;dx<=3;dx++)for(let dz=-3;dz<=3;dz++){const q=[Math.round(p[0])+dx,p[1],Math.round(p[2])+dz];if(ground(q[0],q[2],q[1])&&clear(p,q))options.push(q)}
  options.sort((a,b)=>dist(p,a)-dist(p,b));return options[0]||null;
 }
 function groundRoute(from,to){
+ from=[from[0],Math.round(from[1]),from[2]];to=[to[0],Math.round(to[1]),to[2]];
  if(clear(from,to))return[from,to];const start=nearest(from),end=nearest(to);if(!start||!end)return null;
  const key=p=>p[0]+','+p[2],sk=key(start),ek=key(end),open=[start],cost=new Map([[sk,0]]),parents=new Map(),closed=new Set(),cache=new Map();
  let found=false;for(let runs=0;open.length&&runs<5000;runs++){
   let best=0;for(let i=1;i<open.length;i++)if(cost.get(key(open[i]))+dist(open[i],end)<cost.get(key(open[best]))+dist(open[best],end))best=i;
   const p=open.splice(best,1)[0],k=key(p);if(closed.has(k))continue;if(k===ek){found=true;break}closed.add(k);
   for(const [dx,dz]of [[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]]){
-   const q=[p[0]+dx,1,p[2]+dz],qk=key(q);if(closed.has(qk))continue;
-   if(!cache.has(qk))cache.set(qk,ground(q[0],q[2]));if(!cache.get(qk)||!clear(p,q))continue;
+   const q=[p[0]+dx,p[1],p[2]+dz],qk=key(q);if(closed.has(qk))continue;
+   if(!cache.has(qk))cache.set(qk,ground(q[0],q[2],q[1]));if(!cache.get(qk)||!clear(p,q))continue;
    const c=cost.get(k)+Math.hypot(dx,dz);if(c<(cost.get(qk)??Infinity)){cost.set(qk,c);parents.set(qk,p);open.push(q)}
   }
  }
@@ -61,12 +63,13 @@ function route(id,from=here()){
  if((up||stair||targetUp)&&!stairSafe())return null;
  if(up&&targetUp)return deckRoute(from,d.at);
  let prefix=[],origin=from;
+ if(from[1]>1.8&&from[1]<2.3&&from[0]>=148&&from[0]<=164&&from[2]>=4&&from[2]<=22){const terrace=groundRoute(from,[155,2,21]);if(!terrace||blockedAt(155,1.01,23,R,Player.height))return null;prefix=[...terrace,[155,1,23]];origin=[155,1,23];}
  if(up){const across=deckRoute(from,landing);if(!across)return null;prefix=[...across,...STAIR.slice(0,-1).reverse()];origin=STAIR[0];}
  if(stair){const closest=STAIR.reduce((n,p,i)=>Math.abs(p[2]-from[2])<Math.abs(STAIR[n][2]-from[2])?i:n,0);
   if(targetUp){const across=deckRoute(landing,d.at);return across?[from,...STAIR.slice(closest),...across.slice(1)]:null;}
   prefix=[from,...STAIR.slice(0,closest+1).reverse()];origin=STAIR[0];
  }
- if(targetUp){const groundPath=groundRoute(origin,STAIR[0]),across=deckRoute(landing,d.at);if(!groundPath||!across)return null;return[...groundPath,...STAIR.slice(1),...across.slice(1)]}
+ if(targetUp){const groundPath=groundRoute(origin,STAIR[0]),across=deckRoute(landing,d.at);if(!groundPath||!across)return null;return[...prefix,...groundPath,...STAIR.slice(1),...across.slice(1)]}
  const groundPath=groundRoute(origin,d.at);return groundPath?[...prefix,...groundPath]:null;
 }
 const css=document.createElement('style');css.textContent=`
@@ -107,7 +110,7 @@ function update(now=performance.now()){
  while(index<path.length-1&&dist(p,path[index])<.75&&Math.abs(p[1]-path[index][1])<.85&&((path[index+1][1]===1&&path[index][1]===1)?(Math.abs(p[1]-1)<.2&&clear(p,path[index+1])):(path[index+1][1]===7&&p[1]>6.8&&p[2]>42.6&&path[index+1][2]>42.6)?upperClear(p,path[index+1]):true))index++;
  if(now-lastCheck>2500){lastCheck=now;const target=path[Math.min(index+(dist(p,path[index])<.75?1:0),path.length-1)],obstructed=target&&((Math.abs(p[1]-1)<.2&&target[1]===1&&!clear(p,target))||(upstairs(p)&&target[1]===7&&target[2]>=42.6&&!upperClear(p,target))||(onStair(p)&&!stairSafe()));if(status==='blocked'||obstructed){const next=route(selected.id,p);if(next){path=next;index=Math.min(1,path.length-1);status='walking'}else status='blocked';}}
  const next=path[index];if(!next)return;const dx=next[0]-p[0],dz=next[2]-p[2],angle=Math.atan2(Math.sin(Math.atan2(-dx,-dz)-Player.yaw),Math.cos(Math.atan2(-dx,-dz)-Player.yaw));
- hud.querySelector('b').textContent=selected.title+' · '+Math.round(remaining())+' m';hud.querySelector('small').textContent=status==='blocked'?'The path changed. Open L to choose another stop.':next[1]>p[1]+.5?'Take the teal-lit stair up':next[1]<p[1]-.5?'Follow the stair down':Math.abs(angle)>2.3?'Turn around toward the path':Math.abs(angle)<.35?'Continue along the path':angle>0?'Bear left at the next turn':'Bear right at the next turn';hud.querySelector('#cg-guide-arrow').textContent=status==='blocked'?'!':Math.abs(angle)>2.3?'↓':Math.abs(angle)<.35?'↑':angle>0?'←':'→';
+ hud.querySelector('b').textContent=selected.title+' · '+Math.round(remaining())+' m';hud.querySelector('small').textContent=status==='blocked'?'The path changed. Open L to choose another stop.':next[1]>p[1]+.5?'Take the teal-lit stair up':next[1]<p[1]-.5?(p[0]>147?'Follow the terrace steps down':'Follow the stair down'):Math.abs(angle)>2.3?'Turn around toward the path':Math.abs(angle)<.35?'Continue along the path':angle>0?'Bear left at the next turn':'Bear right at the next turn';hud.querySelector('#cg-guide-arrow').textContent=status==='blocked'?'!':Math.abs(angle)>2.3?'↓':Math.abs(angle)<.35?'↑':angle>0?'←':'→';
 }
 window.addEventListener('keydown',e=>{
  if(panel){if(e.code==='Escape'||e.code==='KeyL'&&!e.repeat){e.preventDefault();close()}else if(e.code==='Tab'){const nodes=[...panel.querySelectorAll('button')],i=nodes.indexOf(document.activeElement);e.preventDefault();nodes[(i+(e.shiftKey?-1:1)+nodes.length)%nodes.length]?.focus()}e.stopImmediatePropagation();return;}

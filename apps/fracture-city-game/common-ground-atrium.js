@@ -38,58 +38,8 @@ Chunk.prototype.generate=function(){
   if(z>=30&&z<40&&x<188)continue;
   box(x+2,1.008,z+2,3.96,.012,3.96,((x+z)/4)%3===0?'pavingAlt':'paving');
  }
- // Atelier: keep its editable interior, stair, doorway and roof-run intact.
- // A deeply layered pale frontage replaces the old board-and-trim shopfront.
- for(const [x,w]of [[151,6],[161,6]]){
-  box(x,2.45,20.035,w,.9,.10,'dark');
-  box(x,6.5,20.035,w,1,.12,'stone');
- }
- for(const x of [148.5,153.5,158.5,163.5]){
-  box(x,4.6,20.08,.4,5.2,.25,'stone');
-  box(x+.18,4.6,20.24,.035,4.9,.08,'bronze');
- }
- for(const x of [148.02,163.98])box(x,4.5,12,.06,5,16,'stone');
- // Keep the studio open to the sky: the roof is an edge frame, not a solid slab.
- for(const x of [148.2,163.8])box(x,7.35,12,.45,.45,16.8,'stone');
- for(const z of [4.2,19.8])box(156,7.35,z,16.8,.45,.45,'stone');
- // Layered horizontal blades create shade and depth above the exhibition bays.
- for(let i=0;i<5;i++)box(156,7.45+i*.19,20.3-i*.38,17.4-i*.25,.12,1.4,'stone');
- box(156,7.28,21.03,16.8,.05,.08,'light');
- sign(156,6.5,20.2,'ATELIER 01','YOUR STUDIO / OPEN TO POSSIBILITY',7,.8);
- for(const x of [150,151,152,160,161,162])box(x,6.97,20.26,.10,.38,.10,'bronze');
- // A sculptural roof crest rises from the roof-walk structure across the court.
- // The elliptical shell is supported by two masonry piers, leaving the view
- // and the existing stairs clear beneath its span.
- for(const x of [173,187]){stamp(x,6,5,1,2,1,136);box(x+.5,7,5.5,1.03,2,1.03,'dark');}
- if(local(180,10)){
-  const shape=new THREE.Shape();shape.absellipse(0,0,7,7,0,Math.PI,false);shape.lineTo(-6.3,0);shape.absellipse(0,0,6.3,6.3,Math.PI,0,true);shape.closePath();
-  const arch=mesh(new THREE.ExtrudeGeometry(shape,{depth:1.3,bevelEnabled:true,bevelThickness:.12,bevelSize:.12,bevelSegments:2,steps:1,curveSegments:48}),'stone',180.5,8,5.5);
-  if(arch){arch.name='forum-roof-crest';arch.userData.fcSupport={points:[[173,7,5],[187,7,5]]}}
- }
- for(const z of [6,9,12])box(180.5,8,z,16,.22,.28,'bronze');
- // The roof walk remains usable; its edge reads as a balcony rather than a shed.
- for(const x of [173.15,187.85]){box(x,6.65,10,.08,1.3,9,'dark');for(let z=6;z<14;z+=.5)box(x,6.65,z,.12,1.3,.05,'bronze');}
- for(const [x,w]of [[174,2],[182.5,9]])box(x,7.1,15.04,w,1.3,.1,'stone');
- sign(182.5,6.98,15.24,'THE FORUM','ROOF WALK / LISTEN / MEET',7,.7);
- // A shallow barrel-vault portico gives the studio its own silhouette.
- for(const x of [148,163]){stamp(x,7,19,1,2,1,120);box(x+.5,8,19.5,1.04,2,1.04,'stone');}
- if(local(156,19)){
-  const profile=new THREE.Shape();profile.absellipse(0,0,8,2.7,0,Math.PI,false);profile.lineTo(-7.7,0);profile.absellipse(0,0,7.7,2.4,Math.PI,0,true);profile.closePath();
-  const vault=mesh(new THREE.ExtrudeGeometry(profile,{depth:3.1,steps:1,bevelEnabled:true,bevelThickness:.08,bevelSize:.08,bevelSegments:2,curveSegments:40}),'stone',156,9,18.3);if(vault)vault.userData.fcSupport={points:[[148,8,19],[163,8,19]]};
- }
- // Recessed bronze fins and a continuous stone plinth finish the roof terrace.
- for(const x of [173.5,187.5])for(const z of [5.5,14.5])box(x,3,z,1.04,4,1.04,'stone');
- box(180.5,5.5,15.03,15.1,1.02,.08,'stone');
- for(let x=178.5;x<187;x+=.45)box(x,6.7,15.11,.05,1.2,.08,'bronze');
- // Low plinth hides raw timber end-grain while keeping the doorway landing.
- box(156,1.51,20.015,16,1.02,.045,'stone');
- for(const x of [148.015,163.985])box(x,1.51,12,.045,1.02,16,'stone');
- // Detailed treads and handrails follow the existing playable roof staircase.
- for(let i=0;i<5;i++)box(176.5,2.035+i,19.5-i,3,.07,.95,'stone');
- if(local(176,18))for(const x of [174.9,178.1]){
-  const curve=new THREE.CatmullRomCurve3([new THREE.Vector3(x,2.9,19.7),new THREE.Vector3(x,4.8,17.5),new THREE.Vector3(x,6.9,15.3)]);
-  const rail=new THREE.Mesh(new THREE.TubeGeometry(curve,16,.055,6,false),mats.bronze);rail.userData.fcSupport={points:[[175,1,19],[175,5,15]]};root.add(rail);
- }
+ // The former Atelier and Forum are now the Conservatory Garden.
+ // Its planting and furniture stream separately in common-ground-garden.js.
  // Long sheltered south gallery, with generous gaps and an open promenade.
  // Posts sit behind the exhibits; the central north-south route stays clear.
  for(const x of [145,159,187]){
@@ -125,8 +75,8 @@ Chunk.prototype.generate=function(){
  // The new court's west edge has a planted pocket, kept out of the gallery path.
  for(const x of [148,153,158]){stamp(x,0,55,3,1,3,B_GRASS);box(x+1.5,1.03,55,3,.06,.08,'bronze');}
  for(const [key,parts]of batches){if(!parts.length)continue;const m=new THREE.InstancedMesh(new THREE.BoxGeometry(1,1,1),mats[key],parts.length),p=new THREE.Object3D();m.name='common-ground-'+key;m.frustumCulled=false;m.userData._hdTag=1;m.userData.groundRows=parts;parts.forEach((r,i)=>{p.position.fromArray(r.p);p.scale.fromArray(r.s);p.updateMatrix();m.setMatrixAt(i,p.matrix)});root.add(m)}
- // Two shadowless pools of warm light mark the studio and gallery at night.
- for(const [x,y,z]of [[156,7,22],[168,6,64]])if(local(x,z)){const lamp=new THREE.PointLight(0xffd6a0,.8,24,2);lamp.position.set(x,y,z);lamp.visible=false;root.add(lamp);chunk.lights.push(lamp)}
+ // The gallery retains its existing night light.
+ for(const [x,y,z]of [[168,6,64]])if(local(x,z)){const lamp=new THREE.PointLight(0xffd6a0,.8,24,2);lamp.position.set(x,y,z);lamp.visible=false;root.add(lamp);chunk.lights.push(lamp)}
  // Discard materials unused by this streamed chunk. Shared texture stays alive.
  const used=new Set();root.traverse(o=>{if(o.material)used.add(o.material)});for(const m of Object.values(mats))if(!used.has(m))m.dispose();
  return result;
