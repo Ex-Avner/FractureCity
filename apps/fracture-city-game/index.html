@@ -20776,7 +20776,8 @@ function shMapDraw(){
 
   // ── The job ────────────────────────────────────────────────────────────
   const task = State.task;
-  const goal = task && task.target && Number.isFinite(task.target.x) ? task.target : null;
+  const walkingGoal = window.FCCommonGroundGuide?.goal();
+  const goal = walkingGoal ? {x:walkingGoal.p[0],z:walkingGoal.p[2]} : task && task.target && Number.isFinite(task.target.x) ? task.target : null;
   if (goal){
     const x = toX(goal.x), y = toY(goal.z);
     MAP.ping = (MAP.ping + 0.14) % 6;
@@ -29960,7 +29961,7 @@ document.addEventListener('DOMContentLoaded', init);
 <script src="city-art.js?v=0.71.0"></script>
 <script src="art-direct.js?v=0.71.0"></script>
 <script src="movement-flow.js?v=0.55.0"></script>
-<script src="own-the-block.js?v=0.81.0"></script>
+<script src="own-the-block.js?v=0.90.1"></script>
 <script src="art-collection.js?v=0.55.0"></script>
 <script src="furniture-catalogue.js?v=0.71.0"></script>
 <script>window.FC_ACCOUNTS_OPTIONAL=true;</script>
@@ -29969,7 +29970,7 @@ document.addEventListener('DOMContentLoaded', init);
 <script src="media-upload.js?v=0.60.0"></script>
 <script src="social-world.js?v=0.85.0"></script>
 <script src="social-city.js?v=0.75.0"></script>
-<script src="news-hub.js?v=0.72.0"></script>
+<script src="news-hub.js?v=0.90.1"></script>
 <script src="common-ground-library.js?v=0.69.0"></script>
 <script src="physical-support.js?v=0.55.0"></script>
 <script src="screen-zombies.js?v=0.55.0"></script>
@@ -29982,14 +29983,14 @@ document.addEventListener('DOMContentLoaded', init);
 <script src="city-structures.js?v=0.87.0"></script>
 <script src="city-online.js?v=0.85.0"></script>
 <script src="city-flow.js?v=0.70.0"></script>
-<script src="online-tour.js?v=0.75.0"></script>
+<script src="online-tour.js?v=0.90.1"></script>
 <script src="world-materials.js?v=0.66.0"></script>
 <script src="sodium-noir.js?v=0.90.0"></script>
 <script src="npc-voices.js?v=0.82.0"></script>
 <script src="city-wildlife.js?v=0.65.0"></script>
 <script src="the-seam.js?v=0.70.0"></script>
 <script src="skate-lines.js?v=0.67.0"></script>
-<script src="reading-garden.js?v=0.90.0"></script>
+<script src="reading-garden.js?v=0.90.1"></script>
 <script src="common-ground-atrium.js?v=0.75.0"></script>
 <script src="chainfire-cabinet.js?v=0.72.0"></script>
 <script src="common-challenge.js?v=0.75.0"></script>
@@ -30007,6 +30008,7 @@ document.addEventListener('DOMContentLoaded', init);
 <script src="social-hub.js?v=0.83.0"></script>
 <script src="phone-hud.js?v=0.85.0"></script>
 <script src="soundstage.js?v=0.88.0"></script>
-<script src="common-ground-megastructure.js?v=2.1.0"></script>
+<script src="common-ground-megastructure.js?v=3.0.0"></script>
+<script src="common-ground-guide.js?v=1.0.0"></script>
 </body>
 </html>

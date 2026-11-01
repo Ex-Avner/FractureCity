@@ -5,13 +5,13 @@
  */
 (function(){'use strict';
 if(typeof THREE==='undefined'||typeof State==='undefined')return;
-const PLAN=Object.freeze({version:2,name:'The Lantern Hall',floor:1,roof:193,
+const PLAN=Object.freeze({version:3,name:'The Lantern Hall',floor:1,roof:193,
  center:{x:178.5,z:36},atrium:{x0:140,x1:217,z0:-2,z1:72},
  publicLevels:[1,7],overlook:{x0:140,x1:146,z0:42,z1:62,y:7},
  stair:{x0:140,x1:144,z0:30,z1:42,rise:.25,going:.5,steps:24},
  protectedPlots:{x0:192,x1:288,z0:48,z1:120}});
-let root=null,scene=null,resources=[],seed=401,lightRig=null,floorAt=-Infinity,blend=0;
-const floorPose=new THREE.Object3D();
+let root=null,scene=null,resources=[],seed=401,lightRig=null,floorAt=-Infinity,blend=0,kinetic=[];
+const floorPose=new THREE.Object3D(),reducedMotion=matchMedia('(prefers-reduced-motion: reduce)');
 const batches=new Map(),mats={},solids=[],fogColor=new THREE.Color(0x24383e);
 const arches=[[-2,98],[22,126],[46,158],[72,192]];
 function rand(){seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296;}
@@ -30,6 +30,10 @@ for(const x of [140,144])for(let i=0;i<24;i++)solid(x,1+(i+1)*.25+.65,30+i*.5+.2
 for(const side of [-1,1])for(let j=0;j<4;j++){if(side===1&&j===3)continue;const h=[38,64,88,116][j];solid(side<0?136:222,1+h/2,4+j*19,6,h,15,'district');}
 for(const x of [138,220])for(const z of [5,46,72]){if(x===220&&z>=48)continue;solid(x,5.5,z,4,9,3,'podium');}
 for(const x of [147,209]){solid(x,32,72,18,62,2,'rear');solid(x,6,70.7,16,10,.6,'rear-face');}
+// Furniture lives out of the walking corridors, with collision matching its base.
+for(const x of [160.7,173.3]){solid(x,1.32,28,2.7,.64,.85,'arrival-seat');solid(x,1.97,27.6,2.7,.85,.1,'seat-back');}
+for(const z of [49,56]){solid(140.85,7.32,z,.9,.64,2.4,'lounge-seat');solid(140.42,7.9,z,.13,1,2.4,'seat-back');}
+solid(140.9,7.38,52.5,.8,.76,1.6,'lounge-table');
 const generate=Chunk.prototype.generate;
 Chunk.prototype.generate=function(){
  const result=generate.apply(this,arguments),ox=this.originX,oz=this.originZ;
@@ -97,6 +101,8 @@ function districts(){
     const front=178.5+side*(38.5*Math.sqrt(Math.max(.1,1-Math.pow((y+3)/vaultHeight,2)))-3.2);
     box('district','stone',front-side*depth/2,y-2.6,z,depth,.65,14);
     box('district','glass',front-side*.08,y+.1,z,.16,4,11);
+    box('district','stone',front-side*depth/2,y+2.4,z,depth,.3,14);
+    for(const dz of [-6.8,6.8])box('district','stone',front-side*depth/2,y,z+dz,depth,4.6,.24);
     for(let p=-4;p<=4;p+=2)box('district',((tier+j+p)%3===0)?'amber':'darkglass',front-side*.2,y+.1,z+p,.12,3,1.7);
     box('district','bronze',front-side*depth,y-1.6,z,.08,.12,14);
     if(tier%3===1)for(let p=-6;p<=6;p+=.6)box('fins','bronze',front-side*.5,y,z+p,.35,5.8,.065);
@@ -152,30 +158,112 @@ function overlook(){
  for(const x of [140,146]){box('rails','bronze',x,8.4,52,.08,.08,20);for(let z=42;z<=62;z+=1)box('rails','metal',x,7.7,z,.05,1.4,.05);}
  box('rails','bronze',145,8.4,42,2,.08,.08);for(const x of [144,145,146])box('rails','metal',x,7.7,42,.05,1.4,.05);
  box('rails','bronze',143,8.4,62,6,.08,.08);for(let x=140;x<=146;x++)box('rails','metal',x,7.7,62,.05,1.4,.05);
- lettering('THE OVERLOOK','FOLLOW THE BRASS STEPS',142,2.6,29.7,3,.8,Math.PI);
- lettering('A PLACE TO BEGIN','COMMON GROUND / LEVEL 01',139.85,8.8,52,6,1,Math.PI/2);
+ lettering('OVERLOOK  /  LOUNGE','UP THE TEAL-LIT STAIR',142,2.6,29.7,3,.8,Math.PI);
+
 }
 function lantern(){
- // Broken oculus, sized to be seen from the actual arrival, rather than 160m away.
- const g=new THREE.Group();g.name='the-fractured-lantern';g.position.set(167,23,54);g.rotation.y=.15;root.add(g);
+ const g=new THREE.Group();g.name='the-fractured-lantern';g.position.set(167,17,53);g.rotation.y=.12;root.add(g);
  for(let i=0;i<5;i++){
-  const a=i*Math.PI*2/5+.06,arc=Math.PI*2/5-.13;
-  const geo=new THREE.TorusGeometry(9.5,.72,10,48,arc),m=new THREE.Mesh(geo,mats.bronze);m.rotation.z=a;m.position.z=(i%2)*.6;g.add(m);resources.push(geo);
-  const innerGeo=new THREE.TorusGeometry(8.8,.10,6,48,arc),line=new THREE.Mesh(innerGeo,mats.glow);line.rotation.z=a;line.position.z=-.7+(i%2)*.6;g.add(line);resources.push(innerGeo);
+  const group=new THREE.Group(),a=i*Math.PI*2/5+.06,arc=Math.PI*2/5-.15;g.add(group);
+  const geo=new THREE.TorusGeometry(7.2,.55,10,40,arc),m=new THREE.Mesh(geo,mats.bronze);m.rotation.z=a;group.add(m);resources.push(geo);
+  const innerGeo=new THREE.TorusGeometry(6.62,.08,6,40,arc),line=new THREE.Mesh(innerGeo,mats.glow);line.rotation.z=a;line.position.z=-.55;group.add(line);resources.push(innerGeo);
+  kinetic.push({object:group,axis:'z',base:i%2*.38,amplitude:.13,phase:i*1.3,speed:.22});
  }
- // Dark vertical stone blade pierces the ring; deliberate fracture gaps remain.
- for(let i=0;i<3;i++)box('lantern','concrete',167+(i-1)*.7,17+i*6.8,54,2.8,6,2,[0,0,(i-1)*.045]);
- for(const x of [157.5,176.5]){const anchorY=1+169.2*Math.sqrt(1-Math.pow((x-178.5)/39.5,2));beam('lantern','metal',[x,23,54],[x,anchorY,54],.075);}
- // Soft halo behind the actual object; subtle and bounded, no full-screen fog cards.
- const c=document.createElement('canvas');c.width=c.height=256;const ctx=c.getContext('2d'),grad=ctx.createRadialGradient(128,128,30,128,128,128);grad.addColorStop(0,'rgba(255,183,84,.10)');grad.addColorStop(.5,'rgba(255,183,84,.035)');grad.addColorStop(1,'rgba(255,183,84,0)');ctx.fillStyle=grad;ctx.fillRect(0,0,256,256);
- const t=new THREE.CanvasTexture(c),mat=new THREE.MeshBasicMaterial({map:t,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,side:THREE.DoubleSide});resources.push(t,mat);mesh(new THREE.PlaneGeometry(29,29),mat,'lantern-halo',[167,23,55]);
+ for(let i=0;i<3;i++){
+  const stone=mesh(new THREE.BoxGeometry(2.4,4.1,1.8),mats.concrete,'suspended-stone',[167+(i-1)*.72,12.3+i*4.8,53]);stone.rotation.z=(i-1)*.065;
+  kinetic.push({object:stone,axis:'y',base:stone.position.y,amplitude:.14,phase:i*1.8,speed:.28});
+ }
+ for(const x of [159.8,174.2]){const anchorY=1+168*Math.sqrt(1-Math.pow((x-178.5)/39.5,2));beam('lantern','metal',[x,17,53],[x,anchorY,53],.055);}
+ const c=document.createElement('canvas');c.width=c.height=256;const ctx=c.getContext('2d'),grad=ctx.createRadialGradient(128,128,30,128,128,128);grad.addColorStop(0,'rgba(255,183,84,.13)');grad.addColorStop(.5,'rgba(255,183,84,.045)');grad.addColorStop(1,'rgba(255,183,84,0)');ctx.fillStyle=grad;ctx.fillRect(0,0,256,256);
+ const t=new THREE.CanvasTexture(c),mat=new THREE.MeshBasicMaterial({map:t,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,side:THREE.DoubleSide});resources.push(t,mat);mesh(new THREE.PlaneGeometry(23,23),mat,'lantern-halo',[167,17,54]);
+}
+// A shared sign atlas keeps every destination readable without a draw call per sign.
+function streetLife(){
+ const cv=document.createElement('canvas');cv.width=2048;cv.height=1024;const ctx=cv.getContext('2d');
+ const labels=[
+  ['06','THEORY','LIBRARY • E TO READ', '#dfb36d'],
+  ['02','LISTEN','MUSIC & DISCOVERY','#acb9e3'],
+  ['03','PLAY','FREE ARCADE GAMES','#e59170'],
+  ['04','GALLERY','ART BY REAL PEOPLE','#e59170'],
+  ['05','OVERLOOK','STAIRS TO THE LOUNGE','#80cfc0'],
+  ['','READING GARDEN','WALK UP TO THE WALL • PRESS E','#dfb36d'],
+  ['','FIND YOUR PLACE','L  /  OPEN THE DIRECTORY','#f0dfbc'],
+  ['','THE OVERLOOK','REST • WATCH THE CITY','#80cfc0']
+ ];
+ labels.forEach(([n,title,sub,color],i)=>{const x=i%2*1024,y=Math.floor(i/2)*256;
+  ctx.fillStyle='#13272a';ctx.fillRect(x,y,1024,256);ctx.fillStyle=color;ctx.fillRect(x,y,12,256);
+  ctx.font='500 42px sans-serif';ctx.textAlign='left';ctx.fillText(n,x+48,y+68);
+  ctx.font='600 66px sans-serif';ctx.fillStyle='#fff0d5';ctx.fillText(title,x+48,y+145,940);
+  ctx.font='400 25px sans-serif';ctx.fillStyle=color;ctx.fillText(sub,x+48,y+211,940);
+ });
+ const tex=new THREE.CanvasTexture(cv);tex.encoding=THREE.sRGBEncoding;tex.anisotropy=4;resources.push(tex);
+ const sm=new THREE.MeshBasicMaterial({map:tex});resources.push(sm);
+ const verts=[],uvs=[],ids=[];
+ function sign(i,x,y,z,w,h,ry=Math.PI){
+  // Separate outward-facing quads keep the lettering correct from either side.
+  for(const angle of [ry,ry+Math.PI]){const k=verts.length/3,c=Math.cos(angle),s=Math.sin(angle),u=i%2/2,v=1-Math.floor(i/2)/4;
+   for(const [px,py,tu,tv]of [[-w/2,-h/2,0,-.25],[w/2,-h/2,.5,-.25],[w/2,h/2,.5,0],[-w/2,h/2,0,0]]){verts.push(x+px*c,y+py,z-px*s);uvs.push(u+tu,v+tv)}ids.push(k,k+1,k+2,k,k+2,k+3);
+  }
+ }
+ // Suspended threshold signs distinguish the three immediate choices.
+ for(const [i,x,color]of [[0,155,'amber'],[1,179,'lilac']]){
+  box('life',color,x,5.6,25.5,7,.12,2.8);
+  for(const px of [x-3.4,x+3.4])beam('life','metal',[px,5.6,25.5],[px,8.8,22],.045);
+  sign(i,x,4.55,26.7,5.2,1.3);
+  for(let n=0;n<7;n++)box('life','wood',x-3+n,5.38,25.5,.45,.1,2.6);
+ }
+ // Keep the axial view of the landmark open; labels belong at the entrances.
+ sign(2,149,4.75,29.1,4,1,Math.PI/2);
+ // The gallery already has its own clear, full-width architectural title.
+ sign(4,143,4.6,28.6,5.4,1.35);for(const x of [140.4,145.6])beam('life','metal',[x,5.3,28.6],[x,9.4,22],.04);
+ sign(7,140.05,9.4,54,5.5,1.375,Math.PI/2);
+ const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.Float32BufferAttribute(verts,3));geo.setAttribute('uv',new THREE.Float32BufferAttribute(uvs,2));geo.setIndex(ids);geo.computeVertexNormals();mesh(geo,sm,'destination-signs');
+ // Seats are at the edge of the arrival and have clear approaches.
+ for(const x of [160.7,173.3]){
+  box('life','wood',x,1.45,28,2.7,.2,.85);box('life','terracotta',x,1.58,28,2.55,.12,.75);
+  box('life','wood',x,1.97,27.6,2.7,.85,.1);for(const xx of [x-1,x+1])box('life','metal',xx,1.23,28,.12,.45,.7);
+ }
+ // A furnished upper refuge, under a slatted canopy tied back to the wall.
+ for(const z of [49,56]){
+  box('life','wood',140.85,7.43,z,.9,.24,2.4);box('life','terracotta',140.93,7.58,z,.76,.12,2.25);
+  box('life','wood',140.42,7.9,z,.13,1,2.4);
+  for(const dz of [-1,1])box('life','metal',140.85,7.2,z+dz,.7,.4,.1);
+ }
+ box('life','wood',140.9,7.73,52.5,.8,.08,1.6);box('life','metal',140.9,7.38,52.5,.1,.76,1.1);
+ // Books and cups, seen close up, make the lounge read as used.
+ for(let i=0;i<3;i++)box('life',i%2?'terracotta':'lilac',140.9,7.81+i*.045,52.4,.36,.045,.5,[0,i*.12,0]);
+ for(const z of [52,53]){box('life','cream',141.1,7.88,z,.13,.2,.13);box('life','bronze',141.1,7.99,z,.08,.015,.08);}
+ box('life','metal',142.5,11.3,53.5,5.8,.2,13);
+ for(let z=47.2;z<60;z+=.5)box('life','wood',142.5,11.12,z,5.7,.14,.26);
+ for(const z of [49,56]){
+  beam('life','bronze',[142.5,11.2,z],[142.5,9.7,z],.04);
+  box('life','cream',142.5,9.6,z,.65,.25,.65);box('life','glow',142.5,9.46,z,.5,.025,.5);
+ }
+ for(let z=44;z<61;z+=2)box('life','teal',145.86,7.035,z,.10,.025,.6);
+ box('life','teal',143.1,7.035,43.3,2.2,.025,.08);for(let z=43.5;z<51;z+=1)box('life','teal',144.2,7.035,z,.08,.025,.45);
+ for(let i=0;i<24;i++)box('life','teal',143.7,1+(i+1)*.25+.03,30+i*.5+.08,.12,.02,.2);
+ // Tall textile drops soften selected galleries; rooms keep all their existing depth.
+ for(const [x,z,color]of [[154,46,'terracotta'],[184,46,'lilac']]){
+  box('life',color,x,13,z,1.4,7,.06);box('life','bronze',x,16.6,z,1.7,.1,.12);
+  for(let n=0;n<7;n++)box('life','bronze',x-.6+n*.2,9.3,z,.03,.4,.04);
+ }
+ // Hanging plants occupy existing roof edges, not the circulation floor.
+ for(const [x,z,y]of [[151,25.3,5.3],[183,25.3,5.3],[140.4,58.5,10.8]]){
+  box('life','bronze',x,y,z,.55,.38,.55);
+  for(let i=0;i<14;i++){const angle=i*2.399,dy=i*.085;box('life','leaf',x+Math.sin(angle)*.3,y-.2-dy,z+Math.cos(angle)*.3,.22,.12,.26,[0,angle,.25]);}
+ }
+ // A small kinetic chime over the listening canopy echoes the fractured ring.
+ const chime=mesh(new THREE.TorusGeometry(.55,.035,6,24),mats.bronze,'listening-chime',[179,6.8,25.5]);
+ kinetic.push({object:chime,axis:'ry',base:0,amplitude:.35,phase:0,speed:.35});
+ beam('life','metal',[179,7.4,25.5],[179,8.8,22],.025);
 }
 function build(){
  root=new THREE.Group();root.name='common-ground-megastructure';scene.add(root);const concrete=texture('concrete'),stone=texture('stone');
  material('concrete',0xb8b3a3,.88,.02,.10,concrete);material('stone',0x62716c,.68,.08,.10,stone);material('basalt',0x263c3e,.7,.10,.13,stone);
  material('metal',0x1b3034,.6,.5,.12);material('bronze',0xb79960,.46,.65,.18);material('glass',0x1c353b,.35,.2,.18);material('darkglass',0x102b33,.4,.1,.18);material('amber',0xbc9b65,.6,.1,.8);
+ material('wood',0x9c7250,.78,.04,.08);material('terracotta',0x9d5040,.85,0,.15);material('lilac',0x687aa0,.8,.05,.22);material('teal',0x80cfc0,.65,.05,.65);material('cream',0xe4d4af,.85,0,.28);material('leaf',0x507b5a,.95,0,.1);
  material('glow',0xffddb0,.5,0,1.8);material('vault',0x26393b,.9,0,.16,concrete);mats.vault.side=THREE.DoubleSide;
- for(const [z,h]of arches)arch(z,h);vault();districts();court();overlook();lantern();
+ for(const [z,h]of arches)arch(z,h);vault();districts();court();overlook();lantern();streetLife();
  // Broad footing collars make the structural load path explicit at eye level.
  for(const [z]of arches)for(const x of [141.5,215.5]){box('feet','basalt',x,1.6,z,3,1.2,3);for(const yy of [2.3,4.1,6])box('feet','bronze',x,yy,z,3,.07,3);}
  const geo=new THREE.BoxGeometry(1,1,1);resources.push(geo);const pose=new THREE.Object3D();let instances=0;
@@ -192,7 +280,7 @@ function build(){
  const lamps=[];for(const [x,y,z,c,intensity,d]of [[167,20,48,0xffd29a,2.4,65],[167,7,25,0xffdfb4,1.4,28],[144,12,48,0x8ebfc6,1.2,40]]){const l=new THREE.PointLight(c,0,d,1.4);l.position.set(x,y,z);l.castShadow=false;rig.add(l);lamps.push(l)}
  lightRig={hemi,lamps,rig};API.stats={instances,batches:root.children.filter(o=>o.isInstancedMesh).length,lights:4,colliders:solids.length};
 }
-function dispose(){root?.traverse(o=>{if(o.isInstancedMesh)o.dispose?.()});root?.removeFromParent();lightRig?.rig.removeFromParent();for(const r of new Set(resources))r.dispose?.();resources=[];batches.clear();for(const k of Object.keys(mats))delete mats[k];scene=null;root=null;lightRig=null;floorAt=-Infinity;}
+function dispose(){root?.traverse(o=>{if(o.isInstancedMesh)o.dispose?.()});root?.removeFromParent();lightRig?.rig.removeFromParent();for(const r of new Set(resources))r.dispose?.();resources=[];batches.clear();for(const k of Object.keys(mats))delete mats[k];scene=null;root=null;lightRig=null;floorAt=-Infinity;kinetic=[];}
 function refreshFloor(){
  if(!root)return;for(const m of root.children){const rows=m.userData.hallFloor;if(!rows)continue;
  rows.forEach((r,i)=>{const ok=[[-.5,-.5],[-.5,.5],[.5,-.5],[.5,.5]].every(([dx,dz])=>isSolid(getBlock(Math.floor(r.p[0]+dx),0,Math.floor(r.p[2]+dz))));floorPose.position.fromArray(r.p);floorPose.rotation.set(0,0,0);floorPose.scale.fromArray(ok?r.s:[0,0,0]);floorPose.updateMatrix();m.setMatrixAt(i,floorPose.matrix)});m.instanceMatrix.needsUpdate=true;
@@ -201,6 +289,8 @@ function refreshFloor(){
 function update(){
  if(!State.scene)return;if(scene!==State.scene){dispose();scene=State.scene;seed=401;build()}
  if(performance.now()-floorAt>500){refreshFloor();floorAt=performance.now();}
+ const now=performance.now()*.001,reduced=reducedMotion.matches;
+ for(const k of kinetic){const value=k.base+(reduced?0:Math.sin(now*k.speed+k.phase)*k.amplitude);if(k.axis==='ry')k.object.rotation.y=value;else k.object.position[k.axis]=value;}
  const p=Player.position,dx=Math.abs(p.x-179),dz=Math.abs(p.z-36);root.visible=dx<190&&dz<170;
  blend=Math.max(0,Math.min(1,(47-dx)/8,(46-dz)/10));
  // Fog is applied through Real Light's zone hook (below), so the look table,

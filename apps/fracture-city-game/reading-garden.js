@@ -230,7 +230,7 @@ function build(){
  view.plaque = plane(pl, 5.3, 2, new THREE.MeshBasicMaterial({ color: 0xffffff }), 0, 0, -.03, Math.PI);
  box(pl, 5.7, .06, .3, mat('lampbar', () => new THREE.MeshBasicMaterial({ color: 0xffe2a8 })), 0, -1.2, -.25);
  //  The title band along the cornice.
- const tb = plane(root, 8, .85, new THREE.MeshBasicMaterial({ map: titleTexture(), transparent:true, depthWrite:false }), CX, WALL.top + .15, WALL.z - .08, Math.PI); tb.name = 'reading-wall-title';
+ const tb = plane(root, 12, 1.3, new THREE.MeshBasicMaterial({ map: titleTexture(), transparent:true, depthWrite:false }), CX, WALL.top + .7, WALL.z - .08, Math.PI); tb.name = 'reading-wall-title';
  //  Reading lamps either side of the plaque.
  for (const s of [-1, 1]){
   const g = new THREE.Group(); g.position.set(CX + s * 4.3, 1, WALL.z - .7); root.add(g);

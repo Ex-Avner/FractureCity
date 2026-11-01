@@ -27,7 +27,7 @@ setInterval(()=>{
  if(!window.FCCityOnline?.ready||!FCAccounts.user||window.FCResidentLife?.blocked)return;
  if(user!==FCAccounts.user.id){user=FCAccounts.user.id;let stored={};try{stored=JSON.parse(localStorage.getItem('fc-first-walk:'+user)||'{}')}catch{}progress=FCResidentLife.get('tour',Object.assign(fresh(),stored));}
  if(window.NPCVoices?.open)mark('met');
- const p=Player.position;if(window.PalmMedia?.audio&&!PalmMedia.audio.paused&&Math.hypot(p.x-171,p.z-29.5)<9)mark('listened');
+ const p=Player.position;if(window.PalmMedia?.audio&&!PalmMedia.audio.paused&&Math.hypot(p.x-179,p.z-26.9)<4)mark('listened');
  if(window.FCSeam?.state?.plots.some(p=>p.crop)||window.FCSeam?.state?.harvests>0)mark('planted');
  if(window.CitySocial?.works.some(w=>w.artist.id===user)||window.FCStructures?.mine?.cells.length)mark('published');
 },500);
@@ -36,7 +36,7 @@ window.FCOnlineTour={open,close,get progress(){return progress},meet(){if(user&&
  const i=steps.findIndex(([k])=>!progress[k]);if(i<0)return null;
  let p=steps[i][3];
  if(i===2&&window.FCSeam){const bed=FCSeam.state.plots.findIndex(p=>p.open&&!p.crop);if(bed>=0)p=[FCSeam.BEDS[bed][0]+2,2,FCSeam.BEDS[bed][1]];}
- if(i===3){const slot=Array.from({length:8},(_,i)=>i).find(i=>!CitySocial.works.some(w=>w.slot===i));if(slot!=null)p=[148+slot*5,1,41];else if(FCStructures?.mine)p=[FCStructures.mine.plot.x+3.5,1,FCStructures.mine.plot.z-1];}
+ if(i===3){const slot=Array.from({length:8},(_,i)=>i).find(i=>!CitySocial.works.some(w=>w.slot===i));if(slot!=null)p=[148+slot*5,1,62];else if(FCStructures?.mine)p=[FCStructures.mine.plot.x+3.5,1,FCStructures.mine.plot.z-1];}
  return{p,text:'FIRST WALK '+(i+1)+'/4 · '+steps[i][1]+' · Tools: skip/help'};
 }};
 })();
