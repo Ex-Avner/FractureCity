@@ -26,7 +26,7 @@ try{
    return out};
   //  Common Ground arrival: Ned's invite, its Later button and the goal are up together.
   await p.evaluate(()=>{Player.position.set(167,1+Player.height,30);Player.yaw=0});
-  const a=await check('arrival');assert.ok(a.ids.includes('minimap')&&a.ids.includes('fc-tools')&&a.ids.includes('city-online'),JSON.stringify(a.ids));
+  const a=await check('arrival');assert.ok(a.ids.includes('minimap')&&!a.ids.includes('fc-tools')&&!a.ids.includes('city-online'),JSON.stringify(a.ids));
   //  The PvP bar only shows once you are hurt.
   assert.equal(await p.evaluate(()=>getComputedStyle(document.querySelector('#city-pvp .pv-hp')).display),'none','no PvP bar at full health');
   //  Hurt, at the Oh No Ned cabinet: the PvP bar, its play prompt and the invite stack.
@@ -35,7 +35,7 @@ try{
   await p.waitForFunction(()=>!document.querySelector('#city-pvp .pv-hp').hidden,null,T);
   const b=await check('prompts');assert.ok(b.ids.includes('pv-hp'),JSON.stringify(b.ids));me.hp=100;
   //  The opened online panel stays on screen.
-  await p.locator('#city-online summary').tap();await check('panel',{panel:true});
+  await p.locator('.tc-chip[data-act=keys]').tap();await p.locator('#mob-keys .grid button').filter({hasText:'Online & friends'}).tap();await p.waitForFunction(()=>document.querySelector('#city-online details')?.open);await check('panel',{panel:true});
   const fits=await p.evaluate(()=>{const r=document.getElementById('city-online').getBoundingClientRect();return r.bottom<=innerHeight+1&&r.right<=innerWidth+1});assert.ok(fits,'online panel fits');
   await p.locator('#city-online summary').tap();
   console.log('PASS '+name+': '+b.ids.join(', ')+' sit apart and on screen');

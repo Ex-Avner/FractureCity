@@ -97,7 +97,7 @@ const EXE = process.env.PW_CHROMIUM || undefined;
       return {
         chipsVsCounter: hit(top, ob), chipsVsTime: hit(top, time), objVsMap: hit(ch, mm), objVsStick: hit(ch, stick),
         abVsObj: hit(ab, ch), distVsChips: hit(dist, top), mapVsActs: hit(mm, acts), mapVsCredits: hit(mm, cr),
-        ctxVsWeapons: hit(mctx, wpn), ctxVsActs: hit(mctx, acts),
+        ctxVsWeapons: hit(mctx, wpn), ctxVsActs: [...document.querySelectorAll('#tc-acts button')].filter(e=>e.offsetWidth&&getComputedStyle(e).visibility!=='hidden').some(e=>hit(mctx,e.getBoundingClientRect())),
         onScreen: [top, ch, mm, acts, stick, wpn].filter(Boolean).every(on), offList: Object.entries({top, ch, mm, acts, stick, wpn}).filter(([k,v]) => v && !on(v)).map(([k,v]) => k + ':' + Math.round(v.left) + ',' + Math.round(v.top) + ',' + Math.round(v.right) + ',' + Math.round(v.bottom)).join(' '),
         casebookBtnHidden: !R('campaign-casebook'),
       };
@@ -117,7 +117,7 @@ const EXE = process.env.PW_CHROMIUM || undefined;
     c.ok('MAP chip does not mute the sound', mapR.sndSame);
     await tapEl('.tc-chip[data-act="map"]'); await wait(150);
 
-    await tapEl('.tc-chip[data-act="case"]');
+    await drawer('Casebook');
     c.ok('CASE chip opens the casebook (KeyJ)', await poll(() => State.ui.inShiftPanel && Shift.panel === 'casebook'));
     c.ok('synthetic J carries code', await ev(() => __keys.some(k => k.startsWith('KeyJ|j|74'))), await ev(() => __keys.slice(-3).join(' ')));
     c.ok('BACK shows over the casebook', await poll(() => Mobile.state().back === '✕ CLOSE'));
@@ -127,13 +127,13 @@ const EXE = process.env.PW_CHROMIUM || undefined;
     await tapEl('#mob-back');
     c.ok('BACK closes the casebook', await poll(() => !State.ui.inShiftPanel));
 
-    await tapEl('.tc-chip[data-act="inv"]');
+    await drawer('Inventory');
     c.ok('ITEMS chip opens the inventory', await poll(() => State.ui.inInventory), await ev(() => __keys.slice(-4).join(' ') + ' ' + JSON.stringify(State.ui) + document.getElementById('touch-layer').style.display));
     //  The 0.81 inventory is a full panel above the touch layer with its own close.
     await tapEl('#fc-inv header [data-close]');
     c.ok('the inventory close button closes it', await poll(() => !State.ui.inInventory));
 
-    await tapEl('.tc-chip[data-act="menu"]');
+    await drawer('Menu');
     c.ok('☰ chip opens the menu', await poll(() => State.ui.paused));
     await shot('3-menu');
     //  The front menu's own Resume is the way back; it must be on screen.
@@ -193,10 +193,10 @@ const EXE = process.env.PW_CHROMIUM || undefined;
       c.ok('ability button sends KeyQ', await ev(() => __keys.slice(__q).some(k => k.startsWith('KeyQ'))));
     }
     await ev(() => shNarrate([{ who: 'ned', text: 'Testing, one, two. This is a long enough line that it types out slowly.' }, { who: 'ned', text: 'Second line.' }]));
-    c.ok('NEXT shows while Ned is talking', await poll(() => document.querySelector('.mob-cb.next').classList.contains('on'), 7000));
+    c.ok('narration remains touch accessible', await poll(() => document.getElementById('narr').offsetWidth > 0, 7000));
     await shot('6-narr');
     const l0 = await ev(() => Narr.line && Narr.line.text);
-    await tapEl('.mob-cb.next'); await wait(100); await tapEl('.mob-cb.next');
+    await tapEl('#narr'); await wait(100); await tapEl('#narr');
     c.ok('NEXT moves the narration on', await poll(t => !Narr.line || Narr.line.text !== t, 1500, l0));
     const l1 = await ev(() => Narr.line && Narr.line.text + '|' + Narr.chars);
     await tapEl('#narr');
@@ -242,9 +242,13 @@ const EXE = process.env.PW_CHROMIUM || undefined;
     c.ok('stick holds W', await poll(() => __w > 0 || __keys.some(k => k.startsWith('KeyW|w|87')), 7000));
     c.ok('stick releases W', await poll(() => !State.keys.has('w'), 7000));
     // ── E is held for as long as the thumb is down (field jobs: hold E) ──
-    await ev(() => { window.__e = []; const t0 = performance.now();
-      document.addEventListener('keydown', e => { if (e.code === 'KeyE') __e.push(['d', performance.now() - t0]); }, true);
-      document.addEventListener('keyup',   e => { if (e.code === 'KeyE') __e.push(['u', performance.now() - t0]); }, true); });
+    await ev(() => { const field=document.getElementById('fc-field');
+      if(field){field.hidden=false;field.style.display='block';field.textContent='Hold E · Test repair';}
+      window.__originalContext=FCPhoneHUD.context;FCPhoneHUD.context=()=>({element:field||document.body,label:'Hold E · Test repair'});
+      Mobile.update();window.__e = []; const t0 = performance.now();
+      // Isolate the hold gesture from nearby NPCs that may open a modal on E.
+      document.addEventListener('keydown', e => { if (e.code === 'KeyE'){ __e.push(['d', performance.now() - t0]); e.stopImmediatePropagation(); } }, true);
+      document.addEventListener('keyup', e => { if (e.code === 'KeyE'){ __e.push(['u', performance.now() - t0]); e.stopImmediatePropagation(); } }, true); });
     await poll(() => document.querySelector('.tc-use').getBoundingClientRect().width > 0, 7000);
     const eb = await ev(() => { const b = document.querySelector('.tc-use').getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top + b.height / 2 }; });
     await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: eb.x, y: eb.y, id: 3 }] });
@@ -256,6 +260,7 @@ const EXE = process.env.PW_CHROMIUM || undefined;
     const fin = await ev(() => __e);
     c.eq('E stays down while held', mid, 'd');
     c.ok('E comes up on release', fin.length === 2 && fin[1][0] === 'u' && fin[1][1] - fin[0][1] > 1500, JSON.stringify(fin));
+    await ev(()=>{FCPhoneHUD.context=window.__originalContext;Mobile.update()});
     await shot('9-end');
 
     c.eq('no page errors', w.pageErrors.length, 0);

@@ -144,10 +144,18 @@ const EVENTS = {
  ashrose: { title: 'Tuber Night', crop: 'tuber', migrant: 'moth', text: 'Sodium tubers grow twice as fast. Lamp moths are swarming the wards.' },
  oxide: { title: 'Quiet Haze', quiet: true, text: 'No Misprints come tonight. Everything grows a quarter faster and your defences count half again while you are away.' },
 };
+// Date localization creates an Intl formatter internally. The almanac is read by
+// every crop/raid tick, but its label only changes when the day does.
+let almanacDay = null, almanacLabel = '';
+const almanacDate = new Intl.DateTimeFormat(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
 function almanac(){
  const hue = window.Grit?.hue || { id: 'oxide', name: 'Oxide Haze' };
  const day = window.Grit?._key || new Date(now()).toISOString().slice(0, 10);
- const label = new Date((String(day).match(/\d{4}-\d{2}-\d{2}/) || [new Date(now()).toISOString().slice(0, 10)])[0] + 'T12:00:00Z').toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
+ if (day !== almanacDay){
+  const date = (String(day).match(/\d{4}-\d{2}-\d{2}/) || [new Date(now()).toISOString().slice(0, 10)])[0];
+  almanacLabel = almanacDate.format(new Date(date + 'T12:00:00Z')); almanacDay = day;
+ }
+ const label = almanacLabel;
  //  0.89 renamed the day hues to weathers; each weather keeps the almanac
  //  event its old hue had, so the farm's calendar did not go quiet.
  const OLD = { clear: 'bile', haze: 'bruise', overcast: 'rust', smog: 'chemical', marine: 'nicotine', golden: 'ashrose', cold: 'oxide' };

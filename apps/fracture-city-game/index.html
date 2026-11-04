@@ -4549,7 +4549,7 @@ function toggleConstructMode(){
   State.ui.construct = !State.ui.construct;
   $('build-hud').classList.toggle('show', State.ui.construct);
   if (!State.ui.construct && highlightMesh) highlightMesh.visible = false;
-  toast(State.ui.construct ? 'BUILD MODE · 1–8 or wheel to pick · right-click place · hold left break · I inventory' : 'BUILD MODE OFF', 'info');
+  toast(State.ui.construct ? (typeof Touch !== 'undefined' && Touch.on ? 'Build mode · choose a slot, then Place or Mine' : 'BUILD MODE · 1–8 or wheel to pick · right-click place · hold left break · I inventory') : 'BUILD MODE OFF', 'info');
   if (!State.ui.construct) shStopMine();
   refreshBuildHUD();
 }
@@ -24872,22 +24872,38 @@ function shTouchBusy(){
 //  the inventory, eating every tap meant for it, and kept holding whatever key
 //  the thumb was on when the panel opened. This runs whatever the game is doing.
 (function(){
+  let lastBusy, lastBuild, lastPortrait, lastLayer;
+  let layer, chip;
   function tick(){
     try {
       if (Touch.on){
         const busy = shTouchBusy();
-        const layer = document.getElementById('touch-layer');
-        if (layer) layer.style.display = busy ? 'none' : '';
-        if (busy) shTouchReleaseAll();
-        else {
-          //  There is no pointer to lock on a phone, so the flag that gates
-          //  every input in the game has to be held true by hand.
-          if (!State.ui.locked) State.ui.locked = true;
-          document.body.classList.toggle('tc-build', !!State.ui.construct);
-          document.body.classList.toggle('tc-portrait', innerHeight > innerWidth * 1.08);
-          const chip = document.querySelector('.tc-chip[data-act="build"]');
-          if (chip) chip.classList.toggle('on', !!State.ui.construct);
+        if (!layer || !layer.isConnected){
+          layer = document.getElementById('touch-layer');
+          chip = document.querySelector('.tc-chip[data-act="build"]');
         }
+        if (busy !== lastBusy || layer !== lastLayer){
+          if (layer) layer.style.display = busy ? 'none' : '';
+          if (busy) shTouchReleaseAll();
+          lastBusy = busy; lastLayer = layer;
+        }
+        if (!busy){
+          // Keep modal detection immediate, but only write changed HUD state.
+          if (!State.ui.locked) State.ui.locked = true;
+          const build = !!State.ui.construct;
+          const portrait = innerHeight > innerWidth * 1.08;
+          if (build !== lastBuild){
+            document.body.classList.toggle('tc-build', build);
+            if (chip) chip.classList.toggle('on', build);
+            lastBuild = build;
+          }
+          if (portrait !== lastPortrait){
+            document.body.classList.toggle('tc-portrait', portrait);
+            lastPortrait = portrait;
+          }
+        }
+      } else {
+        lastBusy = lastBuild = lastPortrait = lastLayer = undefined;
       }
     } catch (e){}
     requestAnimationFrame(tick);
@@ -28052,10 +28068,10 @@ const HD_TIERS = {
 const HD_ORDER = ['perf', 'balanced', 'high', 'ultra'];
 
 const HD = window.HD = {
-  tier: 'ultra',
+  tier: 'balanced',
   locked: false,                                  // set by hand; watchdog keeps off
   want: { shadows:true, bloom:true, surfaces:true },
-  fps: 60, ms: 16, _acc: 0, _n: 0, _hot: 0,
+  fps: 60, ms: 16, _acc: 0, _n: 0, _hot: 0, _warm: 2,
   get T(){ return HD_TIERS[this.tier] || HD_TIERS.balanced; },
   get shadowsOn(){ return !!this.want.shadows && this.T.shadow > 0; },
   get bloomOn(){ return !!this.want.bloom && this.T.bloom > 0; },
@@ -28076,16 +28092,12 @@ function hdLoad(){
   } catch (e){ return Promise.resolve(); }
 }
 
-//  A first guess, used once, before anything has been measured. A phone starts
-//  at BALANCED because the watchdog climbing down from ULTRA on a phone would
-//  cost it ten seconds of stutter to learn what the pointer type already said.
+// Start with a measured-size world, not a CPU-core guess at GPU capacity.
+// Manual HIGH/ULTRA choices remain available and retain their saved settings.
 function hdGuessTier(){
-  try { if (typeof shIsTouch === 'function' && shIsTouch()) return 'balanced'; } catch (e){}
   const mem = navigator.deviceMemory || 8;
   const cpu = navigator.hardwareConcurrency || 8;
-  if (mem <= 4 || cpu <= 4) return 'balanced';
-  if (mem <= 8 && cpu <= 6) return 'high';
-  return 'ultra';
+  return mem <= 2 || cpu <= 2 ? 'perf' : 'balanced';
 }
 
 // =============================================================================
@@ -28756,27 +28768,39 @@ function hdInstallRender(r){
 //  instead of a constant. Everything else about it is unchanged: the chunk you
 //  stand in is never queued, the rest is nearest-first on a time budget.
 const _hdStreamChunks = window.updateChunks;
+const hdStreamPlan = { map:null, x:NaN, z:NaN, radius:0, size:-1, checked:0, stale:[] };
 window.updateChunks = function(force){
   const R = HD.T.view;
   const U = Math.max(UNLOAD_RADIUS, R + 1);
   const t0 = performance.now();
-  const px = Player.position.x, pz = Player.position.z;
-  const pcx = Math.floor((px + CHUNK_SIZE / 2) / CHUNK_SIZE);
-  const pcz = Math.floor((pz + CHUNK_SIZE / 2) / CHUNK_SIZE);
+  const pcx = Math.floor((Player.position.x + CHUNK_SIZE / 2) / CHUNK_SIZE);
+  const pcz = Math.floor((Player.position.z + CHUNK_SIZE / 2) / CHUNK_SIZE);
   const here = `${pcx},${pcz}`;
+  const map = State.chunkMap;
+  const plan = hdStreamPlan;
+  const changed = force || plan.map !== map || plan.x !== pcx || plan.z !== pcz ||
+    plan.radius !== R || plan.size !== map.size || !map.has(here);
 
-  if (!State.chunkMap.has(here)) shBuildChunk(here);
-
-  const missing = [];
-  for (let dx = -R; dx <= R; dx++){
-    for (let dz = -R; dz <= R; dz++){
-      const key = `${pcx + dx},${pcz + dz}`;
-      if (State.chunkMap.has(key)) continue;
-      missing.push({ key, d: Math.abs(dx) + Math.abs(dz) });
+  // The ground underfoot is immediate; the rest remains nearest-first.
+  if (!map.has(here)) shBuildChunk(here);
+  // Reuse the queue while standing in the same chunk. The periodic audit also
+  // repairs external remove/add operations that leave the map size unchanged.
+  if (changed || t0 - plan.checked >= 500){
+    const missing = [];
+    for (let dx = -R; dx <= R; dx++){
+      for (let dz = -R; dz <= R; dz++){
+        const key = `${pcx + dx},${pcz + dz}`;
+        if (!map.has(key)) missing.push({key, d:Math.abs(dx) + Math.abs(dz)});
+      }
     }
+    missing.sort((a, b) => a.d - b.d);
+    Stream.queue = missing.map(m => m.key);
+    plan.stale.length = 0;
+    for (const [key, chunk] of map){
+      if (Math.abs(chunk.cx - pcx) > U || Math.abs(chunk.cz - pcz) > U) plan.stale.push(key);
+    }
+    plan.map = map; plan.x = pcx; plan.z = pcz; plan.radius = R; plan.checked = t0;
   }
-  missing.sort((a, b) => a.d - b.d);
-  Stream.queue = missing.map(m => m.key);
 
   if (Stream.prime > 0){
     let n = Stream.prime; Stream.prime = 0;
@@ -28792,14 +28816,9 @@ window.updateChunks = function(force){
     }
   }
 
-  const stale = [];
-  for (const [key, chunk] of State.chunkMap){
-    const dx = chunk.cx - pcx, dz = chunk.cz - pcz;
-    if (Math.abs(dx) > U || Math.abs(dz) > U) stale.push(key);
-  }
-  const canDrop = force ? stale.length : Stream.unloadPerFrame;
-  for (let i = 0; i < Math.min(canDrop, stale.length); i++) shDestroyChunk(stale[i]);
-
+  const canDrop = force ? plan.stale.length : Stream.unloadPerFrame;
+  for (let i = 0; i < canDrop && plan.stale.length; i++) shDestroyChunk(plan.stale.shift());
+  plan.size = map.size;
   const ms = performance.now() - t0;
   if (ms > Stream.peakMs) Stream.peakMs = ms;
   return Stream.queue.length;
@@ -28821,6 +28840,7 @@ window.shApplyLighting = function(hour){
 };
 
 function hdApply(quiet){
+  HD._warm = 2; HD._acc = 0; HD._n = 0;
   const T = HD.T;
   const r = State.renderer;
   HD_U.uSurfMode.value = HD.surfMode;
@@ -28854,32 +28874,33 @@ function hdSetTier(name, byHand){
   try { toast('Graphics: ' + HD.T.label, 'info'); } catch (e){}
 }
 
-//  The watchdog. Four seconds of sustained sub-thirty is not a hitch, it is a
-//  machine saying no. It steps down one tier, once, and says so — and it never
-//  touches a tier that was chosen by hand.
+// Sustained slow frames should trigger help before the game falls below 30fps.
+// Ignore the first two seconds after an apply, then include ongoing streaming:
+// a heavy world is still heavy while its loading queue is draining.
 function hdWatchdog(dt){
+  if (HD._warm > 0){ HD._warm -= dt; return; }
   HD._acc += dt; HD._n++;
   if (HD._acc < 0.5) return;
-  HD.ms = (HD._acc / HD._n) * 1000;
+  const elapsed = HD._acc;
+  HD.ms = (elapsed / HD._n) * 1000;
   HD.fps = 1000 / Math.max(0.001, HD.ms);
   HD._acc = 0; HD._n = 0;
   hdPanelStats();
   if (HD.locked) return;
   if (typeof shStreamQuiet === 'function' && shStreamQuiet()) return;
-  if (Stream && Stream.queue.length > 6) return;     // streaming, not struggling
-  if (HD.ms > 33){
-    HD._hot += 0.5;
-    if (HD._hot >= 4){
+  if (HD.ms > 25){
+    HD._hot += elapsed;
+    if (HD._hot >= 3){
       const i = HD_ORDER.indexOf(HD.tier);
       if (i > 0){
         HD.tier = HD_ORDER[i - 1];
         HD._hot = 0;
         hdApply();
-        try { toast('Frame time high — graphics stepped down to ' + HD.T.label + '. F to set it yourself.', 'warn'); } catch (e){}
+        try { toast('Graphics adjusted for smoother play.', 'info'); } catch (e){}
       }
     }
   } else if (HD.ms < 20){
-    HD._hot = Math.max(0, HD._hot - 0.5);
+    HD._hot = Math.max(0, HD._hot - elapsed);
   }
 }
 
@@ -29952,7 +29973,7 @@ document.addEventListener('DOMContentLoaded', init);
 <script src="street-life.js?v=0.55.0"></script>
 <script src="campaign-polish.js?v=0.55.0"></script>
 <script src="resident-motion.js?v=0.81.0"></script>
-<script src="mobile.js?v=0.70.0"></script>
+<script src="mobile.js?v=0.92.2"></script>
 <script src="dispatch-content.js?v=0.55.0"></script>
 <script src="side-quests.js?v=0.81.0"></script>
 <script src="story-refresh.js?v=0.59.0"></script>
@@ -29973,7 +29994,7 @@ document.addEventListener('DOMContentLoaded', init);
 <script src="social-city.js?v=0.75.0"></script>
 <script src="news-hub.js?v=0.90.1"></script>
 <script src="common-ground-library.js?v=0.69.0"></script>
-<script src="physical-support.js?v=0.55.0"></script>
+<script src="physical-support.js?v=0.92.2"></script>
 <script src="screen-zombies.js?v=0.55.0"></script>
 <script src="zombie-combat.js?v=0.55.0"></script>
 <script src="scrap-weapons.js?v=0.55.0"></script>
@@ -29990,7 +30011,7 @@ document.addEventListener('DOMContentLoaded', init);
 <script src="sodium-noir.js?v=0.90.0"></script>
 <script src="npc-voices.js?v=0.82.0"></script>
 <script src="city-wildlife.js?v=0.65.0"></script>
-<script src="the-seam.js?v=0.91.0"></script>
+<script src="the-seam.js?v=0.92.2"></script>
 <script src="skate-lines.js?v=0.67.0"></script>
 <script src="reading-garden.js?v=0.90.1"></script>
 <script src="common-ground-atrium.js?v=0.75.1"></script>
@@ -30009,7 +30030,7 @@ document.addEventListener('DOMContentLoaded', init);
 <script src="city-fauna.js?v=0.81.0"></script>
 <script src="street-events.js?v=0.81.0"></script>
 <script src="social-hub.js?v=0.83.0"></script>
-<script src="phone-hud.js?v=0.85.0"></script>
+<script src="phone-hud.js?v=0.92.2"></script>
 <script src="soundstage.js?v=0.88.0"></script>
 <script src="common-ground-megastructure.js?v=3.0.0"></script>
 <script src="common-ground-guide.js?v=1.1.0"></script>

@@ -114,6 +114,10 @@
     if (u.inIntro)    return { label: 'SKIP ▸▸', run: () => tap('Escape') };
     if (hdOpen())     return { label: '✕ CLOSE', run: () => tap('f') };
     if (keysOpen)     return { label: '✕ CLOSE', run: () => showKeys(false) };
+    const tools=document.getElementById('fc-tools');
+    if(tools?.open) return {label:'✕ CLOSE',run:()=>window.FCQuietUI?.close()};
+    const online=document.querySelector('#city-online details');
+    if(online?.open) return {label:'✕ CLOSE',run:()=>{online.open=false;}};
     //  Build panels.
     if (document.getElementById('furniture-menu') && window.FCFurniture) return { label: '✕ CLOSE', run: () => FCFurniture.close() };
     if (window.CityArt && CityArt.panelOpen)   return { label: '✕ CLOSE', run: () => CityArt.close() };
@@ -124,6 +128,15 @@
   // ─── 3 · The KEYS drawer ─────────────────────────────────────────────────
   //  Every binding in the game, by what it does rather than which letter it is.
   const KEYS = [
+    { h: 'YOUR CITY' },
+    { k: 'L', t: 'Explore Common Ground', run: () => window.FCCommonGroundGuide?.open() },
+    { k: 'I', t: 'Inventory', run: () => tap('i') },
+    { k: 'B', t: 'Build mode', run: () => tap('b') },
+    { k: '☷', t: 'Tools & radio', run: () => { const e=document.getElementById('fc-tools'); if(e){e.hidden=false;e.open=true;} } },
+    { k: '◎', t: 'Online & friends', run: () => { const e=document.querySelector('#city-online details'); if(e)e.open=true; } },
+    { k: '✉', t: 'Inbox', run: () => document.getElementById('fc-bell')?.click() },
+    { k: 'N', t: 'Ned’s invitation', run: () => document.getElementById('common-invite')?.click() },
+    { k: '—', t: 'Dismiss invitation', run: () => document.getElementById('common-later')?.click() },
     { h: 'STORY' },
     { k: 'J', t: 'Casebook',      run: () => tap('j') },
     { k: 'N', t: 'Next line',     run: () => tap('n') },
@@ -140,8 +153,6 @@
     { k: '1', t: 'Weapon 1',      run: () => tap('1') },
     { k: '2', t: 'Weapon 2',      run: () => tap('2') },
     { k: '3', t: 'Weapon 3',      run: () => tap('3') },
-    { k: 'I', t: 'Inventory',     run: () => tap('i') },
-    { k: 'B', t: 'Build mode',    run: () => tap('b') },
     { k: 'G', t: 'Free build',    run: () => tap('g') },
     { h: 'CITY' },
     { k: 'T', t: 'Post a thought', run: () => tap('t') },
@@ -268,19 +279,13 @@
     if (top){
       top.innerHTML = '';
       const chips = [
-        ['☰',     'menu',  () => tap('Escape')],
-        ['MAP',   'map',   toggleMap],
-        ['ITEMS', 'inv',   () => tap('i')],
-        ['BUILD', 'build', () => tap('b')],
-        ['BOARD', 'board', () => tap('s', true)],
-        ['CASE',  'case',  () => tap('j')],
-        ['ZOMBIES','siege', () => typeof shSiegeToggle === 'function' && shSiegeToggle()],
-        ['KEYS',  'keys',  () => showKeys(!keysOpen)],
+        ['Menu', 'keys', () => showKeys(!keysOpen)],
+        ['Map', 'map', toggleMap],
       ];
       for (const [label, act, run] of chips){
         const b = document.createElement('button');
         b.className = 'tc-chip' + (act === 'keys' ? ' mob-keys' : '');
-        b.dataset.act = act; b.textContent = label;
+        b.dataset.act = act; b.textContent = label; b.setAttribute('aria-label',label); if(act==='keys'){b.setAttribute('aria-haspopup','dialog');b.setAttribute('aria-controls','mob-keys');b.setAttribute('aria-expanded','false');}
         bindTap(b, run);
         top.appendChild(b);
       }
@@ -299,6 +304,8 @@
       use.addEventListener('pointerdown', e => {
         e.preventDefault(); e.stopPropagation();
         if (held) return;
+        const action=Mobile.action;
+        if(action && !action.hold){action.run();update();return;}
         held = true; use.classList.add('held');
         try { use.setPointerCapture(e.pointerId); } catch (err){}
         send(true, 'e');
@@ -335,7 +342,7 @@
     const over = document.createElement('div');
     over.id = 'mob-over';
     over.innerHTML = `
-      <div id="mob-keys"><div class="in"><div class="grid"></div></div></div>
+      <div id="mob-keys" role="dialog" aria-modal="true" aria-label="City menu"><div class="in"><h2 class="mob-menu-title">Your city</h2><p class="mob-menu-hint">Explore, create, or make yourself at home.</p><div class="grid"></div></div></div>
       <button id="mob-back">✕ CLOSE</button>
       <button id="mob-next">NEXT ▸</button>
       <div id="mob-pad">
@@ -409,14 +416,22 @@
       try { run(); } catch (err){ console.warn('[mobile]', err); }
       update(); setTimeout(update, 60);
     });
+    // Keyboard activation and accessibility click, without duplicating pointer taps.
+    b.addEventListener('click',e=>{if(e.detail!==0)return;e.preventDefault();run();update();});
     b.addEventListener('contextmenu', e => e.preventDefault());
   }
 
   function showKeys(on){
     keysOpen = !!on;
+    document.body.classList.toggle('mob-menu-open',keysOpen);
+    document.querySelector('.tc-chip[data-act=keys]')?.setAttribute('aria-expanded',String(keysOpen));
     const d = document.getElementById('mob-keys');
     if (d) d.classList.toggle('on', keysOpen);
     if (keysOpen && typeof shTouchReleaseAll === 'function') shTouchReleaseAll();
+    if(keysOpen){State.keys?.clear();Mobile.releaseUse?.();}
+    update();
+    const focus=keysOpen?d?.querySelector('.grid button'):document.querySelector('.tc-chip[data-act=keys]');
+    focus?.focus({preventScroll:true});
   }
   Mobile.showKeys = showKeys;
   Mobile.backAction = backAction;
@@ -430,8 +445,8 @@
       if (Touch.on && build()){
         const u = ui();
         const layer = document.getElementById('touch-layer');
-        const busyNow = typeof shTouchBusy === 'function' && shTouchBusy();
-        if (layer) layer.style.display = busyNow ? 'none' : '';
+        const busyNow = (typeof shTouchBusy === 'function' && shTouchBusy()) || keysOpen;
+        if (layer && layer.style.display!==(busyNow?'none':'')) layer.style.display = busyNow ? 'none' : '';
         if (busyNow && Mobile.releaseUse) Mobile.releaseUse();
         const back = backAction();
         const bb = document.getElementById('mob-back');
@@ -449,11 +464,29 @@
         const ctx = document.getElementById('mob-ctx');
         if (ctx && !busy){
           const set = (m, on) => { const b = ctx.querySelector(`[data-m=${m}]`); if (b) b.classList.toggle('on', !!on); return b; };
-          set('next', narrUp());
-          set('take', window.FN && FN._nearPickup && Player.mode === 'walk');
+          set('next', false);
+          set('take', false);
+          const context=window.FCPhoneHUD?.context();
+          const pickup=window.FN&&FN._nearPickup&&Player.mode==='walk';
+          const action=u.construct?null:pickup?{label:'Take',run:()=>tap('r')}:context?{
+            label:context.label, hold:context.element.id==='fc-field'||/hold\s+E/i.test(context.element.textContent),
+            run:()=>{if(typeof context.element.onclick==='function'||context.element.matches('button,[role=button]'))context.element.click();else tap('e');}
+          }:narrUp()?{label:'Next',run:()=>shNarrPush()}:null;
+          Mobile.action=action;
+          const use=document.querySelector('.tc-use');
+          document.body.classList.toggle('mob-has-action',!!action);
+          if(use&&action){
+            const full=action.label||'Use';
+            const label=/hold/i.test(full)?'Hold':/read/i.test(full)?'Read':/listen|music|track/i.test(full)?'Listen':/talk|speak/i.test(full)?'Talk':/play/i.test(full)?'Play':/open|enter|visit/i.test(full)?'Open':/Ned|welcome|meet/i.test(full)?'Meet Ned':full.length>16?'Interact':full;
+            if(use.textContent!==label)use.textContent=label;
+            if(use.getAttribute('aria-label')!==full)use.setAttribute('aria-label',full);
+            if(use.title!==full)use.title=full;
+          }
+          const combat=!!window.FCPvp?.on||!!(typeof Siege!=='undefined'&&Siege.active)||!!u.inCombat||!!(typeof Campaign!=='undefined'&&Campaign.active&&!window.OwnBlock?.state?.enabled);
+          document.body.classList.toggle('mob-combat',combat);
           const ab = document.getElementById('fn-ability');
           const abOn = !!(ab && ab.classList.contains('on'));
-          const qb = set('ability', abOn);
+          const qb = set('ability', abOn && !u.construct);
           if (abOn && qb){
             qb.classList.toggle('cd', ab.classList.contains('cd'));
             const nm = (ab.textContent.split('·')[1] || 'ABILITY').trim().slice(0, 9);
@@ -466,10 +499,20 @@
       }
     } catch (e){}
   }
-  function tick(){ update(); requestAnimationFrame(tick); }
-  requestAnimationFrame(tick);
-  //  Timers keep running when frames crawl (a hot phone, a background tab).
-  setInterval(update, 120);
+  // Control state is cheap and changes at human speed. Avoid another full HUD
+  // walk on every render frame; taps still update synchronously.
+  setInterval(()=>{if(!document.hidden)update();},120);
+  document.addEventListener('visibilitychange',()=>{if(document.hidden){Mobile.releaseUse?.();shTouchReleaseAll();}else update();});
+  document.addEventListener('keydown',e=>{
+    if(!keysOpen)return;
+    if(e.code==='Escape'){e.preventDefault();e.stopImmediatePropagation();showKeys(false);}
+    if(e.code==='Tab'){
+      const buttons=[document.getElementById('mob-back'),...document.querySelectorAll('#mob-keys .grid button')].filter(e=>e&&e.offsetWidth);
+      const i=buttons.indexOf(document.activeElement),next=buttons[(i+(e.shiftKey?-1:1)+buttons.length)%buttons.length];
+      if(next){e.preventDefault();next.focus();}
+    }
+  },true);
+  update();
   Mobile.update = update;
 
   //  Debug surface for the test.
