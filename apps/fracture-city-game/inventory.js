@@ -21,7 +21,7 @@ function parse(sku){if(!sku)return null;const [kind,a,b]=sku.split(':');if(kind=
 function kitDef(shape){return (window.CityBuild?.defs||[]).find(d=>d[0]===shape)}
 function label(sku){const it=parse(sku);if(!it)return'';if(it.kind==='block')return I.skus?.get(sku)?.name||shMat4Block(it.id)?.label||'Block';if(it.kind==='furn')return I.skus?.get(sku)?.name||window.FCFurniture?.items?.[it.id]?.name||'Furniture';const d=kitDef(it.shape);return (d?d[1]:it.shape)+' · '+(I.skus?.get('b:'+it.material)?.name||'')}
 function count(sku){const it=parse(sku);if(!it)return 0;if(it.kind==='kit')return count('b:'+it.material);
- if(online()){return Math.max(0,(I.server?.items?.[sku]||0)-(it.kind==='block'?(window.FCStructures?.reserved?.(it.id)||0):0))}
+ if(online()){if(it.kind==='block'&&window.FCCityOnline?.self?.god)return 6000;return Math.max(0,(I.server?.items?.[sku]||0)-(it.kind==='block'?(window.FCStructures?.reserved?.(it.id)||0):0))}
  if(it.kind==='block')return shInvCount(it.id);return I.furn.get(it.id)||0}
 const creative=()=>!online()&&!!State.ui.freeBuild;
 function setCount(sku,n){const it=parse(sku);if(online()){if(!I.server)return;I.server.items[sku]=Math.max(0,n);return}

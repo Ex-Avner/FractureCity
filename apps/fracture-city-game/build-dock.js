@@ -64,6 +64,7 @@ function kitUndo(redo){
  return ok;
 }
 function undo(redo=false){
+ if(window.FCWorldEdit?.active){try{return FCWorldEdit.undo(redo)}catch(e){toast(e.message,"warn");return false}}
  const m=mode();
  if(m==='kit')return kitUndo(redo);
  if(m==='art'){const A=art();return redo?A?.undo?.(true):A?.undo?.()}

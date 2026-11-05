@@ -404,6 +404,7 @@ function gradeFrame(hour){
  //  Night: shadows go teal, highlights sodium. Day: a softer version.
  u.uShadowTint.value.set(-0.014 - 0.01 * night, 0.004 + 0.012 * night, 0.028 + 0.012 * night);
  u.uHighTint.value.set(0.028 + 0.02 * night, 0.012 + 0.004 * night, -0.022 - 0.014 * night);
+ window.FCWorldStudio?.applyGrade(u);
  const B = window.HD && HD.Bloom; if (B && B.w) u.uRes.value.set(B.w, B.h);
 }
 //  Performance tier has no composite pass: a CSS vignette stands in.

@@ -18,12 +18,13 @@ const clean=(s,n)=>String(s||'').replace(/[\x00-\x1f\x7f<>]/g,'').trim().slice(0
 function createServer(opts={}){
 const rooms=new Map(),tokens=new Map(),limits=new Map(),now=opts.now||Date.now;let tickTimer,tickCount=0;const store=createStore(opts.dbPath||process.env.DB_PATH||path.join(__dirname,'data','districts.sqlite'),now);
 const life=createResidentLife(store.db,now);
+const worldEdits=require('./world-edits.cjs').createWorldEdits(store.db);
 const media=createMedia(store.db,now),social=createSocial(store.db,now,media,{isOwner:id=>mb.isOwner(id)}),cityBuild=createCityBuildStore(store.db),structures=createStructures(store.db);
 const challenge=createChallenge(store.db,now);
 const economy=createEconomy(store.db,{now});
 const worldReset=require('./world-reset.cjs').createWorldReset(store.db,{economyHelpers:require('./economy.cjs'),now});
 //  Casting Booth NPCs. A brawler's punch costs health like PvP and downs the same way.
-const spawns=createSpawns({economy,looks,now,notify:(account,actor,text)=>social.note(account,'courier',actor,null,text),chat:(r,text)=>{system(r,text)},hurtPlayer:(r,p,dmg,n)=>{if(!p||p.hp<=0||p.protectUntil>now())return;p.hp=Math.max(0,p.hp-dmg);if(!p.hp){p.deaths++;p.respawnAt=now()+4000;system(r,p.name+' was knocked down by '+(n.story?.name||'a brawler')+'.')}}});
+const spawns=createSpawns({economy,looks,now,notify:(account,actor,text)=>social.note(account,'courier',actor,null,text),chat:(r,text)=>{system(r,text)},hurtPlayer:(r,p,dmg,n)=>{if(!p||p.god||p.hp<=0||p.protectUntil>now())return;p.hp=Math.max(0,p.hp-dmg);if(!p.hp){p.deaths++;p.respawnAt=now()+4000;system(r,p.name+' was knocked down by '+(n.story?.name||'a brawler')+'.')}}});
 const news=createNews(store.db,{fetcher:opts.newsFetch,now});
 const classics=createClassics({dir:opts.classicsDir||path.join(path.dirname(opts.dbPath||process.env.DB_PATH||path.join(__dirname,'data','districts.sqlite')),'classics'),shelfDir:path.join(GAME,'classics'),fetcher:opts.classicsFetch,now});
 const mb=createMainBeta(store.db,{now,code:opts.mainCode,owners:opts.owners,idleDays:opts.idleDays}),MAX=()=>Number(opts.maxRooms||process.env.MAX_ROOMS||4),privateRooms=()=>[...rooms.values()].filter(r=>!r.public).length,present=()=>new Set([...rooms.values()].flatMap(r=>[...r.players.values()].map(p=>p.accountId)));
@@ -41,7 +42,8 @@ function json(res,value){res.setHeader('Cache-Control','no-store');res.setHeader
 function revokePlayers(id){for(const r of [...rooms.values()])for(const p of [...r.players.values()])if(p.accountId===id)remove(r,p)}
 function fail(code,message){throw Object.assign(Error(message),{status:code})}
 function rate(key,max,period){let r=limits.get(key),t=now();if(!r||t-r.t>=period){r={t,n:0};limits.set(key,r)}if(++r.n>max)fail(429,'Please slow down and try again.')}
-function state(r){return {code:r.code,public:!!r.public,lookRev:r.lookRev||0,npcRev:r.npcRev||0,npcs:r.map.city?spawns.state(r):[],structureRevision:r.map.city?structures.revision(r.code):0,artRevision:r.map.city?cityBuild.revision(r.code):0,map:r.map.id,phase:r.phase,host:r.host,time:now(),players:[...r.players.values()].map(p=>({id:p.id,accountId:p.accountId,name:p.name,color:p.color,x:p.x,y:p.y||0,z:p.z,yaw:p.yaw,pitch:p.pitch,hp:p.hp,ammo:p.ammo,reloading:p.reloadUntil>now(),ready:p.ready,connected:!!p.stream,pvp:!!p.pvp,kills:p.kills,deaths:p.deaths,score:p.score,moving:p.moving,sprint:p.sprint,safe:r.map.city?citySafe(p):W.safe(p),protected:p.protectUntil>now(),respawnAt:p.respawnAt,emote:p.emoteUntil>now()?p.emote:null,seq:p.seq})),quests:r.quests,chat:r.chat,events:r.events.slice(-10)}}
+function canGod(r,p){return !!r.map.city&&(mb.isOwner(p.accountId)||!r.public&&r.ownerId===p.accountId)}
+function state(r){return {code:r.code,public:!!r.public,worldRevision:worldEdits.snapshot(r.code).revision,lookRev:r.lookRev||0,npcRev:r.npcRev||0,npcs:r.map.city?spawns.state(r):[],structureRevision:r.map.city?structures.revision(r.code):0,artRevision:r.map.city?cityBuild.revision(r.code):0,map:r.map.id,phase:r.phase,host:r.host,time:now(),players:[...r.players.values()].map(p=>({id:p.id,accountId:p.accountId,name:p.name,color:p.color,x:p.x,y:p.y||0,z:p.z,yaw:p.yaw,pitch:p.pitch,hp:p.hp,ammo:p.ammo,reloading:p.reloadUntil>now(),ready:p.ready,connected:!!p.stream,pvp:!!p.pvp,god:!!p.god,kills:p.kills,deaths:p.deaths,score:p.score,moving:p.moving,sprint:p.sprint,safe:r.map.city?citySafe(p):W.safe(p),protected:p.protectUntil>now(),respawnAt:p.respawnAt,emote:p.emoteUntil>now()?p.emote:null,seq:p.seq})),quests:r.quests,chat:r.chat,events:r.events.slice(-10)}}
 function publish(r){const message='data: '+JSON.stringify(state(r))+'\n\n';for(const p of r.players.values())if(p.stream){if(p.stream.writableLength>131072){p.stream.destroy();p.stream=null}else p.stream.write(message)}}
 function system(r,text){r.chat.push({id:id(),name:'Dispatch',text,at:now()});r.chat=r.chat.slice(-30)}
 function spawn(p,r){p.x=(p.seat%4-1.5)*2;p.z=(Math.floor(p.seat/4)-1)*2;p.hp=100;p.ammo=6;p.respawnAt=0;p.protectUntil=now()+5000;p.input={x:0,z:0};p.reloadUntil=0;if(r?.map.city){p.x=165+(p.seat%4)*1.2;p.z=24+Math.floor(p.seat/4)*1.2;p.y=1;p.yaw=Math.PI;p.pitch=0;p.moving=false;p.poseAt=now()}}
@@ -65,6 +67,7 @@ function cityShoot(r,p,b){
  const w=PVP[b.weapon]||PVP.other,target=r.players.get(b.target),out={hit:false};
  for(const k of ['ox','oy','oz','dx','dy','dz'])if(!Number.isFinite(b[k]))fail(400,'Invalid shot.');
  if(p.hp<=0)return{...out,reason:'down'};
+ if(p.god||target?.god)return{...out,reason:'creator-mode'};
  if(citySafe(p))return{...out,reason:'safe'};
  if(t-(p.cityShotAt||0)<w.cd*.85)return{...out,reason:'cooldown'};p.cityShotAt=t;
  if(p.protectUntil>t)p.protectUntil=t;
@@ -125,7 +128,24 @@ if(u.pathname.startsWith('/api/social/')&&req.method==='GET'){const a=account(re
  fail(404,'Unknown social page.');}
 if(u.pathname==='/api/social'&&req.method==='GET'){const a=account(req);rate('social-read:'+a.id,60,60000);return json(res,social.snapshot(a.id))}
 if(u.pathname==='/api/profiles'&&req.method==='GET'){account(req);return json(res,{profiles:store.leaders()})}
-if(u.pathname==='/api/city-structures'){const {r,p}=auth(req);if(!r.map.city||r.phase!=='live')fail(409,'Enter the shared city first.');if(!structures.ensure(r.code,p.accountId)&&r.public&&mb.releasePlot(r.code,present()))structures.ensure(r.code,p.accountId);if(req.method==='GET'){rate('structure-read:'+p.accountId,120,60000);return json(res,structures.snapshot(r.code,p.accountId))}if(req.method!=='POST')fail(405,'Use GET or POST.');if(!String(req.headers['content-type']||'').startsWith('application/json'))fail(415,'Send JSON.');rate('structure-write:'+p.accountId,60,60000);const b=await body(req,600000);if(b.travel===true){rate('plot-travel:'+p.accountId,12,60000);const snapshot=structures.snapshot(r.code,p.accountId),own=snapshot.owners.find(o=>o.author===p.accountId);if(!own)fail(409,'No free building plot in this city.');p.x=own.plot.x+3.5;p.y=1;p.z=own.plot.z-1;p.yaw=Math.PI;p.pitch=0;p.moving=false;p.poseAt=now();p.seq++;store.checkpoint(r);json(res,{...snapshot,arrival:{x:p.x,y:p.y,z:p.z}});publish(r);return}const result=structures.save(r.code,p.accountId,b,[...r.players.values()],(before,after)=>economy.plotChange(p.accountId,before,after));json(res,{...result,wallet:economy.read(p.accountId)});publish(r);return;}
+if(u.pathname==='/api/world-edits'){
+ const {r,p}=auth(req);if(!r.map.city||r.phase!=='live')fail(409,'Enter the shared city first.');
+ if(req.method==='GET'){rate('world-read:'+p.accountId,120,60000);return json(res,worldEdits.snapshot(r.code))}
+ if(req.method!=='POST')fail(405,'Use GET or POST.');if(!canGod(r,p)||!p.god)fail(403,'Enable authorized god mode before editing the world.');
+ if(!String(req.headers['content-type']||'').startsWith('application/json'))fail(415,'Send JSON.');rate('world-write:'+p.accountId,40,60000);
+ const out=worldEdits.save(r.code,p.accountId,await body(req,1800000),[...r.players.values()]);json(res,out);publish(r);return;
+}
+if(u.pathname==='/api/city-moderation'){
+ const {r,p}=auth(req);if(!canGod(r,p))fail(403,'Only the server owner or private-city owner can moderate this city.');
+ const roster=()=>({players:state(r).players,banned:[...r.banned].map(id=>({id,name:store.db.prepare('SELECT display_name AS name FROM accounts WHERE id=?').get(id)?.name||'Former resident'}))});
+ if(req.method==='GET')return json(res,roster());if(req.method!=='POST')fail(405,'Use GET or POST.');
+ rate('moderation:'+p.accountId,20,60000);const b=await body(req);if(!['remove','ban','allow'].includes(b.action))fail(400,'Unknown moderation action.');
+ const target=store.db.prepare('SELECT id,display_name FROM accounts WHERE id=?').get(String(b.accountId||''));if(!target)fail(404,'Resident not found.');
+ if(target.id===p.accountId||mb.isOwner(target.id)||target.id===r.ownerId&&!r.public)fail(403,'A city owner cannot be removed.');
+ if(b.action==='allow')r.banned.delete(target.id);else{if(b.action==='ban')r.banned.add(target.id);for(const q of [...r.players.values()])if(q.accountId===target.id)remove(r,q);}
+ worldEdits.audit(r.code,p.accountId,b.action,target.id);store.checkpoint(r);publish(r);return json(res,roster());
+}
+if(u.pathname==='/api/city-structures'){const {r,p}=auth(req);if(!r.map.city||r.phase!=='live')fail(409,'Enter the shared city first.');if(!structures.ensure(r.code,p.accountId)&&r.public&&mb.releasePlot(r.code,present()))structures.ensure(r.code,p.accountId);if(req.method==='GET'){rate('structure-read:'+p.accountId,120,60000);return json(res,structures.snapshot(r.code,p.accountId))}if(req.method!=='POST')fail(405,'Use GET or POST.');if(!String(req.headers['content-type']||'').startsWith('application/json'))fail(415,'Send JSON.');rate('structure-write:'+p.accountId,60,60000);const b=await body(req,600000);if(b.travel===true){rate('plot-travel:'+p.accountId,12,60000);const snapshot=structures.snapshot(r.code,p.accountId),own=snapshot.owners.find(o=>o.author===p.accountId);if(!own)fail(409,'No free building plot in this city.');p.x=own.plot.x+3.5;p.y=1;p.z=own.plot.z-1;p.yaw=Math.PI;p.pitch=0;p.moving=false;p.poseAt=now();p.seq++;store.checkpoint(r);json(res,{...snapshot,arrival:{x:p.x,y:p.y,z:p.z}});publish(r);return}const result=structures.save(r.code,p.accountId,b,[...r.players.values()],(before,after)=>{if(!(p.god&&canGod(r,p)))economy.plotChange(p.accountId,before,after)});json(res,{...result,wallet:economy.read(p.accountId)});publish(r);return;}
 if(u.pathname==='/api/city-npcs'&&req.method==='GET'){const {r,p}=auth(req);rate('npcs-read:'+p.accountId,120,60000);return json(res,spawns.detail(r))}
 if(u.pathname.startsWith('/api/npc-')&&req.method==='POST'){const {r,p}=auth(req);if(!r.map.city||r.phase!=='live')fail(409,'Enter the shared city first.');if(!String(req.headers['content-type']||'').startsWith('application/json'))fail(415,'Send JSON.');const action=u.pathname.slice(9);p.seen=now();
  if(action==='poses'){rate('npc-poses:'+p.id,30,1000);const b=await body(req,16384);return json(res,{ok:true,n:spawns.poses(r,p,b.poses)})}
@@ -176,7 +196,7 @@ if(u.pathname==='/api/join'){
  const token=crypto.randomBytes(32).toString('base64url');let p=existing;
  if(p){p.stream?.end();tokens.delete(p.tokenHash);p.stream=null;p.seen=now()}
  else{const used=new Set([...r.players.values()].map(p=>p.seat));let seat=0;while(used.has(seat))seat++;p={id:id(),accountId:a.id,seat,name:a.displayName,color:a.color,ready:r.phase==='live',kills:0,deaths:0,score:0,seen:now(),inputAt:0,shotAt:0,yaw:0,pitch:0,seq:0};spawn(p,r);const saved=store.visit(a.id,r.code);if(saved){Object.assign(p,saved);p.input={x:0,z:0};p.protectUntil=now()+5000;if(p.hp<=0)spawn(p,r)}r.players.set(p.id,p);if(!r.public)r.host ||= p.id;system(r,p.name+' arrived.')}
- p.tokenHash=hash(token);tokens.set(p.tokenHash,{r,p});store.checkpoint(r);return json(res,{token,id:p.id,code:r.code,owner:mb.isOwner(a.id),room:state(r)});
+ p.tokenHash=hash(token);tokens.set(p.tokenHash,{r,p});store.checkpoint(r);return json(res,{token,id:p.id,code:r.code,owner:mb.isOwner(a.id),canGod:canGod(r,p),room:state(r)});
 }
 const {r,p}=auth(req);rate('player:'+p.id,80,1000);p.seen=now();
 switch(u.pathname){
@@ -190,14 +210,23 @@ case '/api/city-pose':{
  if(!r.map.city||r.phase!=='live')fail(409,'Enter the shared city first.');
  if(!Number.isSafeInteger(b.seq)||b.seq<=p.seq)fail(409,'Outdated position.');
  for(const k of ['x','y','z','yaw','pitch'])if(!Number.isFinite(b[k]))fail(400,'Invalid position.');
- if(Math.abs(b.x)>2048||Math.abs(b.z)>2048||b.y<0||b.y>160)fail(400,'Outside city bounds.');
+ if(Math.abs(b.x)>2048||Math.abs(b.z)>2048||b.y<0||b.y>(p.god&&canGod(r,p)?400:160))fail(400,'Outside city bounds.');
  const dt=Math.min(2,Math.max(0,(now()-(p.poseAt||now()))/1000));
  if(Math.hypot(b.x-p.x,b.z-p.z)>2+dt*55||Math.abs(b.y-(p.y||1))>3+dt*45)fail(409,'Movement too far.');
  p.moving=Math.hypot(b.x-p.x,b.z-p.z)>.025;p.x=b.x;p.y=b.y;p.z=b.z;p.yaw=b.yaw%(Math.PI*2);p.pitch=Math.max(-1.3,Math.min(1.3,b.pitch));p.seq=b.seq;p.poseAt=now();break;
 }
 case '/api/input':{if(r.map.city)break;if(!Number.isSafeInteger(b.seq)||b.seq<=p.seq)break;for(const k of ['x','z','yaw','pitch'])if(!Number.isFinite(b[k]))fail(400,'Invalid movement.');p.seq=b.seq;p.yaw=((b.yaw%(Math.PI*2))+Math.PI*2)%(Math.PI*2);p.pitch=Math.max(-1.3,Math.min(1.3,b.pitch));p.input={x:Math.max(-1,Math.min(1,b.x)),z:Math.max(-1,Math.min(1,b.z)),sprint:!!b.sprint};p.inputAt=now();break}
 case '/api/ready':p.ready=!!b.ready;break;
-case '/api/pvp':{if(!r.map.city)fail(409,'Enter the shared city first.');p.pvp=!!b.on;publish(r);return json(res,{pvp:p.pvp})}
+case '/api/god-mode':{
+ if(!canGod(r,p))fail(403,'God mode is reserved for the server owner or the owner of this private city.');
+ if(r.phase!=='live')fail(409,'Open the city first.');
+ if(typeof b.on!=='boolean')fail(400,'Choose on or off.');
+ if(b.on&&!p.god)p.godReturn={x:p.x,y:p.y||1,z:p.z};
+ if((!b.on||b.home===true)&&p.godReturn){Object.assign(p,p.godReturn);p.seq++;p.poseAt=now();p.moving=false;}
+ p.god=b.on;p.pvp=false;if(b.on){p.hp=100;p.respawnAt=0;}else delete p.godReturn;
+ json(res,{on:p.god,room:state(r)});publish(r);return;
+}
+case '/api/pvp':{if(p.god&&b.on)fail(409,'Leave god mode before enabling PvP.');if(!r.map.city)fail(409,'Enter the shared city first.');p.pvp=!!b.on;publish(r);return json(res,{pvp:p.pvp})}
 case '/api/start':if(r.public)fail(409,'The Main Beta is always open.');if(r.host!==p.id)fail(403,'Only the host can start.');if([...r.players.values()].some(q=>!q.ready))fail(409,'Every resident must be ready.');r.phase='live';system(r,r.map.city?'Makers’ Mile is open. Meet and explore the real city together. Building edits and NPCs are local; this city session is social free roam.':'The district is open. The central ring is protected. PvP is active outside it.');break;
 case '/api/shoot':shoot(r,p);break;
 case '/api/city-look':{if(!r.map.city)fail(409,'Enter the shared city first.');rate('look:'+p.accountId,20,60000);p.look=looks.clean(b.look,sku=>economy.owns(p.accountId,sku));try{social.action({id:p.accountId},'profile',{look:p.look})}catch(e){}r.lookRev=(r.lookRev||0)+1;json(res,{ok:true,look:p.look});publish(r);return}
@@ -209,7 +238,7 @@ case '/api/quest':{if(r.phase!=='live'||p.hp<=0)fail(409,'Enter the district fir
 //  A phone still building the city after joining says it is here, so the 45 s idle sweep does not drop it.
 case '/api/still-here':break;
 case '/api/leave':remove(r,p);break;
-case '/api/kick':{if(r.public?!mb.isOwner(p.accountId):r.host!==p.id)fail(403,r.public?'Only the server owner can remove residents from the Main Beta.':'Only the host can remove a player.');const target=r.players.get(b.id);if(target&&target!==p){r.banned.add(target.accountId);remove(r,target)}break}
+case '/api/kick':{if(r.map.city?!canGod(r,p):r.host!==p.id)fail(403,r.public?'Only the server owner can remove residents from the Main Beta.':'Only the host can remove a player.');const target=r.players.get(b.id);if(target&&target!==p){if(r.map.city&&(mb.isOwner(target.accountId)||!r.public&&target.accountId===r.ownerId))fail(403,'A city owner cannot be removed.');r.banned.add(target.accountId);remove(r,target)}break}
 default:fail(404,'Unknown action.')}
 if(!['/api/input','/api/shoot','/api/city-pose','/api/still-here'].includes(u.pathname))store.checkpoint(r);res.setHeader('Content-Type','application/json');res.end(JSON.stringify({ok:true}));if(r.phase!=='live')publish(r);return;
 }
