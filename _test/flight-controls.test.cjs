@@ -1,0 +1,53 @@
+const {chromium}=require('playwright');
+const {createServer}=require('../server/server.cjs');
+const fs=require('node:fs'),path=require('node:path'),os=require('node:os'),assert=require('node:assert/strict');
+(async()=>{
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'fc-flight-'));
+ const app=createServer({dbPath:path.join(dir,'city.sqlite'),owners:['flight_owner'],newsFetch:async()=>new Response('<rss/>')});
+ await new Promise(r=>app.server.listen(0,'127.0.0.1',r));
+ let browser;
+ try{
+  browser=await chromium.launch({channel:'chrome'});
+  const ctx=await browser.newContext({viewport:{width:844,height:390},isMobile:true,hasTouch:true});
+  const base='http://127.0.0.1:'+app.server.address().port;
+  await ctx.request.post(base+'/api/account/register',{data:{username:'flight_owner',password:'flight controls test password'}});
+  const joined=await (await ctx.request.post(base+'/api/join',{data:{public:true}})).json();
+  const p=await ctx.newPage(),errors=[];p.on('pageerror',e=>errors.push(e.message));
+  await p.goto(base+'/city/?online='+joined.code);
+  await p.waitForFunction(()=>window.FCWorldStudio&&FCCityOnline?.connected&&FCWorldEdit.ready,null,{timeout:60000});
+  await p.evaluate(()=>{HD.setTier('perf',true);State.ui.paused=false;});
+  const doubleSpace=async()=>{await p.keyboard.press('Space');await p.waitForTimeout(70);await p.keyboard.press('Space');};
+  const flying=()=>p.evaluate(()=>FCWorldStudio.flying);
+  await doubleSpace();assert.equal(await flying(),false,'ordinary players cannot fly');
+  await p.evaluate(()=>FCWorldStudio.setGod(true));
+  await p.waitForTimeout(400);
+  await p.keyboard.down('Space');await p.waitForTimeout(100);await p.keyboard.down('Space');await p.keyboard.up('Space');
+  assert.equal(await flying(),false,'auto-repeat is not a double tap');
+  await p.waitForTimeout(400);await p.keyboard.press('Space');await p.waitForTimeout(400);await p.keyboard.press('Space');
+  assert.equal(await flying(),false,'slow taps do not toggle');
+  await p.waitForTimeout(400);await doubleSpace();await p.waitForFunction(()=>FCWorldStudio.flying);
+  const y=await p.evaluate(()=>Player.position.y);
+  await p.waitForTimeout(400);await p.keyboard.down('Space');await p.waitForTimeout(450);await p.keyboard.up('Space');
+  const raised=await p.evaluate(()=>Player.position.y);assert.ok(raised>y+2,'held Space rises');assert.equal(await flying(),true);
+  await p.keyboard.down('Shift');await p.waitForTimeout(300);
+  const descending=await p.evaluate(()=>({y:Player.position.y,vy:Player.velocity.y}));await p.keyboard.up('Shift');
+  assert.ok(descending.y<raised-1,'held Shift lowers player');assert.equal(descending.vy,-16,'Shift descends at normal flight speed');
+  // Actual mobile stick input must not turn its old sprint modifier into descent.
+  await p.evaluate(()=>{Player.position.y=60;State.keys.clear();});
+  const box=await p.locator('#tc-stick').boundingBox();assert.ok(box);
+  const x=box.x+box.width/2,yStick=box.y+box.height/2;
+  await p.mouse.move(x,yStick);await p.mouse.down();await p.mouse.move(x,yStick-50);await p.waitForTimeout(200);
+  const stick=await p.evaluate(()=>({shift:State.keys.has('shift'),vy:Player.velocity.y,w:State.keys.has('w')}));await p.mouse.up();
+  assert.equal(stick.w,true);assert.equal(stick.shift,false);assert.equal(stick.vy,0);
+  await p.evaluate(()=>{const el=document.createElement('input');el.id='flight-text-test';document.body.append(el);el.focus();});
+  await doubleSpace();assert.equal(await flying(),true,'typing spaces does not toggle flight');
+  await p.evaluate(()=>document.getElementById('flight-text-test').remove());
+  await p.evaluate(()=>FCWorldStudio.open());await doubleSpace();assert.equal(await flying(),true,'menus do not toggle flight');
+  await p.evaluate(()=>{FCWorldStudio.close();document.activeElement.blur();});
+  await p.waitForTimeout(400);await doubleSpace();await p.waitForFunction(()=>!FCWorldStudio.flying);
+  assert.equal(await p.evaluate(()=>State.keys.has(' ')),false,'toggle press does not leave jump held');
+  await p.evaluate(()=>FCWorldStudio.setGod(false));await p.waitForTimeout(400);await doubleSpace();assert.equal(await flying(),false);
+  assert.deepEqual(errors,[]);
+  console.log('PASS double-tap flight on/off, Shift descent, held-key and menu guards, owner restriction, mobile stick; no browser errors');
+ }finally{await browser?.close();await new Promise(r=>{app.server.once('close',r);app.close();});fs.rmSync(dir,{recursive:true,force:true});}
+})().catch(e=>{console.error(e);process.exitCode=1;});

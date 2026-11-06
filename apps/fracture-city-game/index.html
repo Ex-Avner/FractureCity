@@ -24761,7 +24761,7 @@ function shTouchBuild(){
     (ny >  0.38 ? shTouchHold : shTouchRelease)('s');
     (nx < -0.38 ? shTouchHold : shTouchRelease)('a');
     (nx >  0.38 ? shTouchHold : shTouchRelease)('d');
-    (len > R * 0.86 ? shTouchHold : shTouchRelease)('shift');
+    (len > R * 0.86 && !window.FCWorldStudio?.flying ? shTouchHold : shTouchRelease)('shift');
   }
   stick.addEventListener('pointerdown', e => {
     e.preventDefault();
@@ -30037,6 +30037,6 @@ document.addEventListener('DOMContentLoaded', init);
 <script src="omnism-church.js?v=0.91.0"></script>
 <script src="backlot.js?v=0.92.0"></script>
 <script src="world-editor.js?v=0.93.0"></script>
-<script src="world-studio.js?v=0.93.0"></script>
+<script src="world-studio.js?v=0.93.1"></script>
 </body>
 </html>

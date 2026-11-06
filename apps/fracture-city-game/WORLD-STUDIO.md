@@ -14,7 +14,7 @@ Solo worlds allow god mode. Online, the server authorizes accounts in `OWNER_USE
 
 God mode supplies invulnerability, flight and unlimited workshop blocks in the owner's plot. Plot size and door limits still apply. Shared furniture continues to use the existing inventory system. PvP is disabled while god mode is enabled.
 
-Fly with normal movement, Space to rise, C or Control to descend, and Shift to accelerate. Phones use Rise and a dedicated Down button. Returning to ground or leaving god mode restores the entry position. Server checkpoints store that safe position while flying. God mode is not persisted across a server restart, and solo saves require explicitly re-enabling it.
+With god mode enabled, double-tap Space within 300 ms to start or stop flying. Fly with normal movement, hold Space to rise, and hold Shift to descend (C and Control also descend). Holding Space does not toggle flight. Flight shortcuts are inactive while typing or using menus. Phones use Rise and a dedicated Down button. Returning to ground or leaving god mode restores the entry position. Server checkpoints store that safe position while flying. God mode is not persisted across a server restart, and solo saves require explicitly re-enabling it.
 
 ## Shared terrain editing
 
