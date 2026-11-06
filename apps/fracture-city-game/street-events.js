@@ -119,12 +119,13 @@ const EVENTS = {
  },
 };
 const KINDS = Object.keys(EVENTS);
-let wait = 25, lastKind = '', prevT = performance.now();
+let wait = 8, lastKind = '', prevT = performance.now();
 function start(kind){
- if (!window.FCNpcs || ev) return false;
- kind = kind || pick(KINDS.filter(k => k !== lastKind));
+ if (!window.FCNpcs || ev || !State.chunkMap.size) return false;
+ kind = kind || pick(KINDS.filter(k => k !== lastKind && (k !== 'brawl' || !(Player.position.x>=140&&Player.position.x<=288&&Player.position.z>=0&&Player.position.z<=120))));
+ if (!EVENTS[kind]) return false;
  const at = spot(kind === 'parade' ? 1.5 : 3.6); if (!at) return false;
- ev = { kind, actors: [], at };
+ ev = { kind, actors: [], at, scene: State.scene, seed: State.citySeed };
  try { const logic = EVENTS[kind](at); Object.assign(ev, logic); ev.left = logic.secs; ev.age = 0; } catch (e){ console.warn('[street-events]', e); end(); return false; }
  lastKind = kind; return true;
 }
@@ -132,10 +133,11 @@ function frame(now){
  requestAnimationFrame(frame);
  const dt = Math.min(.1, (now - prevT) / 1000); prevT = now;
  try {
+  if (ev && (ev.scene !== State.scene || ev.seed !== State.citySeed)) end();
   if (!State.scene || State.ui.inIntro || window.FN?.prologue || window.FN?.scene){ end(); return; }
-  if (State.ui.paused) return;
+  if (State.ui.paused || State.ui.inDialogue || State.ui.inInventory || State.ui.inArcade || State.ui.inMiniGame) return;
   const t = now / 1000;
-  if (!ev){ wait -= dt; if (wait <= 0 && Player.mode !== 'drive'){ wait = rnd(70, 130); if (!start()) wait = 10; } return; }
+  if (!ev){ wait -= dt; if (wait <= 0 && Player.mode !== 'drive'){ wait = rnd(35, 65); if (!start()) wait = 10; } return; }
   ev.age += dt; ev.left -= dt;
   const far = Math.hypot(Player.position.x - ev.at.x, Player.position.z - ev.at.z) > 70;
   if (ev.left <= 0 || far){ end(); return; }
@@ -151,5 +153,5 @@ function frame(now){
  } catch (e){ if (!frame._w){ frame._w = 1; console.warn('[street-events]', e); } end(); }
 }
 requestAnimationFrame(frame);
-window.FCStreetEvents = { kinds: KINDS, start, end, get current(){ return ev ? { kind: ev.kind, people: ev.actors.length, left: ev.left } : null; } };
+window.FCStreetEvents = { kinds: KINDS, start, end, get current(){ return ev ? { kind: ev.kind, people: ev.actors.length, left: ev.left, at: {...ev.at} } : null; } };
 })();

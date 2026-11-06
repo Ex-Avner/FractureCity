@@ -129,6 +129,7 @@
   //  Every binding in the game, by what it does rather than which letter it is.
   const KEYS = [
     { h: 'YOUR CITY' },
+    { k: '✉', t: 'City Dispatch · quests & dailies', run: () => window.FCCityDispatch?.open() },
     { k: 'F4', t: 'World Studio', run: () => window.FCWorldStudio?.open() },
     { k: 'L', t: 'Explore Common Ground', run: () => window.FCCommonGroundGuide?.open() },
     { k: 'I', t: 'Inventory', run: () => tap('i') },

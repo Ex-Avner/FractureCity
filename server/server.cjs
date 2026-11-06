@@ -22,6 +22,7 @@ const worldEdits=require('./world-edits.cjs').createWorldEdits(store.db);
 const media=createMedia(store.db,now),social=createSocial(store.db,now,media,{isOwner:id=>mb.isOwner(id)}),cityBuild=createCityBuildStore(store.db),structures=createStructures(store.db);
 const challenge=createChallenge(store.db,now);
 const economy=createEconomy(store.db,{now});
+const dispatch=require('./city-dispatch.cjs').createDispatch(store.db,{now,economy});
 const worldReset=require('./world-reset.cjs').createWorldReset(store.db,{economyHelpers:require('./economy.cjs'),now});
 //  Casting Booth NPCs. A brawler's punch costs health like PvP and downs the same way.
 const spawns=createSpawns({economy,looks,now,notify:(account,actor,text)=>social.note(account,'courier',actor,null,text),chat:(r,text)=>{system(r,text)},hurtPlayer:(r,p,dmg,n)=>{if(!p||p.god||p.hp<=0||p.protectUntil>now())return;p.hp=Math.max(0,p.hp-dmg);if(!p.hp){p.deaths++;p.respawnAt=now()+4000;system(r,p.name+' was knocked down by '+(n.story?.name||'a brawler')+'.')}}});
@@ -103,6 +104,13 @@ if(u.pathname.startsWith('/api/wallet')){
  if(u.pathname==='/api/wallet/earn'){rate('earn:'+a.id,40,60000);return json(res,economy.claim(a.id,b.amount,b.reason))}
  if(u.pathname==='/api/wallet/hotbar')return json(res,economy.setHotbar(a.id,b.slots));
  fail(404,'Unknown wallet action.');
+}
+if(u.pathname==='/api/city-dispatch'){
+ const {r,p}=auth(req);rate('dispatch:'+p.accountId,60,60000);
+ if(req.method==='GET')return json(res,dispatch.snapshot(p.accountId));
+ if(req.method!=='POST')fail(405,'Use GET or POST.');
+ if(!String(req.headers['content-type']||'').startsWith('application/json'))fail(415,'Send JSON.');
+ return json(res,dispatch.action(p,await body(req,2048),r));
 }
 if(u.pathname==='/api/resident-life'){
  const a=account(req);rate('life:'+a.id,120,60000);
