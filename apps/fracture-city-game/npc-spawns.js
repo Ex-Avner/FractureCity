@@ -323,7 +323,7 @@ function shot(){
  const dir = new THREE.Vector3(0, 0, -1).applyEuler(State.camera.rotation).normalize(), ray = new THREE.Ray(Player.position.clone(), dir);
  let best = null, bd = Infinity;
  for (const e of E.values()){
-  const v = e.v; if (!v || !e.group.visible || B.ROLES[v.role]?.group !== 'trouble' || v.mode === 'down' || B.inSafe(e.group.position.x, e.group.position.z)) continue;
+  const v = e.v; if (!v || !e.group.visible || v.mode === 'down' || B.inSafe(e.group.position.x, e.group.position.z)) continue;
   const p = e.group.position; box.min.set(p.x - .45, p.y - .05, p.z - .45); box.max.set(p.x + .45, p.y + 1.95, p.z + .45);
   const h = ray.intersectBox(box, hitP); if (!h) continue; const d = h.distanceTo(ray.origin); if (d > (w.range || 30) || d >= bd) continue;
   if (typeof raycastVoxel === 'function'){ const vx = raycastVoxel(ray.origin, dir, d); if (vx && Math.hypot(vx.x + .5 - ray.origin.x, vx.y + .5 - ray.origin.y, vx.z + .5 - ray.origin.z) < d) continue; }
@@ -331,7 +331,7 @@ function shot(){
  }
  if (!best) return;
  if (online()){ if (B.inSafe(Player.position.x, Player.position.z)) return; api('city-shoot', { weapon: ['baton', 'pistol', 'shotgun'].includes(key) ? key : 'other', ox: ray.origin.x, oy: ray.origin.y, oz: ray.origin.z, dx: dir.x, dy: dir.y, dz: dir.z, npc: best.v.id, pellets: 1 }).catch(() => {}); return; }
- const n = solo.find(q => q.id === best.v.id); if (n){ const down = B.strike(null, n, w.damage || 25); if (down){ say((n.story?.name || 'They') + ' is down.', 'success'); if (typeof grantCredits === 'function') grantCredits(5); } else if (n.mode !== 'fight' && n.role !== 'pickpocket'){ n.mode = 'fight'; n.target = 'me'; n.punches = 0; } }
+ const n = solo.find(q => q.id === best.v.id); if (n){ const down = B.strike(null, n, w.dmg || w.damage || 25); if(down && B.ROLES[n.role]?.group !== 'trouble'){ window.FCJustice?.civilianDeath({kind:'shared',char:best.char,pos:best.group.position,id:n.id}); } else if (down){ say((n.story?.name || 'They') + ' is down.', 'success'); if (typeof grantCredits === 'function') grantCredits(5); } else if (B.ROLES[n.role]?.group === 'trouble' && n.mode !== 'fight' && n.role !== 'pickpocket'){ n.mode = 'fight'; n.target = 'me'; n.punches = 0; } }
 }
 const attack = window.tryAttack; window.tryAttack = function(){ const before = Player.attackCooldown; const r = attack.apply(this, arguments); if (before <= 0 && Player.attackCooldown > 0) try { shot(); } catch (e){} return r; };
 

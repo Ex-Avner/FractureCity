@@ -15,7 +15,7 @@ const SIM_RANGE=60,THINK_EVERY=.25,ABSENT_MS=10*60000;
 const fail=(status,message)=>{throw Object.assign(Error(message),{status})};
 const num=v=>Number.isFinite(v)?v:null;
 
-function createSpawns({economy,looks,now=Date.now,hurtPlayer,chat,notify}={}){
+function createSpawns({economy,looks,now=Date.now,hurtPlayer,chat,notify,civilianDeath}={}){
  const list=r=>r.npcs||(r.npcs=new Map());
  const bump=r=>{r.npcRev=(r.npcRev||0)+1};
  function ownedBy(r,accountId){return [...list(r).values()].filter(n=>n.owner===accountId).length}
@@ -103,13 +103,14 @@ function createSpawns({economy,looks,now=Date.now,hurtPlayer,chat,notify}={}){
  //  Players shooting NPCs: trouble only, never inside Common Ground.
  function shoot(r,p,b,w,o,d){
   const n=list(r).get(String(b.npc||''));if(!n)return{hit:false,reason:'gone'};
-  if(B.ROLES[n.role].group!=='trouble'||n.mode==='down')return{hit:false,reason:'not-a-target'};
+  if(n.mode==='down'||n.hp<=0)return{hit:false,reason:'not-a-target'};
   if(B.inSafe(n.x,n.z))return{hit:false,reason:'target-safe'};
   const ny=n.y||1,dist=rayBox(o,d,{x:n.x-.6,y:ny-.2,z:n.z-.6},{x:n.x+.6,y:ny+2.1,z:n.z+.6});
   if(!(dist<=w.range+1))return{hit:false,reason:'miss'};
   const dmg=w.dmg*Math.max(1,Math.min(w.pellets,Number.isSafeInteger(b.pellets)?b.pellets:1)),down=B.strike(p,n,dmg);
-  if(down){const k='npcdown:'+p.accountId,t=now();if(t-(r.rewardAt?.[k]||0)>=20000){(r.rewardAt||(r.rewardAt={}))[k]=t;economy.credit(p.accountId,5)}chat?.(r,p.name+' knocked down '+(n.story?.name||'an NPC')+'.')}
-  else if(n.mode!=='fight'&&n.role!=='pickpocket'){n.mode='fight';n.target=p.id;n.punches=0}
+  if(down&&B.ROLES[n.role].group!=='trouble'){civilianDeath?.(r,p,n);}
+  else if(down){const k='npcdown:'+p.accountId,t=now();if(t-(r.rewardAt?.[k]||0)>=20000){(r.rewardAt||(r.rewardAt={}))[k]=t;economy.credit(p.accountId,5)}chat?.(r,p.name+' knocked down '+(n.story?.name||'an NPC')+'.')}
+  else if(B.ROLES[n.role].group==='trouble'&&n.mode!=='fight'&&n.role!=='pickpocket'){n.mode='fight';n.target=p.id;n.punches=0}
   return{hit:true,npc:n.id,dmg,hp:n.hp,down};
  }
  function state(r){return [...list(r).values()].map(n=>({i:n.id,o:n.owner,r:n.role,n:n.story?.name||'',x:+n.x.toFixed(2),y:+(n.y||1).toFixed(2),z:+n.z.toFixed(2),w:+(n.yaw||0).toFixed(2),gx:+n.gx.toFixed(2),gz:+n.gz.toFixed(2),v:n.speed||0,a:n.act,m:n.mode,h:n.hp,hm:n.maxHp,s:n.sayUntil>now()?n.say:'',si:n.sayId||0,sim:n.sim||null,c:n.crew||null,tp:n.teleported?1:0}))}

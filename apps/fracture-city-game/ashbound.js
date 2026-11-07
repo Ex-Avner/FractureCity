@@ -45,7 +45,7 @@ function mesh(e){
 const make=Enemy.prototype.makeMesh;Enemy.prototype.makeMesh=function(rng){return this.type===TYPE?mesh(this):make.apply(this,arguments);};
 const hour=()=>((State.dayTime/60)%24+24)%24;
 const night=()=>hour()>=19.5||hour()<5.5;
-function sanctuary(x,z){return (x>=72&&x<=120&&z>=-48&&z<=48)||(x>=137&&x<=216&&z>=0&&z<=73)||(x>=192&&x<=288&&z>=48&&z<=120);}
+function sanctuary(x,z){return (x>=24&&x<=72&&z>=-48&&z<=0)||(x>=72&&x<=120&&z>=-48&&z<=48)||(x>=137&&x<=216&&z>=0&&z<=73)||(x>=192&&x<=288&&z>=48&&z<=120);}
 function playable(){const u=State.ui;return !!State.scene&&State.chunkMap.size>0&&night()&&!Peace.on&&Player.hp>0&&!u.paused&&!u.inIntro&&!u.inDialogue&&!u.inInventory&&!u.inArcade&&!u.inMiniGame&&!u.inShiftPanel&&!u.construct&&!window.FN?.prologue&&!window.FN?.scene&&Player.mode==='walk';}
 function clearSight(a,b){
  if(!shLineOfSight(a.x,a.y,a.z,b.x,b.y,b.z))return false;

@@ -467,6 +467,7 @@ function fnHurt(p, amount, head, fromX, fromZ){
     b.lx = x; b.lz = z;
     safe(() => shHitmark('kill'));
     FN.state.crimes++;
+    window.FCJustice?.civilianDeath(p);
   } else {
     safe(() => shHitmark(head ? 'head' : null));
     sev = 0.6;
@@ -1234,6 +1235,7 @@ function fnTickMarkers(dt){
 }
 
 function fnUseAbility(){
+  if(window.FCJustice?.active)return;
   const c = FN_CLASSES[FN.state.cls];
   if (!c || FN.abilityCd > 0 || State.ui.paused || Player.hp <= 0 || Player.mode !== 'walk') return;
   if (ABILITIES[c.ability.key]()) FN.abilityCd = c.ability.cd;
