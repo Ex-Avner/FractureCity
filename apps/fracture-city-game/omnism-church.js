@@ -2,7 +2,7 @@
 
    West of Common Ground, on the city blocks between the crossroads and the
    Lantern Hall (chunks 3..4 × 0..1). An octagonal stone hall under a bronze
-   dome: ten lecterns stand around the walls, one for each scripture in the
+   dome: twelve lecterns stand around the walls, one for each scripture in the
    library, and the round table in the middle holds the Guide, the table of
    contents to all of them.
 
@@ -47,7 +47,7 @@ if (typeof MATERIALS !== 'undefined'){
  MATERIALS[B_OM_FLOOR] = { label: 'Temple Floor', cls: 'stone', hardness: 2, drop: B_OM_FLOOR, yield: 1, value: 3, desc: 'Worn smooth by every kind of footstep.' };
 }
 
-// ─── The ten stations (one per work), around the walls ─────────────────────
+// ─── The original ten stations plus two mythic reading stands, around the walls ─────────────────────
 //  Indexed by the library's work ids; the angle puts the door (east, +x) in
 //  the gap between the first and last.
 const ORDER = ['tanakh', 'bible', 'quran', 'bahai', 'mormon', 'gita', 'upanishads', 'dhammapada', 'tao', 'analects'];
@@ -57,6 +57,10 @@ const STATIONS = ORDER.map((id, i) => {
  const x = C.x + Math.cos(a) * RING, z = C.z + Math.sin(a) * RING;
  return { id, a, x, z, fx: C.x + Math.cos(a) * (RING - 1.6), fz: C.z + Math.sin(a) * (RING - 1.6) };
 });
+STATIONS.push(
+ {id:'greek-myths',a:-Math.PI/2,x:96,z:16,fx:96,fz:17.6,mythic:true},
+ {id:'norse-myths',a:Math.PI/2,x:96,z:32,fx:96,fz:30.4,mythic:true}
+);
 const TABLE = { x: C.x, z: C.z, r: 1.9 };
 
 // ─── Voxels ────────────────────────────────────────────────────────────────
@@ -115,6 +119,7 @@ let root = null, scene = null;
 const resources = [];
 function canvasTex(w, h, paint){ const c = document.createElement('canvas'); c.width = w; c.height = h; paint(c.getContext('2d'), w, h); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; resources.push(t); return t; }
 const MARKS = { tanakh: ['✡', 'TANAKH', 'JUDAISM'], bible: ['✝', 'HOLY BIBLE', 'CHRISTIANITY'], quran: ['☪', "QUR'AN", 'ISLAM'], gita: ['ॐ', 'BHAGAVAD GITA', 'HINDUISM'], upanishads: ['ॐ', 'UPANISHADS', 'HINDUISM'], dhammapada: ['☸', 'DHAMMAPADA', 'BUDDHISM'], tao: ['☯', 'TAO TE CHING', 'TAOISM'], analects: ['儒', 'ANALECTS', 'CONFUCIANISM'], mormon: ['✦', 'BOOK OF MORMON', 'LATTER-DAY SAINTS'], bahai: ['✶', "BAHÁ'U'LLÁH", "BAHÁ'Í FAITH"] };
+MARKS['greek-myths']=['Ω','GREEK MYTHS','HESIOD · HOMERIC HYMNS'];MARKS['norse-myths']=['ᚱ','NORSE MYTHS','THE POETIC EDDA'];
 const COVERS = { tanakh: 0x23405e, bible: 0x5a1e22, quran: 0x1f4a35, gita: 0x7a3d17, upanishads: 0x6a4a1c, dhammapada: 0x7a5a12, tao: 0x2a2a2e, analects: 0x3a2a4e, mormon: 0x2e3b4a, bahai: 0x4a2a3e };
 function build(){
  if (root && scene === State.scene){ if (root.parent !== scene) scene.add(root); return; }
@@ -165,7 +170,7 @@ function build(){
   part(new THREE.BoxGeometry(.7, .08, .6), dark, 0, .04, 0);
   part(new THREE.BoxGeometry(.16, .95, .16), bronze, 0, .5, 0);
   part(new THREE.BoxGeometry(.78, .06, .56), dark, 0, 1.02, .05, -.32);
-  const cov = M(COVERS[s.id] || 0x333333, { roughness: .6 });
+  const cov = M(COVERS[s.id] || (s.id==='greek-myths'?0x80522d:s.id==='norse-myths'?0x315667:0x333333), { roughness: .6 });
   part(new THREE.BoxGeometry(.74, .03, .5), cov, 0, 1.07, .06, -.32);
   part(new THREE.BoxGeometry(.33, .02, .46), page, -.18, 1.095, .06, -.32).rotation.z = .05;
   part(new THREE.BoxGeometry(.33, .02, .46), page, .18, 1.095, .06, -.32).rotation.z = -.05;
@@ -180,7 +185,8 @@ function build(){
   const ca = Math.abs(Math.cos(s.a)), sa = Math.abs(Math.sin(s.a)), wr = (R - 1.04) / Math.max(ca, sa, (ca + sa) / Math.SQRT2);
   const wx = C.x + Math.cos(s.a) * wr, wz = C.z + Math.sin(s.a) * wr;
   const plaque = new THREE.Mesh(new THREE.PlaneGeometry(1.15, 1.34), pm); resources.push(plaque.geometry);
-  plaque.position.set(wx, FLOOR + 2.6, wz); plaque.lookAt(C.x, FLOOR + 2.6, C.z); root.add(plaque);
+  plaque.position.set(s.mythic?s.x+Math.cos(s.a)*.65:wx,FLOOR+(s.mythic?2.25:2.6),s.mythic?s.z+Math.sin(s.a)*.65:wz);
+  if(s.mythic)add(new THREE.BoxGeometry(.09,2.3,.09),bronze,plaque.position.x,FLOOR+1.15,plaque.position.z); plaque.lookAt(C.x, FLOOR + 2.6, C.z); root.add(plaque);
   const lamp = add(new THREE.BoxGeometry(1.2, .05, .12), glow, wx - Math.cos(s.a) * .1, FLOOR + 1.8, wz - Math.sin(s.a) * .1); lamp.lookAt(C.x, FLOOR + 1.8, C.z);
  }
  //  Over the door, outside: the name.
@@ -214,7 +220,7 @@ const prompt = document.createElement('button'); prompt.id = 'om-approach'; prom
 prompt.onclick = () => near && open(near);
 let near = null, panel = null, priorPause = false, oldFocus = null;
 function blocked(){ return State.ui.paused || State.ui.inArcade || State.ui.inDialogue || State.ui.inIntro || window.CityArt?.panelOpen || window.CityBuild?.panelOpen || window.FCAccounts?.visible || window.FCNewsHub?.isOpen || window.CitySocial?.writing || window.OwnBlock?.modal; }
-const TITLES = { tanakh: 'the Tanakh', bible: 'the Holy Bible', quran: "the Qur'an", gita: 'the Bhagavad Gita', upanishads: 'the Upanishads', dhammapada: 'the Dhammapada', tao: 'the Tao Te Ching', analects: 'the Analects', mormon: 'the Book of Mormon', bahai: "Bahá'u'lláh" };
+const TITLES = { 'greek-myths':'Greek mythic poetry', 'norse-myths':'Norse mythic poetry', tanakh: 'the Tanakh', bible: 'the Holy Bible', quran: "the Qur'an", gita: 'the Bhagavad Gita', upanishads: 'the Upanishads', dhammapada: 'the Dhammapada', tao: 'the Tao Te Ching', analects: 'the Analects', mormon: 'the Book of Mormon', bahai: "Bahá'u'lláh" };
 function tick(){
  requestAnimationFrame(tick);
  try {
@@ -345,7 +351,7 @@ function guideHTML(){
  return `<div class="om-guide">
  <small style="letter-spacing:.1em;color:#7a6a50">THE GUIDE</small>
  <h1>Every path, one library.</h1>
- <p class="lede">Omnism holds that every religion carries some part of the truth, and that no single one carries all of it. This hall keeps the scriptures of the world's traditions side by side, complete, in their own languages where the texts allow and in public-domain translations. Choose a book below, or walk to its lectern. Nothing here asks you to believe anything; it asks you to read.</p>
+ <p class="lede">Omnism holds that every religion carries some part of the truth, and that no single one carries all of it. This hall keeps the scriptures of the world's traditions side by side, with complete works and selected complete mythic poems, in original languages where available and attributed English translations. The Greek and Norse shelves preserve historical poetry; Fracture City’s fictional creatures are not presented as ancient teachings. Choose a book below, or walk to its lectern. Nothing here asks you to believe anything; it asks you to read.</p>
  <div class="om-cards">${cards}</div>
  <h2 style="font:600 24px Georgia,serif;margin:0 0 10px">Contents</h2>
  <div class="om-toc">${toc}</div>

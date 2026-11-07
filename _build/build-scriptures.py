@@ -355,7 +355,9 @@ def build_bahai():
      'unit': 'Part', 'verse': 'Paragraph'})
 
 if __name__ == '__main__':
-    import shutil
+    import shutil, runpy
+    for name in ['greek.html','norse.html']:
+        if not (RAW/name).exists(): raise SystemExit('Missing mythic source '+name+'; see build-mythic-library.py source URLs.')
     if OUT.exists(): shutil.rmtree(OUT)
     OUT.mkdir(parents=True)
     for f in [build_tanakh, build_bible, build_quran, build_gita, build_upanishads, build_dhammapada, build_tao, build_analects, build_mormon, build_bahai]:
@@ -364,5 +366,6 @@ if __name__ == '__main__':
     index = {'v': 1, 'name': 'The Library of the Church of Omnism', 'works': WORKS,
              'missing': ['Sri Guru Granth Sahib (Sikhism)', 'The Avesta (Zoroastrianism)', 'The Agamas (Jainism)', 'The Kojiki (Shinto)']}
     (OUT / 'index.json').write_text(json.dumps(index, ensure_ascii=False, separators=(',', ':')))
+    runpy.run_path(str(ROOT/'_build/build-mythic-library.py'))['build'](RAW,OUT)
     total = sum(p.stat().st_size for p in OUT.rglob('*.json'))
     print('files', len(list(OUT.rglob('*.json'))), 'bytes', total)
