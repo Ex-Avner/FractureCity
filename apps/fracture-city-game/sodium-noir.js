@@ -37,8 +37,8 @@ const HUES = [
 //  Night: up-facing surfaces (streets, roofs, shoulders) take sodium orange from
 //  above; walls and undersides fall to teal. That split is the sodium-noir look,
 //  and it lights every street without a single extra light.
-const NIGHT = {sky:['#d0742c','#6a3c3a','#1c2c3c','#0a1822'], hemi:'#e8903e', ground:'#1e5560', amb:'#2c6a74'};
-const SODIUM = 0xffa040;
+const NIGHT = {sky:['#767d78','#40575e','#203740','#0e1d2b'], hemi:'#d6b48a', ground:'#49666a', amb:'#526b76'};
+const SODIUM = 0xe8be83;
 
 const Grit = window.Grit = {
  enabled: true, hue: HUES[0], dayIndex: 0, wraps: 0, HUES,

@@ -49,6 +49,20 @@ function build(){
  function mesh(g,m,x,y,z){resources.push(g);const o=new THREE.Mesh(g,m);o.position.set(x,y,z);root.add(o);return o;}
  function ring(m,x,y,z,r,t=.08,rx=0,ry=0){const o=mesh(new THREE.TorusGeometry(r,t,6,48),m,x,y,z);o.rotation.set(rx,ry,0);return o;}
  function sign(title,subtitle,x,y,z,w,ry=0){const c=document.createElement('canvas');c.width=1024;c.height=256;const g=c.getContext('2d');g.fillStyle='#17232a';g.fillRect(0,0,1024,256);g.strokeStyle='#bda275';g.lineWidth=5;g.strokeRect(12,12,1000,232);g.textAlign='center';g.fillStyle='#ffebc6';let fs=64;g.font=fs+'px Georgia';while(g.measureText(title).width>950){g.font=(--fs)+'px Georgia';}g.fillText(title,512,113);g.font='25px system-ui';g.fillStyle='#a9cfce';g.fillText(subtitle,512,183);const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;resources.push(t);const m=new THREE.MeshBasicMaterial({map:t});resources.push(m);mesh(new THREE.PlaneGeometry(w,w/4),m,x,y,z).rotation.y=ry;}
+ // Matching bronze-edged cornices and stone archivolts bind both houses
+ // to the church and Custody House without crossing their six-metre doors.
+ for(const x of [86,106]){
+  for(const z of [-41.1,-9.9]){
+   box(dark,x,9.8,z,16.3,.38,.55);
+   box(stone,x,10.2,z,16.8,.42,.8);
+   box(bronze,x,10.47,z,16.9,.10,.84);
+  }
+  for(const dx of [-7.9,7.9])box(bronze,x+dx,10.45,-25,.13,.12,31);
+  const portal=mesh(new THREE.TorusGeometry(3.25,.24,6,32,Math.PI),stone,x,7.6,-9.65);
+  portal.scale.y=.65;
+  ring(bronze,x,11.8,-9.6,.65,.055);
+  for(const dx of [-3.35,3.35])box(stone,x+dx,4.8,-9.8,.36,5.6,.4);
+ }
  // Church: a second order of slender stone ribs and a suspended constellation.
  for(let i=0;i<16;i++){
   const a=i/16*TAU,x=96+Math.cos(a)*12.8,z=24+Math.sin(a)*12.8;

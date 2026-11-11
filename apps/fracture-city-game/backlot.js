@@ -20,9 +20,9 @@ const CAM = { x: 103, z: 58.6 };                      // the camera, just inside
 const inside = (x, z) => x >= IN.x0 && x < IN.x1 && z >= IN.z0 && z < IN.z1;
 const inHall = (x, z) => x >= HALL.x0 && x < HALL.x1 && z >= HALL.z0 && z < HALL.z1;
 
-const B_STAGE = shDefBlock(174, { name: 'stage wall', solid: true, emit: false, color: 0x7a7e86, grain: 0.05 });
+const B_STAGE = shDefBlock(174, { name: 'stage wall', solid: true, emit: false, color: 0x87978b, grain: 0.05 });
 const B_STAGE_FLOOR = shDefBlock(175, { name: 'stage floor', solid: true, emit: false, color: 0x9a958a, grain: 0.04 });
-const B_LOT = shDefBlock(176, { name: 'lot concrete', solid: true, emit: false, color: 0x6c6a64, grain: 0.09 });
+const B_LOT = shDefBlock(176, { name: 'lot concrete', solid: true, emit: false, color: 0x9a9b8c, grain: 0.09 });
 if (typeof MATERIALS !== 'undefined'){
  MATERIALS[B_STAGE] = { label: 'Stage Wall', cls: 'metal', hardness: 3, drop: B_STAGE, yield: 1, value: 4, desc: 'Sound-deadened steel from the Backlot hangar.' };
  MATERIALS[B_STAGE_FLOOR] = { label: 'Stage Floor', cls: 'stone', hardness: 2, drop: B_STAGE_FLOOR, yield: 1, value: 3, desc: 'Smooth, painted, covered in old tape marks.' };
@@ -93,6 +93,28 @@ function build(){
  //  The roof: a steel deck on the walls, with a cornice band.
  const roofMat = M(0x2a2c31, { roughness: .7, metalness: .3, side: THREE.DoubleSide });
  add(new THREE.BoxGeometry(HALL.x1 - HALL.x0 + .4, .3, HALL.z1 - HALL.z0 + .4), roofMat, (HALL.x0 + HALL.x1) / 2, ROOF + .15, (HALL.z0 + HALL.z1) / 2);
+ // Industrial civic frontage: grounded limestone piers, bronze joints,
+ // clerestory sawtooths and a continuous cornice. Three instanced batches.
+ const stone=M(0xc4b99f,{roughness:.82}),bronze=M(0xa38a5f,{metalness:.55}),patina=M(0x385451,{metalness:.3,roughness:.35});
+ const bays=new Map(),pose=new THREE.Object3D();
+ const bay=(m,x,y,z,w,h,d,rz=0)=>{if(!bays.has(m))bays.set(m,[]);bays.get(m).push([x,y,z,w,h,d,rz]);};
+ for(const z of [54,65.95]){
+  bay(stone,103,9.8,z,22.4,.5,.36);bay(bronze,103,10.13,z,22.5,.10,.42);
+  for(const x of [92.2,96.3,109.7,113.7])bay(stone,x,5.8,z,.42,7.6,.32);
+  // The back wall has a quiet rhythmic relief; the working door stays clear.
+  if(z>60)for(let x=94;x<113;x+=2){bay(bronze,x,6.2,z,.065,5.8,.16);bay(patina,x,7.5,z+.02,1.1,1.8,.08);}
+ }
+ for(const x of [92,113.95]){
+  bay(stone,x,9.8,60,.36,.5,12.4);
+  for(const z of [54.3,58,62,65.7]){bay(stone,x,5.8,z,.32,7.6,.42);bay(bronze,x,6,z+.25,.34,6,.065);}
+ }
+ for(let i=0;i<6;i++){
+  const x=93.85+i*3.6;
+  bay(patina,x,10.96,60,3.82,.14,11.8,.35);
+  bay(bronze,x+1.75,10.95,60,.12,1.35,11.8);
+  for(const z of [54.15,65.85])bay(stone,x,10.96,z,3.82,.16,.16,.35);
+ }
+ for(const [m,rows]of bays){const g=new THREE.BoxGeometry(1,1,1);res.push(g);const inst=new THREE.InstancedMesh(g,m,rows.length);inst.name='backlot-civic-frontage';rows.forEach(([x,y,z,w,h,d,rz],i)=>{pose.position.set(x,y,z);pose.scale.set(w,h,d);pose.rotation.set(0,0,rz);pose.updateMatrix();inst.setMatrixAt(i,pose.matrix);});inst.instanceMatrix.needsUpdate=true;root.add(inst);}
  //  The camera on its tripod, facing the set.
  const cam = new THREE.Group(); cam.position.set(CAM.x, FLOOR, CAM.z); root.add(cam);
  const part = (g, m, x, y, z, rx = 0, rz = 0) => { const o = new THREE.Mesh(g, m); o.position.set(x, y, z); o.rotation.set(rx, 0, rz); cam.add(o); res.push(g); return o; };

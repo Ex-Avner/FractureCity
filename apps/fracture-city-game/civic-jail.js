@@ -63,6 +63,23 @@ function build(){if(root&&scene===State.scene){if(root.parent!==scene)scene.add(
   box(brass,48+side*20.4,10,-41+n*5.6,.10,7,.15);
   box(limestone,31+n*5.6,9,side<0?-44.4:-4.6,1.1,12,.7);
  }
+ // A continuous cornice and layered blind arcades give the institution a
+ // legible base, body and crown. Relief hugs the existing solid perimeter.
+ for(const z of [-44.55,-4.45]){
+  box(basalt,48,2.5,z,40,1,.18);
+  box(limestone,48,12.8,z,41,.55,.85);
+  box(brass,48,13.15,z,41.2,.12,.92);
+  for(let x=32;x<=64;x+=6.4){
+   const arch=mesh(new THREE.TorusGeometry(2.45,.20,6,20,Math.PI),limestone,x,9.4,z);
+   arch.scale.y=.85;
+   for(const dx of [-2.45,2.45])box(limestone,x+dx,6.25,z,.4,6.3,.38);
+   box(brass,x,4,z,4,.11,.18);
+  }
+ }
+ for(const x of [27.65,68.35]){
+  box(limestone,x,12.8,-24,.85,.55,40);
+  box(brass,x,13.15,-24,.92,.12,40.2);
+ }
  // The east intake canopy is cantilevered from two deep stone piers.
  for(const z of [-39,-29]){box(basalt,68,7,z,1.4,10,1.4);box(amber,68.73,8,z,.05,6,.13);}
  box(limestone,69,12.4,-34,5,.7,12);box(brass,70.8,12,-34,.15,.12,11);

@@ -18,16 +18,16 @@
 (function(){
 'use strict';
 if (typeof Chunk === 'undefined') return;
-const ARCH = window.Architecture = { version: '0.38.0', counts: {} };
+const ARCH = window.Architecture = { version: '0.99.0', counts: {} };
 const safe = f => { try { return f(); } catch (e){ console.warn('[architecture]', e); } };
 
-const B_CURTAIN  = shDefBlock(80, { name: 'curtain glass',  solid: true, emit: false, color: 0x2a3b52, grain: 0.03 });
-const B_CURTAINL = shDefBlock(81, { name: 'lit curtain',    solid: true, emit: true,  color: 0xa9d6ff, grain: 0.02 });
-const B_GOLD     = shDefBlock(82, { name: 'deco trim',      solid: true, emit: false, color: 0xc49a4a, grain: 0.06 });
-const B_TILEROOF = shDefBlock(83, { name: 'roof tile',      solid: true, emit: false, color: 0x7a3a2c, grain: 0.14 });
-const B_LACQUER  = shDefBlock(84, { name: 'lacquer',        solid: true, emit: false, color: 0x9c2a2a, grain: 0.05 });
-const B_LANTERN  = shDefBlock(85, { name: 'lantern',        solid: true, emit: true,  color: 0xff8a4a, grain: 0.02 });
-const B_BLUETILE = shDefBlock(86, { name: 'blue tile',      solid: true, emit: false, color: 0x3c6680, grain: 0.05 });
+const B_CURTAIN  = shDefBlock(80, { name: 'curtain glass',  solid: true, emit: false, color: 0x385451, grain: 0.03 });
+const B_CURTAINL = shDefBlock(81, { name: 'lit curtain',    solid: true, emit: true,  color: 0xd4c39c, grain: 0.02 });
+const B_GOLD     = shDefBlock(82, { name: 'deco trim',      solid: true, emit: false, color: 0xa38a5f, grain: 0.06 });
+const B_TILEROOF = shDefBlock(83, { name: 'roof tile',      solid: true, emit: false, color: 0x55665d, grain: 0.14 });
+const B_LACQUER  = shDefBlock(84, { name: 'lacquer',        solid: true, emit: false, color: 0x784c40, grain: 0.05 });
+const B_LANTERN  = shDefBlock(85, { name: 'lantern',        solid: true, emit: true,  color: 0xe8bd83, grain: 0.02 });
+const B_BLUETILE = shDefBlock(86, { name: 'blue tile',      solid: true, emit: false, color: 0x638b81, grain: 0.05 });
 Object.assign(MATERIALS, {
   [B_CURTAIN]:  { label: 'Curtain Glass', cls: 'glass',  hardness: 1.0, drop: B_GLASS, yield: 1, value: 4, desc: 'Mirrored on the outside, so the tower only ever sees the city.' },
   [B_CURTAINL]: { label: 'Lit Curtain',   cls: 'signal', hardness: 1.0, drop: B_GLASS, yield: 1, value: 5, desc: 'Someone is working late. Someone is always working late.' },
@@ -226,6 +226,28 @@ function lantern(chunk, F){
 }
 const APPLY = { curtain, setback, spire, brick, tenement, gable, sawtooth, chimney, tile, mast, pagoda, lantern, plain(){} };
 
+// A shared architectural order ties the different roof types together. These
+// are replacements of existing solid wall cells, never new collision volumes.
+// Four-metre bays, quiet floor bands, stone corner piers and a roof cornice.
+function civicOrder(chunk, F, district){
+  const walls = new Set([B_CONCRETE,B_BRICK,B_METAL,B_GOLD,B_BLUETILE,B_LACQUER]);
+  const warm = district?.name === 'RESIDENTIAL' || district?.name === 'NIGHT MARKET';
+  for (let y=GROUND+3;y<F.top;y++) for(let x=F.x0;x<F.x1;x++) for(let z=F.z0;z<F.z1;z++){
+    if(!edge(F,x,z))continue;
+    const id=get(chunk,x,y,z);if(!walls.has(id))continue;
+    // Setbacks have already removed their cells. Never bridge their empty air.
+    const corner=(x===F.x0||x===F.x1-1)&&(z===F.z0||z===F.z1-1);
+    const along=(z===F.z0||z===F.z1-1)?x-F.x0:z-F.z0;
+    const cornice=y===F.top-1, belt=(y-GROUND)%6===0;
+    if(cornice) set(chunk,x,y,z,B_GOLD);
+    else if(corner||along%4===0) set(chunk,x,y,z,B_CONCRETE);
+    else if(belt) set(chunk,x,y,z,B_BLUETILE);
+    else if(warm&&id===B_CONCRETE) set(chunk,x,y,z,B_BRICK);
+  }
+}
+
+ARCH.civicOrder = civicOrder;
+
 // ─── Hook ───────────────────────────────────────────────────────────────────
 const _make = Chunk.prototype.makeBuilding;
 Chunk.prototype.makeBuilding = function(b, district){
@@ -235,10 +257,10 @@ Chunk.prototype.makeBuilding = function(b, district){
   safe(() => {
     const rng = new RNG('arch:' + this.key + ':' + Math.round(b.cx * 10) + ':' + Math.round(b.cz * 10));
     const style = pickStyle(district, rng);
-    if (style === 'plain') return;
     const F = frame(this, b);
     const roofBefore = F.top + 1;
     APPLY[style](this, F, rng);
+    civicOrder(this, F, district);
     ARCH.counts[style] = (ARCH.counts[style] || 0) + 1;
     //  Re-seat anything that was sitting on the old roof.
     for (let i = before; i < this.group.children.length; i++){

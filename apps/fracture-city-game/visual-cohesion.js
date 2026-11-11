@@ -65,17 +65,17 @@
 /* All authored colour decisions for the city live here. */
 (function(){
   const P=window.FC_PALETTE=Object.freeze({
-    ink:0x141e29, shadow:0x263545, concrete:0x687078, metal:0x858d98,
+    ink:0x141e29, shadow:0x263545, concrete:0xb6af9b, metal:0x8c998f,
     sodium:0xd4aa78, paper:0xe2ddd1, fcn:0xff5268, bureau:0x9aa2bb, player:0xf4bb3d,
     dusk:[0x89949d,0x596d82,0x344c65,0x21374f],
     night:[0x354553,0x263847,0x192b3d,0x132233],
     day:[0xaabec9,0x87a6ba,0x628ba9,0x456d91],
     districts:{
-      DOWNTOWN:{sign:0x91acbd,window:0xb8c6cc,wall:0x656e79,hue:.57},
-      RESIDENTIAL:{sign:0xc6a67c,window:0xd5ba92,wall:0x716d67,hue:.105},
-      FORGE:{sign:0xca9678,window:0xd5a883,wall:0x72685f,hue:.06},
-      FLOOD:{sign:0x85aaa7,window:0xa6c0b7,wall:0x606f73,hue:.48},
-      CHINATOWN:{sign:0xc18d7f,window:0xc9ad87,wall:0x756663,hue:.025},
+      DOWNTOWN:{sign:0x91acbd,window:0xb8c6cc,wall:0xb6b4a7,hue:.57},
+      RESIDENTIAL:{sign:0xc6a67c,window:0xd5ba92,wall:0xbba48b,hue:.105},
+      FORGE:{sign:0xca9678,window:0xd5a883,wall:0xa28b78,hue:.06},
+      FLOOD:{sign:0x85aaa7,window:0xa6c0b7,wall:0x92aba2,hue:.48},
+      CHINATOWN:{sign:0xc18d7f,window:0xc9ad87,wall:0xb49889,hue:.025},
     },
     neonSaturation:.51, // previous holo saturation .85, reduced by forty percent
     neonHueRange:.012,
@@ -87,7 +87,7 @@
     const d=DISTRICTS[k];Object.assign(d,{bgColor:s.wall,accentColor:s.sign,windowColors:[s.window,P.paper,P.sodium],neonProb:d.neonProb*.3,graffitiProb:d.graffitiProb*.2});
   }
   NEON_COLORS.splice(0,NEON_COLORS.length,P.sodium,P.districts.DOWNTOWN.sign,P.districts.FLOOD.sign);
-  for(const [id,c] of [[B_ASPHALT,P.ink],[B_SIDEWALK,0x525e65],[B_CONCRETE,P.concrete],[B_WIN_LIT,P.sodium],[B_WIN_DARK,P.shadow],[B_ROOF,0x343f4a],[B_METAL,P.metal],[B_NEON,P.bureau],[B_GLASS,0x8198a6],[B_PAINT,0xb5aa8e],[B_BRICK,0x80665e],[B_RUST,0x916b51]])BLOCKS[id].color=c;
+  for(const [id,c] of [[B_ASPHALT,P.ink],[B_SIDEWALK,0x9a9b8c],[B_CONCRETE,P.concrete],[B_WIN_LIT,P.sodium],[B_WIN_DARK,P.shadow],[B_ROOF,0x343f4a],[B_METAL,P.metal],[B_NEON,P.bureau],[B_GLASS,0x8198a6],[B_PAINT,0xb5aa8e],[B_BRICK,0x9d7762],[B_RUST,0x916b51]])BLOCKS[id].color=c;
   // Preserve block IDs and save compatibility; tint the existing voxel buckets
   // in their chunk context instead of inventing new material IDs.
   const geometry=quadsToGeometry;
