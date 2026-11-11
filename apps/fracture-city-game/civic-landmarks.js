@@ -4,7 +4,7 @@ if(typeof THREE==='undefined'||typeof Chunk==='undefined')return;
 const TAU=Math.PI*2,KEYS=new Set(['3,-2','4,-2','3,-1','4,-1']);
 const sites=[
  {id:'sanctuary',name:'The House of Many Lights',x:102,z:20,sub:'CHURCH OF OMNISM',color:0xffcf8c},
- {id:'archive',name:'The Mnemonic Archive',x:86,z:-24,sub:'CULTURE / A MECHANICAL MYSTERY',color:0x81e0dc},
+ {id:'archive',name:'The Mnemonic Archive',x:86,z:-24,sub:'FREE COLLEGE / LEARN • PRACTICE • INVESTIGATE',color:0x81e0dc},
  {id:'salon',name:'The Resonance House',x:106,z:-24,sub:'MUSIC / CONVERSATION / COMPANY',color:0xe8a4be},
  {id:'walk',name:'The Civic Walk',x:112,z:19,sub:'THREE PLACES TO DISCOVER',color:0xffcf8c}
 ];
@@ -86,8 +86,8 @@ function build(){
  for(let i=0;i<3;i++){const o=ring(i===1?gold:teal,86,5,-24,1.35+i*.5,.07,0,i*.5);rings.push(o);}
  mesh(new THREE.IcosahedronGeometry(.5,0),bronze,86,5,-24);
  for(let i=0;i<3;i++){const o=mesh(new THREE.OctahedronGeometry(.7-i*.12),stone,86+i*.9,20+i*1.3,-25);o.rotation.z=.5+i*.4;}
- sign('THE MNEMONIC ARCHIVE','ENTER / ALIGN THE THREE MEMORY RINGS',86,10.7,-8.94,11);
- sign('ROOT → TIDE → STAR','THE CITY REMEMBERS FROM EARTH TO SKY',86,5.4,-39.85,8);
+ sign('THE MNEMONIC ARCHIVE','FREE COLLEGE / START YOUR FIRST COURSE',86,10.7,-8.94,11);
+ sign('ASK / READ / TEST','FREE COLLEGE / ALL WELCOME',86,5.4,-39.85,8);
  // Resonance House: a fan of suspended bronze sails above a rose-lit salon.
  for(let i=0;i<9;i++){
   const z=-39+i*3.5,peak=13+Math.sin(i/8*Math.PI)*4;
@@ -137,13 +137,14 @@ function close(){if(!panel)return;panel.remove();panel=null;stopSound();State.ui
 function render(){
  if(!panel)return;const s=near,p=state();let content='';
  if(s.id==='sanctuary')content=`<p>Scriptures and mythic poetry surround a shared table. This new sanctuary offers a moment of reflection alongside the library, without pretending that different beliefs are the same.</p><div class="civic-card"><h2>Leave a light</h2><p>Choose an intention. The paired lanterns change color in the room. This is a fictional, personal activity, not a religious rite.</p><div class="civic-actions">${['Remember / amber','Welcome / teal','Begin again / rose'].map((n,i)=>`<button data-light="${i+1}" aria-pressed="${p.light===i+1}">${n}</button>`).join('')}</div></div><h2>Choose a reading journey</h2><p>Read the sources in their own voices. These starting points are invitations, not claims that the traditions teach identical things.</p><div class="civic-actions"><button data-work="greek-myths">Origins / Greek poetry</button><button data-work="norse-myths">Wisdom / Norse poetry</button><button data-work="tao">The way / Tao Te Ching</button><button data-work="dhammapada">Conduct / Dhammapada</button></div><h2>Explore the house</h2><p>At the center: the Guide and the complete library index. Around the walls: ten scripture stations. The north and south inner stands hold Greek and Norse mythic poetry.</p><div class="civic-actions"><button data-library>Open the library guide</button></div><p>Reflection: What can you learn from a tradition without claiming it as your own?</p>`;
- if(s.id==='archive')content=`<p>An archive of the fictional city, held inside a ribbed stone vault. The broken crown above it marks a memory that never settled into place.</p><div class="civic-card"><h2>The three memory rings</h2><p>The inscription at the back reads: <b>ROOT → TIDE → STAR</b>. Put the rings in that order, from inner to outer, to restore the archive’s first memory.</p><div class="civic-actions">${p.rings.map((v,i)=>`<button data-ring="${i}">${['Inner','Middle','Outer'][i]}: ${['Silence','Root','Tide','Star'][v]} ↻</button>`).join('')}</div><button data-check>Restore the memory</button></div>${p.solved?'<div class="civic-card"><small>MEMORY 001 / THE FIRST COMMON ROOM</small><h2>Before the towers</h2><p>The first common room was a table dragged into a flooded station. Someone brought a lamp. Someone brought a book they could not read. A third person stayed to teach them. The city began again around those three things.</p><p><i>Original FractureCity fiction. Memory restored in this browser.</i></p></div>':'<p>The suspended rings turn as you adjust them. Close this panel to inspect your arrangement.</p>'}`;
+ if(s.id==='archive')content=`<p>The Archive is now the first home of FractureCity Free College. Learn real reasoning skills, keep a notebook and investigate a case.</p><div class="civic-card"><small>THINKING 101 / FREE / SELF-PACED</small><h2>Critical Thinking and the Art of Asking Questions</h2><p>Six units. Worked examples. Practice with explanations. Unit tests, a final assessment, and a written investigation you can keep.</p><button data-college>Start or resume my course</button></div><p>No prerequisites. About 3–4 hours. Free, non-accredited pilot; open-book tests and a self-assessed project. You can also resume from Tools or the mobile menu.</p>`;
  if(s.id==='salon')content=`<p>A folded bronze roof gathers around an instrument with five notes. Bring another player here, make a little music, or use a question to start talking.</p><div class="civic-card"><h2>Play the light</h2><div class="civic-actions">${notes.map((n,i)=>`<button data-note="${i}" aria-label="Play ${n}">${n}</button>`).join('')}</div><p>Sound plays only on your device. No microphone, recording, or autoplay.</p></div><div class="civic-card"><small>A QUESTION FOR THE ROOM</small><blockquote>${questions[p.prompt]}</blockquote><div class="civic-actions"><button data-question>Another question</button></div></div><p>Use the city’s existing chat to share your answers with nearby company.</p>`;
  if(s.id==='walk')content=`<p>Three destinations, each with an open doorway and something to discover. Progress is personal to this browser and world.</p>${sites.slice(0,3).map((a,i)=>`<div class="civic-card"><small>0${i+1} / ${p.visited.includes(a.id)?'VISITED':'UNDISCOVERED'}</small><h2>${a.name}</h2><p>${['Enter the church to the west. The paired lanterns are just inside, right of the doorway.','Follow the street north across the junction. Take the left doorway beneath the ribbed roof.','Beside the archive: the right doorway under the folded bronze roof.'][i]}</p></div>`).join('')}`;
  panel.innerHTML=`<button class="civic-close" data-close aria-label="Close">Close · Esc</button><small>${s.sub}</small><h1>${s.name}</h1>${content}<p role="status" aria-live="polite"></p><small>THE CIVIC WALK / ${p.visited.length} OF 3 PLACES VISITED</small>`;
 }
 function click(e){const b=e.target.closest('button');if(!b)return;
  if(b.hasAttribute('data-close'))return close();
+ if(b.hasAttribute('data-college')){close();window.FCCollege?.open();return;}
  if(b.dataset.work){const id=b.dataset.work;close();FCOmnism.open({kind:'work',id});return;}
  if(b.hasAttribute('data-library')){close();FCOmnism.open({kind:'guide'});return;}
  let msg='';

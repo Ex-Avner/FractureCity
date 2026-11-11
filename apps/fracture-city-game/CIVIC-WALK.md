@@ -12,7 +12,7 @@ The original octagonal sanctuary, dome, twelve reading stations and library rema
 
 ## Mnemonic Archive
 
-16 × 32 metre ground-level hall, floor elevation 2; walls to 10; repeated stone vault ribs rise approximately 19. Bronze shelving, a linear skylight and three deliberately fractured crown stones form the silhouette. The inner, middle and outer memory rings visibly respond to the puzzle controls. Read the rear inscription and align Root → Tide → Star to reveal an original piece of FractureCity fiction. No currency or server rewards.
+16 × 32 metre ground-level hall, floor elevation 2; walls to 10; repeated stone vault ribs rise approximately 19. Bronze shelving, a linear skylight and three deliberately fractured crown stones form the silhouette. The rings are now an architectural sculpture. The Archive opens Free College: a complete introductory critical-thinking course with lessons, assessments and a private investigation portfolio. See FREE-COLLEGE.md. The earlier ring puzzle has been retired. No currency rewards.
 
 ## Resonance House
 
@@ -28,6 +28,6 @@ Personal progress is stored under `fc-civic-v1:<world seed>` in browser localSto
 
 ## Verification
 
-`node _test/civic-landmarks.test.cjs`: grounded doors/floors, wall/console/bench collisions, church entrance, scene attachment, no new lights, six instance batches, wrong and correct puzzle solutions, lantern choice, library handoff, audio cleanup, 390 px phone fit, persistence across reload. Screenshots cover the exterior, church, puzzle and phone salon. Existing Ashbound/library regression remains separate.
+`node _test/civic-landmarks.test.cjs`: grounded doors/floors, wall/console/bench collisions, church entrance, scene attachment, no new lights, six instance batches, Free College handoff, lantern choice, library handoff, audio cleanup, 390 px phone fit, persistence across reload. Screenshots cover the exterior, church, puzzle and phone salon. Existing Ashbound/library regression remains separate.
 
 Deploy the pushed source through the normal hosting process; git push alone does not redeploy a host with automatic deployment disabled.

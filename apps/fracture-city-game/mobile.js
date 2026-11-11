@@ -128,6 +128,7 @@
   // ─── 3 · The KEYS drawer ─────────────────────────────────────────────────
   //  Every binding in the game, by what it does rather than which letter it is.
   const KEYS = [
+    { k: 'College', t: 'Free College', run: () => window.FCCollege?.open() },
     { h: 'YOUR CITY' },
     { k: '✉', t: 'City Dispatch · quests & dailies', run: () => window.FCCityDispatch?.open() },
     { k: 'F4', t: 'World Studio', run: () => window.FCWorldStudio?.open() },

@@ -23,6 +23,7 @@ const media=createMedia(store.db,now),social=createSocial(store.db,now,media,{is
 const challenge=createChallenge(store.db,now);
 const economy=createEconomy(store.db,{now});
 const justice=require('./justice.cjs').createJustice(store.db,{now});
+const college=require('./college.cjs').createCollege(store.db,{now});
 const dispatch=require('./city-dispatch.cjs').createDispatch(store.db,{now,economy});
 const worldReset=require('./world-reset.cjs').createWorldReset(store.db,{economyHelpers:require('./economy.cjs'),now});
 //  Casting Booth NPCs. A brawler's punch costs health like PvP and downs the same way.
@@ -119,6 +120,13 @@ if(u.pathname==='/api/city-dispatch'){
  if(req.method!=='POST')fail(405,'Use GET or POST.');
  if(!String(req.headers['content-type']||'').startsWith('application/json'))fail(415,'Send JSON.');
  return json(res,dispatch.action(p,await body(req,2048),r));
+}
+if(u.pathname==='/api/college'){
+ const a=account(req);rate('college:'+a.id,60,60000);
+ if(req.method==='GET')return json(res,college.read(a.id));
+ if(req.method!=='POST')fail(405,'Use GET or POST.');
+ if(!String(req.headers['content-type']||'').startsWith('application/json'))fail(415,'Send JSON.');
+ return json(res,college.write(a.id,await body(req,150000)));
 }
 if(u.pathname==='/api/resident-life'){
  const a=account(req);rate('life:'+a.id,120,60000);
