@@ -407,6 +407,7 @@ function fnPeople(){
   safe(() => { if (typeof Cast !== 'undefined' && Cast.staged && Cast.staged.members)
     for (const m of Cast.staged.members) if (m.char) out.push({ char: m.char, kind: 'cast', owner: m, pos: m.char.group.position, protect: true }); });
   if (FN.prologue) for (const x of FN.prologue.extras) if (x.char) out.push({ char: x.char, kind: 'extra', owner: x, pos: x.char.group.position, protect: true });
+  for(const p of window.FCStreetEvents?.combatants||[])out.push(p);
   return out;
 }
 
@@ -421,7 +422,7 @@ function fnBody(p){
   c.fnb.protect = c.fnb.protect || !!p.protect;
   return c.fnb;
 }
-function fnFeetY(p){ return (p.char.baseY != null ? p.char.baseY : p.pos.y); }
+function fnFeetY(p){ if(p.owner?.streetEvent)return p.pos.y;return (p.char.baseY != null ? p.char.baseY : p.pos.y); }
 
 //  Lying down, on the back, facing where they were facing.
 function fnPoseDown(c, yaw){
