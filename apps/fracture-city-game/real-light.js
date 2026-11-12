@@ -573,7 +573,7 @@ function frame(){
   //  Under the Soundstage the shot camera, not the player's, is the eye.
   const eye = (document.body.classList.contains('fc-soundstage') && window.FCSoundstage && FCSoundstage.camera) || State.camera;
   if (RL.skyline && eye){
-   RL.skyline.visible = true;
+   RL.skyline.visible = !window.FCExpanse || FCExpanse.showUrbanHorizon(eye.position);
    RL.skyline.position.set(eye.position.x, 0, eye.position.z);
    //  Windows light as the sky darkens; a few are on through the day.
    skyMat.emissiveIntensity = 0.06 + 1.1 * Math.pow(night, 1.4);

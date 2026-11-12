@@ -128,6 +128,7 @@
   // ─── 3 · The KEYS drawer ─────────────────────────────────────────────────
   //  Every binding in the game, by what it does rather than which letter it is.
   const KEYS = [
+    { k: 'Explore', t: 'Outer Expanse · expeditions', run: () => window.FCExpanse?.open() },
     { k: 'College', t: 'Free College', run: () => window.FCCollege?.open() },
     { h: 'YOUR CITY' },
     { k: '✉', t: 'City Dispatch · quests & dailies', run: () => window.FCCityDispatch?.open() },

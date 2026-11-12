@@ -390,7 +390,7 @@ function hazardTick(dt){
   const biome = d && d.wild ? d.biome : null;
   if (biome !== W.here){
     W.here = biome;
-    if (biome && !W.seen[biome] && !story){ W.seen[biome] = true; toast(INTRO[biome], 'warn'); }
+    if (biome && !W.seen[biome] && !story){ W.seen[biome] = true; toast(INTRO[biome] || d.description || d.name, 'warn'); }
   }
   sampleT -= dt;
   if (sampleT <= 0){ sampleT = 0.25; glow = biome === 'nuke' || biome === 'scrub' ? glowNear() : 0; }
