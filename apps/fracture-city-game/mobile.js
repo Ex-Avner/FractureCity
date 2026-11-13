@@ -129,6 +129,8 @@
   //  Every binding in the game, by what it does rather than which letter it is.
   const KEYS = [
     { k: 'Explore', t: 'Outer Expanse · expeditions', run: () => window.FCExpanse?.open() },
+    { k: 'Records', t: 'First Signal · records', run: () => window.FCFirstSignal?.openRecords() },
+    { k: 'Mirror', t: 'The Mirror Hour', run: () => window.FCMirrorHour?.toggle() },
     { k: 'College', t: 'Free College', run: () => window.FCCollege?.open() },
     { h: 'YOUR CITY' },
     { k: '✉', t: 'City Dispatch · quests & dailies', run: () => window.FCCityDispatch?.open() },
@@ -494,8 +496,8 @@
           if (abOn && qb){
             qb.classList.toggle('cd', ab.classList.contains('cd'));
             const nm = (ab.textContent.split('·')[1] || 'ABILITY').trim().slice(0, 9);
-            const lbl = 'Q\n' + nm;
-            if (qb.dataset.l !== lbl){ qb.dataset.l = lbl; qb.innerHTML = 'Q<br>' + nm; }
+            const lbl = nm;
+            if (qb.dataset.l !== lbl){ qb.dataset.l = lbl; qb.textContent = nm; }
           }
         }
         //  If a panel opened from the drawer, the drawer must not sit on it.
