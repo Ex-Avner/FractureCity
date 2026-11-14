@@ -25,7 +25,7 @@ const BODY=`
   float fcU=abs(vSurfN.x)>0.5?fract(vSurfW.z):fract(vSurfW.x);
   float fcV=fract(vSurfW.y);
   float fcH=fcPaneHash(fcCell),fcH2=fcPaneHash(fcCell+17.3);
-  float fcNear=smoothstep(110.0,45.0,1.0/gl_FragCoord.w);
+  float fcNear=1.0-smoothstep(45.0,110.0,1.0/gl_FragCoord.w);
   float fcEdge=min(min(fcU,1.0-fcU),min(fcV,1.0-fcV));
   float fcFrame=1.0-smoothstep(0.05,0.075,fcEdge);
   float fcMull=(1.0-smoothstep(0.014,0.03,abs(fcU-0.5)))*step(0.4,fcH2);
@@ -61,7 +61,7 @@ function patch(mat){
   shader.uniforms.uPaneOn=U.uPaneOn;
   shader.fragmentShader=fs.replace('#include <common>','#include <common>\n'+HEAD).replace('#include <color_fragment>','#include <color_fragment>\n'+BODY);
  };
- mat.customProgramCacheKey=function(){return(innerKey?innerKey.call(this):'')+'|panes-1'};
+ mat.customProgramCacheKey=function(){return(innerKey?innerKey.call(this):'')+'|panes-2'};
  mat.needsUpdate=true;P.patched++;return true;
 }
 // The voxel materials are patched for surface detail during start-up; follow them.

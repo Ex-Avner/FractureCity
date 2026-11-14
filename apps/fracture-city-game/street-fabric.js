@@ -205,7 +205,7 @@ function render(chunk){const fab=chunk.fabric,b=new Solid(),g=new Solid(),dc=new
  for(const m of [...fab.root.children]){fab.root.remove(m);m.geometry.dispose()}
  for(const it of fab.items)if(it.on)it.draw(b,g,dc);
  const body=b.mesh(MAT.body),glow=g.mesh(MAT.glow),decals=dc.mesh();
- if(body){body.receiveShadow=true;fab.root.add(body)}if(glow){glow.castShadow=false;glow.userData._hdTag=1;fab.root.add(glow)}if(decals)fab.root.add(decals);
+ if(body){body.receiveShadow=true;body.castShadow=false;body.userData._hdTag=1;fab.root.add(body)} // no shadow pass: it doubled the draw cost of every blockif(glow){glow.castShadow=false;glow.userData._hdTag=1;fab.root.add(glow)}if(decals)fab.root.add(decals);
  fab.tris=(b.p.length+g.p.length+dc.p.length)/9}
 function refresh(chunk,force){const fab=chunk.fabric;let changed=force;
  for(const it of fab.items){const on=valid(chunk,it);if(on!==it.on){changed=true;it.on=on;

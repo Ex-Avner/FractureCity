@@ -12,8 +12,9 @@
 
    By day the mirror is a ghost in the sky, like a day moon.
 
-   Cost: one light (created at start-up at zero intensity, so nothing recompiles
-   when night falls), five draw calls while the hour is up, none of them textured.
+   Cost: no lights, five draw calls while the hour is up, none of them textured.
+   The aurora is shaded per vertex. If frames run long the piece sheds its own
+   layers (aurora first, then motes and half the threads): FCMirrorHour.perf().
    Everything but the ghost is switched off by day. Sound follows the game's own
    sound switch. Progress is kept per browser in localStorage (fc-mirror-hour).
 
@@ -40,7 +41,7 @@ const LINES=[
  'Go home by a street you have not read yet.',
 ];
 const KEY='fc-mirror-hour',MAXT=64,GOLD=[1.0,.78,.36],TEAL=[.35,.95,.86],ROSE=[1.0,.42,.62];
-const H=window.FCMirrorHour={version:'0.103.0',lines:LINES,amount:0,held:0,heard:new Set(),whole:false,threads:0};
+const H=window.FCMirrorHour={version:'0.104.0',lines:LINES,amount:0,held:0,heard:new Set(),whole:false,threads:0};
 try{const s=JSON.parse(localStorage.getItem(KEY)||'{}');for(const i of s.heard||[])if(i>=0&&i<LINES.length)H.heard.add(i);H.whole=H.heard.size>=LINES.length}catch(e){}
 const save=()=>{try{localStorage.setItem(KEY,JSON.stringify({heard:[...H.heard]}))}catch(e){}};
 
@@ -68,26 +69,25 @@ const mirror=(function(){const p=[],n=[],b=[],id=[];let k=0;
   vec2 q=r.xz/(abs(r.y)+.55)*1.6+vId*3.7;float neb=mhFbm(q+uTime*.012),neb2=mhFbm(q*2.3-uTime*.02+9.);
   vec3 col=mix(vec3(.02,.03,.09),mhAxis(vId/8.+neb*.55+uTime*.004),smoothstep(.25,.85,neb))*(.55+neb2);
   vec2 sg=floor(q*46.);float st=step(.992,mhHash(sg))*(.5+.5*sin(uTime*1.7+mhHash(sg+3.)*40.));col+=vec3(st)*1.6;
-  float fres=pow(1.-abs(dot(v,n)),2.5),e=min(vB.x,min(vB.y,vB.z)),edge=1.-smoothstep(0.,.022,e),inner=1.-smoothstep(0.,.16,e);
+  float fres=pow(clamp(1.-abs(dot(v,n)),0.,1.),2.5),e=min(vB.x,min(vB.y,vB.z)),edge=1.-smoothstep(0.,.022,e),inner=1.-smoothstep(0.,.16,e);
   vec3 rim=mix(vec3(1.,.86,.55),vec3(1.),uWhole);col=col*(.75+fres*1.2)+rim*(edge*1.25+inner*.12+fres*.2);
   float night=smoothstep(.0,.6,uAmt),a=mix(.075,.9,night)*(.55+.45*edge+.25*fres);
-  gl_FragColor=vec4(col*mix(.75,1.25,night)*(1.+uWhole*.35),a);}`})),4)})();
+  gl_FragColor=vec4(clamp(col*mix(.75,1.25,night)*(1.+uWhole*.35),0.,4.),clamp(a,0.,1.));}`})),4)})();
 // Halo behind it and the light at its heart.
 const halo=add(new THREE.Mesh(new THREE.PlaneGeometry(1,1),new THREE.ShaderMaterial({uniforms:U,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,fog:false,
  vertexShader:`varying vec2 vUv;void main(){vUv=uv*2.-1.;vec4 c=modelViewMatrix*vec4(0.,0.,0.,1.);c.xy+=position.xy*270.;gl_Position=projectionMatrix*c;}`,
  fragmentShader:`uniform float uTime,uAmt,uWhole;varying vec2 vUv;void main(){float r=length(vUv),a=atan(vUv.y,vUv.x);float core=exp(-r*r*140.)*.8,glow=exp(-r*3.6)*.26,rays=pow(.5+.5*sin(a*8.+uTime*.07),6.)*exp(-r*4.)*.35;
-  vec3 c=mix(vec3(.55,.8,1.),vec3(1.,.85,.6),uWhole*.7+.15)*(glow+rays)+vec3(1.,.96,.88)*core;gl_FragColor=vec4(c*smoothstep(1.,.6,r)*uAmt*(1.+uWhole*.5),1.);}`})),3);
+  vec3 c=mix(vec3(.55,.8,1.),vec3(1.,.85,.6),uWhole*.7+.15)*(glow+rays)+vec3(1.,.96,.88)*core;gl_FragColor=vec4(clamp(c*(1.-smoothstep(.6,1.,r))*uAmt*(1.+uWhole*.5),0.,4.),1.);}`})),3);
 
 // ─── Aurora: three curtains, one per axis ──────────────────────────────────
-const aurora=add(new THREE.Mesh(new THREE.SphereGeometry(1,24,12,0,Math.PI*2,0,Math.PI*.5),new THREE.ShaderMaterial({uniforms:U,transparent:true,depthWrite:false,side:THREE.BackSide,blending:THREE.AdditiveBlending,fog:false,
- vertexShader:`varying vec3 vD;void main(){vD=position;vec4 w=modelMatrix*vec4(position,1.);gl_Position=projectionMatrix*viewMatrix*w;}`,
- fragmentShader:`uniform float uTime,uAmt;varying vec3 vD;${NOISE}
- void main(){vec3 d=normalize(vD);float h=d.y;vec2 p=d.xz/(h+.32);vec3 col=vec3(0.);
+const aurora=add(new THREE.Mesh(new THREE.SphereGeometry(1,112,30,0,Math.PI*2,0,Math.PI*.5),new THREE.ShaderMaterial({uniforms:U,transparent:true,depthWrite:false,side:THREE.BackSide,blending:THREE.AdditiveBlending,fog:false,
+ vertexShader:`uniform float uTime,uAmt;varying vec3 vC;${NOISE}
+ void main(){vec3 d=normalize(position);float h=max(d.y,0.);vec2 p=d.xz/(h+.32);vec3 col=vec3(0.);
   for(int i=0;i<3;i++){float fi=float(i),w=mhFbm(p*(.7+fi*.25)+vec2(uTime*.018*(fi+1.),fi*7.3));
-   float ridge=pow(1.-abs(sin(p.x*(.9+fi*.35)+p.y*.4*fi+w*4.5+fi*2.1+uTime*.03)),7.);
-   float rays=.45+.55*mhNoise(vec2(p.x*26.+w*30.,uTime*.25+fi*5.));
-   col+=mhAxis(fi/3.+w*.18)*ridge*rays*(.55+.45*w);}
-  float mask=smoothstep(.03,.3,h)*(1.-smoothstep(.72,1.,h));gl_FragColor=vec4(col*mask*uAmt*.6,1.);}`})),1);
+   float ridge=pow(clamp(1.-abs(sin(p.x*(.9+fi*.35)+p.y*.4*fi+w*4.5+fi*2.1+uTime*.03)),0.,1.),5.);
+   col+=mhAxis(fi/3.+w*.18)*ridge*(.5+.5*w);}
+  float mask=smoothstep(.03,.3,h)*(1.-smoothstep(.72,1.,h));vC=clamp(col*mask*uAmt*.55,0.,3.);gl_Position=projectionMatrix*viewMatrix*modelMatrix*vec4(position,1.);}`,
+ fragmentShader:`varying vec3 vC;void main(){gl_FragColor=vec4(vC,1.);}`})),1);
 
 // ─── Threads: a ribbon per intersection, drawn along a curve in the shader ─
 const base=new THREE.InstancedBufferAttribute(new Float32Array(MAXT*3),3),info=new THREE.InstancedBufferAttribute(new Float32Array(MAXT*2),2);base.setUsage?.(THREE.DynamicDrawUsage);info.setUsage?.(THREE.DynamicDrawUsage);
@@ -97,28 +97,27 @@ const threadGeo=inst(ribbon),ringSrc=new THREE.PlaneGeometry(2,2),ringGeo=inst(r
 const threads=add(new THREE.Mesh(threadGeo,new THREE.ShaderMaterial({uniforms:U,transparent:true,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending,fog:false,
  vertexShader:`attribute vec3 aBase;attribute vec2 aInfo;uniform vec3 uTop;uniform float uTime;varying float vS,vT,vSeed,vLit;
  vec3 curve(float t){vec3 c=aBase+vec3(0.,uTop.y*.62,0.)+(uTop-aBase)*vec3(.1,0.,.1);vec3 p=mix(mix(aBase,c,t),mix(c,uTop,t),t);float s=t*(1.-t)*4.;p.x+=sin(uTime*.33+aInfo.x*40.+t*5.)*s*2.2;p.z+=cos(uTime*.27+aInfo.x*23.+t*4.)*s*2.2;return p;}
- void main(){float t=position.y;vec3 p=curve(t),tan=normalize(curve(t+.012)-p),side=normalize(cross(tan,normalize(cameraPosition-p)));
+ void main(){float t=position.y;vec3 p=curve(t),tan=normalize(curve(t+.012)-p),sx=cross(tan,normalize(cameraPosition-p));vec3 side=sx/max(length(sx),1e-4);
   float dist=length(cameraPosition-p),w=max(mix(.07,.5,t),dist*.0016)*(1.+aInfo.y*1.6);p+=side*position.x*w;vS=position.x;vT=t;vSeed=aInfo.x;vLit=aInfo.y;gl_Position=projectionMatrix*viewMatrix*vec4(p,1.);}`,
  fragmentShader:`uniform float uTime,uAmt;varying float vS,vT,vSeed,vLit;${NOISE}
- void main(){float core=pow(1.-abs(vS),2.2);float ph=fract(vT*1.6-uTime*.11-vSeed*7.),pulse=smoothstep(.07,0.,abs(ph-.5)),ph2=fract(vT*.9-uTime*.05+vSeed*3.),pulse2=smoothstep(.03,0.,abs(ph2-.5));
+ void main(){float core=pow(clamp(1.-abs(vS),0.,1.),2.2);float ph=fract(vT*1.6-uTime*.11-vSeed*7.),pulse=1.-smoothstep(0.,.07,abs(ph-.5)),ph2=fract(vT*.9-uTime*.05+vSeed*3.),pulse2=1.-smoothstep(0.,.03,abs(ph2-.5));
   vec3 c=mix(mhAxis(vSeed),vec3(1.,.93,.78),clamp(vLit,0.,1.)*.75+pulse*.5);float glow=.3+1.9*pulse+.9*pulse2+vLit*1.3+.5*exp(-vT*14.);
-  gl_FragColor=vec4(c*core*glow*uAmt*smoothstep(1.,.8,vT),1.);}`})),2);
+  gl_FragColor=vec4(clamp(c*core*glow*uAmt*(1.-smoothstep(.8,1.,clamp(vT,0.,1.))),0.,4.),1.);}`})),2);
 const rings=add(new THREE.Mesh(ringGeo,new THREE.ShaderMaterial({uniforms:U,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,fog:false,polygonOffset:true,polygonOffsetFactor:-4,polygonOffsetUnits:-4,
  vertexShader:`attribute vec3 aBase;attribute vec2 aInfo;varying vec2 vUv;varying float vSeed,vLit;void main(){vUv=position.xy;vSeed=aInfo.x;vLit=aInfo.y;float r=2.6+aInfo.y*1.4;vec3 p=aBase+vec3(position.x*r,.04,position.y*r);gl_Position=projectionMatrix*viewMatrix*vec4(p,1.);}`,
  fragmentShader:`uniform float uTime,uAmt;varying vec2 vUv;varying float vSeed,vLit;${NOISE}
- void main(){float r=length(vUv);float ring=smoothstep(.035,0.,abs(r-.78-.03*sin(uTime*.8+vSeed*30.)))+.5*smoothstep(.02,0.,abs(r-.52));float ripple=smoothstep(.05,0.,abs(r-fract(uTime*.35+vSeed)))*(1.-r)*.6;
-  vec3 c=mix(mhAxis(vSeed),vec3(1.,.93,.78),clamp(vLit,0.,1.)*.7);gl_FragColor=vec4(c*(ring+ripple+exp(-r*r*9.)*.55*(1.+vLit*2.))*step(r,1.)*uAmt*(.8+vLit),1.);}`})),2);
+ void main(){float r=length(vUv);float ring=(1.-smoothstep(0.,.035,abs(r-.78-.03*sin(uTime*.8+vSeed*30.))))+.5*(1.-smoothstep(0.,.02,abs(r-.52)));float ripple=(1.-smoothstep(0.,.05,abs(r-fract(uTime*.35+vSeed))))*max(0.,1.-r)*.6;
+  vec3 c=mix(mhAxis(vSeed),vec3(1.,.93,.78),clamp(vLit,0.,1.)*.7);gl_FragColor=vec4(c*(ring+ripple+exp(-r*r*9.)*.55*(1.+vLit*2.))*step(r,1.)*uAmt*(.8+max(0.,vLit)),1.);}`})),2);
 
 // ─── Motes: a box of drifting light that travels with the camera ───────────
-const motes=(function(){const n=typeof matchMedia==='function'&&matchMedia('(pointer: coarse)').matches?260:620,p=new Float32Array(n*3);let s=77;for(let i=0;i<p.length;i++){s=(Math.imul(s,1664525)+1013904223)>>>0;p[i]=s/4294967296}
+const motes=(function(){const n=typeof matchMedia==='function'&&matchMedia('(pointer: coarse)').matches?160:320,p=new Float32Array(n*3);let s=77;for(let i=0;i<p.length;i++){s=(Math.imul(s,1664525)+1013904223)>>>0;p[i]=s/4294967296}
  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(p,3));
  return add(new THREE.Points(g,new THREE.ShaderMaterial({uniforms:Object.assign({uPx:{value:300}},U),transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,fog:false,
  vertexShader:`uniform float uTime,uPx;varying float vK;void main(){vec3 box=vec3(70.,36.,70.);vec3 q=position+vec3(sin(uTime*.05+position.y*9.)*.02,uTime*.006*(.4+position.x),cos(uTime*.04+position.x*7.)*.02);
   vec3 p=cameraPosition+(fract(q-cameraPosition/box)-.5)*box;vK=position.z;vec4 mv=viewMatrix*vec4(p,1.);gl_PointSize=clamp((.035+.09*position.z)*uPx/max(1.,-mv.z),1.,9.);gl_Position=projectionMatrix*mv;}`,
  fragmentShader:`uniform float uTime,uAmt;varying float vK;${NOISE}void main(){float r=length(gl_PointCoord-.5)*2.;float tw=.55+.45*sin(uTime*(.6+vK*2.)+vK*50.);gl_FragColor=vec4(mhAxis(vK*1.7)*mix(1.,1.6,vK)*exp(-r*r*5.)*tw*uAmt*.42,1.);}`})),2)})();
 
-// One light, present from the start at zero so night does not recompile the city.
-const glowLight=new THREE.DirectionalLight(0x9fd8ff,0);glowLight.castShadow=false;root.add(glowLight);root.add(glowLight.target);
+// No light of its own: an extra light is paid for by every lit pixel in the city, day and night.
 
 // ─── Words ─────────────────────────────────────────────────────────────────
 const css=document.createElement('style');css.textContent=`
@@ -152,8 +151,8 @@ for(const type of ['pointerdown','keydown','touchend'])addEventListener(type,()=
 const feet=[];           // {x,z,line,lit,key}
 const lineFor=(cx,cz)=>{let n=Math.imul(cx,374761393)^Math.imul(cz,668265263);n=Math.imul(n^(n>>>13),1274126177);return((n^(n>>>16))>>>0)%LINES.length};
 function gather(){if(!State.chunkMap||typeof Player==='undefined')return;const keep=new Map(feet.map(f=>[f.key,f]));feet.length=0;
- const list=[...State.chunkMap.values()].map(c=>({c,d:Math.hypot(c.originX-Player.position.x,c.originZ-Player.position.z)})).filter(o=>o.d<120).sort((a,b)=>a.d-b.d);
- for(const {c} of list){if(feet.length>=MAXT)break;const x=c.originX,z=c.originZ;if(typeof getBlock!=='function'||getBlock(x,0,z)!==B_ASPHALT||getBlock(x,1,z)!==B_AIR||getBlock(x-1,0,z-1)!==B_ASPHALT)continue;
+ const list=[...State.chunkMap.values()].map(c=>({c,d:Math.hypot(c.originX-Player.position.x,c.originZ-Player.position.z)})).filter(o=>o.d<100).sort((a,b)=>a.d-b.d);
+ for(const {c} of list){if(feet.length>=(H.quality>0?26:12))break;const x=c.originX,z=c.originZ;if(typeof getBlock!=='function'||getBlock(x,0,z)!==B_ASPHALT||getBlock(x,1,z)!==B_AIR||getBlock(x-1,0,z-1)!==B_ASPHALT)continue;
   const old=keep.get(c.key),line=lineFor(c.cx,c.cz);feet.push(old||{key:c.key,x,z,line,lit:H.heard.has(line)?.3:0})}
  feet.forEach((f,i)=>{base.setXYZ(i,f.x,1.02,f.z);info.setXY(i,(f.line+.5)/LINES.length,f.lit)});base.needsUpdate=info.needsUpdate=true;
  for(const g of [threadGeo,ringGeo]){g.instanceCount=feet.length;g.maxInstancedCount=feet.length}H.threads=feet.length}
@@ -163,8 +162,8 @@ function ring(f){const fresh=!H.heard.has(f.line);H.heard.add(f.line);f.lit=1.6;
 
 // ─── The clock ─────────────────────────────────────────────────────────────
 const isNight=()=>{const h=((State.dayTime||0)/60)%24;return h>=20.5||h<4.5};
-let last=0,scan=0,announced=false;
-function frame(now){requestAnimationFrame(frame);const dt=Math.min(.1,(now-last)/1000||0);last=now;
+let last=0,scan=0,announced=false,ema=.016,slow=0;H.quality=2;
+function frame(now){requestAnimationFrame(frame);const raw=(now-last)/1000||0,dt=Math.min(.1,raw);last=now;if(raw<.5)ema=ema*.95+raw*.05;
  if(!State.scene||!State.camera||typeof Player==='undefined')return;
  // A new world means a new scene. Follow it.
  if(root.parent!==State.scene)State.scene.add(root);
@@ -176,9 +175,9 @@ function frame(now){requestAnimationFrame(frame);const dt=Math.min(.1,(now-last)
  const k=Math.min(cam.far*.6,250)/302; // the sky dome is a depth-writing sphere 380 m out; stay inside it
  mirror.position.set(cam.position.x-150*k,cam.position.y*.25+150*k,cam.position.z-215*k);mirror.scale.setScalar(k);mirror.rotation.y=now*.00003;mirror.rotation.z=Math.sin(now*.00002)*.12;
  halo.position.copy(mirror.position);halo.visible=on;
- aurora.position.copy(cam.position);aurora.scale.setScalar(Math.min(cam.far*.85,350));aurora.visible=on;threads.visible=rings.visible=on&&feet.length>0;motes.visible=on;
+ aurora.position.copy(cam.position);aurora.scale.setScalar(Math.min(cam.far*.85,350));aurora.visible=on&&H.quality>1;threads.visible=rings.visible=on&&feet.length>0;motes.visible=on&&H.quality>0;
+ if(on&&H.governor!==false&&H.quality>0){slow=ema>.026?slow+dt:0;if(slow>3){H.quality--;slow=0;console.info('[mirror-hour] frames at '+(ema*1000).toFixed(1)+' ms; quality now '+H.quality)}}
  U.uTop.value.copy(mirror.position);motes.material.uniforms.uPx.value=(State.renderer?State.renderer.domElement.height:720)*.9;
- glowLight.intensity=.32*a;glowLight.position.copy(mirror.position);glowLight.target.position.copy(cam.position);
  if(A.drone&&A.ctx){const v=soundOn()?a*.085:0;A.drone.gain.setTargetAtTime(v,A.ctx.currentTime,.8)}
  if(!on){announced=false;return}
  if(a>.5&&!announced){announced=true;say('The Mirror Hour','◆  WALK THROUGH A THREAD',8000)}
@@ -188,7 +187,7 @@ function frame(now){requestAnimationFrame(frame);const dt=Math.min(.1,(now-last)
  if(dirty)info.needsUpdate=true}
 requestAnimationFrame(frame);
 
-Object.assign(H,{read,say,ring:i=>{const f=feet[i];if(f)ring(f);return !!f},feet:()=>feet.map(f=>({x:f.x,z:f.z,line:f.line})),
+Object.assign(H,{perf:()=>({ms:+(ema*1000).toFixed(1),quality:H.quality,threads:feet.length}),read,say,ring:i=>{const f=feet[i];if(f)ring(f);return !!f},feet:()=>feet.map(f=>({x:f.x,z:f.z,line:f.line})),
  summon(seconds=600){H.held=performance.now()+seconds*1000;const c=audio();if(c&&c.state==='suspended')c.resume().catch(()=>{});return true},
  release(){H.held=0;return true},
  toggle(){if(H.held>performance.now()){H.release();say('The hour is let go.','◆',4000)}else{H.summon();read(12000)}return H.held>0},

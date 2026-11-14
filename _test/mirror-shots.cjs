@@ -10,6 +10,6 @@ const {chromium,devices}=require('playwright'),{serve}=require('./lib/harness'),
    await p.waitForTimeout(3500);await p.screenshot({path:path.join(__dirname,'out',`mirror-${tag}-${name}.png`)});await p.evaluate(()=>{State.ui.paused=false});}
   console.log(tag,JSON.stringify(await p.evaluate(()=>{const e=document.getElementById('mirror-line'),r=e.getBoundingClientRect(),c=getComputedStyle(e);return{cls:e.className,op:c.opacity,disp:c.display,vis:c.visibility,rect:[r.x,r.y,r.width,r.height].map(Math.round),txt:e.textContent.slice(0,30),top:document.elementFromPoint(640,560)?.id}})),'threads',await p.evaluate(()=>FCMirrorHour.threads),'errors',errors.slice(0,4));await ctx.close();};
  try{
-  if(only!=='phone')await run({viewport:{width:1280,height:720}},'balanced',[['roof',[204,34,210],75,false],['street',[196,3.4,164],95,true]],'desktop');
+  if(only!=='phone')await run({viewport:{width:1280,height:720}},'balanced',[['roof',[204,34,210],75,false]],'desktop');
   if(only!=='desktop')await run({viewport:{width:390,height:844},isMobile:true,hasTouch:true,deviceScaleFactor:1,userAgent:devices['iPhone 13'].userAgent},'perf',[['portrait',[196,3.4,164],120,true]],'phone');
  }finally{await browser.close();site.close();}})().catch(e=>{console.error(e);process.exitCode=1});
