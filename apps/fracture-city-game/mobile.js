@@ -132,6 +132,7 @@
     { k: 'Records', t: 'First Signal · records', run: () => window.FCFirstSignal?.openRecords() },
     { k: 'Mirror', t: 'The Mirror Hour', run: () => window.FCMirrorHour?.toggle() },
     { k: 'College', t: 'Free College', run: () => window.FCCollege?.open() },
+    { k: 'Seminars', t: 'College seminars', run: () => window.FCSeminars?.open() },
     { h: 'YOUR CITY' },
     { k: '✉', t: 'City Dispatch · quests & dailies', run: () => window.FCCityDispatch?.open() },
     { k: 'F4', t: 'World Studio', run: () => window.FCWorldStudio?.open() },
