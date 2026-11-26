@@ -9,7 +9,7 @@ const GROUPS={
  Gear:['Inventory','Ability','Take weapon','Use / talk','Sit','Weapon 1','Weapon 2','Weapon 3','Siege'],
  Social:['Online & friends','Inbox','Ned’s invitation','Dismiss invitation','Post a thought'],
  Quests:['City Dispatch · quests & dailies','First Signal · records','Casebook','Next line'],
- Settings:['Tools & radio','Camera view','Radio on/off','Next song','Peaceful','Display','Detail','Darker','Brighter','Sound on/off','Menu']
+ Settings:['Touch controls','Tools & radio','Camera view','Radio on/off','Next song','Peaceful','Display','Detail','Darker','Brighter','Sound on/off','Menu']
 };
 const SHORT={'Outer Expanse · expeditions':'Expeditions','The Mirror Hour':'Mirror Hour','College seminars':'Seminars','Explore Common Ground':'Common Ground','City Dispatch · quests & dailies':'Quests & dailies','First Signal · records':'Signal records','Menu':'Main menu','Tools & radio':'More tools'};
 const css=document.createElement('style');css.id='phone-sheet-css';css.textContent=`
@@ -37,6 +37,7 @@ html body.touch #mob-keys .grid button{font:13px system-ui;min-height:48px;paddi
 #mob-keys .fc-notes{color:#d1dfd8;font:14px/1.45 system-ui}
 #mob-keys .fc-notes p{padding:12px 0;margin:0;border-bottom:1px solid #344b4b;overflow-wrap:anywhere}
 #mob-keys .fc-notes h3{font:600 13px system-ui;color:#e8d2a0;margin:18px 0 4px}
+#mob-keys .fc-control-setting{display:grid;grid-template-columns:1fr auto;gap:10px;padding:12px 0;color:#e7ede6}#mob-keys .fc-control-setting input{grid-column:1/-1;width:100%;height:36px;accent-color:#dbc791;touch-action:pan-x}#mob-keys .fc-control-toggle{display:flex;align-items:center;gap:12px;min-height:52px}#mob-keys .fc-control-toggle input{width:22px;height:22px;accent-color:#dbc791}
 #mob-keys .fc-subtitles{width:100%;text-align:left;margin-bottom:8px}
 @media(orientation:landscape) and (max-height:540px){
  html body.touch #mob-keys .in{align-items:stretch;justify-content:flex-end}
@@ -48,6 +49,7 @@ html body.touch #mob-keys .grid button{font:13px system-ui;min-height:48px;paddi
 function mount(){
  const keys=document.getElementById('mob-keys'),inn=keys?.querySelector('.in'),grid=keys?.querySelector('.grid');
  if(!keys||!inn||!grid)return false;if(inn.querySelector('.fc-sheet'))return true;
+ const controlButton=document.createElement('button');controlButton.type='button';controlButton.innerHTML='<span>Touch controls</span>';grid.append(controlButton);
  const originals=[...grid.querySelectorAll('button')];
  for(const b of originals){const span=b.querySelector('span');b.dataset.menuName=(span?.textContent||b.textContent).trim();if(span&&SHORT[b.dataset.menuName])span.textContent=SHORT[b.dataset.menuName];}
  const original=name=>originals.find(b=>b.dataset.menuName===name);
@@ -61,10 +63,10 @@ function mount(){
  const button=(text,run)=>{const b=document.createElement('button');b.type='button';b.textContent=text;b.setAttribute('aria-label',text);b.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();run()});return b};
  let section='Menu';
  function show(name){
-  section=name;title.textContent=name;back.hidden=name==='Menu';quick.hidden=categories.hidden=name!=='Menu';notes.hidden=name!=='Journal';grid.hidden=name==='Menu'||name==='Journal';
+  section=name;title.textContent=name;back.hidden=name==='Menu';quick.hidden=categories.hidden=name!=='Menu';notes.hidden=!['Journal','Touch controls'].includes(name);grid.hidden=['Menu','Journal','Touch controls'].includes(name);
   for(const b of originals)b.hidden=!(GROUPS[name]||[]).includes(b.dataset.menuName);
-  if(name==='Journal')journal();sheet.scrollTop=0;
-  if(name!=='Menu')(name==='Journal'?notes.querySelector('button'):grid.querySelector('button:not([hidden])'))?.focus({preventScroll:true});
+  if(name==='Journal')journal();if(name==='Touch controls')controls();sheet.scrollTop=0;
+  if(name!=='Menu')(['Journal','Touch controls'].includes(name)?notes.querySelector('input,button'):grid.querySelector('button:not([hidden])'))?.focus({preventScroll:true});
  }
  function journal(){
   notes.replaceChildren();const prefs=window.FCPhoneHUD;
@@ -73,6 +75,19 @@ function mount(){
   const heading=document.createElement('h3');heading.textContent='Recent activity';notes.append(heading);
   const entries=prefs?.journal()||[];
   for(const item of entries.length?entries:[{text:'No recent activity.'}]){const p=document.createElement('p');p.textContent=item.text;notes.append(p);}
+ }
+ controlButton.onclick=()=>show('Touch controls');
+ function controls(){
+  notes.replaceChildren();
+  for(const [key,label,min,max,step]of [['sensitivity','Look sensitivity',.4,1.8,.1],['stickSize','Joystick size',100,148,4],['deadzone','Joystick dead zone',.08,.32,.02]]){
+   const row=document.createElement('label');row.className='fc-control-setting';const text=document.createElement('span'),value=document.createElement('output'),input=document.createElement('input');text.textContent=label;input.type='range';input.min=min;input.max=max;input.step=step;input.value=Mobile.preferences[key];input.setAttribute('aria-label',label);
+   const update=()=>{value.textContent=key==='stickSize'?Math.round(input.value)+' px':key==='deadzone'?Math.round(input.value*100)+'%':Number(input.value).toFixed(1)+'×'};
+   input.oninput=()=>{Mobile.setPreference(key,input.value);update()};update();row.append(text,value,input);notes.append(row);
+  }
+  for(const [key,label]of [['autoSprint','Sprint at joystick edge'],['haptics','Haptic feedback']]){
+   const row=document.createElement('label');row.className='fc-control-toggle';const input=document.createElement('input');input.type='checkbox';input.checked=Mobile.preferences[key];input.onchange=()=>Mobile.setPreference(key,input.checked);row.append(input,document.createTextNode(label));notes.append(row);
+  }
+  notes.append(button('Reset controls',()=>{Mobile.resetPreferences();controls()}));
  }
  const icons={Map:'<path d="M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2zM9 4v14M15 6v14"/>',Inventory:'<rect x="4" y="7" width="16" height="13" rx="2"/><path d="M9 7V4h6v3M4 12h16"/>',Build:'<path d="M12 3l8 4.5v9L12 21l-8-4.5v-9zM12 12l8-4.5M12 12L4 7.5M12 12v9"/>',Journal:'<path d="M5 3h14v18H5zM8 7h8M8 11h8M8 15h5"/>'};
  for(const [label,target]of[['Map','Map'],['Inventory','Inventory'],['Build','Build mode'],['Journal',null]]){const b=button(label,()=>target?original(target)?.click():show('Journal'));b.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true">'+icons[label]+'</svg><span>'+label+'</span>';quick.append(b);}

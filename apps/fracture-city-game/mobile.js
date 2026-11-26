@@ -74,6 +74,75 @@
   }
   const Mobile = window.Mobile = { send, tap, codeFor };
 
+  // Touch preferences and proportional movement. Existing collision, class,
+  // flight, board and jump systems remain the authority over the player.
+  const PREF_KEY='fc-touch-controls-v1';
+  const defaults={sensitivity:1,stickSize:124,deadzone:.16,autoSprint:true,haptics:true};
+  const prefs={...defaults};
+  function sanitize(key,value){
+    if(key==='autoSprint'||key==='haptics')return !!value;
+    const limits={sensitivity:[.4,1.8],stickSize:[100,148],deadzone:[.08,.32]},n=Number(value);
+    return limits[key]&&Number.isFinite(n)?Math.max(limits[key][0],Math.min(limits[key][1],n)):defaults[key];
+  }
+  try{const saved=JSON.parse(localStorage.getItem(PREF_KEY)||'{}');for(const key of Object.keys(defaults))if(saved?.[key]!==undefined)prefs[key]=sanitize(key,saved[key])}catch(e){}
+  const motion={x:0,y:0,strength:0,active:false};
+  Mobile.preferences=prefs;Mobile.motion=motion;Mobile.jumpPresses=0;
+  function applyPrefs(){Touch.sens=.0042*prefs.sensitivity;document.documentElement.style.setProperty('--phone-stick-size',prefs.stickSize+'px');}
+  Mobile.setPreference=(key,value)=>{if(!(key in defaults))return; prefs[key]=sanitize(key,value);applyPrefs();try{localStorage.setItem(PREF_KEY,JSON.stringify(prefs))}catch(e){};};
+  Mobile.resetPreferences=()=>{Object.assign(prefs,defaults);applyPrefs();try{localStorage.removeItem(PREF_KEY)}catch(e){}};
+  let vibrationAt=0;
+  Mobile.feedback=()=>{const now=performance.now();if(!Touch.on||!prefs.haptics||now-vibrationAt<90)return;vibrationAt=now;try{navigator.vibrate?.(8)}catch(e){}};
+  applyPrefs();
+  const speed=getWalkSpeed;
+  const analog=()=>Touch.on&&motion.active&&Player.mode==='walk'&&!Board.on&&!window.FCWorldStudio?.flying;
+  window.getWalkSpeed=function(){return speed.apply(this,arguments)*(analog()?motion.strength:1)};
+  const walk=updateWalkInput;
+  window.updateWalkInput=function(){
+    const result=walk.apply(this,arguments);
+    if(analog()&&motion.strength>0){
+      // Replace only the digital directional component, retaining other velocity
+      // contributions. movement-flow applies acceleration after this wrapper.
+      const x=(State.keys.has('d')?1:0)-(State.keys.has('a')?1:0),z=(State.keys.has('s')?1:0)-(State.keys.has('w')?1:0),len=Math.hypot(x,z);
+      if(len){const v=getWalkSpeed(),cy=Math.cos(Player.yaw),sy=Math.sin(Player.yaw),dx=motion.x-x/len,dz=motion.y-z/len;
+        Player.velocity.x+=(dx*cy+dz*sy)*v;Player.velocity.z+=(-dx*sy+dz*cy)*v;}
+    }
+    return result;
+  };
+  let resetControls=()=>{};
+  const releaseAll=shTouchReleaseAll;
+  window.shTouchReleaseAll=function(){resetControls();return releaseAll.apply(this,arguments)};
+  function installControls(){
+    const original=document.getElementById('tc-stick');if(!original||original.dataset.precision)return;
+    const stick=original.cloneNode(true);stick.dataset.precision='true';original.replaceWith(stick);const knob=stick.querySelector('#tc-knob');
+    const lookOld=document.getElementById('tc-look'),look=lookOld.cloneNode(true);lookOld.replaceWith(look);
+    const jumpOld=document.querySelector('.tc-jump'),jump=jumpOld.cloneNode(true);jumpOld.replaceWith(jump);
+    let moveId=null,lookId=null,jumpId=null,lookX=0,lookY=0;
+    const capture=(el,e)=>{try{el.setPointerCapture(e.pointerId)}catch(err){}};
+    const releaseMove=()=>{moveId=Touch.moveId=null;motion.active=false;motion.strength=motion.x=motion.y=0;stick.classList.remove('live');knob.style.transform='';for(const k of ['w','a','s','d','shift'])shTouchRelease(k)};
+    const releaseLook=()=>{lookId=Touch.lookId=null};
+    const releaseJump=()=>{jumpId=null;shTouchRelease(' ');jump.classList.remove('held')};
+    resetControls=()=>{releaseMove();releaseLook();releaseJump();Mobile.jumpPresses=0};
+    function steer(e){
+      const rect=stick.getBoundingClientRect(),radius=rect.width*.36,dx=e.clientX-(rect.left+rect.width/2),dy=e.clientY-(rect.top+rect.height/2),len=Math.hypot(dx,dy),distance=Math.min(1,len/radius),k=len>radius?radius/len:1;
+      knob.style.transform=`translate(${dx*k}px,${dy*k}px)`;motion.active=true;
+      motion.strength=Math.max(0,(distance-prefs.deadzone)/(1-prefs.deadzone));motion.x=len?dx/len:0;motion.y=len?dy/len:0;
+      for(const [key,on]of [['w',motion.y<-.38],['s',motion.y>.38],['a',motion.x<-.38],['d',motion.x>.38]])(motion.strength>0&&on?shTouchHold:shTouchRelease)(key);
+      // Flight uses Shift to descend; pushing the stick must never trigger it.
+      (prefs.autoSprint&&distance>.94&&motion.y<-.38&&!window.FCWorldStudio?.flying?shTouchHold:shTouchRelease)('shift');
+    }
+    stick.addEventListener('pointerdown',e=>{if(moveId!==null||shTouchBusy()||keysOpen)return;e.preventDefault();e.stopPropagation();moveId=Touch.moveId=e.pointerId;capture(stick,e);stick.classList.add('live');steer(e)});
+    stick.addEventListener('pointermove',e=>{if(e.pointerId!==moveId)return;e.preventDefault();steer(e)});
+    for(const ev of ['pointerup','pointercancel','lostpointercapture'])stick.addEventListener(ev,e=>{if(e.pointerId===moveId)releaseMove()});
+    look.addEventListener('pointerdown',e=>{if(lookId!==null||shTouchBusy()||keysOpen)return;e.preventDefault();lookId=Touch.lookId=e.pointerId;lookX=e.clientX;lookY=e.clientY;capture(look,e)});
+    look.addEventListener('pointermove',e=>{if(e.pointerId!==lookId)return;e.preventDefault();if(!shTouchBusy()&&!keysOpen){Player.yaw-=(e.clientX-lookX)*Touch.sens;Player.pitch=Math.max(-Math.PI/2+.01,Math.min(Math.PI/2-.01,Player.pitch-(e.clientY-lookY)*Touch.sens));}lookX=e.clientX;lookY=e.clientY});
+    for(const ev of ['pointerup','pointercancel','lostpointercapture'])look.addEventListener(ev,e=>{if(e.pointerId===lookId)releaseLook()});
+    jump.setAttribute('aria-label','Jump; tap again in the air to double jump');
+    jump.addEventListener('pointerdown',e=>{if(jumpId!==null||shTouchBusy()||keysOpen)return;e.preventDefault();e.stopPropagation();jumpId=e.pointerId;capture(jump,e);if(!window.FCWorldStudio?.god)Mobile.jumpPresses=Math.min(2,Mobile.jumpPresses+1);shTouchHold(' ');jump.classList.add('held');Mobile.feedback()});
+    for(const ev of ['pointerup','pointercancel','lostpointercapture'])jump.addEventListener(ev,e=>{if(e.pointerId===jumpId)releaseJump()});
+    addEventListener('blur',()=>shTouchReleaseAll());addEventListener('orientationchange',()=>shTouchReleaseAll());addEventListener('resize',()=>shTouchReleaseAll());
+    const style=document.createElement('style');style.textContent=`html body.touch #tc-stick{width:var(--phone-stick-size,124px)!important;height:var(--phone-stick-size,124px)!important}html body.touch.mob-has-action #crosshair{border:2px solid #f2d49a;border-radius:50%;width:14px;height:14px;box-shadow:0 0 0 4px #172b3066}html body.touch .tc-jump.held{background:#345753!important;border-color:#d6dfbb!important}`;document.head.append(style);
+  }
+
   // ─── 2 · What each control does ──────────────────────────────────────────
   const ui = () => State.ui || {};
   const vis = id => { const e = document.getElementById(id); if (!e) return false;
@@ -312,8 +381,8 @@
         e.preventDefault(); e.stopPropagation();
         if (held) return;
         const action=Mobile.action;
-        if(action && !action.hold){action.run();update();return;}
-        held = true; use.classList.add('held');
+        if(action && !action.hold){action.run();Mobile.feedback();update();return;}
+        held = true; use.classList.add('held');Mobile.feedback();
         try { use.setPointerCapture(e.pointerId); } catch (err){}
         send(true, 'e');
         update();
@@ -325,6 +394,8 @@
       //  A panel opening mid-press must not leave E stuck down.
       Mobile.releaseUse = release;
     }
+
+    installControls();
 
     // ── Context buttons on the main layer.
     const ctx = document.createElement('div');
@@ -454,7 +525,7 @@
         const layer = document.getElementById('touch-layer');
         const busyNow = (typeof shTouchBusy === 'function' && shTouchBusy()) || keysOpen;
         if (layer && layer.style.display!==(busyNow?'none':'')) layer.style.display = busyNow ? 'none' : '';
-        if (busyNow && Mobile.releaseUse) Mobile.releaseUse();
+        if (busyNow){resetControls();Mobile.releaseUse?.();}
         const back = backAction();
         const bb = document.getElementById('mob-back');
         bb.classList.toggle('on', !!back);
@@ -484,7 +555,7 @@
           document.body.classList.toggle('mob-has-action',!!action);
           if(use&&action){
             const full=action.label||'Use';
-            const label=/hold/i.test(full)?'Hold':/read/i.test(full)?'Read':/listen|music|track/i.test(full)?'Listen':/talk|speak/i.test(full)?'Talk':/play/i.test(full)?'Play':/open|enter|visit/i.test(full)?'Open':/Ned|welcome|meet/i.test(full)?'Meet Ned':/take|pick up|collect/i.test(full)?'Take':/repair|fix/i.test(full)?'Repair':/return|descend/i.test(full)?'Return':/next/i.test(full)?'Next':'Use';
+            const label=/hold/i.test(full)?'Hold':/read/i.test(full)?'Read':/listen|music|track/i.test(full)?'Listen':/talk|speak/i.test(full)?'Talk':/play/i.test(full)?'Play':/open|visit/i.test(full)?'Open':/Ned|welcome|meet/i.test(full)?'Meet Ned':/take|pick up|collect/i.test(full)?'Take':/repair|fix/i.test(full)?'Repair':/climb/i.test(full)?'Climb':/enter/i.test(full)?'Enter':/return|descend/i.test(full)?'Return':/next/i.test(full)?'Next':'Use';
             if(use.textContent!==label)use.textContent=label;
             if(use.getAttribute('aria-label')!==full)use.setAttribute('aria-label',full);
             if(use.title!==full)use.title=full;
