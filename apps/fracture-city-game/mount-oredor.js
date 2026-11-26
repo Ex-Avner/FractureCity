@@ -65,12 +65,12 @@ const mesh=new THREE.Mesh(geo,mat);mesh.name='mount-oredor';mesh.frustumCulled=f
 // ─── Each frame: keep bearing and angular size, follow the sky ─────────────
 const v=new THREE.Vector3();
 function frame(){requestAnimationFrame(frame);const cam=State.camera,scene=State.scene;if(!cam||!scene)return;
- if(mesh.parent!==scene)scene.add(mesh);mesh.visible=O.enabled;if(!O.enabled)return;
+ if(mesh.parent!==scene)scene.add(mesh);mesh.visible=O.enabled&&!O.hold;if(!mesh.visible)return; // O.hold: the ascent hides it inside the cloud
  v.copy(O.anchor).sub(cam.position);const dist=v.length(),s=Math.min(1,DRAW/Math.max(dist,1));
  mesh.position.copy(cam.position).addScaledVector(v,s);mesh.scale.set(O.radius*s,O.height*s,O.radius*s);
  const hour=(((State.dayTime||0)/60)%24+24)%24,ang=(hour-6)/12*Math.PI;
  U.uSun.value.set(Math.cos(ang)*.8,Math.max(-.2,Math.sin(ang)),-.45);U.uDay.value=Math.min(1,Math.max(0,Math.sin(ang)*2.2+.15));
- if(scene.fog&&scene.fog.color)U.uHaze.value.copy(scene.fog.color);U.uMist.value=.3+.38*(1-U.uDay.value)}
+ if(scene.fog&&scene.fog.color)U.uHaze.value.copy(scene.fog.color);U.uMist.value=.3+.38*(1-U.uDay.value);if(O.mist!=null)U.uMist.value=Math.max(U.uMist.value,O.mist)}
 requestAnimationFrame(frame);
 Object.assign(O,{mesh,uniforms:U,set(on){O.enabled=!!on;mesh.visible=O.enabled;return O.enabled},bearing(){const c=State.camera;return c?Math.atan2(O.anchor.x-c.position.x,O.anchor.z-c.position.z):0}});
 })();

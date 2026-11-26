@@ -24,6 +24,7 @@ materials.forEach(([name,color,emit],i)=>{const id=shDefBlock(180+i,{name,solid:
 for(const d of defs)d.district={...Wilds.districts.SCRUB,name:d.name,biome:d.id,bgColor:d.color,accentColor:d.color,description:d.description,expanse:true};
 const size=144,seed=()=>String(State.citySeed||''),hash=(tag,x,z)=>hashStr('expanse:'+seed()+':'+tag+':'+x+':'+z)>>>0;
 function region(cx,cz){
+ if(window.FCOredor?.claims?.(cx,cz))return null; // Mount Oredor takes these columns
  const rx=Math.floor(cx/6),rz=Math.floor(cz/6),nearest=n=>n>=0?n*6:-(n*6+5);
  if(Math.max(nearest(rx),nearest(rz))<12)return null;
  let i=defs.findIndex(d=>d.starter[0]===rx&&d.starter[1]===rz);
