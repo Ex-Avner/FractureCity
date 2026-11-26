@@ -3,13 +3,15 @@ let t=1000000,s=R.fresh();assert.equal(R.record(s,'a',t),false);assert.equal(R.r
 s=R.fresh();R.record(s,'a',t);R.record(s,'b',t+100);assert.equal(R.record(s,'c',t+300000),true);assert.equal(R.active(s,s.until-1),true);R.clean(s,s.until);assert.equal(s.until,0);
 const db=new DatabaseSync(':memory:');db.exec("PRAGMA foreign_keys=ON; CREATE TABLE accounts(id TEXT PRIMARY KEY);INSERT INTO accounts VALUES('a'),('b')");
 let j=createJustice(db,{now:()=>t}),p={accountId:'a',x:80,y:1,z:80,seq:0,hp:100},room={map:{city:true},phase:'live'};
-for(let i=0;i<3;i++)j.record(p,'shared:'+i);assert.equal(j.active('a'),true);assert.equal(j.active('b'),false);assert.deepEqual([p.x,p.y,p.z],[34,2,-35]);assert.equal(p.god,false);assert.throws(()=>j.pose(p,{x:165,y:1,z:24}),/sentence/);
-j=createJustice(db,{now:()=>t});assert.equal(j.active('a'),true);p.x=165;p.z=24;j.enforce(p);assert.equal(p.x,34);
-assert.throws(()=>j.action(p,{id:'outlet',action:'begin'}),/next lead/);
-for(let i=0;i<R.stations.length;i++){const a=R.stations[i];Object.assign(p,a.at);if(a.id==='service'){t=j.snapshot('a').started+(Math.floor((t-j.snapshot('a').started)/36000)+1)*36000;assert.throws(()=>j.action(p,{id:a.id,action:'begin'}),/guard/);t+=18000;}
- j.action(p,{id:a.id,action:'begin'});assert.throws(()=>j.action(p,{id:a.id,action:'finish'}),/Start/);t+=a.seconds*1000;j.action(p,{id:a.id,action:'finish'});
+for(let i=0;i<3;i++)j.record(p,'shared:'+i);assert.equal(j.active('a'),true);assert.equal(j.active('b'),false);assert.deepEqual([p.x,p.y,p.z],[R.CELL.x,R.CELL.y,R.CELL.z]);assert.equal(p.god,false);assert.throws(()=>j.pose(p,{x:165,y:1,z:24}),/sentence/);
+j=createJustice(db,{now:()=>t});assert.equal(j.active('a'),true);p.x=165;p.z=24;j.enforce(p);assert.equal(p.x,R.CELL.x);
+assert.throws(()=>j.action(p,{id:'outlet',action:'begin'}),/not the way out/);
+for(let i=0;i<R.stations.length;i++){const a=R.stations[i];Object.assign(p,a.at);if(a.id==='keys'){t=j.snapshot('a').started+(Math.floor((t-j.snapshot('a').started)/36000)+1)*36000;assert.throws(()=>j.action(p,{id:a.id,action:'begin'}),/guard/);t+=18000;}
+ j.action(p,{id:a.id,action:'begin'});assert.throws(()=>j.action(p,{id:a.id,action:'finish'}),/Hold the action/);t+=a.seconds*1000;j.action(p,{id:a.id,action:'finish'});
 }
-assert.equal(j.active('a'),false);assert.equal(j.snapshot('a').reason,'escaped');assert.equal(p.x,70);
+assert.equal(j.active('a'),false);assert.equal(j.snapshot('a').reason,'escaped');
+// Caught: back to the cell, an opened vent stays open, later progress is lost.
+{const q={accountId:'b',x:80,y:1,z:80,seq:0,hp:100};for(let i=0;i<3;i++)j.record(q,'c:'+i);for(const id of ['vent','duct','uniform']){const a=R.stations.find(s=>s.id===id);Object.assign(q,a.at);j.action(q,{id,action:'begin'});t+=a.seconds*1000;j.action(q,{id,action:'finish'});}assert.equal(j.snapshot('b').stage,3);j.action(q,{id:'',action:'caught'});assert.equal(j.snapshot('b').stage,1);assert.deepEqual([q.x,q.z],[R.CELL.x,R.CELL.z]);assert.equal(R.allowed(j.snapshot('b'),{x:29.5,y:2,z:-30},t),true);t=j.snapshot('b').until;j.enforce(q);}assert.equal(p.x,70);
 for(let i=3;i<6;i++)j.record(p,'shared:'+i);assert.equal(j.active('a'),true);t=j.snapshot('a').until;j.enforce(p);assert.equal(j.active('a'),false);assert.equal(p.x,70);assert.equal(j.snapshot('a').reason,'served');
 assert.throws(()=>j.report(p,{id:'anything',kind:'street',x:70,y:1,z:-3},room),/Invalid/);assert.throws(()=>j.report(p,{id:'ambient:123456789',kind:'street',x:900,y:1,z:900},room),/vicinity/);
 // Authoritative shared NPC death attribution: civilians count once; hostiles reward normally.

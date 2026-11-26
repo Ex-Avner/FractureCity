@@ -14,22 +14,29 @@ Three distinct player-caused civilian deaths within a rolling 300,000 ms window 
 
 The existing First Night lethal-damage branch reports street/shop deaths once. The Casting Booth combat path now permits lethal damage to nonhostile NPCs outside its existing safe zones; zero HP counts once and pays no bounty. Shared NPC deaths are attributed on the server through `spawns.cjs`. Hostile NPC rewards remain unchanged.
 
-On the third death the player is moved to Cell 01. Equipment stays in inventory but attacks, special abilities, mining and placement are disabled. Server mutations such as world editing, god mode, NPC spawning and shooting are rejected while sentenced. Ordinary walking remains available. Movement outside the current confinement area returns the player to the cell/laundry anchor; death or respawn does not bypass custody. Jail is also an Ashbound sanctuary.
+On the third death the player is moved to cell A-01. Equipment stays in inventory but attacks, special abilities, mining and placement are disabled. Server mutations such as world editing, god mode, NPC spawning and shooting are rejected while sentenced. Ordinary walking remains available. Movement outside the current confinement area returns the player to the cell/laundry anchor; death or respawn does not bypass custody. Jail is also an Ashbound sanctuary.
 
 The ten minutes are elapsed wall-clock time, including menus and time offline. Online records are account-wide, stored in SQLite independently of room/visit saves and restored after server restart. Solo records use browser localStorage independently of individual save slots. A new world does not wipe an active solo sentence. Expired sentences release to the public street, including reconnects from a saved jail position.
 
-## Escape
+## Escape (0.111: a stealth breakout you play)
 
-The compact custody HUD opens a plan; E or the touch prompt operates the next physical lead. Each action requires proximity, ordering and a short timed hold:
+No panel is required. Prompts appear beside the object; hold E (or press and hold the prompt on touch). The bar starts on the key press.
 
-1. Read the scratched bedframe (2 s).
-2. Work a strip loose from the meal tray (4 s).
-3. Open the west vent and crawl into laundry (8 s).
-4. Study the service roster beside the courtyard (3 s).
-5. Slip past the guard during the clear half of a 36 s patrol (3 s).
-6. Crawl through the rainwater outlet (5 s).
+1. **The cell vent** (A-01, west wall). Hold 5 s to pry the cover. Brandt walks the cell corridor and stops to look into each cell; if he sees you prying, you are caught.
+2. **The duct.** A real, walkable 1 m passage behind the cells under a steel lid, lit by small amber strips. At the far end, hold 2 s to push out the laundry grate.
+3. **The uniform rack** (laundry). Hold 3 s. Before the uniform, any guard who sees you outside your cell fills the SEEN bar quickly, and so does the yard searchlight. In uniform, guards only notice you within about 3 m.
+4. **The key cabinet** (control room). Hold 3 s, only while Officer Vale is out on his yard round (the second half of every 36 s cycle, server-checked). Being seen while lifting the key raises the bar.
+5. **The rainwater outlet.** The key opens the service door. Hold 5 s at the outlet in the south wall of the service passage to escape.
 
-The guard visibly walks west and back during the clear half. The passage gate rotates with that cue. Starting or completing the passage action while it is watched fails without resetting the whole escape. Moving out of range cancels an active server hold. Vent/outlet actions explicitly transition the player through narrow ducts; they are not free-form crawl physics. Escape clears the sentence and the kill window, restores equipment use and pays no reward. Serving the deadline has the same release outcome.
+Guards show their sight cones on the floor (yellow, red while noticing you). The SEEN bar at the top fills while you are noticed and drains when you are not. Full bar: alarm, back to A-01. An opened vent stays open; the uniform and key are lost (server stage drops to 1).
+
+The plan panel (tap the CUSTODY box) lists the steps reached so far. It is optional.
+
+## The building (0.111)
+
+Grey concrete perimeter 9 m tall with razor wire and wall-mounted floodlights; Cell Block A with four barred cells (bunks, toilet, sink), a corridor with a locked gate to the yard; the service duct; the laundry (drums, press, uniform rack); an open-air yard with court lines, hoop, tables, a guard tower with a sweeping searchlight; the control room (desk, monitors, key cabinet); the service passage with pipes and the outlet; public intake (glass desk, lockers, phones) behind a concrete forecourt so street parking never blocks the door. Ceilings rest on the partition tops. Bars, bunks, desks, cabinets, the tower legs, the vent, the grate and the service door all collide. Inmates wear orange; guards wear navy with caps, badges and batons; the laundry worker wears grey. The weapon in your hand is hidden in custody.
+
+Block ids 200–207 are reserved for the building.
 
 ## Authority and limits
 
