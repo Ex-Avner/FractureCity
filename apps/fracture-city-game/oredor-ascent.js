@@ -26,11 +26,15 @@
    Progress is per browser and per world seed, like First Signal. Double jump is
    off on the mountain. God mode still flies, but nothing counts while it is on.
 
+   Guidance (0.110): a gold beam stands over the trailhead until the summit is
+   taken; the chip at the top gives direction and distance to the trailhead, then
+   to the next camp, rope or the summit; the trail is inlaid with lit blazes.
+
    FCOredor.ascent: state, places, sight, debug.  FCOredor.sight: true once earned.
    Event 'fc-oredor-sight' fires on the summit. */
 (function(){'use strict';
 if (typeof THREE === 'undefined' || typeof State === 'undefined' || typeof Chunk === 'undefined' || !window.FCOredor || typeof shDefBlock !== 'function') return;
-const O = window.FCOredor, VERSION = '0.109.0';
+const O = window.FCOredor, VERSION = '0.110.0';
 
 // ─── Canon: words and handles are yours to change; nothing depends on them ───
 const CANON = {
@@ -130,11 +134,12 @@ function natural(x, z){
 
 // ─── The grid: surface height and kind for every column of the zone ───────
 const K = { NAT: 0, TRAIL: 1, CAMP: 2, TALUS: 3, ROCK: 4 };
-let SURF = null, KIND = null, CAIRNS = null, GRID_MS = 0, GRID_RAISED = 0;
+let SURF = null, KIND = null, GLOW = null, CAIRNS = null, GRID_MS = 0, GRID_RAISED = 0;
 const gi = (x, z) => (z - ZONE.z0) * GW + (x - ZONE.x0);
 function segments(){
  const out = [];
  for (let i = 0; i < ROUTE.length - 1; i++){ const a = ROUTE[i], b = ROUTE[i + 1]; out.push({ a, b, rope: a[3] === 'rope' ? ROPES.find(r => Math.abs(r.x - a[0]) < 1 && Math.abs(r.face - a[1]) < 3) : null, ridge: a[3] === 'ridge', len: Math.hypot(b[0] - a[0], b[1] - a[1]) }); }
+ let run = 0; for (const s of out){ s.at = run; run += s.rope ? 0 : s.len; }
  return out;
 }
 const SEGS = segments();
@@ -147,11 +152,11 @@ function nearestSeg(x, z){ // distance, height and segment of the trail nearest 
 }
 function buildGrid(){
  if (SURF) return; const t0 = performance.now();
- SURF = new Uint8Array(GW * GD); KIND = new Uint8Array(GW * GD); CAIRNS = new Map();
+ SURF = new Uint8Array(GW * GD); KIND = new Uint8Array(GW * GD); GLOW = new Uint8Array(GW * GD); CAIRNS = new Map();
  for (let z = ZONE.z0; z < ZONE.z1; z++) for (let x = ZONE.x0; x < ZONE.x1; x++){
   const cx = x + .5, cz = z + .5, i = gi(x, z), T = nearestSeg(cx, cz), half = T.s && T.s.ridge ? 1.15 : 1.65;
   let s = natural(x, z), k = K.NAT;
-  if (T.d <= half){ s = T.y; k = K.TRAIL; }
+  if (T.d <= half){ s = T.y; k = K.TRAIL; if (T.d < .55 && T.s && !T.s.rope && (T.s.at + T.t * T.s.len) % 4 < 1) GLOW[i] = 1; }
   else if (T.s && T.s.ridge && T.d < 12){ s = Math.min(s, T.y - 5 - Math.floor((T.d - half) * .8)); }
   else if (T.d < half + 9){ const talus = T.y - Math.ceil(T.d - half); if (s < talus){ s = talus; k = K.TALUS; } }
   for (const [n, c] of CAMPS.entries()){ const d = Math.hypot(cx - c.x, cz - c.z);
@@ -208,6 +213,7 @@ function terrain(c){
   else if (snow) top = steep && g < .3 ? BK.ice : BK.firn;
   else if (s < 18) top = steep ? BK.granite : BK.silt;
   else top = steep ? BK.granite : BK.scree;
+  if (GLOW[i] && k === K.TRAIL) top = BK.blaze;
   if (x === SUMMIT.x && z === SUMMIT.z) top = BK.mirror;
   for (let y = 0; y < s; y++){
    let id = y === s - 1 ? top : (y % 6 === 0 && y > 4 ? BK.scree : BK.granite);
@@ -391,6 +397,21 @@ function buildStreaks(){ const n = 70, g = new THREE.BufferGeometry(), p = new F
  const m = new THREE.Points(g, new THREE.PointsMaterial({ color: 0xffffff, size: .09, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }));
  m.frustumCulled = false; m.userData._hdTag = 1; streaks = { mesh: m, p, n, seed: Array.from({ length: n }, () => [Math.random(), Math.random(), Math.random()]) }; return streaks; }
 
+// ─── The beacon: a gold beam over the trailhead, seen from the whole city ─
+//  Drawn no further than 320 m from the camera and scaled toward it, like the
+//  painted peak, so it keeps its bearing and angular width at any distance.
+const BEACON = { x: 0.5, y: 3, z: 303, h: 220, r: 2.4 };
+let beacon = null;
+function buildBeacon(){
+ const geo = new THREE.CylinderGeometry(1, 1, 1, 24, 1, true); geo.translate(0, .5, 0);
+ const mat = new THREE.ShaderMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, fog: false, uniforms: { uA: { value: 1 }, uTime: { value: 0 } },
+  vertexShader: `varying vec3 vN;varying vec3 vV;varying float vY;void main(){vec4 w=modelMatrix*vec4(position,1.);vN=normalize(mat3(modelMatrix)*normal);vV=normalize(cameraPosition-w.xyz);vY=position.y;gl_Position=projectionMatrix*viewMatrix*w;}`,
+  fragmentShader: `uniform float uA,uTime;varying vec3 vN;varying vec3 vV;varying float vY;void main(){float f=clamp(abs(dot(normalize(vN),normalize(vV))),0.,1.);float core=f*f;float y=clamp(vY,0.,1.);float fade=(1.-smoothstep(.35,1.,y))*smoothstep(0.,.02,y);float pulse=.85+.15*sin(uTime*1.7-y*30.);gl_FragColor=vec4(vec3(1.,.78,.38)*core*fade*pulse*uA,1.);}` });
+ const m = new THREE.Mesh(geo, mat); m.frustumCulled = false; m.renderOrder = 6; m.name = 'oredor-beacon'; m.userData._hdTag = 1;
+ beacon = { mesh: m, mat }; return beacon;
+}
+const bv = new THREE.Vector3();
+
 // ─── Air: the feed's haze, the whiteout, the clear air above ─────────────
 let air = { blend: 0, f: 0 };
 const haze = new THREE.Color(0x6f6a84), white = new THREE.Color(0xdfe4ea), high = new THREE.Color(0xb6c4d8);
@@ -466,7 +487,7 @@ function despawnFear(n){ const e = live.get(n); if (!e) return; e.group.removeFr
 
 // ─── HUD: altitude chip, prompt, title card, fades ───────────────────────
 const css = document.createElement('style');
-css.textContent = `#oredor-alt{position:fixed;top:46px;left:50%;transform:translateX(-50%);z-index:125000;pointer-events:none;font:600 12px/1.2 system-ui,sans-serif;letter-spacing:.14em;color:#eef1f6;background:#0f1520b8;border:1px solid #5d6d7855;border-radius:14px;padding:7px 14px;white-space:nowrap}#oredor-alt b{color:#f0bf62;font-weight:700}#oredor-alt[hidden]{display:none}
+css.textContent = `#oredor-alt{position:fixed;top:94px;left:50%;transform:translateX(-50%);z-index:125000;pointer-events:none;font:600 12px/1.2 system-ui,sans-serif;letter-spacing:.14em;color:#eef1f6;background:#0f1520b8;border:1px solid #5d6d7855;border-radius:14px;padding:7px 14px;white-space:nowrap}#oredor-alt b{color:#f0bf62;font-weight:700}#oredor-alt[hidden]{display:none}
 #oredor-prompt{position:fixed;bottom:110px;left:50%;transform:translateX(-50%);z-index:125001;background:#0f1820e6;color:#eef2f3;border:1px solid #5d6d78;border-left:3px solid #f0bf62;border-radius:22px;padding:13px 22px;font:600 14px/1.3 system-ui,sans-serif;cursor:pointer;backdrop-filter:blur(6px);max-width:calc(100vw - 32px)}#oredor-prompt[hidden]{display:none}#oredor-prompt.hint{cursor:default;border-left-color:#8fb3d9}
 #oredor-card{position:fixed;inset:0;z-index:125002;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none;opacity:0;transition:opacity 1.2s ease;text-align:center;color:#f4f6fb;text-shadow:0 2px 18px #000a}#oredor-card.on{opacity:1}#oredor-card h2{margin:0;font:700 clamp(34px,7vw,72px)/1 system-ui,sans-serif;letter-spacing:.32em;padding-left:.32em}#oredor-card p{margin:14px 0 0;font:500 clamp(13px,2vw,17px)/1.4 system-ui,sans-serif;letter-spacing:.08em;color:#f0bf62;max-width:min(620px,86vw)}
 #oredor-fade{position:fixed;inset:0;z-index:125003;pointer-events:none;background:#000;opacity:0;transition:opacity .45s ease}#oredor-fade.white{background:#f4f8ff}`;
@@ -531,12 +552,24 @@ window.updateWalkInput = function(dt){
  return r;
 };
 
+// ─── Guidance: the next thing to reach, and which way it is ──────────────
+const GOALS = [[6, 'CAMP I'], [8, 'THE ROPE'], [12, 'CAMP II'], [14, 'THE ROPE'], [16, 'THE RIDGE'], [18, 'THE SUMMIT']];
+function nextGoal(p, f){
+ const T = nearestSeg(p.x, p.z); let i = SEGS.indexOf(T.s); if (i < 0) i = 0;
+ // Off the trail and below it: the trailhead is still the way in.
+ if (T.d > 14 && f < T.y - 3) i = 0;
+ const g = GOALS.find(([n]) => n > i + (T.t > .97 ? 1 : 0)) || GOALS[GOALS.length - 1], w = ROUTE[g[0]];
+ return { label: g[1], x: w[0] + .5, z: w[1] + .5 };
+}
+function bearing(x, z){ const dx = x - Player.position.x, dz = z - Player.position.z, y = Player.yaw;
+ return Math.atan2(dx * Math.cos(y) - dz * Math.sin(y), -dx * Math.sin(y) - dz * Math.cos(y)) * 180 / Math.PI; }
+
 // ─── Each frame ──────────────────────────────────────────────────────────
 let built = false, last = 0, inside = false;
 function build(){
  if (built || !State.scene) return; built = true; buildGrid();
  root = new THREE.Group(); root.name = 'mount-oredor-ascent';
- root.add(buildFeed().mesh, buildProps(), buildCloud().mesh, buildStreaks().mesh);
+ root.add(buildFeed().mesh, buildProps(), buildCloud().mesh, buildStreaks().mesh, buildBeacon().mesh);
  State.scene.add(root); applySight();
 }
 function tick(now){
@@ -558,6 +591,9 @@ function tick(now){
  // Props only near the mountain.
  props.group.visible = p.z > 260 && Math.abs(p.x) < 220;
  props.shard.rotation.y = t * .6; props.shard.position.y = SUMMIT.y + 2.7 + Math.sin(t * 1.3) * .12; props.halo.lookAt(State.camera.position); props.halo.material.opacity = .35 + .15 * Math.sin(t * 2);
+ { const cam = State.camera.position; bv.set(BEACON.x, BEACON.y, BEACON.z).sub(cam); const dist = bv.length(), k = Math.min(1, 320 / Math.max(dist, 1));
+  beacon.mesh.position.copy(cam).addScaledVector(bv, k); beacon.mesh.scale.set(BEACON.r * k, BEACON.h * k, BEACON.r * k);
+  const flat = Math.hypot(cam.x - BEACON.x, cam.z - BEACON.z); beacon.mat.uniforms.uA.value = (S.sight ? 0 : 1) * smooth(18, 60, flat); beacon.mat.uniforms.uTime.value = t; beacon.mesh.visible = beacon.mat.uniforms.uA.value > .01; }
  if (seq){ seq.t = (now - seq.t0) / 1000; const k = clamp(seq.t / 1.4); props.shard.position.lerp(new THREE.Vector3(p.x, p.y - .3, p.z), k * .5); props.shard.scale.setScalar(lerp(1, .05, k)).multiply(new THREE.Vector3(.7, 2.1, .7)); cloud.mat.uniforms.uPart.value = Math.sin(clamp(seq.t / 5) * Math.PI); if (seq.t > 5.2){ seq = null; cloud.mat.uniforms.uPart.value = 0; } applySight(); }
  // Fears: alive while you are on the slopes below them.
  for (let n = 0; n < FEARS.length; n++){
@@ -579,7 +615,10 @@ function tick(now){
  inside = zone;
  let campHere = -1;
  for (let n = 0; n < CAMPS.length; n++){ const c = CAMPS[n]; if (Math.hypot(p.x - c.x, p.z - c.z) < c.r + 1.5 && Math.abs(f - c.y) < 1.6){ campHere = n; if (n > S.camp && n < 3 && !god()){ S.camp = n; save(); if (n > 0) notice(CANON.camps[n] + ' · ' + fmt(alt(c.y)) + ' m'); } } }
- hud.hidden = !zone; if (zone) hud.innerHTML = 'MOUNT OREDOR · <b>' + fmt(alt(f)) + ' m</b>' + (campHere >= 0 ? ' · ' + CANON.camps[campHere] : '') + (god() ? ' · GOD MODE' : '');
+ const goal = S.sight ? null : zone ? nextGoal(p, f) : { label: 'TRAILHEAD', x: BEACON.x, z: BEACON.z };
+ const pointer = goal ? ' · ' + goal.label + ' ' + fmt(Math.round(Math.hypot(goal.x - p.x, goal.z - p.z))) + ' m <i style="display:inline-block;font-style:normal;transform:rotate(' + Math.round(bearing(goal.x, goal.z)) + 'deg)">↑</i>' : '';
+ hud.hidden = !zone && !goal;
+ if (!hud.hidden) hud.innerHTML = zone ? 'MOUNT OREDOR · <b>' + fmt(alt(f)) + ' m</b>' + (campHere >= 0 ? ' · ' + CANON.camps[campHere] : '') + (god() ? ' · GOD MODE' : '') + pointer : 'FIRST MISSION · <b>MOUNT OREDOR</b>' + pointer;
  // What you can do here.
  near = null;
  if (zone && Player.mode === 'walk'){

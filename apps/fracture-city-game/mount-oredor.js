@@ -12,10 +12,14 @@
    pass. Shading is per pixel but trivial: every expression is clamped and every
    smoothstep runs low edge to high, so no GPU can produce an invalid pixel.
 
+   0.110: it stands behind the climbable mountain (oredor-ascent.js), its foot past
+   z 940, and mists out then hides as you near its footprint, so nobody walks into
+   a painted slope.
+
    FCOredor.set(false) hides it. FCOredor.anchor is its position in the world. */
 (function(){'use strict';
 if(typeof THREE==='undefined'||typeof State==='undefined')return;
-const O=window.FCOredor={version:'0.108.0',enabled:true,anchor:new THREE.Vector3(0,-40,1400),height:720,radius:980};
+const O=window.FCOredor={version:'0.110.0',enabled:true,anchor:new THREE.Vector3(4,-30,1700),height:720,radius:760};
 const DRAW=330; // drawn no further than this from the camera; the sky dome is 380 m
 
 // ─── Shape: a dominant peak, two shoulder summits, ridges and gullies ──────
@@ -65,12 +69,14 @@ const mesh=new THREE.Mesh(geo,mat);mesh.name='mount-oredor';mesh.frustumCulled=f
 // ─── Each frame: keep bearing and angular size, follow the sky ─────────────
 const v=new THREE.Vector3();
 function frame(){requestAnimationFrame(frame);const cam=State.camera,scene=State.scene;if(!cam||!scene)return;
- if(mesh.parent!==scene)scene.add(mesh);mesh.visible=O.enabled&&!O.hold;if(!mesh.visible)return; // O.hold: the ascent hides it inside the cloud
+ // Near its footprint it is a painting you could walk into: mist it out, then hide it.
+ const foot=Math.hypot(O.anchor.x-cam.position.x,O.anchor.z-cam.position.z)/O.radius,near=Math.min(1,Math.max(0,(1.45-foot)/.3));
+ if(mesh.parent!==scene)scene.add(mesh);mesh.visible=O.enabled&&!O.hold&&foot>1.15;if(!mesh.visible)return; // O.hold: the ascent hides it inside the cloud
  v.copy(O.anchor).sub(cam.position);const dist=v.length(),s=Math.min(1,DRAW/Math.max(dist,1));
  mesh.position.copy(cam.position).addScaledVector(v,s);mesh.scale.set(O.radius*s,O.height*s,O.radius*s);
  const hour=(((State.dayTime||0)/60)%24+24)%24,ang=(hour-6)/12*Math.PI;
  U.uSun.value.set(Math.cos(ang)*.8,Math.max(-.2,Math.sin(ang)),-.45);U.uDay.value=Math.min(1,Math.max(0,Math.sin(ang)*2.2+.15));
- if(scene.fog&&scene.fog.color)U.uHaze.value.copy(scene.fog.color);U.uMist.value=.3+.38*(1-U.uDay.value);if(O.mist!=null)U.uMist.value=Math.max(U.uMist.value,O.mist)}
+ if(scene.fog&&scene.fog.color)U.uHaze.value.copy(scene.fog.color);U.uMist.value=.3+.38*(1-U.uDay.value);if(O.mist!=null)U.uMist.value=Math.max(U.uMist.value,O.mist);U.uMist.value=Math.max(U.uMist.value,near*.98)}
 requestAnimationFrame(frame);
 Object.assign(O,{mesh,uniforms:U,set(on){O.enabled=!!on;mesh.visible=O.enabled;return O.enabled},bearing(){const c=State.camera;return c?Math.atan2(O.anchor.x-c.position.x,O.anchor.z-c.position.z):0}});
 })();

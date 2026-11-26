@@ -43,24 +43,29 @@ function build(){root=new THREE.Group();root.name='common-ground-crown-run';scen
  const geo=new THREE.TorusGeometry(.62,.055,6,24);resources.push(geo);beacon=new THREE.Mesh(geo,material(0x80ffdf,1.6));root.add(beacon);finish=new THREE.Mesh(geo,material(0xe6b75e,1.3));root.add(finish);const end=nodes.at(-1);finish.position.set(end.x,end.y+1.3,end.z);
  paint();}
 function paint(){if(!pads)return;const c=new THREE.Color();nodes.forEach((n,i)=>{pads.setColorAt(i,c.setHex(completed||run&&i<=run.index?0x69b7a6:n.checkpoint?0xe4c181:0xbfb69c));});pads.instanceColor.needsUpdate=true;}
-function reset(){const n=nodes[run.checkpoint];Player.position.set(n.x,n.y+Player.height+.02,n.z);Player.velocity.set(0,0,0);Player.onGround=true;run.index=run.checkpoint;run.falls++;paint();notice('Caught by the arch · try again');}
+// A fall ends the run and you fall. The checkpoint is kept for three minutes; the start pad resumes from it.
+let kept=null;
+function reset(){kept={checkpoint:run.checkpoint,elapsed:run.elapsed,falls:run.falls+1,until:performance.now()+180000};run=null;paint();cooldown=performance.now()+1500;notice(kept.checkpoint?'Fell · checkpoint kept 3 min · step on the start pad to resume':'Fell · run ended');}
+function resume(){const n=nodes[kept.checkpoint];run={index:kept.checkpoint,checkpoint:kept.checkpoint,elapsed:kept.elapsed,falls:kept.falls};kept=null;Player.position.set(n.x,n.y+Player.height+.02,n.z);Player.velocity.set(0,0,0);Player.onGround=true;paint();notice('Resumed at '+Math.round(n.y)+' m');}
 function tick(){if(!State.scene)return;if(scene!==State.scene){dispose();scene=State.scene;build();last=performance.now();}
  const now=performance.now(),dt=Math.min(.1,(now-last)/1000);last=now;const p=Player.position;root.visible=Math.abs(p.x-179)<180&&Math.abs(p.z+12)<180;
  if(State.ui.paused)return;
  if(run&&(Player.mode!=='walk'||window.FCWorldStudio?.flying||window.FCJustice?.active)){run=null;paint();notice('Run ended');cooldown=now+3000;}
  const feet=p.y-Player.height;
  const standing=i=>{const n=nodes[i];return Player.onGround&&Math.abs(feet-n.y)<.16&&Math.abs(p.x-n.x)<.94&&Math.abs(p.z-n.z)<.94;};
+ if(kept&&now>kept.until)kept=null;
+ if(!run&&kept&&kept.checkpoint&&now>cooldown&&Player.mode==='walk'&&!window.FCWorldStudio?.flying&&!window.FCJustice?.active&&standing(0)){completed=false;finish.scale.setScalar(1);resume();return;}
  if(!run&&now>cooldown&&Player.mode==='walk'&&!window.FCWorldStudio?.flying&&!window.FCJustice?.active&&standing(0)){completed=false;finish.scale.setScalar(1);run={index:0,checkpoint:0,elapsed:0,falls:0};paint();notice('Crown Run · follow the mint light');}
  if(run){run.elapsed+=dt;
   // Every ledge must be landed on. Flying or teleporting cannot skip the run.
   if(run.index+1<nodes.length&&standing(run.index+1)){run.index++;if(nodes[run.index].checkpoint){run.checkpoint=run.index;notice(run.index===summit?'Crown reached · follow the lights down':'Checkpoint lit');}paint();}
   const n=nodes[run.index];if(feet<n.y-4)reset();
-  else if(Math.hypot(p.x-n.x,p.z-n.z)>16){run=null;paint();cooldown=now+3000;notice('Left the Crown Run');}
-  if(run&&run.index===nodes.length-1){notice(`Crown Run complete · ${Math.round(run.elapsed)}s · ${run.falls} catches`);finish.scale.setScalar(2);completed=true;run=null;cooldown=now+8000;paint();}
+  else if(run&&Math.hypot(p.x-n.x,p.z-n.z)>16){run=null;paint();cooldown=now+3000;notice('Left the Crown Run');}
+  if(run&&run.index===nodes.length-1){notice(`Crown Run complete · ${Math.round(run.elapsed)}s · ${run.falls} falls`);finish.scale.setScalar(2);completed=true;run=null;cooldown=now+8000;paint();}
  }
  const target=nodes[run?Math.min(run.index+1,nodes.length-1):0];beacon.position.set(target.x,target.y+.6,target.z);beacon.rotation.x=-Math.PI/2;
  if(now>noticeUntil)hud.style.display='none';
 }
 const day=window.updateDayNight;window.updateDayNight=function(){const result=day.apply(this,arguments);tick();return result;};
-window.FCCrownRun={nodes,boxes,summit,tick,dispose,get run(){return run;},get root(){return root;}};
+window.FCCrownRun={nodes,boxes,summit,tick,dispose,get run(){return run;},get kept(){return kept;},get root(){return root;}};
 })();

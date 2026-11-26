@@ -27,6 +27,15 @@ const out=n=>path.join(__dirname,'out',n),SHOTS=!process.env.NO_SHOTS;
  const place=(x,y,z,yaw)=>p.evaluate(([x,y,z,yaw])=>{for(let cx=Math.floor((x-60)/24);cx<=Math.floor((x+60)/24);cx++)for(let cz=Math.floor((z-60)/24);cz<=Math.floor((z+60)/24);cz++)if(!State.chunkMap.has(cx+','+cz))shBuildChunk(cx+','+cz);Player.mode='walk';Player.position.set(x,y+Player.height+.02,z);Player.velocity.set(0,0,0);Player.yaw=yaw;Player.onGround=true;State.keys.clear();},[x,y,z,yaw]);
  const step=(keys,frames)=>p.evaluate(([keys,frames])=>{State.ui.paused=true;State.keys.clear();for(const k of keys)State.keys.add(k);for(let i=0;i<frames;i++){updateWalkInput(1/60);updateWalkPhysics(1/60);}State.keys.clear();const f=Player.position.y-Player.height;return{x:+Player.position.x.toFixed(2),f:+f.toFixed(2),z:+Player.position.z.toFixed(2),g:Player.onGround,rope:!!FCOredor.ascent.debug.rope};},[keys,frames]);
 
+ // 2b · Guidance: the beacon from the city, the chip, the lit trail, the painted peak never underfoot.
+ const guide=await p.evaluate(async()=>{const w=ms=>new Promise(r=>setTimeout(r,ms));State.ui.paused=false;for(let cx=0;cx<=3;cx++)for(let cz=4;cz<=7;cz++)if(!State.chunkMap.has(cx+','+cz))shBuildChunk(cx+','+cz);Player.position.set(60,shSurfaceY(60,150,63)+Player.height,150);await w(900);
+  const city={beacon:State.scene.getObjectByName('oredor-beacon').visible,chip:document.getElementById('oredor-alt').textContent,hidden:document.getElementById('oredor-alt').hidden};
+  Player.position.set(-30.5,22+Player.height,404.5);await w(900);const slope=document.getElementById('oredor-alt').textContent;
+  const G=FCOredor.ascent.debug.grid;let lit=0;for(let x=-144;x<144;x++)for(let z=288;z<720;z++)if(getBlock(x,G.SURF[G.gi(x,z)]-1,z)===195&&G.KIND[G.gi(x,z)]===1)lit++;
+  Player.position.set(150,2+Player.height,900);await w(900);const footHidden=!FCOredor.mesh.visible;Player.position.set(165,2.7+Player.height,24);await w(600);const cityPeak=FCOredor.mesh.visible;
+  return{city,slope,lit,footHidden,cityPeak};});
+ console.log('guide',JSON.stringify(guide));assert.ok(guide.city.beacon&&!guide.city.hidden&&/TRAILHEAD/.test(guide.city.chip),'beacon and chip from the city');assert.ok(/CAMP I\b/.test(guide.slope),'chip points to Camp I '+guide.slope);assert.ok(guide.footHidden&&guide.cityPeak,'painted peak hides at its foot, shows from the city');pass('guidance: beacon, chip, painted peak');
+
  // 3 · The first rope: you cannot jump it, you climb it by hand.
  const R1=await p.evaluate(()=>FCOredor.ascent.ropes[0]);
  await place(R1.x+.5,R1.y0,R1.face-1.6,Math.PI);
@@ -84,7 +93,7 @@ const out=n=>path.join(__dirname,'out',n),SHOTS=!process.env.NO_SHOTS;
  assert.ok(await p.evaluate(()=>Math.abs(Player.position.y-Player.height-3)<1&&Player.position.z<320),'descended to the trailhead');pass('descent');
 
  // 9 · Views. Cameras placed by hand; the HUD is part of the picture.
- if(SHOTS){const views=[['oredor-approach.png',[0,4,262],[0,40,600],-1,13],['oredor-basecamp.png',[6,6,296],[0,6,330],-1,13],['oredor-slopes.png',[50,22,370],[-20,14,400],-1,13],['oredor-rope.png',[38,33,440],[35.5,34,446],-1,13],['oredor-whiteout.png',[-20,47.8,495],[10,50,520],46.2,13],['oredor-above.png',[10,57.6,540],[8,58,600],55.5,13],['oredor-summit-down.png',[8,63.6,608],[-10,40,480],61,17.5],['oredor-night-slopes.png',[50,22,370],[-20,14,400],-1,22]];
+ if(SHOTS){const views=[['oredor-approach.png',[0,4,262],[0,40,600],-1,13],['oredor-from-city.png',[165,4,24],[0,60,600],-1,13],['oredor-trail-lit.png',[-40,13,350],[0,12,330],-1,19.5],['oredor-basecamp.png',[6,6,296],[0,6,330],-1,13],['oredor-slopes.png',[50,22,370],[-20,14,400],-1,13],['oredor-rope.png',[38,33,440],[35.5,34,446],-1,13],['oredor-whiteout.png',[-20,47.8,495],[10,50,520],46.2,13],['oredor-above.png',[10,57.6,540],[8,58,600],55.5,13],['oredor-summit-down.png',[8,63.6,608],[-10,40,480],61,17.5],['oredor-night-slopes.png',[50,22,370],[-20,14,400],-1,22]];
   for(const [name,eye,look,fy,hour] of views){await p.evaluate(([eye,look,fy,hour])=>{State.dayTime=hour*60;Player.position.set(eye[0],(fy>0?fy:eye[1]-1.6)+Player.height,eye[2]);for(let cx=Math.floor((eye[0]-80)/24);cx<=Math.floor((eye[0]+80)/24);cx++)for(let cz=Math.floor((eye[2]-80)/24);cz<=Math.floor((eye[2]+80)/24);cz++)if(!State.chunkMap.has(cx+','+cz))shBuildChunk(cx+','+cz);State.ui.paused=false;},[eye,look,fy,hour]);await p.waitForTimeout(1200);
    await p.evaluate(([eye,look])=>{State.ui.paused=true;State.camera.up.set(0,1,0);State.camera.position.set(...eye);State.camera.lookAt(...look);},[eye,look]);await p.waitForTimeout(2600);await p.screenshot({path:out(name)});}
   await p.evaluate(()=>{State.ui.paused=false;State.dayTime=13*60});}

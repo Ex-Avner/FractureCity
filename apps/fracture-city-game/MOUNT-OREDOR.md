@@ -1,6 +1,13 @@
-# Mount Oredor · 0.109
+# Mount Oredor · 0.110
 
 The first mission. Walk north out of the city toward the peak on the horizon. The trailhead is at X 0 / Z 300.
+
+## Finding it (0.110)
+
+- A gold beam stands over the trailhead, visible from the whole city, until the shard is taken. It fades out within 60 m.
+- The chip at the top reads FIRST MISSION · MOUNT OREDOR with distance and an arrow to the trailhead. On the mountain it gives altitude, then distance and an arrow to the next camp, rope, the ridge or the summit.
+- The trail is inlaid with lit blazes every 4 m.
+- The painted peak now stands behind the climbable mountain (anchor 4, -30, 1700, radius 760, foot past Z 940). It mists out as you approach its footprint and is hidden before you can reach it. In 0.109 its skirt began at Z 420 and ran 980 m either side, so a player who missed the 288 m wide climbable zone walked into a painted slope over Outer Expanse ruins.
 
 ## The climb
 
