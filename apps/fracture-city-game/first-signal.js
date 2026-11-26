@@ -617,7 +617,7 @@ window.addEventListener('keydown', e => {
 
 // ─── The incident ───────────────────────────────────────────────────────────
 let inc = null, idle = 0, flickUntil = 0;
-function active(){ return !!State.citySeed && State.chunkMap.size > 0 && !!State.scene && !window.FN?.prologue && !window.FN?.scene && !State.ui.inIntro && !State.ui.inDialogue && !State.ui.inArcade && !State.ui.inMiniGame && !State.ui.inInventory && !State.ui.inCar && !window.FCJustice?.active && !panel; }
+function active(){ return !window.FCArrival?.busy && !!State.citySeed && State.chunkMap.size > 0 && !!State.scene && !window.FN?.prologue && !window.FN?.scene && !State.ui.inIntro && !State.ui.inDialogue && !State.ui.inArcade && !State.ui.inMiniGame && !State.ui.inInventory && !State.ui.inCar && !window.FCJustice?.active && !panel; }
 function onHallFloor(){ const p = Player.position; return p.x > 150 && p.x < 212 && p.z > 2 && p.z < 46 && feet() < 2.6 && Player.mode === 'walk' && !State.ui.construct && !!window.FCCommonGroundMega?.root; }
 function beginIncident(){
  const p = Player.position, f = feet(), yaw = Player.yaw; let C = null, A = null;

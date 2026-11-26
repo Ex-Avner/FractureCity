@@ -408,6 +408,7 @@ function fnPeople(){
     for (const m of Cast.staged.members) if (m.char) out.push({ char: m.char, kind: 'cast', owner: m, pos: m.char.group.position, protect: true }); });
   if (FN.prologue) for (const x of FN.prologue.extras) if (x.char) out.push({ char: x.char, kind: 'extra', owner: x, pos: x.char.group.position, protect: true });
   for(const p of window.FCStreetEvents?.combatants||[])out.push(p);
+  for(const p of window.FCArrival?.combatants||[])out.push(p);
   return out;
 }
 
