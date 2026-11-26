@@ -1,15 +1,13 @@
 /* Streets connect the story to the maker district without changing saves. */
 (function(){'use strict';
-// Replace the older, separately scripted first-night detour with the current bulletin.
+// All new local cities use the same district builder as online beta. Story
+// mode retains the campaign in that city; it no longer starts an older film.
 const oldAct=shFrontAct;
-window.shFrontAct=function(action){if(action!=='new-campaign')return oldAct.apply(this,arguments);
-return fcLoad('Tuning in to FCN…',async()=>{
- if(State.chunkMap.size&&Slots.activeId)await shSlotSave(Slots.activeId);
- if(FN.prologue)fnEndPrologueWorld();
- Player.classKey=Player.classKey||'witness';State.classChosen=true;
- await shSlotNew('campaign');FN.state.prologueDone=true;FN.state.inPrologue=false;
- shPlayIntro(()=>{shCampaignStart(true);fnSave();shCampaignCheckpointSoon()});
-});};
+window.shFrontAct=function(action){
+ if(action==='new-campaign')return OwnBlock.start({story:true});
+ if(action==='new-free')return OwnBlock.start();
+ return oldAct.apply(this,arguments);
+};
 // Keep menus and gameplay at the same readable native device width.
 if(matchMedia('(pointer:coarse)').matches){const menu=document.getElementById('menu-overlay'),meta=document.querySelector('meta[name="viewport"]');
  const fit=()=>{const value='width=device-width, initial-scale=1, viewport-fit=cover';if(meta&&meta.content!==value)meta.content=value};

@@ -2,7 +2,7 @@
 """Build a complete static arcade, soundtrack and game for Netlify Drop."""
 from pathlib import Path
 import json,shutil,zipfile,importlib.util,re
-ROOT=Path(__file__).resolve().parents[1];OUT=ROOT/'_build/netlify-mobile';VERSION='0.92.0'
+ROOT=Path(__file__).resolve().parents[1];OUT=ROOT/'_build/netlify-mobile';VERSION='0.107.0'
 slugs=['chainfire','fracture-city-game','wrong-floor','palm-drive','coherence-game','still-human','still-human-wild','sun-fall','light-bearer','the-visitor','works','character-forge','backroom','toilet-heads','fractured-mirror','breaking-ned','oh-no-ned','bad-weather','outgrow']
 if OUT.exists():shutil.rmtree(OUT)
 OUT.mkdir(parents=True)
@@ -25,12 +25,12 @@ for i,p in enumerate(sorted(music.glob('*.mp3'))):
 assert len(tracks)==13,'Expected the 13 final tracks'
 (target/'playlist.json').write_text(json.dumps({'tracks':tracks},indent=2))
 spec=importlib.util.spec_from_file_location('beta',ROOT/'_build/build-beta.py');module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
-(OUT/'_headers').write_text(module.build_headers('','').replace('max-age=31536000, immutable','max-age=86400')+'\n/media/music/*\n  Cache-Control: public, max-age=86400\n')
+(OUT/'_headers').write_text(module.build_headers('','').replace('max-age=31536000, immutable','max-age=86400')+'\n/apps/fracture-city-game/*.js\n  Cache-Control: no-cache\n/apps/fracture-city-game/*.html\n  Cache-Control: no-cache\n/media/music/*\n  Cache-Control: public, max-age=86400\n')
 # No SPA wildcard: a missing script must remain a real 404, never game HTML.
 (OUT/'_redirects').write_text('/play /apps/fracture-city-game/index.html 302\n')
 (OUT/'404.html').write_text('<!doctype html><title>Not found</title><h1>This street is closed.</h1><a href="/">Return to the arcade</a>')
 (OUT/'index.html').write_text((ROOT/'_build/netlify-home.html').read_text())
-(OUT/'DEPLOY.txt').write_text('''FRACTURE CITY WEB 0.92.0
+(OUT/'DEPLOY.txt').write_text('''FRACTURE CITY WEB 0.107.0
 1. Unzip this download.
 2. Sign into Netlify and visit https://app.netlify.com/drop
 3. Drop the folder containing index.html, apps, shared and media onto Netlify.
@@ -38,12 +38,12 @@ spec=importlib.util.spec_from_file_location('beta',ROOT/'_build/build-beta.py');
 4. Open the HTTPS link on your phone. Landscape is recommended for action games.
 5. To update an existing site, use that site's Deploys upload area, retaining its address.
 
-Choose Begin story. Ned’s bulletin leads into the city’s first objective.
-Walk east to discover Makers’ Mile in the same saved city. Follow its street
-signs, approach Studio 01 and press E for your key, then B opens the workshop.
-Studio ownership, artwork and story progress save with that city. Older
-studio saves remain in Saved cities; no existing cities are deleted or merged.
-The neighborhood board can take you back to Civic Core.
+Choose New single-player story to arrive at Common Ground, with the same
+architecture, garden arrival, arch parkour, college and outer biomes as the
+current shared-city client. The campaign remains part of your saved city.
+Explore the city uses the same district without campaign objectives.
+Saved cities preserves existing story progress, positions and builds.
+Desktop Present Palm loads the same source files from ~/Fracture City.
 
 13 soundtrack tracks are included. Music begins after a tap. Songs load on demand.
 Use Radio & menu in the city, or the music player on the home page.

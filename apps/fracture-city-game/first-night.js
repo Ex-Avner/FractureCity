@@ -1722,6 +1722,8 @@ function fnEndPrologueWorld(){
   const o = document.getElementById('fn-obj'); if (o) o.classList.remove('on');
 }
 
+FN.endPrologue = fnEndPrologueWorld;
+
 function fnPrologueFinish(){
   FN.state.prologueDone = true; FN.state.inPrologue = false;
   //  A year passes. Nobody's file is still warm.

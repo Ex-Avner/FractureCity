@@ -4,7 +4,15 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta charset="UTF-8">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%230b141b'/%3E%3Crect x='6' y='6' width='9' height='20' fill='%23ff5268'/%3E%3Crect x='18' y='6' width='8' height='9' fill='%232cb8c7'/%3E%3Crect x='18' y='18' width='8' height='8' fill='%23f4bb3d'/%3E%3C/svg%3E">
-<title>Fracture City // Shift</title>
+<title>Fracture City</title>
+<style id="city-entry-shell">
+/* Own the first paint, before any of the legacy game scripts load. */
+#menu-overlay{background:#102529!important;z-index:10000!important;}
+#menu-overlay>:not(#front-root){display:none!important;}
+#menu-overlay:not(.entry-ready)::before{content:'FRACTURE CITY · Opening…';color:#e9e8d5;font:600 18px system-ui;letter-spacing:.08em;}
+#menu-overlay:not(.entry-ready) #front-root{visibility:hidden;}
+body:has(#menu-overlay:not(.hide)) #lock-instruction{display:none!important;}
+</style>
 <script>
 (function(){
   if(location.pathname.startsWith('/city/')){window.FC_FULL_WEB=true;window.FC_WEB_EDITION=true;window.FC_RADIO_URL='/media/music/playlist.json';}
@@ -29955,8 +29963,8 @@ if (typeof NED_LINES !== 'undefined'){
 
 document.addEventListener('DOMContentLoaded', init);
 </script>
-<script src="front-menu.js?v=0.59.0"></script>
-<script src="first-night.js?v=0.106.0"></script>
+<script src="front-menu.js?v=0.107.0"></script>
+<script src="first-night.js?v=0.107.0"></script>
 <script src="visual-cohesion.js?v=0.99.0"></script>
 <script src="city-media.js?v=0.55.0"></script>
 <script src="quiet-interface.js?v=0.105.0"></script>
@@ -29984,7 +29992,7 @@ document.addEventListener('DOMContentLoaded', init);
 <script src="city-art.js?v=0.71.0"></script>
 <script src="art-direct.js?v=0.71.0"></script>
 <script src="movement-flow.js?v=2.0.0"></script>
-<script src="own-the-block.js?v=0.106.0"></script>
+<script src="own-the-block.js?v=0.107.0"></script>
 <script src="art-collection.js?v=0.55.0"></script>
 <script src="furniture-catalogue.js?v=0.71.0"></script>
 <script>window.FC_ACCOUNTS_OPTIONAL=true;</script>
@@ -30006,7 +30014,7 @@ document.addEventListener('DOMContentLoaded', init);
 <script src="structure-save-queue.js?v=1.0.0"></script>
 <script src="city-structures.js?v=0.93.0"></script>
 <script src="city-online.js?v=0.93.0"></script>
-<script src="city-flow.js?v=0.70.0"></script>
+<script src="city-flow.js?v=0.107.0"></script>
 <script src="online-tour.js?v=0.90.1"></script>
 <script src="world-materials.js?v=0.66.0"></script>
 <script src="sodium-noir.js?v=0.99.0"></script>
