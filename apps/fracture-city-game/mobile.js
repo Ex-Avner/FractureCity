@@ -413,7 +413,7 @@
   window.addEventListener('click', e => {
     //  Never a deliberate tap on a drawer key: that is the next action, not
     //  the tail of the last one.
-    const own = e.target && e.target.closest && e.target.closest('#mob-keys .grid button');
+    const own = e.target && e.target.closest && e.target.closest('#mob-keys button');
     if (!own && performance.now() < swallowUntil){ swallowUntil = 0; e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation(); }
   }, true);
   function bindTap(b, run){
@@ -437,7 +437,7 @@
     if (keysOpen && typeof shTouchReleaseAll === 'function') shTouchReleaseAll();
     if(keysOpen){State.keys?.clear();Mobile.releaseUse?.();}
     update();
-    const focus=keysOpen?d?.querySelector('.grid button'):document.querySelector('.tc-chip[data-act=keys]');
+    const focus=keysOpen?d?.querySelector('.fc-quick button,.grid button'):document.querySelector('.tc-chip[data-act=keys]');
     focus?.focus({preventScroll:true});
   }
   Mobile.showKeys = showKeys;
@@ -477,20 +477,21 @@
           const pickup=window.FN&&FN._nearPickup&&Player.mode==='walk';
           const action=u.construct?null:pickup?{label:'Take',run:()=>tap('r')}:context?{
             label:context.label, hold:context.element.id==='fc-field'||/hold\s+E/i.test(context.element.textContent),
-            run:()=>{if(typeof context.element.onclick==='function'||context.element.matches('button,[role=button]'))context.element.click();else tap('e');}
+            run:()=>{if(context.element.id==='jail-approach'){tap('e');return;}if(typeof context.element.onclick==='function'||context.element.matches('button,[role=button]'))context.element.click();else tap('e');}
           }:narrUp()?{label:'Next',run:()=>shNarrPush()}:null;
           Mobile.action=action;
           const use=document.querySelector('.tc-use');
           document.body.classList.toggle('mob-has-action',!!action);
           if(use&&action){
             const full=action.label||'Use';
-            const label=/hold/i.test(full)?'Hold':/read/i.test(full)?'Read':/listen|music|track/i.test(full)?'Listen':/talk|speak/i.test(full)?'Talk':/play/i.test(full)?'Play':/open|enter|visit/i.test(full)?'Open':/Ned|welcome|meet/i.test(full)?'Meet Ned':full.length>16?'Interact':full;
+            const label=/hold/i.test(full)?'Hold':/read/i.test(full)?'Read':/listen|music|track/i.test(full)?'Listen':/talk|speak/i.test(full)?'Talk':/play/i.test(full)?'Play':/open|enter|visit/i.test(full)?'Open':/Ned|welcome|meet/i.test(full)?'Meet Ned':/take|pick up|collect/i.test(full)?'Take':/repair|fix/i.test(full)?'Repair':/return|descend/i.test(full)?'Return':/next/i.test(full)?'Next':'Use';
             if(use.textContent!==label)use.textContent=label;
             if(use.getAttribute('aria-label')!==full)use.setAttribute('aria-label',full);
             if(use.title!==full)use.title=full;
           }
           const combat=!!window.FCPvp?.on||!!(typeof Siege!=='undefined'&&Siege.active)||!!u.inCombat||!!(typeof Campaign!=='undefined'&&Campaign.active&&!window.OwnBlock?.state?.enabled);
           document.body.classList.toggle('mob-combat',combat);
+          document.body.classList.toggle('mob-hurt',Player.hp<Player.hpMax);
           const ab = document.getElementById('fn-ability');
           const abOn = !!(ab && ab.classList.contains('on'));
           const qb = set('ability', abOn && !u.construct);
@@ -514,7 +515,7 @@
     if(!keysOpen)return;
     if(e.code==='Escape'){e.preventDefault();e.stopImmediatePropagation();showKeys(false);}
     if(e.code==='Tab'){
-      const buttons=[document.getElementById('mob-back'),...document.querySelectorAll('#mob-keys .grid button')].filter(e=>e&&e.offsetWidth);
+      const buttons=[document.getElementById('mob-back'),...document.querySelectorAll('#mob-keys button,#mob-keys input')].filter(e=>e&&e.offsetWidth);
       const i=buttons.indexOf(document.activeElement),next=buttons[(i+(e.shiftKey?-1:1)+buttons.length)%buttons.length];
       if(next){e.preventDefault();next.focus();}
     }

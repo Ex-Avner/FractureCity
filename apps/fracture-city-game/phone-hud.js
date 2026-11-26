@@ -3,9 +3,13 @@
  * useful action. Desktop retains the familiar prompt stack. Layout is scheduled
  * by changes to HUD elements, never a permanent measurement interval. */
 (function(){'use strict';
-const ORDER=[['.pv-hp'],['#maker-interact'],['#interact-prompt'],['#npc-talk-prompt'],['#casting-prompt'],['#cg-approach'],['#news-approach'],['#rw-approach'],['#seam-approach'],['#chainfire-play'],['#campus-arcade-play'],['#city-art-open'],['#city-build-quick'],['#fc-field'],['#cast-talk'],['#city-build-open'],['#common-invite','#common-later']];
+const ORDER=[['#arrival-action'],['#jail-approach'],['#fs-prompt'],['#oredor-prompt'],['#expanse-approach'],['#om-approach'],['#civic-approach'],['#backlot-approach'],['#dispatch-goal'],['.pv-hp'],['#maker-interact'],['#interact-prompt'],['#npc-talk-prompt'],['#casting-prompt'],['#cg-approach'],['#news-approach'],['#rw-approach'],['#seam-approach'],['#chainfire-play'],['#campus-arcade-play'],['#city-art-open'],['#city-build-quick'],['#fc-field'],['#cast-talk'],['#city-build-open'],['#common-invite','#common-later']];
 const ACTIONS=ORDER.flat().filter(s=>!['.pv-hp','#city-build-quick','#common-later'].includes(s));
-const WATCH=[...ORDER.flat(),'#tc-top','#tc-stick','#tc-acts','#mob-ctx','#hud-hp','#hud-weapons','#fc-hotbar','#siege-bar','#maker-goal','#fc-story-goal','#city-online','#minimap','#fc-tools','#fc-bell'];
+const NOTES=['#seam-hud','#fn-take','#dispatch-goal','#jail-approach','#arrival-caption','#fs-sub','#narr','#maker-goal','#fc-story-goal','#campaign-hud','#cg-walk-guide','#expanse-route','#crown-run-status','#jail-status','#oredor-card','#toast-stack'];
+const history=[],lastNote=new Map();
+let subtitles=false;try{subtitles=localStorage.getItem('fc-phone-subtitles')==='true'}catch(e){}
+document.body.classList.toggle('phone-subtitles',subtitles);
+const WATCH=[...NOTES,...ORDER.flat(),'#tc-top','#tc-stick','#tc-acts','#mob-ctx','#hud-hp','#hud-weapons','#fc-hotbar','#siege-bar','#maker-goal','#fc-story-goal','#city-online','#minimap','#fc-tools','#fc-bell'];
 const css=document.createElement('style');css.id='phone-hud-css';css.textContent=`
 html body.touch #tc-top{display:flex!important;top:max(12px,env(safe-area-inset-top))!important;left:max(12px,env(safe-area-inset-left))!important;right:auto!important;transform:none!important;gap:8px!important;max-width:none!important;flex-wrap:nowrap!important}
 html body.touch #tc-top .tc-chip{min-height:44px!important;min-width:56px!important;padding:0 14px!important;font:600 12px system-ui!important;letter-spacing:.02em!important;border-radius:22px;background:#11272de8;color:#e6efea;border:1px solid #688079}
@@ -63,7 +67,8 @@ html body.touch #mob-back{border-radius:22px;min-height:44px;padding:12px 18px;f
 html body.touch.mob-menu-open #fc-hotbar,html body.touch.mob-menu-open #touch-layer,html body.touch.mob-menu-open #minimap,html body.touch.mob-menu-open #maker-goal,html body.touch.mob-menu-open #fc-story-goal,html body.touch.mob-menu-open #narr{visibility:hidden!important}
 @media(orientation:landscape){
  html body.touch #maker-goal,html body.touch #fc-story-goal,html body.touch #campaign-hud{top:12px!important;left:190px!important;max-width:calc(100vw - 310px)!important;max-height:44px!important;padding:5px 10px!important}
- html body.touch #cg-walk-guide{top:12px!important;left:190px!important;width:calc(100vw - 310px)!important;max-height:82px}
+ html body.touch.phone-subtitles #arrival-caption:not(.phone-caption-current),html body.touch.phone-subtitles #fs-sub:not(.phone-caption-current),html body.touch.phone-subtitles #narr:not(.phone-caption-current){visibility:hidden!important}
+html body.touch #cg-walk-guide{top:66px!important;left:190px!important;width:calc(100vw - 310px)!important;max-height:82px}
  html body.touch #narr{left:190px!important;right:190px!important;top:74px!important;max-width:none!important;max-height:90px!important}
  html body.touch #toast-stack{left:50%!important;bottom:18px!important;max-width:calc(100vw - 340px)!important}
  html body.touch #hud-hp,html body.touch .pv-hp{bottom:72px!important;width:min(240px,calc(100vw - 340px))!important}
@@ -72,6 +77,37 @@ html body.touch.mob-menu-open #fc-hotbar,html body.touch.mob-menu-open #touch-la
  html body.touch #city-build-quick{top:68px!important;left:160px!important;right:170px!important;max-width:none!important;max-height:calc(100dvh - 170px)!important}
  html body.touch #mob-keys .grid{grid-template-columns:repeat(3,minmax(0,1fr))}
 }
+
+/* Quiet play: details are available in Menu > Journal, never a permanent wall. */
+html body.touch #minimap,html body.touch #maker-goal,html body.touch #fc-story-goal,
+html body.touch #campaign-hud,html body.touch #expanse-route,html body.touch #oredor-card,
+html body.touch #ws-badge,html body.touch #seam-hud,html body.touch #fn-take,html body.touch #ob-build-hud,html body.touch #build-hint,
+html body.touch #fc-hotbar .hb-name{display:none!important}
+html body.touch:not(.phone-subtitles) #arrival-caption,
+html body.touch:not(.phone-subtitles) #fs-sub,
+html body.touch:not(.phone-subtitles) #narr{display:none!important}
+html body.touch.phone-subtitles #arrival-caption,html body.touch.phone-subtitles #fs-sub,
+html body.touch.phone-subtitles #narr{top:auto!important;bottom:190px!important;left:50%!important;right:auto!important;transform:translateX(-50%)!important;width:calc(100vw - 40px)!important;max-width:460px!important;max-height:64px!important;overflow:auto!important;font:13px/1.35 system-ui!important;padding:8px 12px!important;box-sizing:border-box}
+html body.touch.phone-subtitles #arrival-caption:not(.phone-caption-current),html body.touch.phone-subtitles #fs-sub:not(.phone-caption-current),html body.touch.phone-subtitles #narr:not(.phone-caption-current){visibility:hidden!important}
+html body.touch #cg-walk-guide{top:66px!important;left:auto!important;right:12px!important;width:84px!important;max-width:84px!important;display:flex;align-items:center;padding:0!important;background:#10262bc9}
+html body.touch #cg-walk-guide[hidden]{display:none!important}
+html body.touch #cg-walk-guide>div{display:none!important}
+html body.touch #cg-guide-arrow{padding:6px!important;font-size:24px!important}
+html body.touch #jail-status{top:66px!important;left:12px!important;width:130px!important;max-height:34px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;padding:7px 10px!important;font:12px system-ui!important}
+html body.touch #crown-run-status,html body.touch #oredor-alt{top:66px!important;left:12px!important;right:auto!important;transform:none!important;max-width:180px!important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font:12px system-ui!important;padding:6px 9px!important}
+html body.touch #toast-stack .toast:not(.warn):not(.error){display:none!important}
+html body.touch #toast-stack .toast{font:12px/1.35 system-ui!important;max-height:48px;overflow:hidden}
+html body.touch #mob-ctx .ability{display:none!important}
+html body.touch.mob-hurt #hud-hp{display:block!important}
+html body.touch #hud-hp{width:132px!important;left:auto!important;right:12px!important;top:12px!important;bottom:auto!important;transform:none!important}
+html body.touch #hud-hp .hp-label{font:600 10px system-ui!important;letter-spacing:0!important;color:#ffe3db!important;text-shadow:0 1px 3px #000}
+html body.touch #hud-hp{background:#15252ccf!important;padding:7px 9px!important;border-radius:10px;box-sizing:border-box}
+html body.touch.mob-menu-open #mob-back{display:none!important}
+html body.touch.mob-menu-open #arrival-caption,html body.touch.mob-menu-open #fs-sub,
+html body.touch.mob-menu-open #jail-status,html body.touch.mob-menu-open #jail-seen,
+html body.touch.mob-menu-open #crown-run-status,html body.touch.mob-menu-open #oredor-alt,
+html body.touch.mob-menu-open #cg-walk-guide{visibility:hidden!important}
+@media(orientation:landscape){html body.touch.phone-subtitles #arrival-caption,html body.touch.phone-subtitles #fs-sub,html body.touch.phone-subtitles #narr{bottom:24px!important;max-width:calc(100vw - 360px)!important}}
 `;document.head.append(css);
 let current=null,queued=false,runs=0,lastSignature='';
 const placed=new Set(),observed=new WeakSet();
@@ -80,10 +116,14 @@ function release(e){for(const p of ['left','bottom','top','right','transform','v
 function label(e){return e.textContent.replace(/\b(press|hold)\s+E\b/ig,'').replace(/\bE\s*[·—:]/g,'').replace(/^\s*[·—:]\s*/,'').trim();}
 function layout(){
  runs++;const touch=document.body.classList.contains('touch');
+ if(touch)for(const selector of NOTES){const e=document.querySelector(selector);if(!e||e.hidden||e.style.display==='none')continue;const text=e.textContent.replace(/\s+/g,' ').trim();if(!text||lastNote.get(selector)===text)continue;lastNote.set(selector,text);if(!['#arrival-caption','#fs-sub','#narr','#toast-stack'].includes(selector)){const i=history.findIndex(n=>n.source===selector);if(i>=0)history.splice(i,1);}history.push({source:selector,text:text.slice(0,1000)});if(history.length>40)history.shift();}
  if(touch){
+  const captions=['#arrival-caption','#fs-sub','#narr'].map(s=>document.querySelector(s)).filter(Boolean);
+  const activeCaption=subtitles?captions.find(e=>!e.hidden&&e.style.display!=='none'&&e.offsetWidth&&getComputedStyle(e).opacity!=='0'):null;
+  for(const e of captions)e.classList.toggle('phone-caption-current',e===activeCaption);
   for(const e of [...placed])release(e);
   const candidates=ACTIONS.map(s=>document.querySelector(s)).filter(Boolean);
-  current=candidates.find(shown)||null;
+  current=candidates.find(e=>shown(e)&&!e.classList.contains('hint')&&(e.id!=='dispatch-goal'||/Tap to /i.test(e.textContent)))||null;
   for(const e of candidates)if(!e.classList.contains('phone-stashed'))e.classList.add('phone-stashed');
   const later=document.getElementById('common-later');if(later&&!later.classList.contains('phone-stashed'))later.classList.add('phone-stashed');
   window.Mobile?.update();return;
@@ -119,5 +159,5 @@ function connect(){for(const s of WATCH)for(const e of document.querySelectorAll
 new MutationObserver(records=>{if(records.some(r=>r.addedNodes.length))connect();}).observe(document.body,{childList:true});
 new MutationObserver(soon).observe(document.body,{attributes:true,attributeFilter:['class']});
 addEventListener('resize',soon);addEventListener('orientationchange',soon);document.addEventListener('visibilitychange',soon);connect();
-window.FCPhoneHUD={layout,ORDER,context:()=>current?{element:current,label:label(current)}:null,get runs(){return runs}};
+window.FCPhoneHUD={layout,ORDER,journal:()=>history.slice().reverse(),get subtitles(){return subtitles},setSubtitles(on){subtitles=!!on;document.body.classList.toggle('phone-subtitles',subtitles);try{localStorage.setItem('fc-phone-subtitles',String(subtitles))}catch(e){}},context:()=>current?{element:current,label:label(current)}:null,get runs(){return runs}};
 })();
