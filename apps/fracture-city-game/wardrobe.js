@@ -1,10 +1,10 @@
 /* Wardrobe: the stylised figure everyone in the city wears.
    One builder for the player, online residents, the crowd and the cast.
-   Chunky toon proportions; faces made of shapes (eyes that blink, a mouth
+   Fashion illustration proportions; faces made of shapes (eyes that blink, a mouth
    that moves, makeup, brows); layered clothes: shirt, jacket, bottoms, under,
    boots; hardware: spikes, studs, chains, collars, pins, patches, neon;
    piercings and ink. Everything bakes into one mesh per bone with vertex
-   colours and toon shading, plus a glow mesh only for neon parts.
+   colours and physically lit shading, plus a glow mesh only for neon parts.
    The bones and studio fields are the ones the rest of the game uses:
    torso, head, arms (elbows -> hand grip at -0.30), legs (knees), fingers. */
 (function(){'use strict';
@@ -44,17 +44,35 @@ const SCENES={
  work:r=>({hairStyle:r.pick(['buzz','crop','bun','long']),hair:r.pick(P.hairNat),headgear:r.pick(['cap','none','none','helmet','bandana']),outfit:r.pick(['bomber','hoodie','none']),coat:r.pick(['#ff6a00','#e2c044','#2e5e3a','#3a3d45','#1d3b6b']),top:r.pick(['tee','tank']),top2:r.pick(['#e9e5dc','#3a3d45','#7b7f88']),bottoms:'cargo',pants:r.pick(['#3a3d45','#5b4a3a','#1d3b6b']),boots:'steel-toe',boots2:r.pick(['#5b4a3a','#0b0b0f']),extras:r.sample(['gloves','chain'],r.int(0,1)),piercings:r.pick(['none','none','studs']),tattoos:r.pick(['none','bands','sleeve']),makeup:'none',accent:r.pick(['#e2c044','#ff6a00'])}),
  office:r=>({hairStyle:r.pick(['crop','bun','buzz','long']),hair:r.pick(P.hairNat),outfit:'tailored',coat:r.pick(['#3a3d45','#1d1f26','#7b7f88','#1d3b6b']),top:r.pick(['turtleneck','tee']),top2:r.pick(['#e9e5dc','#7b7f88']),bottoms:'skinny',pants:r.pick(['#1d1f26','#3a3d45']),boots:'steel-toe',boots2:'#1d1f26',extras:r.sample(['shades'],r.int(0,1)),piercings:'none',tattoos:'none',makeup:'none',brows:'straight',eyeShape:r.pick(['sleepy','round']),accent:r.pick(['#b3122e','#7b7f88','#1d3b6b'])}),
 };
+// Art-directed identities use existing wardrobe values: old saves and online
+// validation remain compatible. These are visual families, not new NPC jobs.
+const SIGNATURES={
+ courier:{outfit:'leather',coat:'#202e3d',top:'turtleneck',top2:'#101b26',pants:'#19232e',boots2:'#20252c',accent:'#f57742',hair:'#d8e3df',hairTip:'#d8e3df',hairStyle:'undercut',headgear:'none',bottoms:'skinny',boots:'combat',extras:['gloves','chain'],eyeShape:'sharp',makeup:'liner',frame:'slim'},
+ salvage:{outfit:'bomber',coat:'#b96935',top:'tee',top2:'#252c30',pants:'#343b3b',boots2:'#252b2d',accent:'#e5cc89',hair:'#24292c',hairTip:'#24292c',hairStyle:'buzz',headgear:'visor',bottoms:'cargo',boots:'steel-toe',extras:['gloves'],eyeShape:'sleepy',makeup:'none',frame:'broad'},
+ archive:{outfit:'longcoat',coat:'#303344',top:'turtleneck',top2:'#c2b9a3',pants:'#212431',boots2:'#202431',accent:'#c7a86d',hair:'#ece5cc',hairTip:'#ece5cc',hairStyle:'long',headgear:'none',bottoms:'skinny',boots:'combat',extras:['collar'],eyeShape:'sharp',makeup:'smoky',frame:'slim'},
+ prism:{outfit:'studded',coat:'#d0d5cf',top:'tank',top2:'#343043',pants:'#343043',boots2:'#d0d5cf',accent:'#b68cff',hair:'#8b77b6',hairTip:'#ddd4ef',hairStyle:'fauxhawk',headgear:'none',bottoms:'skinny',boots:'platform',extras:['neon','gloves'],eyeShape:'sharp',makeup:'glam',frame:'curvy'},
+ botanical:{outfit:'denim-vest',coat:'#3d615a',top:'turtleneck',top2:'#aeb5a0',pants:'#2b3d39',boots2:'#3d443d',accent:'#deae69',hair:'#2d302b',hairTip:'#2d302b',hairStyle:'dreads',headgear:'none',bottoms:'cargo',boots:'combat',extras:['gloves'],eyeShape:'sleepy',makeup:'none',frame:'average'},
+ civic:{outfit:'tailored',coat:'#ece3cd',top:'turtleneck',top2:'#27343a',pants:'#27343a',boots2:'#202b32',accent:'#b64c41',hair:'#26313b',hairTip:'#26313b',hairStyle:'crop',headgear:'none',bottoms:'skinny',boots:'creepers',extras:['gloves'],eyeShape:'sharp',makeup:'none',frame:'slim'}
+};
+const FAMILY_FOR={punk:['courier','prism'],goth:['archive'],skater:['courier','botanical'],raver:['prism'],work:['salvage','botanical'],office:['civic']};
 const SCENE_FOR={suit:['office','office','work'],clerk:['office','office','skater'],medic:['work','office'],courier:['skater','work','punk'],runner:['skater','raver'],vendor:['work','skater'],busker:['punk','goth','skater'],drifter:['punk','goth','work'],punk:['punk','punk','goth'],broadcaster:['raver','goth','office'],records:['punk','goth'],bar:['goth','punk','raver'],repair:['work'],laundry:['work','skater'],tea:['goth','office'],print:['punk','office']};
 function rngOf(rng){return{pick:a=>a[Math.floor(rng.next()*a.length)],int:(a,b)=>a+Math.floor(rng.next()*(b-a+1)),sample:(a,n)=>{const c=[...a],o=[];while(n-->0&&c.length)o.push(c.splice(Math.floor(rng.next()*c.length),1)[0]);return o},next:()=>rng.next()}}
 function crowdLook(arch,rng,scenes){
  const r=rngOf(rng),pool=(Array.isArray(scenes)&&scenes.length&&scenes)||SCENE_FOR[arch?.key]||['punk','goth','skater','raver','work','office','skater','work'],scene=r.pick(pool);
  const base={skin:r.pick(P.skin),eyes:r.pick(['#3b2a1e','#6b4a2b','#4b6b8c','#69776d','#9d8651']),eyeShape:r.pick(OPTIONS.eyeShape),brows:r.pick(['straight','arched','heavy','slashed']),faceWidth:.9+r.next()*.2,faceLength:.92+r.next()*.16,jaw:.85+r.next()*.3,nose:.85+r.next()*.4,frame:r.pick(['slim','average','average','broad','curvy']),heightScale:.92+r.next()*.16,shoulders:.92+r.next()*.2,lips:'none',legwear:'none',headgear:'none',hairTip:'',tattoos:'none',extras:[]};
- const l=normalize({...base,...SCENES[scene](r)});if(!l.hairTip||l.hairTip==='')l.hairTip=l.hair;l.scene=scene;return l;
+ const traditional=SCENES[scene](r),family=r.next()<.8?r.pick(FAMILY_FOR[scene]||['courier']):null;
+ const signature=family?{...SIGNATURES[family]}:{};
+ if(family){
+  // Keep a family's silhouette and palette, but avoid identical uniforms.
+  signature.coat='#'+new THREE.Color(signature.coat).multiplyScalar(.82+r.next()*.32).getHexString();
+  signature.hairStyle=r.pick(({courier:['undercut','crop','mohawk'],salvage:['buzz','bun','crop'],archive:['long','bun','dreads'],prism:['fauxhawk','undercut','pigtails'],botanical:['dreads','long','bun'],civic:['crop','bun','buzz']})[family]);
+  signature.accent=r.pick([signature.accent,signature.accent,'#b9c5c4','#bc9870']);
+ }
+ const l=normalize({...base,...traditional,...signature});if(!l.hairTip||l.hairTip==='')l.hairTip=l.hair;l.scene=scene;return l;
 }
 // ─── Geometry ───────────────────────────────────────────────────────────────
 const sphere=new THREE.SphereGeometry(1,10,7),cube=new THREE.BoxGeometry(1,1,1),cone=new THREE.ConeGeometry(1,1,6),dome=new THREE.SphereGeometry(1,16,8,0,Math.PI*2,0,Math.PI/2),ring=new THREE.TorusGeometry(1,.22,4,10);
-const ramp=(()=>{const d=new Uint8Array([70,70,70,255,150,150,150,255,215,215,215,255,255,255,255,255]);const t=new THREE.DataTexture(d,4,1,THREE.RGBAFormat);t.minFilter=t.magFilter=THREE.NearestFilter;t.needsUpdate=true;return t})();
-const TOON=new THREE.MeshToonMaterial({vertexColors:true,gradientMap:ramp});
+const TOON=new THREE.MeshStandardMaterial({vertexColors:true,roughness:.68,metalness:.12});
 const GLOW=new THREE.MeshBasicMaterial({vertexColors:true,toneMapped:false});
 function loft(rows,seg=12){const p=[],ix=[];for(const [y,rx,rz,cz=0]of rows)for(let j=0;j<=seg;j++){const a=j/seg*Math.PI*2;p.push(Math.sin(a)*rx,y,Math.cos(a)*rz+cz)}for(let i=0;i<rows.length-1;i++)for(let j=0;j<seg;j++){const a=i*(seg+1)+j,b=a+seg+1;ix.push(a,a+1,b,b,a+1,b+1)}const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(p,3));g.setIndex(ix);g.computeVertexNormals();return g}
 const ball=new THREE.SphereGeometry(1,12,8),pebble=new THREE.SphereGeometry(1,7,5);
@@ -104,13 +122,15 @@ function build(L,meta){
  const box=(b,x,y,z,sx,sy,sz,c,o)=>put(b,cube,[x,y,z],[sx,sy,sz],c,o);
  const spike=(b,x,y,z,r,h,c,o)=>put(b,cone,[x,y,z],[r,h,r],c,o);
  const shape=(b,rows,c,seg=12,o)=>{const g=loft(rows,seg);owned.push(g);put(b,g,[0,0,0],[1,1,1],c,o)};
+ // Shaped tailoring has actual edges and thickness, not painted rectangles.
+ const panel=(b,points,z,c,depth=.018)=>{const sh=new THREE.Shape();points.forEach(([x,y],i)=>i?sh.lineTo(x,y):sh.moveTo(x,y));sh.closePath();const g=new THREE.ExtrudeGeometry(sh,{depth,bevelEnabled:true,bevelThickness:.004,bevelSize:.004,bevelSegments:1,steps:1,curveSegments:1});owned.push(g);put(b,g,[0,0,z],[1,1,1],c)};
  //  A limb: rows [y,rx,rz] (any order), paint(y,angle)->{c,out}; cuts are hem heights with a hard edge.
  const limb=(b,rows,paint,cuts=[],round={},fine=false)=>{const g=paintedTube(rows,paint,cuts,typeof fine==='number'?fine:12,round,fine==='coarse'?.04:fine?.025:1);owned.push(g);buckets.get(b).push({geo:g,p:[0,0,0],s:[1,1,1],c:0,vc:true})};
  //  A ball joint, coloured like the limb it closes.
  const joint=(b,x,y,z,r,rz,paint,geo=ball)=>put(b,geo,[x,y,z],[r+(paint.out||0),r+(paint.out||0),rz+(paint.out||0)],paint.c);
  const skin=L.makeup==='skull'?'#e9e5dc':L.skin,glowOn=L.extras.includes('neon');
  const torso=new THREE.Group();torso.position.y=1.43;inner.add(torso);
- const body=bone(torso,0,-1.43,0),head=bone(torso,0,.075,0);head.scale.setScalar(1.12);
+ const body=bone(torso,0,-1.43,0),head=bone(torso,0,.075,0);head.scale.setScalar(.91);
  const shoulderX=.235*fr.sh*L.shoulders;
  const la=bone(torso,-shoulderX,0,0),ra=bone(torso,shoulderX,0,0);
  const hipX=.105*(fr.hip/.162);
@@ -220,8 +240,77 @@ function build(L,meta){
   if(glowOn)box(shin,0,-.44+.01,.055,.142,.008,.272,L.accent,{glow:true});
  }
  if(kilt){shape(skirt,[[.6+SK,hp+.1,.2],[.8+SK,hp+.045,.15],[.97+SK,hp+.01,.118]],L.pants,16);[[.66,.0875,.189],[.76,.06,.164],[.86,.035,.14]].forEach(([y,x,z])=>ell(skirt,0,y+SK,0,hp+x,.004,z,shade(L.accent,.8)))}
+ const H=.165;
+ // ── Signature tailoring. All pieces share existing animated bone batches. ──
+ const coat=L.coat,trim=L.accent;
+ // Every jacket gets constructed shoulders, a shaped collar and seam piping.
+ if(jacket){
+  for(const side of[-1,1]){
+   panel(body,[[side*.065,1.45],[side*.12,1.53],[side*.17,1.44],[side*.09,1.29]],.13,shade(coat,1.15));
+   box(body,side*.14,1.13,.13,.008,.21,.014,shade(coat,1.32));
+  }
+ }
+ if(L.outfit==='leather'){
+  // Diagonal blade lapel and a single long split coat panel.
+  panel(body,[[-.19,1.42],[-.08,1.49],[.17,1.13],[.09,1.08]],.15,trim);
+  panel(skirt,[[-.18,.04],[-.02,.04],[-.06,-.57],[-.22,-.42]],.06,coat);
+  panel(skirt,[[.02,.04],[.18,.04],[.19,-.27],[.08,-.35]],-.12,shade(coat,.8));
+  panel(la,[[-.14,.015],[-.04,.06],[.06,-.02],[.05,-.18],[-.10,-.16]],-.08,coat,.16);
+  for(let i=0;i<3;i++)box(la,-.115,-.06-i*.035,.035,.01,.012,.13,trim);
+  box(body,.12,1.04,.16,.07,.09,.035,DARK);
+ }
+ if(L.outfit==='bomber'){
+  // Heavy folded work jacket, one armored shoulder and a spinal power pack.
+  panel(body,[[-.22,1.4],[.22,1.4],[.19,1.17],[-.16,1.08]],.135,shade(coat,.77),.04);
+  panel(ra,[[-.09,.015],[.05,.09],[.14,.025],[.13,-.14],[-.06,-.17]],-.1,shade(coat,.76),.20);
+  for(let i=0;i<3;i++)box(ra,.02,-.018+i*.03,.127,.16,.012,.012,trim);
+  box(body,0,1.25,-.18,.24,.35,.13,DARK);
+  for(const side of[-1,1]){box(body,side*.07,1.24,-.255,.04,.23,.025,trim);box(body,side*.105,1.07,.17,.1,.12,.06,coat);}
+  box(body,-.1,1.36,.185,.045,.045,.012,trim);
+ }
+ if(L.outfit==='longcoat'){
+  // Cathedral-shaped shoulder mantle, tall collar, split ceremonial tails.
+  panel(body,[[-.27,1.4],[-.13,1.56],[.12,1.56],[.28,1.37],[.17,1.24],[-.15,1.29]],-.17,coat,.045);
+  for(const side of[-1,1]){
+   panel(skirt,[[side*.025,.06],[side*.19,.06],[side*.27,-.66],[side*.09,-.77]],.025,coat);
+   panel(skirt,[[side*.07,-.04],[side*.09,-.04],[side*.15,-.67],[side*.13,-.68]],.052,trim,.008);
+   panel(body,[[side*.075,1.45],[side*.1,1.62],[side*.15,1.51],[side*.13,1.33]],.04,coat);
+  }
+  put(head,ring,[0,H+.02,-.14],[.205,.205,.205],trim);
+  box(body,0,1.31,.145,.025,.12,.018,trim);
+ }
+ if(L.outfit==='studded'){
+  // Faceted shell, asymmetrical shoulder fins and luminous inset seams.
+  for(const [arm,side]of[[la,-1],[ra,1]]){
+   panel(arm,[[side*-.06,.02],[side*.08,.15],[side*.16,.12],[side*.13,-.13],[0,-.18]],-.08,coat,.16);
+   box(arm,side*.07,-.01,.09,.012,.15,.012,trim,{glow:glowOn});
+  }
+  panel(body,[[-.16,1.37],[0,1.46],[.17,1.31],[0,1.15]],.143,shade(coat,1.15));
+  for(const side of[-1,1])panel(skirt,[[side*.08,.03],[side*.19,.03],[side*.25,-.21],[side*.15,-.33]],0,coat);
+  box(head,-.057,H+.02,.134,.065,.017,.014,trim,{glow:glowOn});
+ }
+ if(L.outfit==='denim-vest'){
+  // Woven shoulder shawl and a seed reliquary: a gardener's visible equipment.
+  panel(body,[[-.28,1.4],[-.1,1.51],[.15,1.43],[.13,1.25],[-.21,1.1]],.14,coat,.025);
+  for(let i=0;i<5;i++)box(body,-.17+i*.055,1.32-i*.025,.174,.012,.16,.009,trim,{r:-.5});
+  panel(skirt,[[-.13,.03],[.13,.03],[.17,-.39],[0,-.48],[-.16,-.36]],.12,coat);
+  box(body,0,1.22,-.19,.23,.28,.12,DARK);
+  for(let i=0;i<3;i++){
+   ell(body,(i-1)*.07,1.24,-.27,.027,.10,.027,trim);
+   panel(body,[[(i-1)*.07,1.33],[(i-1)*.07-.06,1.48],[(i-1)*.07+.015,1.43]],-.26,shade(coat,1.6),.008);
+  }
+ }
+ if(L.outfit==='tailored'){
+  // Ivory architectural suit: long angular waistcoat, contrasting sash.
+  for(const side of[-1,1]){
+   panel(body,[[side*.06,1.46],[side*.19,1.42],[side*.15,1.06],[side*.04,.96]],.14,coat,.028);
+   panel(skirt,[[side*.035,.04],[side*.15,.04],[side*.17,-.27],[side*.07,-.36]],.08,coat);
+  }
+  panel(body,[[-.16,1.43],[-.11,1.45],[.14,1.08],[.09,1.06]],.18,trim,.01);
+  for(let i=0;i<3;i++)box(body,.11,1.32-i*.035,.18,.012,.012,.01,METAL);
+ }
  // ── Head ──
- const H=.165,jaw=L.jaw;
+ const jaw=L.jaw;
  const headRows=[[-.125,.048,.058],[-.1,.086*jaw,.094],[-.06,.112*Math.min(1.1,jaw),.114],[-.01,.124,.123],[.05,.127,.123],[.1,.114,.111],[.14,.084,.084],[.165,.042,.046],[.176,.005,.006]].map(([y,rx,rz])=>[H+y*fl,rx*fw,rz]);
  shape(head,headRows,skin,14);
  ell(head,0,H-.02*fl,.124,.018*L.nose,.026,.022*L.nose,shade(skin,.94));
@@ -230,18 +319,18 @@ function build(L,meta){
  if(L.tattoos==='face'){box(head,.075*fw,H-.035*fl,.104,.008,.022,.004,INK,{r:.4});ell(head,.072*fw,H-.06*fl,.1,.007,.01,.004,INK)}
  // eyes blink as their own group; brows and makeup stay on the head
  const eyes=bone(head,0,H+.02*fl,0),eyeY=0;
- const ew={round:[.024,.024],sharp:[.028,.016],sleepy:[.027,.013],wide:[.031,.028]}[L.eyeShape]||[.026,.02];
+ const ew={round:[.021,.015],sharp:[.025,.011],sleepy:[.024,.009],wide:[.025,.017]}[L.eyeShape]||[.026,.02];
  for(const s of[-1,1]){const x=s*.046*fw;
   if(L.makeup==='smoky'||L.makeup==='skull')ell(head,x,H+.02*fl,.112,.042,L.makeup==='skull'?.04:.032,.01,L.makeup==='skull'?DARK:'#2a1f2e');
-  ell(eyes,x,eyeY,.115,ew[0],ew[1],.012,'#f4f1ea',{r:L.eyeShape==='sharp'?-s*.18:0});
-  ell(eyes,x,eyeY-.001,.125,.012,Math.min(.012,ew[1]*.75),.005,L.eyes);
+  ell(eyes,x,eyeY,.115,ew[0],ew[1],.008,'#bcb9ad',{r:L.eyeShape==='sharp'?-s*.18:0});
+  ell(eyes,x,eyeY-.001,.125,.009,Math.min(.009,ew[1]*.75),.005,L.eyes);
   ell(eyes,x,eyeY-.001,.129,.0055,Math.min(.0055,ew[1]*.4),.003,'#0b0b0f');
-  ell(eyes,x+s*-.004,eyeY+.004,.131,.0026,.0026,.002,'#ffffff');
+  ell(eyes,x+s*-.004,eyeY+.004,.131,.0015,.0015,.001,'#d8ded9');
   if(L.eyeShape==='sleepy')box(eyes,x,eyeY+ew[1]*.55,.123,ew[0]*2.1,.008,.01,shade(skin,.88));
   if(L.makeup==='liner'||L.makeup==='glam'||L.makeup==='bolt'){box(head,x,H+.02*fl-ew[1]*.85,.122,ew[0]*1.9,.004,.006,DARK);box(head,x+s*ew[0]*1.05,H+.02*fl+.002,.12,.022,.004,.006,DARK,{r:s*.5})}
   if(L.makeup==='glam')ell(head,x,H+.02*fl+ew[1]+.004,.118,ew[0]*1.1,.008,.006,L.accent);
   // brows
-  const by=H+.02*fl+ew[1]+.018,bc=L.hairStyle==='bald'||L.hairStyle==='buzz'?'#2a1d19':L.hair;
+  const by=H+.02*fl+ew[1]+.018,bc='#302a2b';
   if(L.brows==='straight')box(head,x,by,.122,.044,.008,.01,bc);
   if(L.brows==='heavy')box(head,x,by,.122,.048,.014,.012,bc,{r:s*.08});
   if(L.brows==='arched'){box(head,x-s*.012,by,.122,.026,.007,.01,bc,{r:s*.25});box(head,x+s*.014,by+.002,.12,.02,.007,.01,bc,{r:-s*.35})}
@@ -264,21 +353,21 @@ function build(L,meta){
  if(['eyebrow','loaded'].includes(pier))for(let i=0;i<2;i++)ell(head,.06*fw,H+.058*fl-i*.012,.118,.004,.004,.004,metal);
  // hair
  const hs=L.hairStyle,hc=L.hair,tip=L.hairTip||hc,hg=L.headgear,covered=['beanie','helmet','hood','hat'].includes(hg);
- const cap=(sy=1,sc=1,c=hc,back=true)=>{put(head,dome,[0,H+.068*fl,-.006],[.142*fw*sc,.125*fl*sy,.146*sc],c);if(back)ell(head,0,H+.02*fl,-.048,.134*fw*sc,.152*fl,.104*sc,c)};
+ const cap=(sy=1,sc=1,c=hc,back=true)=>{put(head,dome,[0,H+.085*fl,-.012],[.136*fw*sc,.14*fl*Math.max(.85,sy),.139*sc],c);if(back)ell(head,0,H+.02*fl,-.048,.134*fw*sc,.152*fl,.104*sc,c)};
  const spikeAt=(x,y,z,len,rz,rx,fin)=>{const w=fin?[.012,.05]:[.026,.026];put(head,cone,[x,y,z],[w[0],len,w[1]],hc,{r:rz,rx});if(tip!==hc)put(head,cone,[x+Math.sin(-rz)*len*.4,y+Math.cos(rz)*Math.cos(rx||0)*len*.4,z+Math.sin(rx||0)*len*.4],[w[0]*.45,len*.22,w[1]*.45],tip,{r:rz,rx})};
  if(hs!=='bald'&&!covered){
   if(['buzz','mohawk','liberty'].includes(hs))cap(.8,.97,hs==='buzz'?hc:shade(hc,.45));
   else if(hs==='undercut'){cap(1,1,shade(hc,.4));put(head,dome,[0,H+.1*fl,-.01],[.138*fw,.11*fl,.14],hc)}
   else cap();
-  if(hs==='crop')box(head,0,H+.105*fl,.1,.15*fw,.03,.04,hc,{rx:.3});
+  if(hs==='crop'){panel(head,[[-.12,H+.11],[-.04,H+.19],[.12,H+.14],[.09,H+.065],[.03,H+.09],[-.07,H+.06]],.11,hc,.025);}
   if(hs==='mohawk'){ell(head,0,H+.15*fl,-.02,.03,.05,.15,hc);for(let i=0;i<6;i++)spikeAt(0,H+.22*fl-Math.abs(i-2)*.012,.11-i*.048,.2-Math.abs(i-2)*.018,0,-.42+i*.17,true)}
   if(hs==='liberty')for(let i=0;i<11;i++){const a=(i/10-.5)*2.6;spikeAt(Math.sin(a)*.115*fw,H+.2*fl,Math.cos(a)*.06-.03,.26,-Math.sin(a)*.95,-.25)}
   if(hs==='fauxhawk')for(let i=0;i<3;i++)spikeAt(0,H+.16*fl,.07-i*.045,.09,0,.2-i*.1,true);
   if(hs==='spiked')for(let i=0;i<9;i++){const a=i/9*Math.PI*2;spikeAt(Math.sin(a)*.075*fw,H+.2*fl,Math.cos(a)*.065-.01,.13,-Math.sin(a)*.6,Math.cos(a)*.45)}
-  if(hs==='undercut'){ell(head,.05*fw,H+.12*fl,.06,.1,.035,.08,hc,{r:-.3});ell(head,.09*fw,H+.07*fl,.09,.04,.06,.03,tip)}
+  if(hs==='undercut'){panel(head,[[-.11,H+.12],[-.04,H+.22],[.11,H+.18],[.14,H+.08],[.09,H+.015],[.065,H+.1],[-.025,H+.07]],.09,hc,.035);panel(head,[[.07,H+.14],[.12,H+.13],[.105,H+.025]],.13,tip,.008);}
   if(hs==='mullet'){ell(head,0,H-.07,-.1,.09,.12,.05,hc);ell(head,0,H-.17,-.1,.06,.04,.035,tip)}
   if(hs==='long')for(const s of[-1,1]){ell(head,s*.105*fw,H-.06,-.03,.04,.16,.08,hc,{r:s*.06});ell(head,s*.1*fw,H-.2,-.04,.032,.04,.06,tip)}
-  if(hs==='long')ell(head,0,H-.07,-.1,.1,.16,.05,hc);
+  if(hs==='long'){ell(head,0,H-.07,-.1,.1,.16,.05,hc);for(const side of[-1,1])panel(head,[[side*.04,H+.17],[side*.12,H+.13],[side*.15,H-.1],[side*.1,H-.22],[side*.085,H+.035]],.085,hc,.025);}
   if(hs==='pigtails')for(const s of[-1,1]){ell(head,s*.15*fw,H+.03,-.04,.045,.085,.045,hc,{r:s*.5});ell(head,s*.19*fw,H-.04,-.05,.025,.035,.025,tip);ell(head,s*.125*fw,H+.07,-.03,.016,.016,.016,L.accent)}
   if(hs==='bun')ell(head,0,H+.15*fl,-.09,.06,.055,.055,hc);
   if(hs==='dreads')for(let i=0;i<12;i++){const a=(i/11-.5)*3.6;ell(head,Math.sin(a)*.115*fw,H-.08,Math.cos(a)*.09-.03,.016,.15,.016,i%3?hc:tip)}
@@ -355,7 +444,7 @@ addEventListener('DOMContentLoaded',()=>{const all=window.shAnimateCharacter;win
 const talkers=new Set();
 if(typeof shTalkTo==='function'){const talk=shTalkTo;window.shTalkTo=function(person){const r=talk.apply(this,arguments);const c=person?.char;if(c&&State.ui.inDialogue){c.talking=true;talkers.add(c)}return r}}
 if(typeof shEndDialogue==='function'){const end=shEndDialogue;window.shEndDialogue=function(){const r=end.apply(this,arguments);for(const c of talkers)c.talking=false;talkers.clear();return r}}
-window.FCWardrobe={DEFAULT_LOOK,OPTIONS,RANGES,normalize,crowdLook,build,fitSkirt,get current(){return normalize(Shift.avatar)}};
+window.FCWardrobe={SIGNATURES,DEFAULT_LOOK,OPTIONS,RANGES,normalize,crowdLook,build,fitSkirt,get current(){return normalize(Shift.avatar)}};
 //  New and old saves both work: missing fields take the defaults.
 Object.assign(SH_DEFAULT_AVATAR,DEFAULT_LOOK);
 for(const k of Object.keys(DEFAULT_LOOK))if(Shift.avatar[k]===undefined)Shift.avatar[k]=Array.isArray(DEFAULT_LOOK[k])?[...DEFAULT_LOOK[k]]:DEFAULT_LOOK[k];
