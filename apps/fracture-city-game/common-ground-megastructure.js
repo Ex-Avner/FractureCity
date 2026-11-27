@@ -95,7 +95,7 @@ function districts(){
  for(const side of [-1,1]){const x=side<0?136:222,front=x-side*2.4;
   for(let j=0;j<4;j++){const z=4+j*19,h=[38,64,88,116][j];
    if(!(side===1&&j===3))box('district','basalt',x,1+h/2,z,6,h,15);
-   for(let tier=(side<0&&j>=1?2:side===1&&j===3?8:0);tier<Math.floor(h/9);tier++){
+   for(let tier=(side<0&&j>=1?2:side===1&&j===3?8:side===1&&j<2?1:0);tier<Math.floor(h/9);tier++){
     const y=6+tier*9,depth=tier%3===0?4:2;
     const vaultHeight=z<22?98+(z+2)*28/24:z<46?126+(z-22)*32/24:158+(z-46)*34/26;
     const front=178.5+side*(38.5*Math.sqrt(Math.max(.1,1-Math.pow((y+3)/vaultHeight,2)))-3.2);
