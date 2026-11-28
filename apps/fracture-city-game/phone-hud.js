@@ -3,7 +3,7 @@
  * useful action. Desktop retains the familiar prompt stack. Layout is scheduled
  * by changes to HUD elements, never a permanent measurement interval. */
 (function(){'use strict';
-const ORDER=[['#arrival-action'],['#jail-approach'],['#fs-prompt'],['#oredor-prompt'],['#expanse-approach'],['#om-approach'],['#civic-approach'],['#backlot-approach'],['#dispatch-goal'],['.pv-hp'],['#maker-interact'],['#interact-prompt'],['#npc-talk-prompt'],['#casting-prompt'],['#cg-approach'],['#news-approach'],['#rw-approach'],['#seam-approach'],['#chainfire-play'],['#campus-arcade-play'],['#city-art-open'],['#city-build-quick'],['#fc-field'],['#cast-talk'],['#city-build-open'],['#common-invite','#common-later']];
+const ORDER=[['#apprentice-action'],['#arrival-action'],['#jail-approach'],['#fs-prompt'],['#oredor-prompt'],['#expanse-approach'],['#om-approach'],['#civic-approach'],['#backlot-approach'],['#dispatch-goal'],['.pv-hp'],['#maker-interact'],['#interact-prompt'],['#npc-talk-prompt'],['#casting-prompt'],['#cg-approach'],['#news-approach'],['#rw-approach'],['#seam-approach'],['#chainfire-play'],['#campus-arcade-play'],['#city-art-open'],['#city-build-quick'],['#fc-field'],['#cast-talk'],['#city-build-open'],['#common-invite','#common-later']];
 const ACTIONS=ORDER.flat().filter(s=>!['.pv-hp','#city-build-quick','#common-later'].includes(s));
 const NOTES=['#seam-hud','#fn-take','#dispatch-goal','#jail-approach','#arrival-caption','#fs-sub','#narr','#maker-goal','#fc-story-goal','#campaign-hud','#cg-walk-guide','#expanse-route','#crown-run-status','#jail-status','#oredor-card','#toast-stack'];
 const history=[],lastNote=new Map();
