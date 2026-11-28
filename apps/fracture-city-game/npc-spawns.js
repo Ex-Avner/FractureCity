@@ -163,11 +163,20 @@ async function fetchDetail(){
 const tmp = { position: new THREE.Vector3() };
 function blockedByProps(x, y, z){
  const ch = State.chunkMap?.get?.(chunkCoordOf(x) + ',' + chunkCoordOf(z));
- for (const a of ch?.collisionAABBs || []) if (x > a.minX - .28 && x < a.maxX + .28 && z > a.minZ - .28 && z < a.maxZ + .28 && y < (a.maxY ?? 99) - .2) return true;
+ for (const a of ch?.collisionAABBs || []) if (x > a.minX - .28 && x < a.maxX + .28 && z > a.minZ - .28 && z < a.maxZ + .28 && y < (a.maxY ?? 99) - .2 && y+1.7>(a.minY??-Infinity)+.05) return true;
  return false;
 }
+let navAt=0;
 function steer(e, v, dt){
- const p = e.ent.position, dx = v.gx - p.x, dz = v.gz - p.z, d = Math.hypot(dx, dz);
+ const p=e.ent.position,now=performance.now();
+ if(e.path&&(Math.hypot(v.gx-e.pathGoal.x,v.gz-e.pathGoal.z)>2||v.speed<=0)){e.path=null;}
+ if(e.path?.length&&Math.hypot(p.x-e.path[0].x,p.z-e.path[0].z)<.4)e.path.shift();
+ if((e.stuckT||0)>.25&&now>navAt&&now>(e.navRetry||0)){
+  navAt=now+150;e.navRetry=now+1200;
+  const valid=(x,z,px,pz)=>{if(!State.chunkMap.has(chunkCoordOf(x)+','+chunkCoordOf(z)))return false;const y=shSurfaceY(x,z,p.y+1.2),fromY=shSurfaceY(px,pz,p.y+1.2);return y>0&&Math.abs(y-p.y)<.6&&Math.abs(y-fromY)<.6&&!shBodyBlocked(x,y+.03,z,.32,1.7)&&!blockedByProps(x,y,z)&&!shBodyBlocked((x+px)/2,y+.03,(z+pz)/2,.32,1.7)&&!blockedByProps((x+px)/2,y,(z+pz)/2);};
+  const distance=Math.hypot(v.gx-p.x,v.gz-p.z),scale=Math.min(1,9/Math.max(1,distance));e.path=B.route(p,{x:p.x+(v.gx-p.x)*scale,z:p.z+(v.gz-p.z)*scale},valid);e.pathGoal={x:v.gx,z:v.gz};
+ }
+ const target=e.path?.[0]||{x:v.gx,z:v.gz},dx=target.x-p.x,dz=target.z-p.z,d=Math.hypot(dx,dz);
  e.moving = false;
  if (v.speed > 0 && d > .12){
   const s = Math.min(d, v.speed * dt), mx = dx / d * s, mz = dz / d * s, ox = p.x, oz = p.z, oy = p.y;
@@ -183,6 +192,7 @@ function steer(e, v, dt){
 function soloWorld(){
  const t = performance.now();
  return { now: Date.now(), npcs: solo, rand: Math.random,
+  visible:(a,b)=>typeof shLineOfSight!=='function'||shLineOfSight(a.x,(a.y||1)+1.4,a.z,b.x,(b.y||1)+1.4,b.z),
   players: Player && State.scene ? [{ id: 'me', accountId: 'me', name: window.FCAccounts?.user?.displayName || 'you', x: Player.position.x, y: feet(), z: Player.position.z, yaw: Player.yaw, hp: Player.hp > 0 ? Player.hp : 0, safe: B.inSafe(Player.position.x, Player.position.z), protected: false }] : [],
   say: (n, text, secs) => { n.say = String(text); n.sayUntil = Date.now() + secs * 1000; n.sayId = (n.sayId || 0) + 1; },
   hurt: (p, dmg) => { if (typeof damagePlayer === 'function') damagePlayer(dmg); },
@@ -331,7 +341,7 @@ function shot(){
  }
  if (!best) return;
  if (online()){ if (B.inSafe(Player.position.x, Player.position.z)) return; api('city-shoot', { weapon: ['baton', 'pistol', 'shotgun'].includes(key) ? key : 'other', ox: ray.origin.x, oy: ray.origin.y, oz: ray.origin.z, dx: dir.x, dy: dir.y, dz: dir.z, npc: best.v.id, pellets: 1 }).catch(() => {}); return; }
- const n = solo.find(q => q.id === best.v.id); if (n){ const down = B.strike(null, n, w.dmg || w.damage || 25); if(down && B.ROLES[n.role]?.group !== 'trouble'){ window.FCJustice?.civilianDeath({kind:'shared',char:best.char,pos:best.group.position,id:n.id}); } else if (down){ say((n.story?.name || 'They') + ' is down.', 'success'); if (typeof grantCredits === 'function') grantCredits(5); } else if (B.ROLES[n.role]?.group === 'trouble' && n.mode !== 'fight' && n.role !== 'pickpocket'){ n.mode = 'fight'; n.target = 'me'; n.punches = 0; } }
+ const n = solo.find(q => q.id === best.v.id); if (n){ const down = B.strike({id:'me',accountId:'me',x:Player.position.x,z:Player.position.z}, n, w.dmg || w.damage || 25); if(down && B.ROLES[n.role]?.group !== 'trouble'){ window.FCJustice?.civilianDeath({kind:'shared',char:best.char,pos:best.group.position,id:n.id}); } else if (down){ say((n.story?.name || 'They') + ' is down.', 'success'); if (typeof grantCredits === 'function') grantCredits(5); } else if (B.ROLES[n.role]?.group === 'trouble' && n.mode !== 'fight' && n.role !== 'pickpocket'){ n.mode = 'fight'; n.target = 'me'; n.punches = 0; } }
 }
 const attack = window.tryAttack; window.tryAttack = function(){ const before = Player.attackCooldown; const r = attack.apply(this, arguments); if (before <= 0 && Player.attackCooldown > 0) try { shot(); } catch (e){} return r; };
 

@@ -258,7 +258,7 @@ function init(npc, at){
  return npc;
 }
 function owner(npc, world){ return world.players.find(p => p.accountId === npc.owner && p.hp > 0) || null; }
-function near(list, at, r, test){ let best = null, bd = r; for (const q of list){ if (!test(q)) continue; const d = dist(q, at); if (d < bd){ bd = d; best = q; } } return best; }
+function near(list, at, r, test){ let best = null, bd = r; for (const q of list){ const d = dist(q, at); if (d < bd && test(q)){ bd = d; best = q; } } return best; }
 function goTo(npc, x, z, speed){ npc.gx = x; npc.gz = z; npc.speed = speed ?? ROLES[npc.role].speed; }
 function stop(npc){ npc.gx = npc.x; npc.gz = npc.z; npc.speed = 0; }
 function arrived(npc, r = .7){ return Math.hypot(npc.gx - npc.x, npc.gz - npc.z) < r; }
@@ -299,6 +299,65 @@ function follow(npc, o, gap = 2.3){
  return null;
 }
 
+// Bounded attention and short-term memories; no dialogue/model requests.
+function awareness(npc, world, dt){
+ const a=npc.awareness||(npc.awareness={fear:0,energy:1,attention:0,social:0,memory:[],goal:null});
+ a.attention=Math.max(0,a.attention-dt);a.social=Math.max(0,a.social-dt);
+ a.energy=Math.max(0,Math.min(1,a.energy+(npc.moving?-.006:.025)*dt));
+ for(const m of a.memory)m.ttl-=dt;a.memory=a.memory.filter(m=>m.ttl>0).slice(-6);
+ if(npc.alert){npc.alert.ttl-=dt;if(npc.alert.ttl<=0)npc.alert=null;}
+ const seen=q=>Math.abs((q.y??1)-(npc.y??1))<3&&(!world.visible||world.visible(npc,q));
+ const R=ROLES[npc.role];
+ if(R.group==='trouble')return false;
+ // Respond to witnessed harm, never merely to someone's role or appearance.
+ const witness=near(world.npcs,npc,11,q=>q!==npc&&q.alert?.direct&&q.alert.ttl>14&&seen(q));
+ if(witness&&!npc.alert)npc.alert={...witness.alert,direct:false,ttl:9};
+ if(npc.alert){
+  const threat=npc.alert;a.fear=Math.min(1,a.fear+dt*.5);
+  if(threat.who&&!a.memory.some(m=>m.id===threat.who))a.memory.push({id:threat.who,ttl:60});
+  if(npc.role==='bodyguard')return false;
+  const dx=npc.x-threat.x,dz=npc.z-threat.z,d=Math.hypot(dx,dz)||1;
+  if(d<12){goTo(npc,npc.x+(dx||.3)/d*8,npc.z+dz/d*8,3.8);npc.act='run';a.goal='safety';}
+  else{stop(npc);face(npc,threat);npc.act='watch';a.goal='watch';}
+  if(!npc.cool.warning){world.say(npc,'Back away. Someone is hurt.',3);npc.cool.warning=18;}
+  return true;
+ }
+ a.fear=Math.max(0,a.fear-dt*.08);
+ if(a.goal==='safety'||a.goal==='watch'){a.goal=null;npc.mode='idle';npc.t=1;}
+ const remembered=near(world.players,npc,5,q=>q.hp>0&&a.memory.some(m=>m.id===(q.accountId||q.id))&&seen(q));
+ if(remembered&&R.group!=='help'){
+  const d=Math.max(.1,dist(npc,remembered));goTo(npc,npc.x+(npc.x-remembered.x)/d*4,npc.z+(npc.z-remembered.z)/d*4,2.2);npc.act='walk';return true;
+ }
+ // Helpers retain orders; personal breaks never interrupt deliveries or protection.
+ if(R.group==='help')return false;
+ if(a.energy<.15||a.goal==='rest'){
+  a.goal='rest';stop(npc);npc.act='lean';if(a.energy>.7){a.goal=null;npc.t=0;}return true;
+ }
+ // Only one resident attends each fallen person. Others can keep moving.
+ const fallen=near(world.npcs,npc,7,q=>q!==npc&&q.mode==='down'&&seen(q)&&!world.npcs.some(other=>other!==npc&&other.awareness?.helping===q.id));
+ if(fallen){a.helping=fallen.id;if(dist(npc,fallen)>2)goTo(npc,fallen.x,fallen.z,1.9);else{stop(npc);face(npc,fallen);npc.act='watch';if(!npc.cool.aid){world.say(npc,'Give them room. I am staying here.',4);npc.cool.aid=25;}}return true;}a.helping=null;
+ // Brief, reciprocal conversations, with long cooldowns instead of endless chatter.
+ if(a.partner){const q=world.npcs.find(q=>q.id===a.partner);a.chat-=dt;if(q&&q.hp>0&&!q.alert&&dist(npc,q)<4&&a.chat>0){stop(npc);face(npc,q);npc.act='talk';return true;}a.partner=null;a.social=35;npc.t=0;}
+ if(!a.social&&!npc.moving&&!STATION_ACT[npc.role]){
+  const q=near(world.npcs,npc,3,o=>o!==npc&&o.hp>0&&ROLES[o.role]?.group==='life'&&!o.moving&&!o.alert&&!o.awareness?.partner&&!o.awareness?.social&&seen(o));
+  if(q){q.awareness||={fear:0,energy:1,attention:0,social:0,memory:[],goal:null};a.partner=q.id;a.chat=4;q.awareness.partner=npc.id;q.awareness.chat=4;a.social=q.awareness.social=35;stop(npc);face(npc,q);npc.act='talk';return true;}
+ }
+ if(!a.attention&&!npc.moving){const p=near(world.players,npc,3,q=>q.hp>0&&seen(q));if(p){face(npc,p);a.attention=5;}}
+ return false;
+}
+
+// Small A* search used by the collision host. Hard node budget and no diagonals
+// through corners. Failure leaves the current goal intact for a later retry.
+function route(start,goal,walkable,budget=160){
+ const sx=Math.round(start.x),sz=Math.round(start.z),gx=Math.round(goal.x),gz=Math.round(goal.z);
+ const key=(x,z)=>x+','+z,open=[{x:sx,z:sz,g:0,f:Math.abs(gx-sx)+Math.abs(gz-sz),prev:null}],best=new Map([[key(sx,sz),0]]);let count=0;
+ while(open.length&&count++<Math.min(256,budget)){
+  open.sort((a,b)=>a.f-b.f||a.g-b.g);const n=open.shift();
+  if(Math.hypot(n.x-goal.x,n.z-goal.z)<1.1){const path=[];for(let q=n;q.prev;q=q.prev)path.push({x:q.x,z:q.z});return path.reverse();}
+  for(const[dx,dz]of [[1,0],[-1,0],[0,1],[0,-1]]){const x=n.x+dx,z=n.z+dz,g=n.g+1,k=key(x,z);if(Math.abs(x-sx)>12||Math.abs(z-sz)>12||g>=(best.get(k)??Infinity)||!walkable(x,z,n.x,n.z))continue;best.set(k,g);open.push({x,z,g,f:g+Math.abs(gx-x)+Math.abs(gz-z),prev:n});}
+ }return null;
+}
+
 function think(npc, world, dt){
  const R = ROLES[npc.role]; if (!R) return;
  npc.t -= dt;
@@ -317,6 +376,7 @@ function think(npc, world, dt){
   if (npc.leaveT > 30){ npc.x = e.x; npc.z = e.z; npc.teleported = true; npc.leaveT = 0; stop(npc); return; }
   goTo(npc, e.x, e.z, R.speed * 1.4); return;
  }
+ if (awareness(npc,world,dt))return;
  if (npc.stuck){ npc.stuck = false; if (npc.mode === 'walk' || npc.mode === 'flee'){ const w = wanderPoint(npc, world, 10); goTo(npc, w.x, w.z); } else if (npc.role === 'protester'){ npc.turn = (npc.turn || 0) + 1.3; npc.leg = false; stop(npc); } }
  switch (R.group){
   case 'help': return helper(npc, world, o, dt);
@@ -453,10 +513,12 @@ function step(npc, dt){
 }
 //  A blow between NPCs: bodyguards versus trouble.
 function strike(from, to, dmg){
+ if(!(Number.isFinite(dmg)&&dmg>0)||to.mode==='down')return false;
+ if(from&&Number.isFinite(from.x)&&Number.isFinite(from.z))to.alert={x:from.x,z:from.z,who:from.accountId||from.id||null,ttl:18,direct:true};
  to.hp = Math.max(0, to.hp - dmg);
  if (!to.hp){ to.mode = 'down'; to.t = 8; to.speed = 0; return true; }
  return false;
 }
 
-return { ROLES, GROUPS, LIMITS, SAFE, SAFE_AREAS, BOOTH, inSafe, exitPoint, story, reroll, bio, voice, rumorAbout, quest, cleanSpec, init, think, step, strike, BARKS, hash, rng };
+return { ROLES, GROUPS, LIMITS, SAFE, SAFE_AREAS, BOOTH, inSafe, exitPoint, story, reroll, bio, voice, rumorAbout, quest, cleanSpec, init, think, step, strike, route, BARKS, hash, rng };
 });

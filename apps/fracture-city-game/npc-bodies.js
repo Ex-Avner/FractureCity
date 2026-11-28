@@ -66,6 +66,21 @@ function passInner(sc){
     const bx=b.x+b.ox,bz=b.z+b.oz,dx=bx-ax,dz=bz-az,d=Math.hypot(dx,dz);if(d>=R*2||Math.abs(a.y-b.y)>1.2)continue;
     if(!iter)B.stats.pairs++;const n=d>1e-4?[dx/d,dz/d]:[Math.cos(a.id*2.4+b.id),Math.sin(a.id*2.4+b.id)],push=(R*2-d)/2;
     a.ox-=n[0]*push;a.oz-=n[1]*push;b.ox+=n[0]*push;b.oz+=n[1]*push;}}}}
+ // Anticipate a walking player's path instead of waiting for body overlap.
+ B.stats.yielding=0;
+ if(Player.mode==='walk'&&Player.onGround){
+  const vx=Player.velocity.x,vz=Player.velocity.z,speed=Math.hypot(vx,vz);
+  if(speed>.7)for(const b of bodies){
+   if(Math.abs(b.y-pf)>1.2)continue;
+   const dx=b.x-p.x,dz=b.z-p.z,t=(dx*vx+dz*vz)/(speed*speed);
+   if(t<0||t>.6||Math.hypot(dx,dz)>3.5)continue;
+   const cross=(dx*(-vz)+dz*vx)/speed;
+   if(Math.abs(cross)>.85)continue;
+   const side=Math.abs(cross)>.08?Math.sign(cross):(b.id%2?1:-1),amount=Math.min(.65-Math.abs(cross),Math.min(.1,clock.dt)*1.8);
+   if(amount<=0)continue;
+   b.ox+=-vz/speed*side*amount;b.oz+=vx/speed*side*amount;B.stats.yielding++;
+  }
+ }
  // The player bumps people: they give a little.
  if(Player.mode==='walk')for(const b of bodies){const bx=b.x+b.ox,bz=b.z+b.oz,dx=bx-p.x,dz=bz-p.z,d=Math.hypot(dx,dz);if(d<PR+R&&Math.abs(b.y-pf)<1.4&&d>1e-4){const push=(PR+R-d)*.35;b.ox+=dx/d*push;b.oz+=dz/d*push;}}
  // Drift home, stay off walls, stay within a metre, then draw.
@@ -76,6 +91,7 @@ function passInner(sc){
   if(!moved&&L>0){const k=Math.max(0,L-RETURN*dt)/L;ox*=k;oz*=k;} // nobody pushing: walk back
   const L2=Math.hypot(ox,oz);if(L2>MAX){ox*=MAX/L2;oz*=MAX/L2;}
   for(let t=0;t<3&&(ox||oz);t++){if(typeof blockedAt!=='function'||!blockedAt(b.x+ox,b.y+.05,b.z+oz,R*.8,1.6))break;ox*=.5;oz*=.5;if(t===2){ox=0;oz=0;}}
+  if((ox||oz)&&Math.abs(shSurfaceY(b.x+ox,b.z+oz,b.y+1)-b.y)>.35){ox=0;oz=0;}
   b.st.off.set(ox,oz);b.ox=ox;b.oz=oz;
   if(Math.abs(ox)+Math.abs(oz)<1e-3){b.st.off.set(0,0);continue;}
   B.stats.pushed++;
